@@ -1,6 +1,6 @@
-import { useRef, useState, type ChangeEvent } from "react";
-import { Github, Trash2, X } from "lucide-react";
-import { githubClone, githubRepos, parseRepo, type GithubRepo } from "@/lib/github/api";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { Github, Lock, Trash2, X } from "lucide-react";
+import { githubClone, githubOrgs, githubRepos, type GithubOrg, type GithubRepo } from "@/lib/github/api";
 import { setSheet, useProjectUi, useProjects, type ProjectSheet } from "@/lib/workspace/projects";
 import { useWorkspace } from "@/lib/workspace/store";
 import { downloadZip, importZipFile } from "@/lib/workspace/zip";
@@ -305,7 +305,11 @@ function CloneForm() {
   const [url, setUrl] = useState("");
   const [busy, setBusy] = useState("");
   const [err, setErr] = useState("");
+  const [orgs, setOrgs] = useState<GithubOrg[]>([]);
+  const [owner, setOwner] = useState("");
   const [repos, setRepos] = useState<GithubRepo[]>([]);
+  const [filter, setFilter] = useState("");
+  const [loading, setLoading] = useState(false);
 
   async function run(target: string) {
     setErr("");
@@ -328,11 +332,50 @@ function CloneForm() {
     }
   }
 
+  useEffect(() => {
+    if (!github) return;
+    let live = true;
+    void (async () => {
+      try {
+        const list = await githubOrgs(github.token);
+        if (live) setOrgs(list);
+      } catch (e) {
+        if (live) setErr(e instanceof Error ? e.message : "não listou as orgs");
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, [github]);
+
+  useEffect(() => {
+    if (!github) return;
+    let live = true;
+    setLoading(true);
+    void (async () => {
+      try {
+        const list = await githubRepos(github.token, owner || undefined);
+        if (live) setRepos(list);
+      } catch (e) {
+        if (live) setErr(e instanceof Error ? e.message : "não listou os repos");
+      } finally {
+        if (live) setLoading(false);
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, [github, owner]);
+
+  const q = filter.trim().toLowerCase();
+  const shown = q
+    ? repos.filter((r) => `${r.full} ${r.desc}`.toLowerCase().includes(q))
+    : repos;
+
   return (
-    <div className="space-y-3">
-      <p className="text-xs text-fg-muted">Público sem token. Privado precisa conectar o GitHub.</p>
+    <div className="clone-pane">
       <form
-        className="flex gap-2"
+        className="clone-url"
         onSubmit={(e) => {
           e.preventDefault();
           if (url.trim()) void run(url.trim());
@@ -347,42 +390,70 @@ function CloneForm() {
           autoCorrect="off"
           spellCheck={false}
         />
-        <button type="submit" className="chip is-on shrink-0" disabled={!!busy}>
-          {busy ? "…" : "clonar"}
+        <button type="submit" className="chip is-on" disabled={!!busy}>
+          {busy ? "…" : "Clonar"}
         </button>
       </form>
-      {busy ? <p className="text-xs text-fg-muted">{busy}</p> : null}
+      {busy ? <p className="clone-status">{busy}</p> : null}
       {err ? <p className="agent-err">{err}</p> : null}
+
       {github ? (
-        <button
-          type="button"
-          className="chip"
-          onClick={async () => {
-            try {
-              setRepos(await githubRepos(github.token));
-            } catch (e) {
-              setErr(e instanceof Error ? e.message : "não listou os repos");
-            }
-          }}
-        >
-          listar meus repos
-        </button>
+        <>
+          <div className="clone-orgs" role="tablist" aria-label="conta ou org">
+            <button type="button" className={!owner ? "is-on" : undefined} onClick={() => setOwner("")}>
+              @{github.user.login}
+            </button>
+            {orgs.map((o) => (
+              <button
+                key={o.login}
+                type="button"
+                className={owner === o.login ? "is-on" : undefined}
+                onClick={() => setOwner(o.login)}
+              >
+                @{o.login}
+              </button>
+            ))}
+          </div>
+          <input
+            className="field"
+            placeholder="filtrar repositório"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+          />
+          <div className="clone-list">
+            {loading ? <p className="clone-status">carregando repos…</p> : null}
+            {!loading && !shown.length ? <p className="clone-status">nenhum repo nesta conta</p> : null}
+            {shown.map((r) => {
+              const name = r.full.split("/")[1] ?? r.full;
+              return (
+                <button
+                  key={r.full}
+                  type="button"
+                  className="clone-repo"
+                  disabled={!!busy}
+                  onClick={() => void run(r.full)}
+                >
+                  <span className="clone-repo-top">
+                    <strong>{name}</strong>
+                    {r.private ? (
+                      <em className="is-priv">
+                        <Lock size={11} /> privado
+                      </em>
+                    ) : (
+                      <em>público</em>
+                    )}
+                  </span>
+                  {r.desc ? <span className="clone-desc">{r.desc}</span> : null}
+                </button>
+              );
+            })}
+          </div>
+        </>
       ) : (
         <button type="button" className="chip" onClick={() => setSheet("github")}>
           conectar GitHub
         </button>
       )}
-      {repos.length ? (
-        <div className="agent-starts">
-          {repos.map((r) => (
-            <button key={r.full} type="button" onClick={() => void run(r.full)} disabled={!!busy}>
-              <b>{r.full}</b>
-              <em>{r.private ? "privado" : "público"}</em>
-            </button>
-          ))}
-        </div>
-      ) : null}
-      {url && parseRepo(url) ? null : null}
     </div>
   );
 }
@@ -430,7 +501,7 @@ function GithubForm() {
       }}
     >
       <p className="text-xs leading-relaxed text-fg-muted">
-        Cria um token em github.com/settings/tokens (scope <code>repo</code>) e cola aqui. Fica só neste iPad.
+        Cria um token em github.com/settings/tokens (scopes <code>repo</code> e <code>read:org</code>) e cola aqui. Fica só neste iPad.
       </p>
       <input
         className="field"

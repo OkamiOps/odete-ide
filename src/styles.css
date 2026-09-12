@@ -745,6 +745,59 @@ input, textarea, select { font: inherit; font-size: 16px; }
 .cheat-card li { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--color-border); font-size: 13px; }
 .cheat-card kbd { font-family: var(--font-mono); font-size: 12px; color: var(--color-fg-muted); }
 .project-sheet-hd { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--color-border); }
+.clone-pane { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px 18px; min-height: 0; }
+.clone-url { display: flex; gap: 8px; }
+.clone-url .field { flex: 1; min-width: 0; min-height: 44px; }
+.clone-url .chip { min-height: 44px; height: 44px; padding: 0 14px; border-radius: 12px; }
+.clone-status { margin: 0; font-size: 12px; color: var(--color-fg-muted); }
+.clone-orgs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.clone-orgs button {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-bg);
+  color: var(--color-fg-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+.clone-orgs button.is-on {
+  background: var(--color-fg);
+  color: var(--color-bg);
+  border-color: var(--color-fg);
+}
+.clone-list { display: flex; flex-direction: column; gap: 6px; max-height: 48vh; overflow: auto; -webkit-overflow-scrolling: touch; }
+.clone-repo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 48px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  text-align: left;
+}
+.clone-repo:hover { background: var(--color-bg-subtle); }
+.clone-repo-top { display: flex; align-items: center; gap: 8px; }
+.clone-repo-top strong { font-size: 14px; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.clone-repo-top em {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-style: normal;
+  font-size: 10px;
+  color: var(--color-fg-subtle);
+  flex-shrink: 0;
+}
+.clone-repo-top em.is-priv { color: #e6c349; }
+.clone-desc { font-size: 12px; color: var(--color-fg-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .welcome { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; background: var(--color-bg); }
 .welcome-inner { max-width: 420px; padding: 24px; text-align: center; }

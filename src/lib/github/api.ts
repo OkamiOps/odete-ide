@@ -1,4 +1,5 @@
 export type GithubUser = { login: string; name: string | null; avatar: string };
+export type GithubOrg = { login: string; avatar: string };
 export type GithubRepo = { full: string; desc: string; updated: string; private: boolean };
 export type CloneResult = { name: string; branch: string; remote: string; files: Record<string, string> };
 
@@ -52,10 +53,21 @@ export async function githubUser(token: string) {
   return { login: u.login, name: u.name, avatar: u.avatar_url } satisfies GithubUser;
 }
 
-export async function githubRepos(token: string): Promise<GithubRepo[]> {
+export async function githubOrgs(token: string): Promise<GithubOrg[]> {
+  const list = await gh<{ login: string; avatar_url: string }[]>(
+    "https://api.github.com/user/orgs?per_page=100",
+    token,
+  );
+  return list.map((o) => ({ login: o.login, avatar: o.avatar_url }));
+}
+
+export async function githubRepos(token: string, owner?: string): Promise<GithubRepo[]> {
+  const url = owner
+    ? `https://api.github.com/orgs/${encodeURIComponent(owner)}/repos?sort=updated&per_page=50&type=all`
+    : "https://api.github.com/user/repos?sort=updated&per_page=50&affiliation=owner";
   const list = await gh<
     { full_name: string; description: string | null; updated_at: string; private: boolean }[]
-  >("https://api.github.com/user/repos?sort=updated&per_page=40&affiliation=owner,collaborator", token);
+  >(url, token);
   return list.map((r) => ({
     full: r.full_name,
     desc: r.description || "",

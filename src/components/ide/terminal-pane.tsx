@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Plus, MessageSquarePlus, X } from "lucide-react";
+import { MessageSquarePlus, Play, Plus, X } from "lucide-react";
 import { runShell } from "@/lib/workspace/shell";
 import { quoteSelection } from "@/lib/workspace/nav";
 import { useChrome } from "@/lib/workspace/chrome";
@@ -77,56 +77,55 @@ export function TerminalPane() {
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-bg">
-      <div className="pane-hd term-tabs">
+      <div className="term-tabs">
         <div className="term-tablist">
           {tabs.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              className={t.id === active ? "is-on" : undefined}
-              onClick={() => useTerms.getState().setActive(t.id)}
-            >
-              {t.name}
+            <div key={t.id} className={cn("term-tab", t.id === active && "is-on")}>
+              <button type="button" onClick={() => useTerms.getState().setActive(t.id)}>
+                {t.name}
+              </button>
               {tabs.length > 1 ? (
-                <i
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    useTerms.getState().close(t.id);
-                  }}
+                <button
+                  type="button"
+                  className="term-tab-x"
+                  aria-label={`fechar ${t.name}`}
+                  onClick={() => useTerms.getState().close(t.id)}
                 >
-                  <X size={11} />
-                </i>
+                  <X size={14} />
+                </button>
               ) : null}
-            </button>
+            </div>
           ))}
         </div>
-        <button type="button" className="term-add" aria-label="novo terminal" title="Novo terminal" onClick={() => useTerms.getState().add()}>
-          <Plus size={14} />
-        </button>
-        <button
-          type="button"
-          className="term-add"
-          aria-label="Enviar seleção ao agente"
-          title="Enviar seleção ao agente"
-          onClick={() => {
-            if (!quoteSelection()) return;
-            useChrome.setState({ agent: true, mobile: "agent" });
-          }}
-        >
-          <MessageSquarePlus size={14} />
-        </button>
-        <em>{cwd ? `/${cwd}` : "/"}</em>
+        <div className="term-tab-ops">
+          <button type="button" className="term-add" aria-label="novo terminal" title="Novo terminal" onClick={() => useTerms.getState().add()}>
+            <Plus size={16} />
+          </button>
+          <button
+            type="button"
+            className="term-add"
+            aria-label="Enviar seleção ao agente"
+            title="Enviar seleção ao agente"
+            onClick={() => {
+              if (!quoteSelection()) return;
+              useChrome.setState({ agent: true, mobile: "agent" });
+            }}
+          >
+            <MessageSquarePlus size={16} />
+          </button>
+          <span className="term-cwd">{cwd ? `/${cwd}` : "/"}</span>
+        </div>
       </div>
-      <div className="min-h-0 flex-1 overflow-auto px-3 py-2 font-mono text-xs leading-5">
+      <div className="term-log">
         {tab.lines.map((l) => (
           <pre
             key={l.id}
             className={cn(
-              "whitespace-pre-wrap",
-              l.kind === "in" && "text-fg",
-              l.kind === "err" && "text-danger",
-              l.kind === "ok" && "text-ok",
-              l.kind === "out" && "text-fg-muted",
+              "term-line",
+              l.kind === "in" && "is-in",
+              l.kind === "err" && "is-err",
+              l.kind === "ok" && "is-ok",
+              l.kind === "out" && "is-out",
             )}
           >
             {l.text}
@@ -135,60 +134,63 @@ export function TerminalPane() {
         <div ref={end} />
       </div>
       <form
-        className="flex h-11 items-center gap-2 border-t border-border px-3"
+        className="term-compose-wrap"
         onSubmit={(e) => {
           e.preventDefault();
           run(cmd);
         }}
       >
-        <span className="font-mono text-xs text-fg-subtle">%</span>
-        <input
-          id="colo-term"
-          type="text"
-          enterKeyHint="enter"
-          value={cmd}
-          onChange={(e) => {
-            setCmd(e.target.value);
-            setHistI(-1);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "ArrowUp") {
-              e.preventDefault();
-              const hist = tab.hist;
-              if (!hist.length) return;
-              const next = histI < 0 ? hist.length - 1 : Math.max(0, histI - 1);
-              setHistI(next);
-              setCmd(hist[next] ?? "");
-            }
-            if (e.key === "ArrowDown") {
-              e.preventDefault();
-              const hist = tab.hist;
-              if (histI < 0) return;
-              const next = histI + 1;
-              if (next >= hist.length) {
-                setHistI(-1);
-                setCmd("");
-              } else {
+        <div className="term-compose">
+          <span className="term-prompt">%</span>
+          <input
+            id="colo-term"
+            type="text"
+            enterKeyHint="enter"
+            value={cmd}
+            onChange={(e) => {
+              setCmd(e.target.value);
+              setHistI(-1);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "ArrowUp") {
+                e.preventDefault();
+                const hist = tab.hist;
+                if (!hist.length) return;
+                const next = histI < 0 ? hist.length - 1 : Math.max(0, histI - 1);
                 setHistI(next);
                 setCmd(hist[next] ?? "");
               }
-            }
-            if (e.key === "Tab") {
-              e.preventDefault();
-              setCmd(complete(cmd, names, cwd));
-            }
-          }}
-          placeholder="help · git status · npm i"
-          className="h-full min-w-0 flex-1 bg-transparent font-mono text-xs text-fg outline-none placeholder:text-fg-subtle"
-          aria-label="comando do terminal"
-          autoCapitalize="off"
-          autoCorrect="off"
-          autoComplete="off"
-          spellCheck={false}
-        />
-        <button type="submit" className="chip shrink-0">
-          run
-        </button>
+              if (e.key === "ArrowDown") {
+                e.preventDefault();
+                const hist = tab.hist;
+                if (histI < 0) return;
+                const next = histI + 1;
+                if (next >= hist.length) {
+                  setHistI(-1);
+                  setCmd("");
+                } else {
+                  setHistI(next);
+                  setCmd(hist[next] ?? "");
+                }
+              }
+              if (e.key === "Tab") {
+                e.preventDefault();
+                setCmd(complete(cmd, names, cwd));
+              }
+            }}
+            placeholder="help · git status · npm i"
+            className="term-input"
+            aria-label="comando do terminal"
+            autoCapitalize="off"
+            autoCorrect="off"
+            autoComplete="off"
+            spellCheck={false}
+          />
+          <button type="submit" className="term-run" aria-label="run">
+            <Play size={14} fill="currentColor" />
+            Run
+          </button>
+        </div>
       </form>
     </div>
   );

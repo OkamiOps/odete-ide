@@ -12,7 +12,7 @@ export type TermTab = {
 function boot(name: string, n: number): TermTab {
   return {
     id: uid(),
-    name: n <= 1 ? "term" : `term ${n}`,
+    name: n <= 1 ? "Term 1" : `Term ${n}`,
     lines: [
       { id: uid(), kind: "ok", text: `colo  ${name}` },
       { id: uid(), kind: "out", text: "↑ histórico · Tab completa · help" },

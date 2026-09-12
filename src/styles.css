@@ -659,11 +659,13 @@ input, textarea, select { font: inherit; font-size: 16px; }
 .patch-bar { display: flex; gap: 6px; padding: 8px 0; }
 .patch-bar button, .patch-bar-ed { min-height: 32px; }
 
-.pick-btn { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 12px; border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-bg); color: var(--color-fg); font-size: 13px; }
+.pick-btn { display: inline-flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; padding: 0 14px; border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-bg); color: var(--color-fg); font-size: 14px; font-weight: 500; }
 .pick-btn.is-fill { width: 100%; }
-.pick-btn.is-compact { min-height: 40px; height: 40px; }
-.pick-menu { position: absolute; z-index: 40; min-width: 180px; max-height: 280px; overflow: auto; border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-bg-elevated); box-shadow: 0 12px 32px rgb(0 0 0 / .4); }
-.pick-menu button { display: block; width: 100%; min-height: 44px; padding: 0 12px; border: 0; background: transparent; color: var(--color-fg); text-align: left; font-size: 13px; }
+.pick-btn.is-compact { min-height: 44px; height: 44px; }
+.pick-btn span { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+.agent-hd .pick-btn { min-height: 48px; height: 48px; font-size: 15px; padding: 0 16px; border-radius: 14px; }
+.pick-menu { position: absolute; z-index: 40; min-width: 180px; max-height: 320px; overflow: auto; border: 1px solid var(--color-border); border-radius: 14px; background: var(--color-bg-elevated); box-shadow: 0 12px 32px rgb(0 0 0 / .4); }
+.pick-menu button { display: block; width: 100%; min-height: 48px; padding: 0 14px; border: 0; background: transparent; color: var(--color-fg); text-align: left; font-size: 14px; }
 .pick-menu button.is-on, .pick-menu button:hover { background: var(--color-bg-subtle); }
 .pick-empty { padding: 10px 12px; font-size: 12px; color: var(--color-fg-subtle); }
 

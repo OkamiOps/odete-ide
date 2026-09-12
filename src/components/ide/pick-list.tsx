@@ -74,7 +74,7 @@ export function PickList({
         onClick={() => setOpen((v) => !v)}
       >
         <span>{current}</span>
-        <ChevronDown size={14} />
+        <ChevronDown size={18} strokeWidth={2} />
       </button>
       {open
         ? createPortal(

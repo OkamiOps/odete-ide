@@ -70,7 +70,12 @@ export function GitPane() {
 
   return (
     <div className="git">
-      <div className="git-hero">
+      <div className="pane-hd">
+        <span className="label">Git</span>
+        {clean ? <em className="git-clean">limpo</em> : <em className="git-dirty">{changed.length} mudou</em>}
+      </div>
+
+      <div className="git-hero git-card">
         <div className="git-hero-row">
           <GitBranch size={16} />
           <PickList
@@ -111,7 +116,7 @@ export function GitPane() {
         </div>
       </div>
 
-      <div className="git-commit">
+      <div className="git-commit git-card">
         <div className="git-msg-wrap">
           <textarea
             className="git-msg"
@@ -240,9 +245,9 @@ export function GitPane() {
           )}
         </GitGroup>
 
-        <div className="git-more">
+        <div className="git-more git-card">
           <button type="button" className="git-more-toggle" onClick={() => setMore((v) => !v)}>
-            Branch, stash e GitHub
+            {more ? "Branch, stash e GitHub ▾" : "Branch, stash e GitHub ▸"}
           </button>
           {more || stash.length ? (
             <div className="git-more-body">
@@ -380,7 +385,7 @@ function GitGroup({
   children: ReactNode;
 }) {
   return (
-    <section className="git-group">
+    <section className="git-group git-card">
       <header>
         <span>
           {title}

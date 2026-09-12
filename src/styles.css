@@ -327,7 +327,18 @@ input, textarea, select { font: inherit; font-size: 16px; }
 .cm-selectionBackground { background: color-mix(in srgb, var(--color-accent) 32%, transparent) !important; }
 .cm-git-line-A { box-shadow: inset 3px 0 0 #7dce9a; }
 .cm-git-line-M { box-shadow: inset 3px 0 0 #e6c349; }
-.cm-todo-mark { background: color-mix(in srgb, #e6c349 50%, transparent) !important; border-radius: 3px; font-weight: 600; }
+.cm-indent-guide {
+  box-shadow: inset 1px 0 0 color-mix(in srgb, var(--color-fg) 28%, transparent);
+}
+.cm-highlightSpace::before,
+.cm-highlightTab::before {
+  color: color-mix(in srgb, var(--color-fg) 35%, transparent);
+}
+.cm-highlightSpace { background-image: radial-gradient(currentColor 1.1px, transparent 1.2px); background-position: center; background-repeat: no-repeat; background-size: 100% 100%; }
+.cm-highlightTab { background: repeating-linear-gradient(90deg, transparent, transparent 3px, color-mix(in srgb, var(--color-fg) 22%, transparent) 3px, color-mix(in srgb, var(--color-fg) 22%, transparent) 4px); }
+.cm-trailingSpace { background: color-mix(in srgb, #e25d5d 28%, transparent) !important; }
+.cm-selectionMatch { background: color-mix(in srgb, var(--color-accent) 22%, transparent); }
+.cm-url { color: var(--syn-func); text-decoration: underline; text-underline-offset: 2px; }
 .cm-rb-0 { color: #e8b86d !important; }
 .cm-rb-1 { color: #6ec8e0 !important; }
 .cm-rb-2 { color: #d39be8 !important; }
@@ -337,14 +348,14 @@ input, textarea, select { font: inherit; font-size: 16px; }
   top: 0;
   left: 0;
   right: 0;
-  z-index: 6;
+  z-index: 12;
   display: none;
-  padding: 5px 12px 5px 58px;
+  padding: 6px 12px 6px 58px;
   font-family: var(--font-mono);
-  font-size: 13px;
-  line-height: 1.45;
+  font-size: 12px;
+  line-height: 1.4;
   color: var(--color-fg);
-  background: var(--color-bg);
+  background: color-mix(in srgb, var(--color-bg-elevated) 92%, transparent);
   border-bottom: 1px solid var(--color-border);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -877,17 +888,29 @@ input, textarea, select { font: inherit; font-size: 16px; }
 .snip-bar, .hist-list, .blame-list { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px 8px; align-items: center; }
 .snip-bar button, .hist-list button, .blame-list button { min-height: 32px; padding: 0 8px; border: 1px solid var(--color-border); border-radius: 8px; background: transparent; color: var(--color-fg-muted); font-size: 12px; }
 .snip-bar button.is-on { background: var(--color-bg-subtle); color: var(--color-fg); }
-.snip-bar .color-hints { position: static; left: auto; bottom: auto; margin-left: auto; padding: 0; }
+.snip-bar .color-hints { display: none; }
 .color-hints {
+  grid-column: 1;
+  grid-row: 2;
   position: absolute;
-  left: 12px;
-  bottom: 8px;
-  z-index: 4;
+  left: 10px;
+  bottom: 10px;
+  z-index: 8;
   display: flex;
-  gap: 4px;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--color-bg-elevated) 90%, transparent);
+  border: 1px solid var(--color-border);
   pointer-events: none;
 }
-.color-hints span { width: 14px; height: 14px; border-radius: 4px; border: 1px solid var(--color-border); }
+.color-hints span {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: 1px solid rgb(255 255 255 / .28);
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / .25);
+}
 
 .splitter { background: transparent; }
 .splitter.is-x { width: 6px; cursor: col-resize; }

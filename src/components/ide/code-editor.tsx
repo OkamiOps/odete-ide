@@ -10,7 +10,7 @@ import { extOf } from "@/lib/utils";
 import { usePatches } from "@/lib/agent/patches";
 import { chipsFor, coloCompletions } from "@/lib/workspace/complete";
 import { collectDiags } from "@/lib/workspace/plugins";
-import { emmetTab, gitGutter, rainbowBrackets, stickyContext, todoMarks } from "@/lib/workspace/editor-plugins";
+import { emmetTab, extractColors, gitGutter, lineComment, rainbowBrackets, stickyContext, todoMarks, urlMarks } from "@/lib/workspace/editor-plugins";
 import { useChrome } from "@/lib/workspace/chrome";
 import { addedLines, hunksOf } from "@/lib/workspace/hunks";
 import { useHistory } from "@/lib/workspace/history";
@@ -70,7 +70,7 @@ const EMPTY_SNAPS: { at: number; text: string }[] = [];
 
 function languageFor(path: string, langs: LangMod) {
   const ext = extOf(path);
-  if (ext === "html" && langs.html) return langs.html();
+  if (ext === "html" && langs.html) return langs.html({ autoCloseTags: true });
   if (ext === "css" && langs.css) return langs.css();
   if ((ext === "json" || ext === "webmanifest") && langs.json) return langs.json();
   if ((ext === "md" || ext === "mdx") && langs.markdown) return langs.markdown();
@@ -101,6 +101,8 @@ export function CodeEditor({ path }: { path?: string }) {
   const rainbowOn = useChrome((s) => s.pluginRainbow);
   const emmetOn = useChrome((s) => s.pluginEmmet);
   const stickyOn = useChrome((s) => s.pluginSticky);
+  const commentOn = useChrome((s) => s.pluginComment);
+  const urlsOn = useChrome((s) => s.pluginUrls);
   const findOpen = useChrome((s) => s.findOpen);
   const linterOn = useChrome((s) => s.pluginLinter);
   const themeId = useChrome((s) => s.theme);
@@ -249,9 +251,7 @@ export function CodeEditor({ path }: { path?: string }) {
 
   const Editor = cm.default;
   const mapOn = !path && minimap !== "off" && center !== "dual";
-  const uniqueColors = colorHint
-    ? [...new Set([...value.matchAll(/#([0-9a-f]{3,8})\b/gi)].map((m) => m[0]!.toLowerCase()))].slice(0, 8)
-    : [];
+  const uniqueColors = colorHint ? extractColors(value) : [];
   const chips = chipsFor(active);
   function insertChip(text: string) {
     const view = viewRef.current;
@@ -308,6 +308,8 @@ export function CodeEditor({ path }: { path?: string }) {
           rainbowOn ? rainbowBrackets() : [],
           emmetOn ? emmetTab() : [],
           stickyOn ? stickyContext() : [],
+          commentOn ? lineComment(active) : [],
+          urlsOn ? urlMarks() : [],
           linterOn ? lintLines(active, shown) : [],
           patchDeco,
         ].flat()}
@@ -329,13 +331,6 @@ export function CodeEditor({ path }: { path?: string }) {
           writeFile(active, next);
         }}
       />
-      {uniqueColors.length ? (
-        <div className="color-hints">
-          {uniqueColors.map((c) => (
-            <span key={c} title={c} style={{ background: c }} />
-          ))}
-        </div>
-      ) : null}
       </div>
       <div className="ed-tools">
         {pending ? (
@@ -398,6 +393,13 @@ export function CodeEditor({ path }: { path?: string }) {
         ) : null}
       </div>
       {mapOn ? <MiniMap text={shown} viewRef={viewRef} size={minimap} /> : null}
+      {uniqueColors.length ? (
+        <div className="color-hints">
+          {uniqueColors.map((c) => (
+            <span key={c} title={c} style={{ background: c }} />
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }

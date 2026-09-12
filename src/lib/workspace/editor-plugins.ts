@@ -243,3 +243,82 @@ export function stickyContext(): Extension {
     },
   );
 }
+
+function commentToken(path: string) {
+  if (/\.(html|xml|svg)$/i.test(path)) return { open: "<!-- ", close: " -->" };
+  if (/\.css$/i.test(path)) return { open: "/* ", close: " */" };
+  return { open: "// ", close: "" };
+}
+
+export function lineComment(path: string): Extension {
+  const tok = commentToken(path);
+  return keymap.of([
+    {
+      key: "Mod-/",
+      run: (view) => {
+        const lines = new Set<number>();
+        for (const r of view.state.selection.ranges) {
+          const from = view.state.doc.lineAt(r.from).number;
+          const to = view.state.doc.lineAt(r.to).number;
+          for (let n = from; n <= to; n++) lines.add(n);
+        }
+        const nums = [...lines].sort((a, b) => a - b);
+        const allOn = nums.every((n) => view.state.doc.line(n).text.trimStart().startsWith(tok.open.trim()));
+        const changes = nums.map((n) => {
+          const line = view.state.doc.line(n);
+          const t = line.text;
+          if (allOn) {
+            const i = t.indexOf(tok.open.trim());
+            if (i < 0) return { from: line.from, to: line.from, insert: "" };
+            const from = line.from + i;
+            const to = from + tok.open.trim().length + (t.slice(i + tok.open.trim().length).startsWith(" ") ? 1 : 0);
+            const end = tok.close ? t.lastIndexOf(tok.close.trim()) : -1;
+            if (end >= 0) {
+              return [
+                { from: line.from + end, to: line.from + end + tok.close.trim().length, insert: "" },
+                { from, to, insert: "" },
+              ];
+            }
+            return { from, to, insert: "" };
+          }
+          return { from: line.from, to: line.from, insert: tok.open };
+        }).flat();
+        view.dispatch({ changes });
+        return true;
+      },
+    },
+  ]);
+}
+
+export function urlMarks(): Extension {
+  const mark = Decoration.mark({ class: "cm-url" });
+  return EditorView.decorations.of((view) => {
+    const b = new RangeSetBuilder<Decoration>();
+    const re = /https?:\/\/[^\s)'"<>]+/g;
+    for (const { from, to } of view.visibleRanges) {
+      const text = view.state.doc.sliceString(from, to);
+      re.lastIndex = 0;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(text))) {
+        b.add(from + m.index, from + m.index + m[0].length, mark);
+      }
+    }
+    return b.finish();
+  });
+}
+
+export function extractColors(text: string) {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  const add = (c: string) => {
+    const k = c.toLowerCase();
+    if (seen.has(k) || out.length >= 10) return;
+    seen.add(k);
+    out.push(c);
+  };
+  for (const m of text.matchAll(/#(?:[0-9a-fA-F]{3,8})\b/g)) add(m[0]!);
+  for (const m of text.matchAll(/rgba?\(\s*[\d.]+\s*[,\s/]+[\d.]+\s*[,\s/]+[\d.]+(?:\s*[,\s/]+[\d.%]+)?\s*\)/g)) add(m[0]!);
+  for (const m of text.matchAll(/hsla?\(\s*[\d.]+[,\s]+[\d.]+%?[,\s]+[\d.]+%?(?:[,\s/]+[\d.%]+)?\s*\)/g)) add(m[0]!);
+  return out;
+}
+

@@ -74,8 +74,11 @@ const ACTIONS = [
   "setAgentMode",
   "setFindOpen",
   "setEffort",
+  "setPluginEmmet",
+  "setPluginSticky",
+  "setPluginComment",
+  "setPluginUrls",
 ] as const;
-
 export type PaletteKind = "all" | "files" | "cmds";
 
 type ChromeState = {
@@ -118,6 +121,8 @@ type ChromeState = {
   pluginRainbow: boolean;
   pluginEmmet: boolean;
   pluginSticky: boolean;
+  pluginComment: boolean;
+  pluginUrls: boolean;
   skillsOff: string[];
   sideOpen: boolean;
   sideW: number;
@@ -165,6 +170,8 @@ type ChromeState = {
   setPluginRainbow: (v: boolean) => void;
   setPluginEmmet: (v: boolean) => void;
   setPluginSticky: (v: boolean) => void;
+  setPluginComment: (v: boolean) => void;
+  setPluginUrls: (v: boolean) => void;
   toggleSkill: (id: string, on: boolean) => void;
   toggleSide: () => void;
   resetLayout: () => void;
@@ -244,6 +251,8 @@ export const useChrome = create<ChromeState>()(
       pluginRainbow: true,
       pluginEmmet: true,
       pluginSticky: true,
+      pluginComment: true,
+      pluginUrls: true,
       skillsOff: [],
       sideOpen: true,
       sideW: 248,
@@ -300,6 +309,8 @@ export const useChrome = create<ChromeState>()(
       setPluginRainbow: (pluginRainbow) => set({ pluginRainbow }),
       setPluginEmmet: (pluginEmmet) => set({ pluginEmmet }),
       setPluginSticky: (pluginSticky) => set({ pluginSticky }),
+      setPluginComment: (pluginComment) => set({ pluginComment }),
+      setPluginUrls: (pluginUrls) => set({ pluginUrls }),
       toggleSkill: (id, on) =>
         set((s) => ({
           skillsOff: on ? s.skillsOff.filter((x) => x !== id) : [...new Set([...s.skillsOff, id])],
@@ -343,6 +354,8 @@ export const useChrome = create<ChromeState>()(
         pluginRainbow: s.pluginRainbow,
         pluginEmmet: s.pluginEmmet,
         pluginSticky: s.pluginSticky,
+        pluginComment: s.pluginComment,
+        pluginUrls: s.pluginUrls,
         skillsOff: s.skillsOff,
         sideW: s.sideW,
         agentW: s.agentW,

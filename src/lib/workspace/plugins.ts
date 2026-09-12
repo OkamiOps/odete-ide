@@ -17,7 +17,9 @@ export type PluginId =
   | "todoMark"
   | "rainbow"
   | "emmet"
-  | "sticky";
+  | "sticky"
+  | "comment"
+  | "urls";
 
 export const PLUGINS: { id: PluginId; label: string; blurb: string }[] = [
   { id: "linter", label: "Linter", blurb: "JSON, JS, HTML, CSS e Swift com linha." },
@@ -36,6 +38,8 @@ export const PLUGINS: { id: PluginId; label: string; blurb: string }[] = [
   { id: "rainbow", label: "Brackets coloridos", blurb: "Cada nível de () [] {} numa cor." },
   { id: "emmet", label: "Emmet", blurb: "Tab em div.card vira HTML." },
   { id: "sticky", label: "Sticky scroll", blurb: "Mostra a função/tag do topo da tela." },
+  { id: "comment", label: "Comentar linha", blurb: "⌘/ comenta ou descomenta a seleção." },
+  { id: "urls", label: "URLs", blurb: "Sublinha http(s) no código." },
 ];
 
 export type Diag = {

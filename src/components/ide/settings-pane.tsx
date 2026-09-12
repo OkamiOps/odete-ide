@@ -37,7 +37,7 @@ const TABS: { id: "look" | "edit" | "agent" | "ws"; label: string; icon: typeof 
 
 const PLUGIN_GROUPS: { title: string; ids: PluginId[] }[] = [
   { title: "Tela", ids: ["wrap", "lineNo", "fold", "breadcrumbs", "whitespace", "indent", "ruler"] },
-  { title: "Código", ids: ["linter", "todos", "todoMark", "rainbow", "emmet", "sticky", "gitGutter", "colorHint", "formatOnSave"] },
+  { title: "Código", ids: ["linter", "todos", "todoMark", "rainbow", "emmet", "sticky", "gitGutter", "colorHint", "formatOnSave", "comment", "urls"] },
 ];
 
 export function SettingsPane() {
@@ -573,6 +573,8 @@ function PluginSection() {
   const rainbow = useChrome((s) => s.pluginRainbow);
   const emmet = useChrome((s) => s.pluginEmmet);
   const sticky = useChrome((s) => s.pluginSticky);
+  const comment = useChrome((s) => s.pluginComment);
+  const urls = useChrome((s) => s.pluginUrls);
   const setLinter = useChrome((s) => s.setPluginLinter);
   const setTodos = useChrome((s) => s.setPluginTodos);
   const setWrap = useChrome((s) => s.setPluginWrap);
@@ -589,6 +591,8 @@ function PluginSection() {
   const setRainbow = useChrome((s) => s.setPluginRainbow);
   const setEmmet = useChrome((s) => s.setPluginEmmet);
   const setSticky = useChrome((s) => s.setPluginSticky);
+  const setComment = useChrome((s) => s.setPluginComment);
+  const setUrls = useChrome((s) => s.setPluginUrls);
   const setSide = useChrome((s) => s.setSide);
   const openPath = useWorkspace((s) => s.openPath);
   const files = useWorkspace((s) => s.files);
@@ -610,6 +614,8 @@ function PluginSection() {
     rainbow,
     emmet,
     sticky,
+    comment,
+    urls,
   };
   const set: Record<string, (v: boolean) => void> = {
     linter: setLinter,
@@ -628,6 +634,8 @@ function PluginSection() {
     rainbow: setRainbow,
     emmet: setEmmet,
     sticky: setSticky,
+    comment: setComment,
+    urls: setUrls,
   };
 
   return (

@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { type AgentId, agentById } from "@/lib/agent/providers";
-import type { AgentMode } from "@/lib/agent/tools";
+import type { EffortId } from "@/lib/agent/effort";
 import type { TokenBundle } from "@/lib/agent/oauth";
 import type { ThemeId } from "./themes";
 import type { SynColors } from "./themes";
@@ -73,6 +73,7 @@ const ACTIONS = [
   "setCheatsheet",
   "setAgentMode",
   "setFindOpen",
+  "setEffort",
 ] as const;
 
 export type PaletteKind = "all" | "files" | "cmds";
@@ -87,6 +88,7 @@ type ChromeState = {
   paletteKind: PaletteKind;
   findOpen: boolean;
   agentMode: AgentMode;
+  effortByKey: Record<string, EffortId>;
   mobile: MobileTab;
   creating: boolean;
   agentId: AgentId;
@@ -132,6 +134,7 @@ type ChromeState = {
   setPalette: (v: boolean, kind?: PaletteKind) => void;
   setFindOpen: (v: boolean) => void;
   setAgentMode: (m: AgentMode) => void;
+  setEffort: (key: string, effort: EffortId) => void;
   setMobile: (t: MobileTab) => void;
   setCreating: (v: boolean) => void;
   setAgentId: (id: AgentId) => void;
@@ -211,6 +214,7 @@ export const useChrome = create<ChromeState>()(
       paletteKind: "all" as PaletteKind,
       findOpen: false,
       agentMode: "build" as AgentMode,
+      effortByKey: {} as Record<string, EffortId>,
       mobile: "edit",
       creating: false,
       agentId: "grok",
@@ -263,6 +267,8 @@ export const useChrome = create<ChromeState>()(
         set((s) => ({ palette, paletteKind: kind ?? (palette ? s.paletteKind : "all") })),
       setFindOpen: (findOpen) => set({ findOpen }),
       setAgentMode: (agentMode) => set({ agentMode }),
+      setEffort: (key, effort) =>
+        set((s) => ({ effortByKey: { ...s.effortByKey, [key]: effort } })),
       setMobile: (mobile) => set({ mobile }),
       setCreating: (creating) => set({ creating }),
       setAgentId: (agentId) => set({ agentId }),
@@ -342,6 +348,7 @@ export const useChrome = create<ChromeState>()(
         agentW: s.agentW,
         termH: s.termH,
         agentMode: s.agentMode,
+        effortByKey: s.effortByKey,
       }),
       merge: (persisted, current) => {
         const p = { ...((persisted ?? {}) as Record<string, unknown>) };
@@ -370,6 +377,17 @@ export function currentAgentModel(s: {
   if (s.agentId === "claude") return s.claudeModel;
   if (s.agentId === "codex") return s.codexModel;
   return s.grokModel || agentById("grok").defaultModel;
+}
+
+export function currentEffort(s: {
+  agentId: AgentId;
+  grokModel: string;
+  claudeModel: string;
+  codexModel: string;
+  effortByKey: Record<string, EffortId>;
+}): EffortId | "" {
+  const model = currentAgentModel(s);
+  return s.effortByKey[`${s.agentId}:${model}`] ?? "";
 }
 
 export function agentConnected(s: {

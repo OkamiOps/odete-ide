@@ -21,6 +21,7 @@ export type LoopAuth = {
   access?: string;
   accountId?: string;
   mode?: AgentMode;
+  effort?: string;
 };
 
 export async function runAgentLoop(
@@ -56,6 +57,7 @@ export async function runAgentLoop(
         access: auth.access,
         accountId: auth.accountId,
         mode,
+        effort: auth.effort,
       },
     });
     if (shouldStop?.()) break;

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { PickList } from "@/components/ide/pick-list";
 import { listProviderModels, type ModelInfo } from "@/lib/agent/models";
+import { rememberEfforts } from "@/lib/agent/effort";
 import type { AgentId } from "@/lib/agent/providers";
 import { authForTurn } from "@/lib/agent/session";
 import { useChrome } from "@/lib/workspace/chrome";
@@ -41,6 +42,9 @@ export function ModelSelect({ provider, compact }: { provider: AgentId; compact?
         data: { provider, access: tokens.access, accountId: tokens.accountId },
       });
       const list = (r.models ?? []).filter(usable);
+      for (const m of list) {
+        if (m.efforts?.length) rememberEfforts(provider, m.id, m.efforts);
+      }
       if (!r.ok) {
         setErr(r.error);
         setModels(list);

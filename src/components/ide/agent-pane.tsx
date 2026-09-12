@@ -1,16 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, Eraser, ImagePlus, LoaderCircle, AtSign, Send, Square, Undo2, X } from "lucide-react";
-import { AgentConnect, AgentPicker } from "@/components/ide/settings-pane";
+import { AgentConnect } from "@/components/ide/settings-pane";
 import { ModelSelect } from "@/components/ide/model-select";
 import { useAgentChats } from "@/lib/agent/chats";
+import { defaultEffort, effortKey, EFFORT_HINT, EFFORT_LABEL, effortsForModel, type EffortId } from "@/lib/agent/effort";
 import { runAgentLoop, type ChatItem } from "@/lib/agent/loop";
 import { usePatches } from "@/lib/agent/patches";
-import { agentById } from "@/lib/agent/providers";
+import { AGENTS, agentById } from "@/lib/agent/providers";
 import type { AgentImage, AgentMessage } from "@/lib/agent/server";
 import type { AgentMode } from "@/lib/agent/tools";
 import { hunksOf } from "@/lib/workspace/hunks";
 import { authForTurn } from "@/lib/agent/session";
-import { agentConnected, currentAgentModel, useChrome } from "@/lib/workspace/chrome";
+import { agentConnected, currentAgentModel, currentEffort, useChrome } from "@/lib/workspace/chrome";
 import { useNav } from "@/lib/workspace/nav";
 import { allSkills } from "@/lib/workspace/skills";
 import { useWorkspace } from "@/lib/workspace/store";
@@ -183,6 +184,10 @@ export function AgentPane() {
           access: tokens.access,
           accountId: tokens.accountId,
           mode: chrome.agentMode,
+          effort:
+            currentEffort(chrome) ||
+            defaultEffort(effortsForModel(chrome.agentId, currentAgentModel(chrome))) ||
+            undefined,
         },
         () => cancel.current,
         pics,
@@ -210,6 +215,11 @@ export function AgentPane() {
   const pendingCount = usePatches((s) => s.items.filter((p) => p.status === "pending").length);
   const quote = useNav((s) => s.quote);
 
+  const model = useChrome(currentAgentModel);
+  const effortStored = useChrome(currentEffort);
+  const options = effortsForModel(agentId, model);
+  const effort = (options.includes(effortStored as EffortId) ? effortStored : defaultEffort(options)) as EffortId | "";
+
   return (
     <div className="agent-pane">
       <div className="agent-hd">
@@ -219,10 +229,34 @@ export function AgentPane() {
             <Eraser size={15} />
           </button>
         </div>
-        <div className="agent-hd-picks">
-          <AgentPicker compact fill />
-          {connected ? <ModelSelect provider={agentId} compact /> : null}
+        <div className="agent-pick">
+          {AGENTS.map((a) => (
+            <button
+              key={a.id}
+              type="button"
+              className={agentId === a.id ? "is-on" : undefined}
+              onClick={() => useChrome.getState().setAgentId(a.id)}
+            >
+              {a.label}
+            </button>
+          ))}
         </div>
+        {connected ? <ModelSelect provider={agentId} compact /> : null}
+        {connected && options.length ? (
+          <div className="agent-effort" role="tablist" aria-label="effort">
+            {options.map((id) => (
+              <button
+                key={id}
+                type="button"
+                title={EFFORT_HINT[id]}
+                className={effort === id ? "is-on" : undefined}
+                onClick={() => useChrome.getState().setEffort(effortKey(agentId, model), id)}
+              >
+                {EFFORT_LABEL[id]}
+              </button>
+            ))}
+          </div>
+        ) : null}
         <div className="agent-modes" role="tablist" aria-label="modo do agente">
           {MODE_META.map((m) => (
             <button

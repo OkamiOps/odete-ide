@@ -29,6 +29,7 @@ type TurnInput = {
   accountId?: string;
   skills?: string;
   mode?: AgentMode;
+  effort?: string;
 };
 
 function openaiContent(m: AgentMessage) {
@@ -189,6 +190,7 @@ async function claudeTurn(
   model: string,
   messages: AgentMessage[],
   tools: AgentTool[],
+  effort?: string,
 ): Promise<AgentTurnResult> {
   const system = messages.find((m) => m.role === "system")?.content ?? SYSTEM_PROMPT;
   const bodyJson: Record<string, unknown> = {
@@ -198,6 +200,7 @@ async function claudeTurn(
     system,
     messages: toAnthropicMessages(messages),
   };
+  if (effort) bodyJson.output_config = { effort };
   if (tools.length) {
     bodyJson.tools = tools.map((t) => ({
       name: t.function.name,
@@ -253,12 +256,14 @@ export const agentTurn = createServerFn({ method: "POST" })
     accountId: typeof input.accountId === "string" ? input.accountId : "",
     skills: typeof input.skills === "string" ? input.skills : "",
     mode: input.mode === "chat" || input.mode === "plan" ? input.mode : "build",
+    effort: typeof input.effort === "string" ? input.effort : "",
   }))
   .handler(async ({ data }): Promise<AgentTurnResult> => {
     const mode: AgentMode = data.mode === "chat" || data.mode === "plan" ? data.mode : "build";
     const tools = toolsForMode(mode);
     const messages = withSystem(data.messages ?? [], data.fileList, data.skills, mode);
     const model = (data.model || "").trim();
+    const effort = (data.effort || "").trim();
 
     if (data.provider === "grok") {
       const apiKey = process.env.XAI_API_KEY;
@@ -269,7 +274,10 @@ export const agentTurn = createServerFn({ method: "POST" })
         model: model || "grok-4.5",
         messages,
         tools,
-        extra: { max_tokens: 1600 },
+        extra: {
+          max_tokens: 1600,
+          ...(effort ? { reasoning_effort: effort } : {}),
+        },
       });
     }
 
@@ -286,21 +294,24 @@ export const agentTurn = createServerFn({ method: "POST" })
 
     if (data.provider === "claude") {
       if (!model) return { ok: false, error: "escolha um modelo Claude na lista da API." };
-      return claudeTurn(access, model, messages, tools);
+      return claudeTurn(access, model, messages, tools, effort);
     }
 
     if (!model) return { ok: false, error: "escolha um modelo ChatGPT na lista da API." };
-    const headers: Record<string, string> = {
+    const headers: Record<string, unknown> = {
       Authorization: `Bearer ${access}`,
       originator: "codex_cli_rs",
     };
     if (data.accountId) headers["ChatGPT-Account-ID"] = data.accountId;
     return openaiCompatible({
       url: "https://chatgpt.com/backend-api/codex/v1/chat/completions",
-      headers,
+      headers: headers as Record<string, string>,
       model,
       messages,
       tools,
-      extra: { max_completion_tokens: 1600 },
+      extra: {
+        max_completion_tokens: 1600,
+        ...(effort ? { reasoning_effort: effort } : {}),
+      },
     });
   });

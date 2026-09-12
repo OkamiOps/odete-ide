@@ -1,7 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import type { AgentId } from "./providers";
+import { parseEffortList, type EffortId } from "./effort";
 
-export type ModelInfo = { id: string; label: string };
+export type ModelInfo = { id: string; label: string; efforts?: EffortId[] };
 
 function push(out: ModelInfo[], seen: Set<string>, id: string, label?: string) {
   const slug = id.trim();
@@ -33,7 +34,10 @@ function asList(json: unknown): ModelInfo[] {
     if (vis === "hidden" || vis === "true") continue;
     const id = String(m.slug ?? m.id ?? m.model ?? m.name ?? "").trim();
     const label = String(m.display_name ?? m.displayName ?? m.title ?? m.name ?? id);
-    push(out, seen, id, label);
+    const efforts = parseEffortList(m);
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    out.push(efforts.length ? { id, label: (label || id).trim(), efforts } : { id, label: (label || id).trim() });
   }
   return out.sort((a, b) => a.label.localeCompare(b.label, "pt"));
 }

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { Archive, Copy, FileJson, Files, FolderOpen, GitBranch, Github, Lock, Star, Tablet, Trash2, X } from "lucide-react";
 import { githubClone, githubCreateRepo, githubOrgs, githubRepos, type GithubOrg, type GithubRepo } from "@/lib/github/api";
-import { setSheet, useProjectUi, useProjects, type ProjectSheet } from "@/lib/workspace/projects";
+import { PickList } from "@/components/ide/pick-list";
 import { useWorkspace } from "@/lib/workspace/store";
 import { downloadZip, importZipFile, saveBlob, safeName, type SaveOffer } from "@/lib/workspace/zip";
 
@@ -667,26 +667,26 @@ function CloneForm() {
         <>
           <label className="new-label">
             Conta
-            <select
-              className="field"
+            <PickList
+              fill
+              ariaLabel="conta ou organização"
               value={owner}
-              onChange={(e) => setOwner(e.target.value)}
-              aria-label="conta ou organização"
-            >
-              <option value="">@{github.user.login} · você</option>
-              {orgs.map((o) => (
-                <option key={o.login} value={o.login}>
-                  @{o.login} · org
-                </option>
-              ))}
-            </select>
+              onChange={setOwner}
+              options={[
+                { id: "", label: `@${github.user.login} · você` },
+                ...orgs.map((o) => ({ id: o.login, label: `@${o.login} · org` })),
+              ]}
+            />
           </label>
-          <input
-            className="field"
-            placeholder="filtrar repositório"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-          />
+          <label className="new-label">
+            Repositório
+            <input
+              className="field"
+              placeholder="filtrar por nome, linguagem…"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+            />
+          </label>
           <p className="clone-count">
             {loading ? "carregando…" : `${shown.length} repo${shown.length === 1 ? "" : "s"}`}
           </p>

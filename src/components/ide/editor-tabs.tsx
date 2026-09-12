@@ -47,7 +47,7 @@ export function EditorTabs() {
                 aria-label={`fechar ${name}`}
                 onClick={() => closeTab(p)}
               >
-                <X size={12} strokeWidth={2.2} />
+                <X size={16} strokeWidth={2.2} />
               </button>
             </div>
           );
@@ -61,7 +61,7 @@ export function EditorTabs() {
           aria-label="Histórico"
           onClick={() => useNav.getState().setHist(!histOn)}
         >
-          <Clock size={18} strokeWidth={1.7} />
+          <Clock size={20} strokeWidth={1.7} />
         </button>
         <button
           type="button"
@@ -70,7 +70,7 @@ export function EditorTabs() {
           aria-label="Blame"
           onClick={() => useNav.getState().setBlame(!blameOn)}
         >
-          <GitCommit size={18} strokeWidth={1.7} />
+          <GitCommit size={20} strokeWidth={1.7} />
         </button>
         <button
           type="button"
@@ -81,7 +81,7 @@ export function EditorTabs() {
             useChrome.setState({ agent: true, mobile: "agent" });
           }}
         >
-          <MessageSquarePlus size={18} strokeWidth={1.7} />
+          <MessageSquarePlus size={20} strokeWidth={1.7} />
         </button>
       </div>
     </div>

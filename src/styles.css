@@ -214,9 +214,9 @@ input, textarea, select { font: inherit; font-size: 16px; }
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 40px;
-  padding: 4px 8px 4px 6px;
-  font-size: 12px;
+  min-height: 52px;
+  padding: 6px 10px;
+  font-size: 13px;
   color: var(--color-fg-muted);
   border-bottom: 1px solid var(--color-border);
   flex-shrink: 0;
@@ -228,40 +228,39 @@ input, textarea, select { font: inherit; font-size: 16px; }
   border-bottom: 0;
   padding: 0;
   min-height: 0;
-  gap: 4px;
+  gap: 6px;
   scrollbar-width: none;
 }
 .ed-bar .tabs::-webkit-scrollbar { display: none; height: 0; }
 .ed-acts { display: flex; align-items: center; gap: 6px; flex-shrink: 0; margin-left: auto; }
 .ed-acts button {
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   display: grid;
   place-items: center;
   border: 1px solid var(--color-border);
-  border-radius: 10px;
+  border-radius: 12px;
   background: var(--color-bg);
   color: var(--color-fg-muted);
 }
 .ed-acts button.is-on,
 .ed-acts button:hover { background: var(--color-bg-subtle); color: var(--color-fg); }
 .ed-modes {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 6px;
-  padding: 6px 10px;
+  padding: 8px 10px;
   flex-shrink: 0;
   border-bottom: 1px solid var(--color-border);
 }
 .ed-modes button {
-  min-height: 32px;
-  height: 32px;
-  padding: 0 12px;
+  min-height: 40px;
+  padding: 0 8px;
   border: 1px solid var(--color-border);
-  border-radius: 8px;
+  border-radius: 12px;
   background: var(--color-bg);
   color: var(--color-fg-muted);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
 }
 .ed-modes button.is-on {
@@ -280,29 +279,29 @@ input, textarea, select { font: inherit; font-size: 16px; }
 .preview-slot { min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; border-left: 1px solid var(--color-border); }
 .dual-hd { display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 4px 8px; border-bottom: 1px solid var(--color-border); flex-shrink: 0; font-size: 11px; color: var(--color-fg-subtle); }
 
-.tabs { display: flex; gap: 4px; min-height: 32px; padding: 0; overflow: auto; border-bottom: 0; -webkit-overflow-scrolling: touch; }
+.tabs { display: flex; gap: 6px; min-height: 44px; padding: 0; overflow: auto; border-bottom: 0; -webkit-overflow-scrolling: touch; }
 .tab {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
-  min-height: 32px;
-  height: 32px;
-  padding: 0 2px 0 8px;
-  border-radius: 8px;
+  gap: 4px;
+  min-height: 44px;
+  height: 44px;
+  padding: 0 4px 0 12px;
+  border-radius: 12px;
   background: transparent;
   color: var(--color-fg-muted);
-  font-size: 12px;
-  max-width: 168px;
+  font-size: 13px;
+  max-width: 200px;
   flex-shrink: 0;
 }
 .tab.is-on { background: var(--color-bg); color: var(--color-fg); box-shadow: inset 0 0 0 1px var(--color-border); }
-.tab-main { display: inline-flex; align-items: center; gap: 6px; min-width: 0; border: 0; background: transparent; color: inherit; font: inherit; padding: 0; height: 32px; }
+.tab-main { display: inline-flex; align-items: center; gap: 8px; min-width: 0; border: 0; background: transparent; color: inherit; font: inherit; padding: 0; height: 44px; }
 .tab-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tab em { font-style: normal; font-size: 10px; color: var(--color-accent); }
-.tab-dot { width: 6px; height: 6px; border-radius: 99px; background: var(--color-accent); flex-shrink: 0; }
-.tab-x { display: grid; place-items: center; width: 22px; height: 22px; border: 0; border-radius: 6px; background: transparent; color: var(--color-fg-subtle); flex-shrink: 0; }
+.tab em { font-style: normal; font-size: 11px; color: var(--color-accent); }
+.tab-dot { width: 7px; height: 7px; border-radius: 99px; background: var(--color-accent); flex-shrink: 0; }
+.tab-x { display: grid; place-items: center; width: 32px; height: 32px; border: 0; border-radius: 8px; background: transparent; color: var(--color-fg-subtle); flex-shrink: 0; }
 .tab-x:hover { background: var(--color-bg-subtle); color: var(--color-fg); }
-.tab .file-glyph { width: 16px; height: 16px; flex: 0 0 16px; }
+.tab .file-glyph { width: 20px; height: 20px; flex: 0 0 20px; }
 
 .code-wrap { position: relative; display: grid; grid-template-columns: minmax(0,1fr); grid-template-rows: auto minmax(0,1fr); flex: 1 1 0; height: 100%; width: 100%; min-height: 0; overflow: hidden; }
 .code-wrap.has-map.is-s { grid-template-columns: minmax(0,1fr) 88px; }
@@ -660,11 +659,11 @@ input, textarea, select { font: inherit; font-size: 16px; }
 .patch-bar { display: flex; gap: 6px; padding: 8px 0; }
 .patch-bar button, .patch-bar-ed { min-height: 32px; }
 
-.pick-btn { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 10px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-bg); color: var(--color-fg); font-size: 12px; }
+.pick-btn { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 12px; border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-bg); color: var(--color-fg); font-size: 13px; }
 .pick-btn.is-fill { width: 100%; }
-.pick-btn.is-compact { min-height: 36px; height: 36px; }
-.pick-menu { position: absolute; z-index: 40; min-width: 180px; max-height: 240px; overflow: auto; border: 1px solid var(--color-border); border-radius: 10px; background: var(--color-bg-elevated); box-shadow: 0 12px 32px rgb(0 0 0 / .4); }
-.pick-menu button { display: block; width: 100%; min-height: 36px; padding: 0 12px; border: 0; background: transparent; color: var(--color-fg); text-align: left; font-size: 12px; }
+.pick-btn.is-compact { min-height: 40px; height: 40px; }
+.pick-menu { position: absolute; z-index: 40; min-width: 180px; max-height: 280px; overflow: auto; border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-bg-elevated); box-shadow: 0 12px 32px rgb(0 0 0 / .4); }
+.pick-menu button { display: block; width: 100%; min-height: 44px; padding: 0 12px; border: 0; background: transparent; color: var(--color-fg); text-align: left; font-size: 13px; }
 .pick-menu button.is-on, .pick-menu button:hover { background: var(--color-bg-subtle); }
 .pick-empty { padding: 10px 12px; font-size: 12px; color: var(--color-fg-subtle); }
 

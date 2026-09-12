@@ -1,0 +1,747 @@
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
+import { SEED_COMMIT_MESSAGE, SEED_FILES } from "./seed";
+import type { BlameLine, BranchSnap, Commit, Conflict, FileMap, StashEntry, TermLine } from "./types";
+import { uid } from "../utils";
+import { rememberEdit } from "./history";
+import { discardHunk, keepOnlyHunk } from "./hunks";
+import { useProjects } from "./projects";
+import { useTerms } from "./terms";
+
+function cloneFiles(files: FileMap): FileMap {
+  return { ...files };
+}
+
+function filesEqual(a: FileMap, b: FileMap) {
+  const ak = Object.keys(a);
+  const bk = Object.keys(b);
+  if (ak.length !== bk.length) return false;
+  return ak.every((k) => a[k] === b[k]);
+}
+
+function parentDir(path: string) {
+  const i = path.lastIndexOf("/");
+  return i <= 0 ? "" : path.slice(0, i);
+}
+
+function snapBranch(s: {
+  files: FileMap;
+  commits: Commit[];
+  staged: string[];
+  lastPushedId: string | null;
+  origin: Commit | null;
+}): BranchSnap {
+  return {
+    files: cloneFiles(s.files),
+    commits: s.commits,
+    staged: [...s.staged],
+    lastPushedId: s.lastPushedId,
+    origin: s.origin,
+  };
+}
+
+function sanitizePath(path: string) {
+  return path.replace(/^\/+/, "").replace(/\.\.\//g, "").trim();
+}
+
+export type WorkspaceState = {
+  files: FileMap;
+  openPath: string;
+  tabs: string[];
+  commits: Commit[];
+  lastPushedId: string | null;
+  origin: Commit | null;
+  staged: string[];
+  branch: string;
+  branchSnaps: Record<string, BranchSnap>;
+  stash: StashEntry[];
+  conflicts: Conflict[];
+  terminal: TermLine[];
+  cwd: string;
+  projectId: string;
+  projectName: string;
+  remote: string | null;
+  hydrated: boolean;
+  openFile: (path: string) => void;
+  closeTab: (path: string) => void;
+  writeFile: (path: string, content: string) => string | undefined;
+  createFile: (path: string) => string | undefined;
+  deleteFile: (path: string) => string | undefined;
+  readFile: (path: string) => string | undefined;
+  listDir: (path?: string) => string[];
+  grep: (pattern: string, path?: string) => string;
+  commit: (message: string, all?: boolean) => string;
+  gitStatus: () => string;
+  gitLog: () => string;
+  gitPush: () => string;
+  gitPull: () => string;
+  gitFetch: () => string;
+  gitSync: () => string;
+  gitStage: (path: string) => void;
+  gitUnstage: (path: string) => void;
+  gitStageAll: () => void;
+  gitUnstageAll: () => void;
+  gitDiscard: (path: string) => string;
+  gitDiscardAll: () => string;
+  gitUndoCommit: () => string;
+  gitBranchList: () => string[];
+  gitBranchCreate: (name: string) => string;
+  gitCheckout: (name: string) => string;
+  gitStash: () => string;
+  gitStashPop: () => string;
+  gitBlame: (path: string) => BlameLine[];
+  gitRestoreCommit: (id: string) => string;
+  gitApplyHunk: (path: string, index: number, keep: boolean) => string;
+  renameFile: (from: string, to: string) => string | undefined;
+  replaceInFiles: (pattern: string, replacement: string) => { files: number; hits: number };
+  resolveConflict: (path: string, take: "ours" | "theirs" | "merged", merged?: string) => void;
+  mergeRemote: (incoming: FileMap) => string;
+  changedPaths: () => string[];
+  fileDirty: (path: string) => boolean;
+  termPrint: (kind: TermLine["kind"], text: string) => void;
+  termClear: () => void;
+  setCwd: (path: string) => void;
+  loadProject: (p: {
+    id: string;
+    name: string;
+    files: FileMap;
+    remote?: string | null;
+    branch?: string;
+    message?: string;
+  }) => void;
+  newProject: (name: string) => void;
+  closeProject: () => void;
+  importFiles: (files: FileMap, replace?: boolean) => void;
+  rememberNow: () => void;
+  resetWorkspace: () => void;
+  isDirty: () => boolean;
+};
+
+const bootLines: TermLine[] = [
+  { id: "boot", kind: "ok", text: "colo  workspace local" },
+  { id: "boot2", kind: "out", text: "digite help · npm i · git status" },
+];
+
+function freshState() {
+  return {
+    files: cloneFiles(SEED_FILES),
+    openPath: "README.md",
+    tabs: ["README.md"],
+    commits: [
+      {
+        id: "seed",
+        message: SEED_COMMIT_MESSAGE,
+        at: Date.now(),
+        files: cloneFiles(SEED_FILES),
+      },
+    ] as Commit[],
+    lastPushedId: "seed",
+    origin: {
+      id: "seed",
+      message: SEED_COMMIT_MESSAGE,
+      at: Date.now(),
+      files: cloneFiles(SEED_FILES),
+    } as Commit,
+    staged: [] as string[],
+    branch: "main",
+    cwd: "",
+    projectId: "seed",
+    projectName: "colo",
+    remote: null as string | null,
+    branchSnaps: {} as Record<string, BranchSnap>,
+    stash: [] as StashEntry[],
+    conflicts: [] as Conflict[],
+  };
+}
+
+export const useWorkspace = create<WorkspaceState>()(
+  persist(
+    (set, get) => ({
+      ...freshState(),
+      terminal: bootLines,
+      hydrated: false,
+      openFile: (path) => {
+        const { files } = get();
+        if (files[path] === undefined) return;
+        set((s) => ({
+          openPath: path,
+          tabs: s.tabs.includes(path) ? s.tabs : [...s.tabs, path],
+        }));
+      },
+      closeTab: (path) => {
+        set((s) => {
+          const tabs = s.tabs.filter((t) => t !== path);
+          const nextTabs = tabs.length ? tabs : [s.openPath === path ? "README.md" : s.openPath];
+          const openPath =
+            s.openPath === path ? (nextTabs[nextTabs.length - 1] ?? "README.md") : s.openPath;
+          return { tabs: nextTabs, openPath };
+        });
+      },
+      writeFile: (path, content) => {
+        const clean = sanitizePath(path);
+        if (!clean) return "caminho inválido";
+        set((s) => ({
+          files: { ...s.files, [clean]: content },
+          openPath: s.files[clean] === undefined ? clean : s.openPath,
+          tabs:
+            s.files[clean] === undefined && !s.tabs.includes(clean)
+              ? [...s.tabs, clean]
+              : s.tabs,
+        }));
+        rememberEdit(clean, content);
+        return undefined;
+      },
+      createFile: (path) => {
+        const clean = sanitizePath(path);
+        if (!clean) return "caminho inválido";
+        if (get().files[clean] !== undefined) return "já existe";
+        return get().writeFile(clean, "");
+      },
+      deleteFile: (path) => {
+        const { files, openPath, tabs } = get();
+        if (files[path] === undefined) return "arquivo não existe";
+        const next = { ...files };
+        delete next[path];
+        const nextTabs = tabs.filter((t) => t !== path);
+        const fallback = nextTabs[0] ?? Object.keys(next)[0] ?? "README.md";
+        set({
+          files: next,
+          tabs: nextTabs.length ? nextTabs : [fallback],
+          openPath: openPath === path ? fallback : openPath,
+        });
+        return undefined;
+      },
+      readFile: (path) => get().files[path],
+      listDir: (path = "") => {
+        const prefix = path.replace(/^\/+|\/+$/g, "");
+        const { files } = get();
+        const names = new Set<string>();
+        for (const p of Object.keys(files).sort()) {
+          if (prefix) {
+            if (p === prefix) {
+              names.add(p);
+              continue;
+            }
+            if (!p.startsWith(prefix + "/")) continue;
+            const rest = p.slice(prefix.length + 1);
+            names.add(rest.split("/")[0]!);
+          } else {
+            names.add(p.split("/")[0]!);
+          }
+        }
+        return [...names];
+      },
+      grep: (pattern, path) => {
+        let re: RegExp;
+        try {
+          re = new RegExp(pattern, "i");
+        } catch {
+          return "regex inválida";
+        }
+        const { files } = get();
+        const hits: string[] = [];
+        for (const [p, content] of Object.entries(files)) {
+          if (path && p !== path && !p.startsWith(path.replace(/\/+$/, "") + "/")) {
+            continue;
+          }
+          const lines = content.split("\n");
+          lines.forEach((line, i) => {
+            if (re.test(line) && hits.length < 40) {
+              hits.push(`${p}:${i + 1}: ${line.trimEnd()}`);
+            }
+          });
+        }
+        return hits.length ? hits.join("\n") : "sem resultados";
+      },
+      commit: (message, all = false) => {
+        const msg = message.trim();
+        if (!msg) return "informe a mensagem";
+        const { files, commits, staged } = get();
+        const head = commits[commits.length - 1];
+        const headFiles = head?.files ?? {};
+        const changed = get().changedPaths();
+        const pick =
+          all || staged.length === 0
+            ? changed
+            : staged.filter((p) => changed.includes(p));
+        if (!pick.length) return "nada para commitar";
+        const next = cloneFiles(headFiles);
+        for (const p of pick) {
+          if (files[p] === undefined) delete next[p];
+          else next[p] = files[p];
+        }
+        if (head && filesEqual(next, head.files)) return "nada para commitar";
+        const c: Commit = {
+          id: uid().slice(0, 8),
+          message: msg,
+          at: Date.now(),
+          files: next,
+        };
+        set({
+          commits: [...commits, c],
+          staged: staged.filter((p) => !pick.includes(p)),
+        });
+        return `[${c.id}] ${pick.length} arquivo(s) · ${c.message}`;
+      },
+      gitStatus: () => {
+        const { files, commits, lastPushedId, staged, branch, origin } = get();
+        const head = commits[commits.length - 1];
+        const changed = get().changedPaths();
+        const ahead = head && lastPushedId !== head.id;
+        const behind = origin && !commits.some((c) => c.id === origin.id);
+        const rel = [
+          ahead ? "ahead of origin" : null,
+          behind ? "behind origin" : null,
+          !ahead && !behind ? "up to date with origin/main" : null,
+        ]
+          .filter(Boolean)
+          .join(", ");
+        const unstaged = changed.filter((p) => !staged.includes(p));
+        const lines = [
+          `on branch ${branch}`,
+          rel,
+          staged.length ? "changes to be committed:" : "",
+          ...staged.map((p) => `  staged:     ${p}`),
+          unstaged.length ? "changes not staged:" : "",
+          ...unstaged.map((p) => `  modified:   ${p}`),
+          !changed.length ? "working tree clean" : "",
+        ].filter(Boolean);
+        return lines.join("\n");
+      },
+      gitLog: () => {
+        const { commits } = get();
+        return [...commits]
+          .reverse()
+          .map((c) => `${c.id}  ${c.message}`)
+          .join("\n");
+      },
+      gitPush: () => {
+        const { commits, origin } = get();
+        const head = commits[commits.length - 1];
+        if (!head) return "nada para enviar";
+        if (origin?.id === head.id) return "Everything up-to-date";
+        set({
+          lastPushedId: head.id,
+          origin: { ...head, files: cloneFiles(head.files) },
+        });
+        return `To origin/main\n   ${head.id}  ${head.message}\n * [pushed] main -> origin/main`;
+      },
+      gitFetch: () => {
+        const { origin, commits } = get();
+        const behind = origin && !commits.some((c) => c.id === origin.id);
+        if (behind) return `From colo-local\n * branch main -> FETCH_HEAD\n   origin/main está à frente`;
+        return "From colo-local\n * branch            main       -> FETCH_HEAD\n   já atualizado";
+      },
+      gitPull: () => {
+        const { origin, commits, files } = get();
+        const head = commits[commits.length - 1];
+        if (!origin) {
+          if (head) set({ origin: { ...head, files: cloneFiles(head.files) }, lastPushedId: head.id });
+          return "Already up to date.";
+        }
+        if (head && origin.id === head.id) return "Already up to date.";
+        if (commits.some((c) => c.id === origin.id)) return "Already up to date.";
+        if (head && !filesEqual(files, head.files)) {
+          return "error: suas mudanças locais seriam sobrescritas. commite ou descarte antes.";
+        }
+        set({
+          commits: [...commits, origin],
+          files: cloneFiles(origin.files),
+          lastPushedId: origin.id,
+          staged: [],
+        });
+        return `Updating ${head?.id ?? "000"}..${origin.id}\nFast-forward\nAlready on main`;
+      },
+      gitSync: () => {
+        const pull = get().gitPull();
+        if (pull.startsWith("error")) return pull;
+        const push = get().gitPush();
+        return `${pull}\n${push}`;
+      },
+      gitStage: (path) =>
+        set((s) => ({
+          staged: s.staged.includes(path) ? s.staged : [...s.staged, path],
+        })),
+      gitUnstage: (path) => set((s) => ({ staged: s.staged.filter((p) => p !== path) })),
+      gitStageAll: () => set({ staged: get().changedPaths() }),
+      gitUnstageAll: () => set({ staged: [] }),
+      gitDiscard: (path) => {
+        const { commits, files, staged } = get();
+        const head = commits[commits.length - 1];
+        const next = { ...files };
+        if (!head || head.files[path] === undefined) delete next[path];
+        else next[path] = head.files[path];
+        set({ files: next, staged: staged.filter((p) => p !== path) });
+        return `descartado ${path}`;
+      },
+      gitDiscardAll: () => {
+        const { commits } = get();
+        const head = commits[commits.length - 1];
+        if (!head) return "nada para descartar";
+        set({ files: cloneFiles(head.files), staged: [] });
+        return "working tree restaurada para HEAD";
+      },
+      gitUndoCommit: () => {
+        const { commits } = get();
+        if (commits.length < 2) return "não há commit para desfazer";
+        const dropped = commits[commits.length - 1]!;
+        set({
+          commits: commits.slice(0, -1),
+          staged: Object.keys(dropped.files),
+        });
+        return `HEAD agora em ${commits[commits.length - 2]!.id} (soft)`;
+      },
+      gitBranchList: () => {
+        const { branch, branchSnaps } = get();
+        return [...new Set([branch, ...Object.keys(branchSnaps)])].sort();
+      },
+      gitBranchCreate: (name) => {
+        const n = name.trim().replace(/\s+/g, "-");
+        if (!n) return "nome inválido";
+        const { branch, branchSnaps } = get();
+        if (n === branch || branchSnaps[n]) return `branch já existe: ${n}`;
+        set({
+          branchSnaps: { ...branchSnaps, [branch]: snapBranch(get()), [n]: snapBranch(get()) },
+          branch: n,
+        });
+        return `criada e em ${n}`;
+      },
+      gitCheckout: (name) => {
+        const n = name.trim();
+        const s = get();
+        if (!n) return "informe o branch";
+        if (n === s.branch) return `já em ${n}`;
+        const snaps = { ...s.branchSnaps, [s.branch]: snapBranch(s) };
+        const dest = snaps[n];
+        if (!dest) return `branch desconhecida: ${n}`;
+        set({
+          branchSnaps: snaps,
+          branch: n,
+          files: cloneFiles(dest.files),
+          commits: dest.commits,
+          staged: dest.staged,
+          lastPushedId: dest.lastPushedId,
+          origin: dest.origin,
+        });
+        return `trocou para ${n}`;
+      },
+      gitStash: () => {
+        const s = get();
+        const changed = get().changedPaths();
+        if (!changed.length) return "nada para stash";
+        const head = s.commits[s.commits.length - 1];
+        if (!head) return "sem HEAD";
+        const entry: StashEntry = {
+          id: uid().slice(0, 8),
+          message: `WIP on ${s.branch}`,
+          files: cloneFiles(s.files),
+          staged: [...s.staged],
+        };
+        set({
+          stash: [entry, ...s.stash].slice(0, 12),
+          files: cloneFiles(head.files),
+          staged: [],
+        });
+        return `stash@{0}: ${entry.message}`;
+      },
+      gitStashPop: () => {
+        const s = get();
+        const top = s.stash[0];
+        if (!top) return "stash vazio";
+        set({
+          files: { ...s.files, ...top.files },
+          staged: top.staged,
+          stash: s.stash.slice(1),
+        });
+        return `aplicado ${top.id}`;
+      },
+      gitBlame: (path) => {
+        const { commits, files } = get();
+        const lines = (files[path] ?? "").split("\n");
+        const blame: BlameLine[] = lines.map((text, i) => ({
+          line: i + 1,
+          text,
+          id: commits[0]?.id ?? "—",
+          message: commits[0]?.message ?? "",
+          at: commits[0]?.at ?? 0,
+        }));
+        for (const c of commits) {
+          const ls = c.files[path]?.split("\n");
+          if (!ls) continue;
+          ls.forEach((text, i) => {
+            if (blame[i] && blame[i]!.text === text) {
+              blame[i] = { line: i + 1, text, id: c.id, message: c.message, at: c.at };
+            } else if (blame[i] && blame[i]!.text !== text) {
+              /* keep later */
+            }
+          });
+        }
+        for (const c of commits) {
+          const ls = c.files[path]?.split("\n") ?? [];
+          lines.forEach((text, i) => {
+            if (ls[i] !== text) {
+              blame[i] = { line: i + 1, text, id: c.id, message: c.message, at: c.at };
+            }
+          });
+        }
+        return blame;
+      },
+      gitRestoreCommit: (id) => {
+        const c = get().commits.find((x) => x.id === id);
+        if (!c) return "commit não encontrado";
+        set({ files: cloneFiles(c.files), staged: [] });
+        return `arquivos restaurados de ${c.id}  ${c.message}`;
+      },
+      gitApplyHunk: (path, index, keep) => {
+        const { files, commits } = get();
+        const head = commits[commits.length - 1]?.files[path] ?? "";
+        const current = files[path];
+        if (current === undefined) return "arquivo não existe";
+        const next = keep ? keepOnlyHunk(head, current, index) : discardHunk(head, current, index);
+        get().writeFile(path, next);
+        return keep ? `hunk ${index + 1} aplicado` : `hunk ${index + 1} descartado`;
+      },
+      renameFile: (from, to) => {
+        const src = sanitizePath(from);
+        const dest = sanitizePath(to);
+        if (!src || !dest) return "caminho inválido";
+        const { files, tabs, openPath, staged } = get();
+        if (files[src] === undefined) return "arquivo não existe";
+        if (src === dest) return undefined;
+        if (files[dest] !== undefined) return "já existe";
+        const next = { ...files, [dest]: files[src] };
+        delete next[src];
+        set({
+          files: next,
+          tabs: tabs.map((t) => (t === src ? dest : t)),
+          openPath: openPath === src ? dest : openPath,
+          staged: staged.map((t) => (t === src ? dest : t)),
+        });
+        return undefined;
+      },
+      replaceInFiles: (pattern, replacement) => {
+        let re: RegExp;
+        try {
+          re = new RegExp(pattern, "g");
+        } catch {
+          return { files: 0, hits: 0 };
+        }
+        const files = { ...get().files };
+        let fileCount = 0;
+        let hits = 0;
+        for (const [p, text] of Object.entries(files)) {
+          const next = text.replace(re, () => {
+            hits += 1;
+            return replacement;
+          });
+          if (next !== text) {
+            files[p] = next;
+            fileCount += 1;
+          }
+        }
+        if (fileCount) set({ files });
+        return { files: fileCount, hits };
+      },
+      resolveConflict: (path, take, merged) => {
+        const s = get();
+        const c = s.conflicts.find((x) => x.path === path);
+        if (!c) return;
+        const body = take === "ours" ? c.ours : take === "theirs" ? c.theirs : (merged ?? c.ours);
+        const files = { ...s.files, [path]: body };
+        set({ files, conflicts: s.conflicts.filter((x) => x.path !== path) });
+      },
+      mergeRemote: (incoming) => {
+        const s = get();
+        const head = s.commits[s.commits.length - 1];
+        const conflicts: Conflict[] = [];
+        const files = { ...s.files };
+        for (const [path, theirs] of Object.entries(incoming)) {
+          const ours = files[path];
+          const base = head?.files[path];
+          if (ours === undefined || ours === theirs || ours === base) {
+            files[path] = theirs;
+            continue;
+          }
+          if (base !== theirs && ours !== base) {
+            conflicts.push({ path, ours, theirs });
+            files[path] = `<<<<<<< HEAD\n${ours}\n=======\n${theirs}\n>>>>>>> origin\n`;
+          } else {
+            files[path] = theirs;
+          }
+        }
+        const commit: Commit = {
+          id: uid().slice(0, 8),
+          message: conflicts.length ? "merge origin (com conflitos)" : "merge origin",
+          at: Date.now(),
+          files: cloneFiles(files),
+        };
+        set({
+          files,
+          commits: [...s.commits, commit],
+          lastPushedId: commit.id,
+          origin: { ...commit, files: cloneFiles(files) },
+          conflicts,
+          staged: [],
+        });
+        return conflicts.length
+          ? `merge com ${conflicts.length} conflito(s)`
+          : `merge ok · ${Object.keys(incoming).length} arquivos`;
+      },
+      changedPaths: () => {
+        const { files, commits } = get();
+        const head = commits[commits.length - 1];
+        if (!head) return Object.keys(files);
+        const keys = new Set([...Object.keys(files), ...Object.keys(head.files)]);
+        const changed: string[] = [];
+        for (const k of keys) {
+          if (files[k] !== head.files[k]) changed.push(k);
+        }
+        return changed.sort();
+      },
+      fileDirty: (path) => {
+        const { files, commits } = get();
+        const head = commits[commits.length - 1];
+        if (!head) return true;
+        return files[path] !== head.files[path];
+      },
+      termPrint: (kind, text) => {
+        useTerms.getState().print(kind, text);
+        set((s) => ({
+          terminal: [...s.terminal.slice(-40), { id: uid(), kind, text }],
+        }));
+      },
+      termClear: () => {
+        useTerms.getState().clear();
+        set({ terminal: [] });
+      },
+      setCwd: (path) => {
+        const clean = path.replace(/^\/+|\/+$/g, "");
+        set({ cwd: clean });
+      },
+      rememberNow: () => {
+        const s = get();
+        useProjects.getState().remember({
+          id: s.projectId,
+          name: s.projectName,
+          files: Object.keys(s.files).length,
+          remote: s.remote,
+          branch: s.branch,
+          snapshot: cloneFiles(s.files),
+        });
+      },
+      loadProject: (p) => {
+        get().rememberNow();
+        const files = cloneFiles(p.files);
+        const first = Object.keys(files).sort().find((k) => k === "README.md") ?? Object.keys(files).sort()[0] ?? "README.md";
+        const commit: Commit = {
+          id: uid(),
+          message: p.message || `abrir ${p.name}`,
+          at: Date.now(),
+          files: cloneFiles(files),
+        };
+        set({
+          files,
+          openPath: files[first] !== undefined ? first : Object.keys(files)[0] ?? "README.md",
+          tabs: [first],
+          commits: [commit],
+          lastPushedId: commit.id,
+          origin: { ...commit, files: cloneFiles(files) },
+          staged: [],
+          branch: p.branch || "main",
+          cwd: "",
+          projectId: p.id,
+          projectName: p.name,
+          remote: p.remote ?? null,
+          terminal: [{ id: uid(), kind: "ok", text: `projeto ${p.name}` }],
+        });
+      },
+      newProject: (name) => {
+        const title = name.trim() || "sem título";
+        get().loadProject({
+          id: uid(),
+          name: title,
+          files: { "README.md": `# ${title}\n\nProjeto novo no Colo.\n` },
+          remote: null,
+          branch: "main",
+          message: "chore: projeto novo",
+        });
+      },
+      closeProject: () => {
+        get().newProject("vazio");
+      },
+      importFiles: (incoming, replace = false) => {
+        const files = replace ? cloneFiles(incoming) : { ...get().files, ...incoming };
+        const first = Object.keys(files).sort()[0] ?? "README.md";
+        set({
+          files,
+          openPath: files[get().openPath] !== undefined ? get().openPath : first,
+          tabs: replace ? [first] : get().tabs,
+        });
+      },
+      resetWorkspace: () =>
+        set({
+          ...freshState(),
+          terminal: [{ id: uid(), kind: "ok", text: "workspace restaurado" }],
+        }),
+      isDirty: () => {
+        const { files, commits } = get();
+        const head = commits[commits.length - 1];
+        return !head || !filesEqual(files, head.files);
+      },
+    }),
+    {
+      name: "colo-workspace-v2",
+      partialize: (s) => ({
+        files: s.files,
+        openPath: s.openPath,
+        tabs: s.tabs,
+        commits: s.commits,
+        lastPushedId: s.lastPushedId,
+        origin: s.origin,
+        branch: s.branch,
+        cwd: s.cwd,
+        projectId: s.projectId,
+        projectName: s.projectName,
+        remote: s.remote,
+        branchSnaps: s.branchSnaps,
+        stash: s.stash,
+        conflicts: s.conflicts,
+      }),
+      onRehydrateStorage: () => (state) => {
+        if (!state) return;
+        if (!state.files || Object.keys(state.files).length === 0) {
+          Object.assign(state, freshState());
+        }
+        if (!state.tabs?.length) {
+          state.tabs = [state.openPath || "README.md"];
+        }
+        if (!state.origin) {
+          const head = state.commits?.[state.commits.length - 1];
+          state.origin = head
+            ? { ...head, files: { ...head.files } }
+            : {
+                id: "seed",
+                message: SEED_COMMIT_MESSAGE,
+                at: Date.now(),
+                files: { ...SEED_FILES },
+              };
+        }
+        if (!state.staged) state.staged = [];
+        if (!state.branch) state.branch = "main";
+        if (!state.branchSnaps) state.branchSnaps = {};
+        if (!state.stash) state.stash = [];
+        if (!state.conflicts) state.conflicts = [];
+        if (!state.projectId) state.projectId = "seed";
+        if (!state.projectName) state.projectName = "colo";
+        if (state.remote === undefined) state.remote = null;
+        state.hydrated = true;
+      },
+    },
+  ),
+);
+
+export function pathExists(path: string) {
+  return useWorkspace.getState().files[path] !== undefined;
+}
+
+export { parentDir };

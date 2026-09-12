@@ -141,31 +141,31 @@ export async function importZipFile(file: File) {
   return unzipFiles(await file.arrayBuffer());
 }
 
+export type SaveOffer = { href: string; name: string };
+
 function isAbort(e: unknown) {
   return e instanceof DOMException && (e.name === "AbortError" || e.name === "NotAllowedError");
 }
 
-function safeName(name: string, ext: string) {
+export function safeName(name: string, ext: string) {
   const base = (name || "colo").replace(/[\\/:*?"<>|]+/g, "-").trim() || "colo";
   return base.toLowerCase().endsWith(`.${ext}`) ? base : `${base}.${ext}`;
 }
 
-export async function saveBlob(blob: Blob, filename: string) {
-  const file = new File([blob], filename, { type: blob.type || "application/octet-stream" });
+export async function saveBlob(blob: Blob, filename: string): Promise<SaveOffer | null> {
+  const file = new File([blob], filename, { type: "application/octet-stream" });
   const nav = navigator as Navigator & {
     share?: (d: ShareData) => Promise<void>;
     canShare?: (d: ShareData) => boolean;
   };
 
-  if (nav.share && nav.canShare) {
-    try {
-      if (nav.canShare({ files: [file] })) {
-        await nav.share({ files: [file], title: filename });
-        return;
-      }
-    } catch (e) {
-      if (isAbort(e)) return;
+  try {
+    if (nav.share && nav.canShare?.({ files: [file] })) {
+      await nav.share({ files: [file], title: filename });
+      return null;
     }
+  } catch (e) {
+    if (isAbort(e)) return null;
   }
 
   const picker = (
@@ -178,41 +178,28 @@ export async function saveBlob(blob: Blob, filename: string) {
   ).showSaveFilePicker;
   if (picker) {
     try {
-      const handle = await picker({
-        suggestedName: filename,
-        types: [
-          {
-            description: filename.endsWith(".json") ? "JSON" : "ZIP",
-            accept: filename.endsWith(".json")
-              ? { "application/json": [".json"] }
-              : { "application/zip": [".zip"] },
-          },
-        ],
-      });
+      const handle = await picker({ suggestedName: filename });
       const w = await handle.createWritable();
-      await w.write(blob);
+      await w.write(file);
       await w.close();
-      return;
+      return null;
     } catch (e) {
-      if (isAbort(e)) return;
+      if (isAbort(e)) return null;
     }
   }
 
-  const url = URL.createObjectURL(blob);
+  const href = URL.createObjectURL(file);
   const a = document.createElement("a");
-  a.href = url;
+  a.href = href;
   a.download = filename;
   a.rel = "noopener";
   a.style.display = "none";
   document.body.appendChild(a);
   a.click();
-  window.setTimeout(() => {
-    a.remove();
-    URL.revokeObjectURL(url);
-  }, 4000);
+  a.remove();
+  return { href, name: filename };
 }
 
 export async function downloadZip(name: string, files: Record<string, string>) {
-  const blob = zipFiles(files);
-  await saveBlob(blob, safeName(name, "zip"));
+  return saveBlob(zipFiles(files), safeName(name, "zip"));
 }

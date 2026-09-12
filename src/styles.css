@@ -513,6 +513,19 @@ input, textarea, select { font: inherit; font-size: 16px; }
   text-align: left;
 }
 .ex-menu-list button:hover { background: var(--color-bg-subtle); }
+.save-offer {
+  display: grid;
+  place-items: center;
+  min-height: 48px;
+  margin: 8px 12px 4px;
+  padding: 0 14px;
+  border-radius: 12px;
+  background: var(--color-accent);
+  color: var(--color-accent-fg);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
 .ex-remote { margin: 0; padding: 4px 12px 8px; font-size: 10px; color: var(--color-fg-subtle); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ex-new { padding: 8px; }
 

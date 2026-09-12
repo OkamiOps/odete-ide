@@ -3,7 +3,7 @@ import { Archive, Copy, FileJson, Files, FolderOpen, Github, Lock, Tablet, Trash
 import { githubClone, githubCreateRepo, githubOrgs, githubRepos, type GithubOrg, type GithubRepo } from "@/lib/github/api";
 import { setSheet, useProjectUi, useProjects, type ProjectSheet } from "@/lib/workspace/projects";
 import { useWorkspace } from "@/lib/workspace/store";
-import { downloadZip, importZipFile, saveBlob } from "@/lib/workspace/zip";
+import { downloadZip, importZipFile, saveBlob, safeName, type SaveOffer } from "@/lib/workspace/zip";
 
 export function ProjectHub() {
   const sheet = useProjectUi((s) => s.sheet);
@@ -38,9 +38,17 @@ export function ProjectHub() {
 export function ProjectMenu({ onPick }: { onPick?: () => void }) {
   const github = useProjects((s) => s.github);
   const zipRef = useRef<HTMLInputElement>(null);
+  const [offer, setOffer] = useState<SaveOffer | null>(null);
+  const [copied, setCopied] = useState(false);
   function go(next: ProjectSheet) {
     onPick?.();
     setSheet(next);
+  }
+  async function offerFile(next: Promise<SaveOffer | null>) {
+    const prev = offer;
+    const got = await next;
+    if (prev) URL.revokeObjectURL(prev.href);
+    setOffer(got);
   }
   return (
     <div className="ex-menu-list">
@@ -56,7 +64,7 @@ export function ProjectMenu({ onPick }: { onPick?: () => void }) {
         type="button"
         onClick={() => {
           const s = useWorkspace.getState();
-          void downloadZip(s.projectName, s.files).finally(() => onPick?.());
+          void offerFile(downloadZip(s.projectName, s.files));
         }}
       >
         Exportar / compartilhar zip
@@ -87,14 +95,30 @@ export function ProjectMenu({ onPick }: { onPick?: () => void }) {
           });
         }}
       />
-      <button
-        type="button"
-        onClick={() => {
-          void exportJson().finally(() => onPick?.());
-        }}
-      >
+      <button type="button" onClick={() => void offerFile(exportJson())}>
         Exportar JSON
       </button>
+      <button
+        type="button"
+        onClick={async () => {
+          const s = useWorkspace.getState();
+          const text = JSON.stringify({ name: s.projectName, remote: s.remote, files: s.files }, null, 2);
+          try {
+            await navigator.clipboard.writeText(text);
+            setCopied(true);
+            window.setTimeout(() => setCopied(false), 1500);
+          } catch {
+            setCopied(false);
+          }
+        }}
+      >
+        {copied ? "JSON copiado" : "Copiar JSON"}
+      </button>
+      {offer ? (
+        <a className="save-offer" href={offer.href} download={offer.name} rel="noopener">
+          Toque para salvar {offer.name}
+        </a>
+      ) : null}
       <button
         type="button"
         onClick={() => {
@@ -878,7 +902,7 @@ async function exportJson() {
   const s = useWorkspace.getState();
   const blob = new Blob(
     [JSON.stringify({ name: s.projectName, remote: s.remote, files: s.files }, null, 2)],
-    { type: "application/json" },
+    { type: "application/octet-stream" },
   );
-  await saveBlob(blob, `${(s.projectName || "colo").replace(/[\\/:*?"<>|]+/g, "-")}.json`);
+  return saveBlob(blob, safeName(s.projectName || "colo", "json"));
 }

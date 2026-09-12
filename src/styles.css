@@ -759,9 +759,44 @@ input, textarea, select { font: inherit; font-size: 16px; }
 
 .cheat-scrim, .project-scrim { position: fixed; inset: 0; z-index: 45; display: grid; place-items: center; background: rgb(0 0 0 / .45); }
 .cheat-card, .project-sheet { width: min(480px, 94vw); max-height: 84vh; overflow: auto; border: 1px solid var(--color-border); border-radius: 16px; background: var(--color-bg-elevated); }
-.cheat-card { padding: 16px; }
-.cheat-card li { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--color-border); font-size: 13px; }
-.cheat-card kbd { font-family: var(--font-mono); font-size: 12px; color: var(--color-fg-muted); }
+.cheat-card { padding: 0; }
+.cheat-body { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px 16px; }
+.cheat-group h3 {
+  margin: 0 0 4px;
+  font-size: 11px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--color-fg-subtle);
+  font-weight: 600;
+}
+.cheat-group ul { margin: 0; padding: 0; list-style: none; }
+.cheat-group li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  padding: 0 8px;
+  border-radius: 10px;
+  font-size: 14px;
+}
+.cheat-group li:hover { background: var(--color-bg-subtle); }
+.cheat-keys { display: flex; gap: 4px; flex-shrink: 0; }
+.cheat-keys kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 28px;
+  min-height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+}
+.cheat-foot { margin: 4px 0 0; font-size: 11px; color: var(--color-fg-subtle); }
 .project-sheet-hd { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--color-border); }
 .new-pane { display: flex; flex-direction: column; gap: 12px; padding: 14px; }
 .new-label { margin: 0; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--color-fg-subtle); display: flex; flex-direction: column; gap: 6px; }

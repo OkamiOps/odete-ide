@@ -249,6 +249,23 @@ export async function githubPulls(remote: string, token: string) {
   return list.map((p) => ({ number: p.number, title: p.title, url: p.html_url, head: p.head.ref }));
 }
 
+export async function githubCreateRepo(token: string, name: string, owner?: string) {
+  const slug = name
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80) || "colo-app";
+  const url = owner
+    ? `https://api.github.com/orgs/${encodeURIComponent(owner)}/repos`
+    : "https://api.github.com/user/repos";
+  const repo = await ghWrite<{ full_name: string; default_branch: string }>(url, token, "POST", {
+    name: slug,
+    private: true,
+    auto_init: false,
+  });
+  return { remote: repo.full_name, branch: repo.default_branch || "main", slug };
+}
+
 export async function githubCreateIssue(remote: string, token: string, title: string, body: string) {
   const spec = parseRepo(remote);
   if (!spec) throw new Error("remote inválido");

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
-import { Github, Lock, Trash2, X } from "lucide-react";
-import { githubClone, githubOrgs, githubRepos, type GithubOrg, type GithubRepo } from "@/lib/github/api";
+import { FolderOpen, Github, Lock, Tablet, Trash2, X } from "lucide-react";
+import { githubClone, githubCreateRepo, githubOrgs, githubRepos, type GithubOrg, type GithubRepo } from "@/lib/github/api";
 import { setSheet, useProjectUi, useProjects, type ProjectSheet } from "@/lib/workspace/projects";
 import { useWorkspace } from "@/lib/workspace/store";
 import { downloadZip, importZipFile } from "@/lib/workspace/zip";
@@ -212,22 +212,205 @@ function RecentList() {
 }
 
 function NewForm() {
+  const github = useProjects((s) => s.github);
   const [name, setName] = useState("");
+  const [dest, setDest] = useState<"ipad" | "files" | "github">("ipad");
+  const [kind, setKind] = useState<"empty" | "html" | "swift" | "vite">("empty");
+  const [org, setOrg] = useState("");
+  const [orgs, setOrgs] = useState<GithubOrg[]>([]);
+  const [busy, setBusy] = useState("");
+  const [err, setErr] = useState("");
+
+  useEffect(() => {
+    if (!github) return;
+    let live = true;
+    void githubOrgs(github.token)
+      .then((list) => {
+        if (live) setOrgs(list);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [github]);
+
+  async function create() {
+    const title = name.trim() || "sem título";
+    setErr("");
+    setBusy("criando…");
+    try {
+      const files = starterFiles(kind, title);
+      let remote: string | null = null;
+      if (dest === "github") {
+        if (!github) throw new Error("conecta o GitHub antes");
+        const made = await githubCreateRepo(github.token, title, org || undefined);
+        remote = made.remote;
+      }
+      if (dest === "files") {
+        const picker = (window as Window & { showDirectoryPicker?: () => Promise<FileSystemDirectoryHandle> })
+          .showDirectoryPicker;
+        if (picker) {
+          const root = await picker();
+          await writeDir(root, files);
+        } else {
+          await downloadZip(title, files);
+        }
+      }
+      useWorkspace.getState().loadProject({
+        id: uidLocal(),
+        name: title,
+        files,
+        remote,
+        branch: "main",
+        message: "chore: projeto novo",
+      });
+      useWorkspace.getState().rememberNow();
+      setSheet(false);
+    } catch (e) {
+      if (e instanceof DOMException && e.name === "AbortError") return;
+      setErr(e instanceof Error ? e.message : "não criou");
+    } finally {
+      setBusy("");
+    }
+  }
+
   return (
     <form
-      className="space-y-3"
+      className="new-pane"
       onSubmit={(e) => {
         e.preventDefault();
-        useWorkspace.getState().newProject(name || "sem título");
-        setSheet(false);
+        void create();
       }}
     >
-      <input className="field" placeholder="nome do projeto" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
-      <button type="submit" className="chip is-on">
-        Criar
+      <label className="new-label">
+        Nome
+        <input
+          className="field"
+          placeholder="meu app"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          autoFocus
+        />
+      </label>
+
+      <p className="new-label">Onde guardar</p>
+      <div className="new-dests">
+        <button type="button" className={dest === "ipad" ? "is-on" : undefined} onClick={() => setDest("ipad")}>
+          <Tablet size={18} />
+          <b>Neste iPad</b>
+          <span>biblioteca do Colo, offline</span>
+        </button>
+        <button type="button" className={dest === "files" ? "is-on" : undefined} onClick={() => setDest("files")}>
+          <FolderOpen size={18} />
+          <b>Pasta Files</b>
+          <span>escolhe a pasta, ou baixa zip</span>
+        </button>
+        <button
+          type="button"
+          className={dest === "github" ? "is-on" : undefined}
+          onClick={() => setDest("github")}
+          disabled={!github}
+        >
+          <Github size={18} />
+          <b>GitHub</b>
+          <span>{github ? `repo novo em @${github.user.login}` : "conecta o GitHub primeiro"}</span>
+        </button>
+      </div>
+
+      {dest === "github" && github ? (
+        <div className="clone-orgs">
+          <button type="button" className={!org ? "is-on" : undefined} onClick={() => setOrg("")}>
+            @{github.user.login}
+          </button>
+          {orgs.map((o) => (
+            <button
+              key={o.login}
+              type="button"
+              className={org === o.login ? "is-on" : undefined}
+              onClick={() => setOrg(o.login)}
+            >
+              @{o.login}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      <p className="new-label">Modelo</p>
+      <div className="new-kinds">
+        {(
+          [
+            ["empty", "Vazio"],
+            ["html", "HTML"],
+            ["swift", "SwiftUI"],
+            ["vite", "Vite"],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            className={kind === id ? "is-on" : undefined}
+            onClick={() => setKind(id)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {err ? <p className="agent-err">{err}</p> : null}
+      <button type="submit" className="new-go" disabled={!!busy}>
+        {busy || "Criar projeto"}
       </button>
     </form>
   );
+}
+
+function uidLocal() {
+  return `p-${Date.now().toString(36)}`;
+}
+
+function starterFiles(kind: "empty" | "html" | "swift" | "vite", name: string): Record<string, string> {
+  if (kind === "html") {
+    return {
+      "index.html": `<!doctype html>\n<html lang="pt-BR">\n<head>\n  <meta charset="utf-8" />\n  <meta name="viewport" content="width=device-width, initial-scale=1" />\n  <title>${name}</title>\n  <link rel="stylesheet" href="style.css" />\n</head>\n<body>\n  <main>\n    <h1>${name}</h1>\n    <p>Pronto no iPad.</p>\n  </main>\n  <script src="app.js"></script>\n</body>\n</html>\n`,
+      "style.css": `:root { color-scheme: dark; font-family: ui-sans-serif, system-ui; }\nbody { margin: 0; min-height: 100dvh; display: grid; place-items: center; background: #111; color: #f4f4f5; }\nh1 { margin: 0 0 8px; font-size: 28px; }\n`,
+      "app.js": `console.log("${name}");\n`,
+    };
+  }
+  if (kind === "swift") {
+    return {
+      "App.swift": `import SwiftUI\n\n@main\nstruct ${safeIdent(name)}App: App {\n    var body: some Scene {\n        WindowGroup {\n            ContentView()\n        }\n    }\n}\n`,
+      "ContentView.swift": `import SwiftUI\n\nstruct ContentView: View {\n    var body: some View {\n        VStack(spacing: 12) {\n            Text("${name}")\n                .font(.largeTitle.bold())\n            Text("Swift no iPad")\n                .foregroundStyle(.secondary)\n        }\n        .padding()\n    }\n}\n\n#Preview { ContentView() }\n`,
+    };
+  }
+  if (kind === "vite") {
+    return {
+      "package.json": `{\n  "name": "${name.toLowerCase().replace(/\s+/g, "-") || "app"}",\n  "private": true,\n  "type": "module",\n  "scripts": {\n    "dev": "vite",\n    "build": "vite build"\n  },\n  "dependencies": {\n    "vite": "^6.0.0"\n  }\n}\n`,
+      "index.html": `<!doctype html>\n<html lang="pt-BR">\n  <head>\n    <meta charset="utf-8" />\n    <meta name="viewport" content="width=device-width, initial-scale=1" />\n    <title>${name}</title>\n  </head>\n  <body>\n    <div id="app"></div>\n    <script type="module" src="/src/main.js"></script>\n  </body>\n</html>\n`,
+      "src/main.js": `document.getElementById("app").textContent = "${name}";\n`,
+      "src/style.css": `body { margin: 0; font-family: ui-sans-serif, system-ui; }\n`,
+      "README.md": `# ${name}\n\nnpm i && npm run dev\n`,
+    };
+  }
+  return { "README.md": `# ${name}\n\nProjeto novo no Colo.\n` };
+}
+
+function safeIdent(name: string) {
+  const s = name.replace(/[^A-Za-z0-9]/g, "") || "App";
+  return s[0]!.toUpperCase() + s.slice(1);
+}
+
+async function writeDir(root: FileSystemDirectoryHandle, files: Record<string, string>) {
+  for (const [path, text] of Object.entries(files)) {
+    const parts = path.split("/").filter(Boolean);
+    let dir = root;
+    for (const p of parts.slice(0, -1)) {
+      dir = await dir.getDirectoryHandle(p, { create: true });
+    }
+    const file = await dir.getFileHandle(parts.at(-1)!, { create: true });
+    const w = await file.createWritable();
+    await w.write(text);
+    await w.close();
+  }
 }
 
 function OpenForm() {

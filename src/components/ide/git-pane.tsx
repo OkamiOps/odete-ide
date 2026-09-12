@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Archive,
   Check,
@@ -42,12 +42,20 @@ export function GitPane() {
   const [busy, setBusy] = useState(false);
   const [more, setMore] = useState(false);
   const [suggesting, setSuggesting] = useState(false);
+  const msgRef = useRef<HTMLTextAreaElement>(null);
   const token = useProjects((s) => s.github?.token);
   const snaps = useWorkspace((s) => s.branchSnaps);
   const branches = useMemo(
     () => [...new Set([branch, ...Object.keys(snaps ?? {})])].sort(),
     [branch, snaps],
   );
+
+  useEffect(() => {
+    const el = msgRef.current;
+    if (!el) return;
+    el.style.height = "0px";
+    el.style.height = `${Math.min(180, Math.max(56, el.scrollHeight))}px`;
+  }, [msg]);
 
   const head = commits[commits.length - 1];
   const changed = useMemo(() => {
@@ -101,6 +109,10 @@ export function GitPane() {
             <RefreshCw size={16} />
             fetch
           </button>
+          <button type="button" className="is-accent" onClick={() => run(() => w().gitSync())}>
+            <RefreshCw size={16} />
+            sync
+          </button>
           <button type="button" onClick={() => run(() => w().gitPull())}>
             <Download size={16} />
             pull
@@ -109,18 +121,15 @@ export function GitPane() {
             <Upload size={16} />
             push
           </button>
-          <button type="button" className="is-accent" onClick={() => run(() => w().gitSync())}>
-            <RefreshCw size={16} />
-            sync
-          </button>
         </div>
       </div>
 
       <div className="git-commit git-card">
         <div className="git-msg-wrap">
           <textarea
+            ref={msgRef}
             className="git-msg"
-            rows={2}
+            rows={1}
             placeholder="Mensagem do commit"
             value={msg}
             onChange={(e) => setMsg(e.target.value)}

@@ -1,4 +1,5 @@
-import { Clock, GitCommit, MessageSquarePlus, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight, Clock, GitCommit, MessageSquarePlus, X } from "lucide-react";
 import { FileGlyph } from "@/components/ide/file-glyph";
 import { useChrome } from "@/lib/workspace/chrome";
 import { fileDragHandlers, useDrag } from "@/lib/workspace/drag";
@@ -16,10 +17,51 @@ export function EditorTabs() {
   const editFocus = useChrome((s) => s.editFocus);
   const histOn = useNav((s) => s.hist);
   const blameOn = useNav((s) => s.blame);
+  const scroller = useRef<HTMLDivElement>(null);
+  const [more, setMore] = useState({ left: false, right: false });
+
+  function syncMore() {
+    const el = scroller.current;
+    if (!el) return;
+    setMore({
+      left: el.scrollLeft > 6,
+      right: el.scrollLeft + el.clientWidth < el.scrollWidth - 6,
+    });
+  }
+
+  useEffect(() => {
+    const el = scroller.current;
+    if (!el) return;
+    syncMore();
+    const ro = new ResizeObserver(syncMore);
+    ro.observe(el);
+    el.addEventListener("scroll", syncMore, { passive: true });
+    return () => {
+      ro.disconnect();
+      el.removeEventListener("scroll", syncMore);
+    };
+  }, [tabs, openPath]);
+
+  useEffect(() => {
+    const el = scroller.current;
+    if (!el) return;
+    const on = el.querySelector<HTMLElement>(".tab.is-on");
+    on?.scrollIntoView({ inline: "nearest", block: "nearest" });
+    syncMore();
+  }, [openPath]);
+
+  function nudge(dir: -1 | 1) {
+    scroller.current?.scrollBy({ left: dir * 180, behavior: "smooth" });
+  }
 
   return (
-    <div className="ed-bar">
-      <div className="tabs" role="tablist" aria-label="Arquivos abertos">
+    <div className={`ed-bar${more.left ? " has-left" : ""}${more.right ? " has-right" : ""}`}>
+      {more.left ? (
+        <button type="button" className="tab-more" aria-label="abas à esquerda" onClick={() => nudge(-1)}>
+          <ChevronLeft size={18} />
+        </button>
+      ) : null}
+      <div className="tabs" role="tablist" aria-label="Arquivos abertos" ref={scroller}>
         {tabs.map((p) => {
           const name = p.split("/").pop() ?? p;
           const on = openPath === p || (center === "dual" && altPath === p);
@@ -53,6 +95,11 @@ export function EditorTabs() {
           );
         })}
       </div>
+      {more.right ? (
+        <button type="button" className="tab-more" aria-label="abas à direita" onClick={() => nudge(1)}>
+          <ChevronRight size={18} />
+        </button>
+      ) : null}
       <div className="ed-acts">
         <button
           type="button"

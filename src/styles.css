@@ -232,6 +232,26 @@ input, textarea, select { font: inherit; font-size: 16px; }
   scrollbar-width: none;
 }
 .ed-bar .tabs::-webkit-scrollbar { display: none; height: 0; }
+.ed-bar.has-left .tabs {
+  mask-image: linear-gradient(90deg, transparent, #000 28px);
+}
+.ed-bar.has-right .tabs {
+  mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent);
+}
+.ed-bar.has-left.has-right .tabs {
+  mask-image: linear-gradient(90deg, transparent, #000 28px, #000 calc(100% - 28px), transparent);
+}
+.tab-more {
+  flex-shrink: 0;
+  width: 36px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-bg);
+  color: var(--color-fg);
+}
 .ed-acts { display: flex; align-items: center; gap: 6px; flex-shrink: 0; margin-left: auto; }
 .ed-acts button {
   width: 44px;

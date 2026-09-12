@@ -69,6 +69,7 @@ export function AgentPane() {
   const draftRef = useRef("");
   const sendFn = useRef<(t: string) => void>(() => {});
   const fileRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const agentMode = useChrome((s) => s.agentMode);
 
   useEffect(() => {
@@ -81,6 +82,12 @@ export function AgentPane() {
   }, [projectId]);
 
   const saveTimer = useRef<number | null>(null);
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "0px";
+    el.style.height = `${Math.min(180, Math.max(52, el.scrollHeight))}px`;
+  }, [draft]);
   useEffect(() => {
     if (!projectId) return;
     if (saveTimer.current) window.clearTimeout(saveTimer.current);
@@ -396,6 +403,7 @@ export function AgentPane() {
             }}
           >
             <textarea
+              ref={inputRef}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               onPaste={(e) => {
@@ -416,8 +424,8 @@ export function AgentPane() {
                   void send(draft);
                 }
               }}
-              rows={2}
-              placeholder={`Fala com o ${def.label}…  /skill  @arquivo`}
+              rows={1}
+              placeholder={`Fala com o ${def.label}…`}
               className="agent-input"
             />
             <input
@@ -435,41 +443,44 @@ export function AgentPane() {
                 });
               }}
             />
-            <button
-              type="button"
-              className="agent-icon-btn"
-              title="Anexar imagem"
-              aria-label="Anexar imagem"
-              onClick={() => fileRef.current?.click()}
-            >
-              <ImagePlus size={16} />
-            </button>
-            <button
-              type="button"
-              className="agent-icon-btn"
-              title="Citar arquivo aberto"
-              aria-label="Citar arquivo aberto"
-              onClick={() => setDraft((d) => `${d}${d && !d.endsWith(" ") ? " " : ""}@${openPath} `)}
-            >
-              <AtSign size={16} />
-            </button>
-            {busy ? (
+            <div className="agent-compose-bar">
               <button
                 type="button"
-                className="agent-send is-stop"
-                aria-label="parar"
-                onClick={() => {
-                  cancel.current = true;
-                  setBusy(false);
-                }}
+                className="agent-icon-btn"
+                title="Anexar imagem"
+                aria-label="Anexar imagem"
+                onClick={() => fileRef.current?.click()}
               >
-                <Square size={13} fill="currentColor" />
+                <ImagePlus size={18} />
               </button>
-            ) : (
-              <button type="submit" className="agent-send" disabled={!draft.trim() && !quote && !shots.length} aria-label="enviar">
-                <Send size={16} />
+              <button
+                type="button"
+                className="agent-icon-btn"
+                title="Citar arquivo aberto"
+                aria-label="Citar arquivo aberto"
+                onClick={() => setDraft((d) => `${d}${d && !d.endsWith(" ") ? " " : ""}@${openPath} `)}
+              >
+                <AtSign size={18} />
               </button>
-            )}
+              <span className="agent-compose-hint">/skill · @arquivo</span>
+              {busy ? (
+                <button
+                  type="button"
+                  className="agent-send is-stop"
+                  aria-label="parar"
+                  onClick={() => {
+                    cancel.current = true;
+                    setBusy(false);
+                  }}
+                >
+                  <Square size={14} fill="currentColor" />
+                </button>
+              ) : (
+                <button type="submit" className="agent-send" disabled={!draft.trim() && !quote && !shots.length} aria-label="enviar">
+                  <Send size={18} />
+                </button>
+              )}
+            </div>
           </form>
         </div>
       ) : null}

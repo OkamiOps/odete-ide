@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
-import { Archive, Copy, FileJson, Files, FolderOpen, Github, Lock, Tablet, Trash2, X } from "lucide-react";
+import { Archive, Copy, FileJson, Files, FolderOpen, GitBranch, Github, Lock, Star, Tablet, Trash2, X } from "lucide-react";
 import { githubClone, githubCreateRepo, githubOrgs, githubRepos, type GithubOrg, type GithubRepo } from "@/lib/github/api";
 import { setSheet, useProjectUi, useProjects, type ProjectSheet } from "@/lib/workspace/projects";
 import { useWorkspace } from "@/lib/workspace/store";
@@ -600,6 +600,19 @@ function OpenForm() {
   );
 }
 
+function ago(iso: string) {
+  const ms = Date.now() - new Date(iso).getTime();
+  if (!Number.isFinite(ms) || ms < 0) return "";
+  const min = Math.round(ms / 60000);
+  if (min < 1) return "agora";
+  if (min < 60) return `${min} min`;
+  const h = Math.round(min / 60);
+  if (h < 24) return `${h} h`;
+  const d = Math.round(h / 24);
+  if (d < 30) return `${d} d`;
+  return new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" });
+}
+
 function CloneForm() {
   const github = useProjects((s) => s.github);
   const [url, setUrl] = useState("");
@@ -669,7 +682,7 @@ function CloneForm() {
 
   const q = filter.trim().toLowerCase();
   const shown = q
-    ? repos.filter((r) => `${r.full} ${r.desc}`.toLowerCase().includes(q))
+    ? repos.filter((r) => `${r.full} ${r.desc} ${r.language} ${r.branch}`.toLowerCase().includes(q))
     : repos;
 
   return (
@@ -699,29 +712,32 @@ function CloneForm() {
 
       {github ? (
         <>
-          <div className="clone-orgs" role="tablist" aria-label="conta ou org">
-            <button type="button" className={!owner ? "is-on" : undefined} onClick={() => setOwner("")}>
-              @{github.user.login}
-            </button>
-            {orgs.map((o) => (
-              <button
-                key={o.login}
-                type="button"
-                className={owner === o.login ? "is-on" : undefined}
-                onClick={() => setOwner(o.login)}
-              >
-                @{o.login}
-              </button>
-            ))}
-          </div>
+          <label className="new-label">
+            Conta
+            <select
+              className="field"
+              value={owner}
+              onChange={(e) => setOwner(e.target.value)}
+              aria-label="conta ou organização"
+            >
+              <option value="">@{github.user.login} · você</option>
+              {orgs.map((o) => (
+                <option key={o.login} value={o.login}>
+                  @{o.login} · org
+                </option>
+              ))}
+            </select>
+          </label>
           <input
             className="field"
             placeholder="filtrar repositório"
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
           />
+          <p className="clone-count">
+            {loading ? "carregando…" : `${shown.length} repo${shown.length === 1 ? "" : "s"}`}
+          </p>
           <div className="clone-list">
-            {loading ? <p className="clone-status">carregando repos…</p> : null}
             {!loading && !shown.length ? <p className="clone-status">nenhum repo nesta conta</p> : null}
             {shown.map((r) => {
               const name = r.full.split("/")[1] ?? r.full;
@@ -731,7 +747,7 @@ function CloneForm() {
                   type="button"
                   className="clone-repo"
                   disabled={!!busy}
-                  onClick={() => void run(r.full)}
+                  onClick={() => void run(`https://github.com/${r.full}/tree/${encodeURIComponent(r.branch)}`)}
                 >
                   <span className="clone-repo-top">
                     <strong>{name}</strong>
@@ -744,6 +760,18 @@ function CloneForm() {
                     )}
                   </span>
                   {r.desc ? <span className="clone-desc">{r.desc}</span> : null}
+                  <span className="clone-meta">
+                    <span>
+                      <GitBranch size={12} /> {r.branch}
+                    </span>
+                    {r.language ? <span>{r.language}</span> : null}
+                    <span>
+                      <Star size={12} /> {r.stars}
+                    </span>
+                    <span>{ago(r.pushed)}</span>
+                    {r.fork ? <span>fork</span> : null}
+                    {r.archived ? <span>arquivo</span> : null}
+                  </span>
                 </button>
               );
             })}

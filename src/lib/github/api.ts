@@ -1,6 +1,18 @@
 export type GithubUser = { login: string; name: string | null; avatar: string };
 export type GithubOrg = { login: string; avatar: string };
-export type GithubRepo = { full: string; desc: string; updated: string; private: boolean };
+export type GithubRepo = {
+  full: string;
+  desc: string;
+  updated: string;
+  pushed: string;
+  private: boolean;
+  fork: boolean;
+  archived: boolean;
+  branch: string;
+  language: string;
+  stars: number;
+  issues: number;
+};
 export type CloneResult = { name: string; branch: string; remote: string; files: Record<string, string> };
 
 const SKIP =
@@ -63,16 +75,35 @@ export async function githubOrgs(token: string): Promise<GithubOrg[]> {
 
 export async function githubRepos(token: string, owner?: string): Promise<GithubRepo[]> {
   const url = owner
-    ? `https://api.github.com/orgs/${encodeURIComponent(owner)}/repos?sort=updated&per_page=50&type=all`
-    : "https://api.github.com/user/repos?sort=updated&per_page=50&affiliation=owner";
+    ? `https://api.github.com/orgs/${encodeURIComponent(owner)}/repos?sort=updated&per_page=100&type=all`
+    : "https://api.github.com/user/repos?sort=updated&per_page=100&affiliation=owner";
   const list = await gh<
-    { full_name: string; description: string | null; updated_at: string; private: boolean }[]
+    {
+      full_name: string;
+      description: string | null;
+      updated_at: string;
+      pushed_at: string | null;
+      private: boolean;
+      fork: boolean;
+      archived: boolean;
+      default_branch: string;
+      language: string | null;
+      stargazers_count: number;
+      open_issues_count: number;
+    }[]
   >(url, token);
   return list.map((r) => ({
     full: r.full_name,
     desc: r.description || "",
     updated: r.updated_at,
+    pushed: r.pushed_at || r.updated_at,
     private: r.private,
+    fork: r.fork,
+    archived: r.archived,
+    branch: r.default_branch || "main",
+    language: r.language || "",
+    stars: r.stargazers_count || 0,
+    issues: r.open_issues_count || 0,
   }));
 }
 

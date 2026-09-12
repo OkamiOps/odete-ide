@@ -5,7 +5,7 @@ import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { highlightSelectionMatches, search, SearchQuery, setSearchQuery, findNext, findPrevious, replaceNext, replaceAll } from "@codemirror/search";
 import { startCompletion } from "@codemirror/autocomplete";
 import { tags as t } from "@lezer/highlight";
-import { Check, Clock, GitCommit, MessageSquarePlus, X } from "lucide-react";
+import { Check, X } from "lucide-react";
 import { extOf } from "@/lib/utils";
 import { usePatches } from "@/lib/agent/patches";
 import { chipsFor, coloCompletions } from "@/lib/workspace/complete";
@@ -15,7 +15,7 @@ import { useChrome } from "@/lib/workspace/chrome";
 import { addedLines, hunksOf } from "@/lib/workspace/hunks";
 import { useHistory } from "@/lib/workspace/history";
 import { indentGuides } from "@/lib/workspace/indent-guides";
-import { quoteSelection, setActiveView, useNav } from "@/lib/workspace/nav";
+import { setActiveView, useNav } from "@/lib/workspace/nav";
 import { themeById } from "@/lib/workspace/themes";
 import { useWorkspace } from "@/lib/workspace/store";
 
@@ -358,42 +358,15 @@ export function CodeEditor({ path }: { path?: string }) {
             ))}
           </div>
         ) : null}
-        <div className="snip-bar" role="toolbar" aria-label="snippets">
-          {chips.map((c) => (
-            <button key={c.id} type="button" onClick={() => insertChip(c.insert)}>
-              {c.label}
-            </button>
-          ))}
-          <button
-            type="button"
-            className={histOn ? "is-on" : undefined}
-            title="Histórico"
-            aria-label="Histórico"
-            onClick={() => useNav.getState().setHist(!histOn)}
-          >
-            <Clock size={14} />
-          </button>
-          <button
-            type="button"
-            className={blameOn ? "is-on" : undefined}
-            title="Blame"
-            aria-label="Blame"
-            onClick={() => useNav.getState().setBlame(!blameOn)}
-          >
-            <GitCommit size={14} />
-          </button>
-          <button
-            type="button"
-            title="Enviar seleção ao agente"
-            aria-label="Enviar seleção ao agente"
-            onClick={() => {
-              if (!quoteSelection()) return;
-              useChrome.setState({ agent: true, mobile: "agent" });
-            }}
-          >
-            <MessageSquarePlus size={14} />
-          </button>
-        </div>
+        {chips.length ? (
+          <div className="snip-bar" role="toolbar" aria-label="snippets">
+            {chips.map((c) => (
+              <button key={c.id} type="button" onClick={() => insertChip(c.insert)}>
+                {c.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
         {histOn ? (
           <div className="hist-list">
             {snaps.length === 0 ? (

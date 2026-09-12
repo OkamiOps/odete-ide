@@ -44,7 +44,7 @@ export function ProjectMenu({ onPick }: { onPick?: () => void }) {
     onPick?.();
     setSheet(next);
   }
-  async function offerFile(next: Promise<SaveOffer | null>) {
+  async function offerFile(next: Promise<SaveOffer>) {
     const prev = offer;
     const got = await next;
     if (prev) URL.revokeObjectURL(prev.href);

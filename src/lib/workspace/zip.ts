@@ -152,51 +152,22 @@ export function safeName(name: string, ext: string) {
   return base.toLowerCase().endsWith(`.${ext}`) ? base : `${base}.${ext}`;
 }
 
-export async function saveBlob(blob: Blob, filename: string): Promise<SaveOffer | null> {
+export async function saveBlob(blob: Blob, filename: string): Promise<SaveOffer> {
   const file = new File([blob], filename, { type: "application/octet-stream" });
+  const href = URL.createObjectURL(file);
   const nav = navigator as Navigator & {
     share?: (d: ShareData) => Promise<void>;
     canShare?: (d: ShareData) => boolean;
   };
-
   try {
     if (nav.share && nav.canShare?.({ files: [file] })) {
       await nav.share({ files: [file], title: filename });
-      return null;
     }
   } catch (e) {
-    if (isAbort(e)) return null;
-  }
-
-  const picker = (
-    window as Window & {
-      showSaveFilePicker?: (opts: {
-        suggestedName: string;
-        types?: { description: string; accept: Record<string, string[]> }[];
-      }) => Promise<FileSystemFileHandle>;
-    }
-  ).showSaveFilePicker;
-  if (picker) {
-    try {
-      const handle = await picker({ suggestedName: filename });
-      const w = await handle.createWritable();
-      await w.write(file);
-      await w.close();
-      return null;
-    } catch (e) {
-      if (isAbort(e)) return null;
+    if (!isAbort(e)) {
+      /* fallback: o link visível */
     }
   }
-
-  const href = URL.createObjectURL(file);
-  const a = document.createElement("a");
-  a.href = href;
-  a.download = filename;
-  a.rel = "noopener";
-  a.style.display = "none";
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
   return { href, name: filename };
 }
 

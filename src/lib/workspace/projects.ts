@@ -11,6 +11,7 @@ export type RecentProject = {
   remote: string | null;
   snapshot: FileMap;
   branch: string;
+  folder?: string;
 };
 
 export type ProjectSheet = false | "hub" | "recent" | "clone" | "github" | "new" | "open" | "library";
@@ -61,7 +62,13 @@ export const useProjects = create<ProjectsState>()(
       library: [],
       github: null,
       remember: (p) => {
-        const next: RecentProject = { ...p, snapshot: slimSnapshot(p.snapshot), at: Date.now() };
+        const prev = get().library.find((r) => r.id === p.id) ?? get().recents.find((r) => r.id === p.id);
+        const next: RecentProject = {
+          folder: prev?.folder,
+          ...p,
+          snapshot: slimSnapshot(p.snapshot),
+          at: Date.now(),
+        };
         const recents = [next, ...get().recents.filter((r) => r.id !== p.id)].slice(0, MAX_RECENTS);
         const library = [next, ...get().library.filter((r) => r.id !== p.id)].slice(0, 24);
         set({ recents, library });

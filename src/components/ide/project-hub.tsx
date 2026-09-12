@@ -214,6 +214,7 @@ function ProjectBrowser() {
               <button type="button" className="proj-main" onClick={() => open(r)}>
                 <strong>{r.name}</strong>
                 <span>
+                  {r.folder ? `${r.folder} · ` : ""}
                   {r.files} arquivos · {r.remote || "neste iPad"} ·{" "}
                   {new Date(r.at).toLocaleString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
                 </span>
@@ -276,13 +277,22 @@ function ProjectBrowser() {
 
 function NewForm() {
   const github = useProjects((s) => s.github);
+  const library = useProjects((s) => s.library);
+  const recents = useProjects((s) => s.recents);
   const [name, setName] = useState("");
-  const [dest, setDest] = useState<"ipad" | "files" | "github">("ipad");
-  const [kind, setKind] = useState<"empty" | "html" | "swift" | "vite">("empty");
+  const [dest, setDest] = useState<"ipad" | "github">("ipad");
+  const [folder, setFolder] = useState("");
+  const [folderNew, setFolderNew] = useState("");
   const [org, setOrg] = useState("");
   const [orgs, setOrgs] = useState<GithubOrg[]>([]);
   const [busy, setBusy] = useState("");
   const [err, setErr] = useState("");
+
+  const folders = [
+    ...new Set(
+      [...library, ...recents].map((r) => r.folder?.trim()).filter((x): x is string => !!x),
+    ),
+  ].sort((a, b) => a.localeCompare(b, "pt-BR"));
 
   useEffect(() => {
     if (!github) return;
@@ -299,35 +309,35 @@ function NewForm() {
 
   async function create() {
     const title = name.trim() || "sem título";
+    const destFolder = folderNew.trim() || folder;
     setErr("");
     setBusy("criando…");
     try {
-      const files = starterFiles(kind, title);
+      const files = { "README.md": `# ${title}\n` };
       let remote: string | null = null;
       if (dest === "github") {
         if (!github) throw new Error("conecta o GitHub antes");
         const made = await githubCreateRepo(github.token, title, org || undefined);
         remote = made.remote;
       }
-      if (dest === "files") {
-        const picker = (window as Window & { showDirectoryPicker?: () => Promise<FileSystemDirectoryHandle> })
-          .showDirectoryPicker;
-        if (picker) {
-          const root = await picker();
-          await writeDir(root, files);
-        } else {
-          await downloadZip(title, files);
-        }
-      }
+      const id = uidLocal();
       useWorkspace.getState().loadProject({
-        id: uidLocal(),
+        id,
         name: title,
         files,
         remote,
         branch: "main",
         message: "chore: projeto novo",
       });
-      useWorkspace.getState().rememberNow();
+      useProjects.getState().remember({
+        id,
+        name: title,
+        files: 1,
+        remote,
+        branch: "main",
+        snapshot: files,
+        folder: destFolder || undefined,
+      });
       setSheet(false);
     } catch (e) {
       if (e instanceof DOMException && e.name === "AbortError") return;
@@ -363,11 +373,6 @@ function NewForm() {
           <b>Neste iPad</b>
           <span>biblioteca do Colo, offline</span>
         </button>
-        <button type="button" className={dest === "files" ? "is-on" : undefined} onClick={() => setDest("files")}>
-          <FolderOpen size={18} />
-          <b>Pasta Files</b>
-          <span>escolhe a pasta, ou baixa zip</span>
-        </button>
         <button
           type="button"
           className={dest === "github" ? "is-on" : undefined}
@@ -380,44 +385,37 @@ function NewForm() {
         </button>
       </div>
 
-      {dest === "github" && github ? (
-        <div className="clone-orgs">
-          <button type="button" className={!org ? "is-on" : undefined} onClick={() => setOrg("")}>
-            @{github.user.login}
-          </button>
-          {orgs.map((o) => (
-            <button
-              key={o.login}
-              type="button"
-              className={org === o.login ? "is-on" : undefined}
-              onClick={() => setOrg(o.login)}
-            >
-              @{o.login}
-            </button>
+      <label className="new-label">
+        Pasta
+        <select className="field" value={folder} onChange={(e) => setFolder(e.target.value)}>
+          <option value="">Raiz da biblioteca</option>
+          {folders.map((f) => (
+            <option key={f} value={f}>
+              {f}
+            </option>
           ))}
-        </div>
-      ) : null}
+        </select>
+      </label>
+      <input
+        className="field"
+        placeholder="ou nome de uma pasta nova"
+        value={folderNew}
+        onChange={(e) => setFolderNew(e.target.value)}
+      />
 
-      <p className="new-label">Modelo</p>
-      <div className="new-kinds">
-        {(
-          [
-            ["empty", "Vazio"],
-            ["html", "HTML"],
-            ["swift", "SwiftUI"],
-            ["vite", "Vite"],
-          ] as const
-        ).map(([id, label]) => (
-          <button
-            key={id}
-            type="button"
-            className={kind === id ? "is-on" : undefined}
-            onClick={() => setKind(id)}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      {dest === "github" && github ? (
+        <label className="new-label">
+          Conta GitHub
+          <select className="field" value={org} onChange={(e) => setOrg(e.target.value)}>
+            <option value="">@{github.user.login} · você</option>
+            {orgs.map((o) => (
+              <option key={o.login} value={o.login}>
+                @{o.login} · org
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
 
       {err ? <p className="agent-err">{err}</p> : null}
       <button type="submit" className="new-go" disabled={!!busy}>
@@ -429,51 +427,6 @@ function NewForm() {
 
 function uidLocal() {
   return `p-${Date.now().toString(36)}`;
-}
-
-function starterFiles(kind: "empty" | "html" | "swift" | "vite", name: string): Record<string, string> {
-  if (kind === "html") {
-    return {
-      "index.html": `<!doctype html>\n<html lang="pt-BR">\n<head>\n  <meta charset="utf-8" />\n  <meta name="viewport" content="width=device-width, initial-scale=1" />\n  <title>${name}</title>\n  <link rel="stylesheet" href="style.css" />\n</head>\n<body>\n  <main>\n    <h1>${name}</h1>\n    <p>Pronto no iPad.</p>\n  </main>\n  <script src="app.js"></script>\n</body>\n</html>\n`,
-      "style.css": `:root { color-scheme: dark; font-family: ui-sans-serif, system-ui; }\nbody { margin: 0; min-height: 100dvh; display: grid; place-items: center; background: #111; color: #f4f4f5; }\nh1 { margin: 0 0 8px; font-size: 28px; }\n`,
-      "app.js": `console.log("${name}");\n`,
-    };
-  }
-  if (kind === "swift") {
-    return {
-      "App.swift": `import SwiftUI\n\n@main\nstruct ${safeIdent(name)}App: App {\n    var body: some Scene {\n        WindowGroup {\n            ContentView()\n        }\n    }\n}\n`,
-      "ContentView.swift": `import SwiftUI\n\nstruct ContentView: View {\n    var body: some View {\n        VStack(spacing: 12) {\n            Text("${name}")\n                .font(.largeTitle.bold())\n            Text("Swift no iPad")\n                .foregroundStyle(.secondary)\n        }\n        .padding()\n    }\n}\n\n#Preview { ContentView() }\n`,
-    };
-  }
-  if (kind === "vite") {
-    return {
-      "package.json": `{\n  "name": "${name.toLowerCase().replace(/\s+/g, "-") || "app"}",\n  "private": true,\n  "type": "module",\n  "scripts": {\n    "dev": "vite",\n    "build": "vite build"\n  },\n  "dependencies": {\n    "vite": "^6.0.0"\n  }\n}\n`,
-      "index.html": `<!doctype html>\n<html lang="pt-BR">\n  <head>\n    <meta charset="utf-8" />\n    <meta name="viewport" content="width=device-width, initial-scale=1" />\n    <title>${name}</title>\n  </head>\n  <body>\n    <div id="app"></div>\n    <script type="module" src="/src/main.js"></script>\n  </body>\n</html>\n`,
-      "src/main.js": `document.getElementById("app").textContent = "${name}";\n`,
-      "src/style.css": `body { margin: 0; font-family: ui-sans-serif, system-ui; }\n`,
-      "README.md": `# ${name}\n\nnpm i && npm run dev\n`,
-    };
-  }
-  return { "README.md": `# ${name}\n\nProjeto novo no Colo.\n` };
-}
-
-function safeIdent(name: string) {
-  const s = name.replace(/[^A-Za-z0-9]/g, "") || "App";
-  return s[0]!.toUpperCase() + s.slice(1);
-}
-
-async function writeDir(root: FileSystemDirectoryHandle, files: Record<string, string>) {
-  for (const [path, text] of Object.entries(files)) {
-    const parts = path.split("/").filter(Boolean);
-    let dir = root;
-    for (const p of parts.slice(0, -1)) {
-      dir = await dir.getDirectoryHandle(p, { create: true });
-    }
-    const file = await dir.getFileHandle(parts.at(-1)!, { create: true });
-    const w = await file.createWritable();
-    await w.write(text);
-    await w.close();
-  }
 }
 
 function OpenForm() {

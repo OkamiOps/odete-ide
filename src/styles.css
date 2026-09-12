@@ -1160,24 +1160,29 @@ input, textarea, select { font: inherit; font-size: 16px; }
 .term-compose-wrap { padding: 8px 10px 10px; border-top: 1px solid var(--color-border); background: var(--color-bg-elevated); }
 .term-compose {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 8px;
   min-height: 48px;
-  padding: 4px 6px 4px 12px;
+  padding: 6px 6px 6px 12px;
   border: 1px solid var(--color-border);
   border-radius: 14px;
   background: var(--color-bg);
 }
-.term-prompt { font-family: var(--font-mono); font-size: 13px; color: var(--color-accent); flex-shrink: 0; }
+.term-prompt { font-family: var(--font-mono); font-size: 13px; color: var(--color-accent); flex-shrink: 0; align-self: start; padding-top: 12px; }
 .term-input {
   flex: 1;
   min-width: 0;
   min-height: 40px;
+  max-height: 140px;
+  padding: 8px 0;
   border: 0;
+  resize: none;
+  overflow-y: auto;
   background: transparent;
   color: var(--color-fg);
   font-family: var(--font-mono);
   font-size: 14px;
+  line-height: 1.4;
   outline: none;
 }
 .term-run {

@@ -60,11 +60,19 @@ export function TerminalPane() {
   const [cmd, setCmd] = useState("");
   const [histI, setHistI] = useState(-1);
   const end = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const names = useMemo(() => Object.keys(files).sort(), [files]);
 
   useEffect(() => {
     end.current?.scrollIntoView({ block: "end" });
   }, [tab.lines.length, tab.id]);
+
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "0px";
+    el.style.height = `${Math.min(140, Math.max(40, el.scrollHeight))}px`;
+  }, [cmd]);
 
   function run(line: string) {
     const t = line.trim();
@@ -142,9 +150,10 @@ export function TerminalPane() {
       >
         <div className="term-compose">
           <span className="term-prompt">%</span>
-          <input
+          <textarea
+            ref={inputRef}
             id="colo-term"
-            type="text"
+            rows={1}
             enterKeyHint="enter"
             value={cmd}
             onChange={(e) => {
@@ -152,7 +161,13 @@ export function TerminalPane() {
               setHistI(-1);
             }}
             onKeyDown={(e) => {
-              if (e.key === "ArrowUp") {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                run(cmd);
+                return;
+              }
+              const atStart = e.currentTarget.selectionStart === 0 && e.currentTarget.selectionEnd === 0;
+              if (e.key === "ArrowUp" && atStart) {
                 e.preventDefault();
                 const hist = tab.hist;
                 if (!hist.length) return;
@@ -160,7 +175,7 @@ export function TerminalPane() {
                 setHistI(next);
                 setCmd(hist[next] ?? "");
               }
-              if (e.key === "ArrowDown") {
+              if (e.key === "ArrowDown" && e.currentTarget.selectionStart === cmd.length) {
                 e.preventDefault();
                 const hist = tab.hist;
                 if (histI < 0) return;

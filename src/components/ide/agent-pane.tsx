@@ -243,7 +243,12 @@ export function AgentPane() {
         </div>
         {connected ? <ModelSelect provider={agentId} compact /> : null}
         {connected && options.length ? (
-          <div className="agent-effort" role="tablist" aria-label="effort">
+          <div
+            className="agent-effort"
+            role="tablist"
+            aria-label="effort"
+            style={{ gridTemplateColumns: `repeat(${Math.min(options.length, 4)}, minmax(0, 1fr))` }}
+          >
             {options.map((id) => (
               <button
                 key={id}
@@ -253,6 +258,7 @@ export function AgentPane() {
                 onClick={() => useChrome.getState().setEffort(effortKey(agentId, model), id)}
               >
                 {EFFORT_LABEL[id]}
+                <small>{EFFORT_HINT[id]}</small>
               </button>
             ))}
           </div>

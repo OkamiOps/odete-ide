@@ -5,23 +5,23 @@ export type EffortId = "none" | "minimal" | "low" | "medium" | "high" | "xhigh" 
 export const EFFORT_ORDER: EffortId[] = ["none", "minimal", "low", "medium", "high", "xhigh", "max"];
 
 export const EFFORT_LABEL: Record<EffortId, string> = {
-  none: "none",
-  minimal: "min",
-  low: "low",
-  medium: "mid",
-  high: "high",
-  xhigh: "xhigh",
-  max: "max",
+  none: "None",
+  minimal: "Min",
+  low: "Low",
+  medium: "Mid",
+  high: "High",
+  xhigh: "Extra",
+  max: "Max",
 };
 
 export const EFFORT_HINT: Record<EffortId, string> = {
-  none: "sem raciocínio extra",
-  minimal: "mínimo",
+  none: "off",
+  minimal: "leve",
   low: "rápido",
-  medium: "equilíbrio",
-  high: "mais fundo",
-  xhigh: "agente longo",
-  max: "máximo",
+  medium: "médio",
+  high: "fundo",
+  xhigh: "longo",
+  max: "máx",
 };
 
 const cache = new Map<string, EffortId[]>();

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { Archive, Copy, FileJson, Files, FolderOpen, GitBranch, Github, Lock, Star, Tablet, Trash2, X } from "lucide-react";
 import { githubClone, githubCreateRepo, githubOrgs, githubRepos, type GithubOrg, type GithubRepo } from "@/lib/github/api";
 import { PickList } from "@/components/ide/pick-list";
+import { setSheet, useProjectUi, useProjects, type ProjectSheet } from "@/lib/workspace/projects";
 import { useWorkspace } from "@/lib/workspace/store";
 import { downloadZip, importZipFile, saveBlob, safeName, type SaveOffer } from "@/lib/workspace/zip";
 

@@ -10,7 +10,7 @@ export function Splitter({
   const last = useRef(0);
   return (
     <div
-      className={axis === "x" ? "split-x" : "split-y"}
+      className={axis === "x" ? "splitter is-x" : "splitter is-y"}
       role="separator"
       aria-orientation={axis === "x" ? "vertical" : "horizontal"}
       onPointerDown={(e) => {

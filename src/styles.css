@@ -183,6 +183,20 @@ button, [role="button"] { cursor: pointer; touch-action: manipulation; }
 button { font: inherit; color: inherit; font-size: inherit; }
 input, textarea, select { font: inherit; font-size: 16px; }
 * { box-sizing: border-box; }
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--color-fg) 32%, transparent) transparent;
+}
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--color-fg) 28%, transparent);
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--color-fg) 50%, transparent);
+}
+::-webkit-scrollbar-corner { background: transparent; }
 ::selection { background: color-mix(in srgb, var(--color-accent) 40%, transparent); color: var(--color-accent-fg); }
 
 .ide { display: grid; grid-template-rows: minmax(0,1fr) 64px 26px; height: 100dvh; min-height: 0; background: var(--color-bg); color: var(--color-fg); overflow: hidden; overscroll-behavior: none; }

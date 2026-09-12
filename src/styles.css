@@ -440,8 +440,45 @@ input, textarea, select { font: inherit; font-size: 16px; }
 .minimap-lint.is-error { background: #e25d5d; }
 .minimap-lint.is-warn, .minimap-lint.is-todo { background: #e6c349; }
 
-.kb-bar { display: flex; gap: 4px; align-items: center; padding: 0 8px; overflow: auto; border-top: 1px solid var(--color-border); background: var(--color-bg-elevated); }
-.kb-bar button { min-width: 36px; min-height: 36px; padding: 0 8px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-bg); color: var(--color-fg-muted); font-size: 12px; }
+.kb-bar {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 56px;
+  padding: 8px 12px;
+  overflow: auto;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+  scrollbar-width: none;
+}
+.kb-bar::-webkit-scrollbar { display: none; }
+.kb-inner {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin: 0 auto;
+}
+.kb-group {
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-bg);
+}
+.kb-bar button {
+  min-width: 40px;
+  min-height: 40px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--color-fg);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 600;
+}
+.kb-bar button:active { background: var(--color-bg-subtle); }
 .ide-status { display: flex; align-items: center; gap: 10px; padding: 0 10px; font-size: 11px; color: var(--color-fg-muted); border-top: 1px solid var(--color-border); background: var(--color-bg-elevated); }
 .ide-status button { border: 0; background: transparent; color: var(--color-fg-muted); font-size: 11px; }
 .ide-status button.is-on { color: var(--color-fg); }

@@ -1074,8 +1074,54 @@ input, textarea, select { font: inherit; font-size: 16px; }
 .drop-split { position: absolute; inset: 0; z-index: 8; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 8px; }
 .drop-zone { display: grid; place-items: center; border: 1px dashed var(--color-border-strong); border-radius: 12px; background: color-mix(in srgb, var(--color-accent) 10%, transparent); }
 
-.lib-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; padding: 8px 12px; border-bottom: 1px solid var(--color-border); }
-.open-form, .auth-code { display: flex; flex-direction: column; gap: 10px; padding: 14px; }
+.proj-browser { padding: 12px 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.proj-list { display: flex; flex-direction: column; gap: 8px; max-height: 52vh; overflow: auto; -webkit-overflow-scrolling: touch; }
+.proj-card {
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-bg);
+  padding: 4px;
+}
+.proj-main {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 52px;
+  padding: 10px 10px 6px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+.proj-main strong { font-size: 15px; font-weight: 600; }
+.proj-main span { font-size: 12px; color: var(--color-fg-muted); }
+.proj-ops { display: flex; gap: 4px; padding: 0 6px 6px; }
+.proj-ops button {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 10px;
+  background: var(--color-bg-subtle);
+  color: var(--color-fg-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+.proj-ops button:hover { color: var(--color-fg); }
+.proj-empty { padding: 18px 14px; display: flex; flex-direction: column; gap: 8px; }
+.proj-empty p { margin: 0 0 4px; font-size: 13px; color: var(--color-fg-muted); }
+.proj-empty button {
+  min-height: 44px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-size: 14px;
+}
+.open-pane { padding: 14px; display: flex; flex-direction: column; gap: 8px; }
+.auth-code { display: flex; flex-direction: column; gap: 10px; padding: 14px; }
 
 html[data-dragging] { cursor: grabbing; user-select: none; }
 

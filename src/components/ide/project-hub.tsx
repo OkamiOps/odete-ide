@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
-import { FolderOpen, Github, Lock, Tablet, Trash2, X } from "lucide-react";
+import { Archive, Copy, FileJson, Files, FolderOpen, Github, Lock, Tablet, Trash2, X } from "lucide-react";
 import { githubClone, githubCreateRepo, githubOrgs, githubRepos, type GithubOrg, type GithubRepo } from "@/lib/github/api";
 import { setSheet, useProjectUi, useProjects, type ProjectSheet } from "@/lib/workspace/projects";
 import { useWorkspace } from "@/lib/workspace/store";
@@ -122,91 +122,132 @@ function title(sheet: ProjectSheet) {
 }
 
 function LibraryList() {
-  const library = useProjects((s) => s.library);
-  const recents = useProjects((s) => s.recents);
-  const list = library.length ? library : recents;
-  const forget = useProjects((s) => s.forget);
-  const rename = useProjects((s) => s.rename);
-  const duplicate = useProjects((s) => s.duplicate);
-  if (!list.length) return <p className="text-sm text-fg-muted">Nenhum projeto salvo neste iPad.</p>;
-  return (
-    <div className="agent-starts">
-      {list.map((r) => (
-        <div key={r.id} className="lib-row">
-          <button
-            type="button"
-            onClick={() => {
-              useWorkspace.getState().loadProject({
-                id: r.id,
-                name: r.name,
-                files: r.snapshot,
-                remote: r.remote,
-                branch: r.branch,
-              });
-              setSheet(false);
-            }}
-          >
-            <b>{r.name}</b>
-            <em>
-              {r.files} arquivos{r.remote ? ` · ${r.remote}` : " · local"}
-            </em>
-          </button>
-          <input
-            className="field"
-            defaultValue={r.name}
-            aria-label={`renomear ${r.name}`}
-            onBlur={(e) => {
-              if (e.target.value.trim() && e.target.value !== r.name) rename(r.id, e.target.value);
-            }}
-          />
-          <button
-            type="button"
-            className="agent-icon"
-            aria-label="duplicar"
-            onClick={() => duplicate(r.id)}
-          >
-            +
-          </button>
-          <button type="button" className="agent-icon" aria-label="apagar" onClick={() => forget(r.id)}>
-            <Trash2 size={14} />
-          </button>
-        </div>
-      ))}
-    </div>
-  );
+  return <ProjectBrowser />;
 }
 
 function RecentList() {
+  return <ProjectBrowser />;
+}
+
+function ProjectBrowser() {
+  const library = useProjects((s) => s.library);
   const recents = useProjects((s) => s.recents);
   const forget = useProjects((s) => s.forget);
-  if (!recents.length) return <p className="text-sm text-fg-muted">Nenhum recente ainda.</p>;
+  const rename = useProjects((s) => s.rename);
+  const duplicate = useProjects((s) => s.duplicate);
+  const [q, setQ] = useState("");
+  const [edit, setEdit] = useState<string | null>(null);
+
+  const map = new Map<string, (typeof recents)[number]>();
+  for (const r of [...library, ...recents]) {
+    const prev = map.get(r.id);
+    if (!prev || r.at > prev.at) map.set(r.id, r);
+  }
+  const all = [...map.values()].sort((a, b) => b.at - a.at);
+  const needle = q.trim().toLowerCase();
+  const list = needle
+    ? all.filter((r) => `${r.name} ${r.remote ?? ""}`.toLowerCase().includes(needle))
+    : all;
+
+  function open(r: (typeof recents)[number]) {
+    useWorkspace.getState().loadProject({
+      id: r.id,
+      name: r.name,
+      files: r.snapshot,
+      remote: r.remote,
+      branch: r.branch,
+    });
+    setSheet(false);
+  }
+
+  if (!all.length) {
+    return (
+      <div className="proj-empty">
+        <p>Nada salvo neste iPad ainda.</p>
+        <button type="button" onClick={() => setSheet("new")}>
+          Novo projeto
+        </button>
+        <button type="button" onClick={() => setSheet("clone")}>
+          Clonar do GitHub
+        </button>
+        <button type="button" onClick={() => setSheet("open")}>
+          Abrir pasta ou zip
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <div className="agent-starts">
-      {recents.map((r) => (
-        <div key={r.id} className="recent-row">
-          <button
-            type="button"
-            onClick={() => {
-              useWorkspace.getState().loadProject({
-                id: r.id,
-                name: r.name,
-                files: r.snapshot,
-                remote: r.remote,
-                branch: r.branch,
-              });
-              setSheet(false);
-            }}
-          >
-            <b>{r.name}</b>
-            <em>
-              {r.files} arquivos{r.remote ? ` · ${r.remote}` : ""} · {new Date(r.at).toLocaleDateString("pt-BR")}
-            </em>
-          </button>
-          <button type="button" className="agent-icon" aria-label="apagar recente" onClick={() => forget(r.id)}>
-            <Trash2 size={14} />
-          </button>
-        </div>
-      ))}
+    <div className="proj-browser">
+      <input
+        className="field"
+        placeholder="buscar projeto"
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+      />
+      <div className="proj-list">
+        {list.length ? (
+          list.map((r) => (
+            <div key={r.id} className="proj-card">
+              <button type="button" className="proj-main" onClick={() => open(r)}>
+                <strong>{r.name}</strong>
+                <span>
+                  {r.files} arquivos · {r.remote || "neste iPad"} ·{" "}
+                  {new Date(r.at).toLocaleString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                </span>
+              </button>
+              {edit === r.id ? (
+                <input
+                  className="field"
+                  defaultValue={r.name}
+                  autoFocus
+                  aria-label="renomear"
+                  onBlur={(e) => {
+                    if (e.target.value.trim() && e.target.value !== r.name) rename(r.id, e.target.value);
+                    setEdit(null);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                    if (e.key === "Escape") setEdit(null);
+                  }}
+                />
+              ) : null}
+              <div className="proj-ops">
+                <button type="button" aria-label="renomear" title="Renomear" onClick={() => setEdit(r.id)}>
+                  Aa
+                </button>
+                <button
+                  type="button"
+                  aria-label="duplicar"
+                  title="Duplicar"
+                  onClick={() => {
+                    const id = duplicate(r.id);
+                    if (id) {
+                      const copy = useProjects.getState().library.find((x) => x.id === id);
+                      if (copy) open(copy);
+                    }
+                  }}
+                >
+                  <Copy size={15} />
+                </button>
+                <button
+                  type="button"
+                  aria-label="exportar zip"
+                  title="Exportar zip"
+                  onClick={() => void downloadZip(r.name, r.snapshot)}
+                >
+                  <Archive size={15} />
+                </button>
+                <button type="button" aria-label="apagar" title="Apagar" onClick={() => forget(r.id)}>
+                  <Trash2 size={15} />
+                </button>
+              </div>
+            </div>
+          ))
+        ) : (
+          <p className="clone-status">nenhum projeto com esse nome</p>
+        )}
+      </div>
     </div>
   );
 }
@@ -417,6 +458,7 @@ function OpenForm() {
   const fileRef = useRef<HTMLInputElement>(null);
   const dirRef = useRef<HTMLInputElement>(null);
   const jsonRef = useRef<HTMLInputElement>(null);
+  const zipRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState("");
   const [err, setErr] = useState("");
 
@@ -453,19 +495,37 @@ function OpenForm() {
   }
 
   return (
-    <div className="open-form">
-      <p className="text-xs leading-relaxed text-fg-muted">
-        Pasta local neste iPad, sem Git e sem recente. Abre pelo Files e vira o workspace.
-      </p>
-      <div className="agent-starts">
-        <button type="button" onPointerDown={() => void fromDirectoryApi()} disabled={!!busy}>
-          {busy || "Pasta do iPad"}
+    <div className="open-pane">
+      <div className="new-dests">
+        <button type="button" onClick={() => void fromDirectoryApi()} disabled={!!busy}>
+          <FolderOpen size={18} />
+          <b>Pasta Files</b>
+          <span>{busy || "abre uma pasta do iPad"}</span>
         </button>
-        <button type="button" onPointerDown={() => jsonRef.current?.click()}>
-          Arquivo JSON do Colo
+        <button type="button" onClick={() => zipRef.current?.click()}>
+          <Archive size={18} />
+          <b>Arquivo zip</b>
+          <span>projeto compactado</span>
         </button>
-        <button type="button" onPointerDown={() => fileRef.current?.click()}>
-          Vários arquivos
+        <button type="button" onClick={() => jsonRef.current?.click()}>
+          <FileJson size={18} />
+          <b>JSON do Colo</b>
+          <span>backup exportado do app</span>
+        </button>
+        <button type="button" onClick={() => fileRef.current?.click()}>
+          <Files size={18} />
+          <b>Vários arquivos</b>
+          <span>escolhe um por um</span>
+        </button>
+        <button type="button" onClick={() => setSheet("recent")}>
+          <Tablet size={18} />
+          <b>Neste iPad</b>
+          <span>biblioteca e recentes</span>
+        </button>
+        <button type="button" onClick={() => setSheet("clone")}>
+          <Github size={18} />
+          <b>GitHub</b>
+          <span>clonar repo ou org</span>
         </button>
       </div>
       {err ? <p className="agent-err">{err}</p> : null}
@@ -478,7 +538,42 @@ function OpenForm() {
         onChange={(e) => void importPicked(e, true)}
       />
       <input ref={fileRef} type="file" multiple hidden onChange={(e) => void importPicked(e)} />
-      <input ref={jsonRef} type="file" accept="application/json,.json" hidden onChange={(e) => void openJson(e).catch((er) => setErr(er instanceof Error ? er.message : "JSON inválido"))} />
+      <input
+        ref={jsonRef}
+        type="file"
+        accept="application/json,.json"
+        hidden
+        onChange={(e) => void openJson(e).catch((er) => setErr(er instanceof Error ? er.message : "JSON inválido"))}
+      />
+      <input
+        ref={zipRef}
+        type="file"
+        accept=".zip,application/zip"
+        hidden
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          e.target.value = "";
+          if (!f) return;
+          setBusy("lendo zip…");
+          void importZipFile(f)
+            .then((files) => {
+              if (!Object.keys(files).length) {
+                setErr("zip vazio");
+                return;
+              }
+              useWorkspace.getState().loadProject({
+                id: `zip-${Date.now()}`,
+                name: f.name.replace(/\.zip$/i, "") || "zip",
+                files,
+                remote: null,
+                message: "importar zip",
+              });
+              setSheet(false);
+            })
+            .catch((er) => setErr(er instanceof Error ? er.message : "zip inválido"))
+            .finally(() => setBusy(""));
+        }}
+      />
     </div>
   );
 }

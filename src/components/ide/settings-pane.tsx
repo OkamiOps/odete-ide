@@ -533,7 +533,7 @@ function MinimapSection() {
     <section className="set-card">
       <h2>Minimap</h2>
       <p>O retângulo mostra onde você está. Arrasta pra pular.</p>
-      <div className="chip-row" style={{ padding: 0 }}>
+      <div className="set-grid-2">
         {(
           [
             ["off", "Off"],

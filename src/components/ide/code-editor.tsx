@@ -474,6 +474,9 @@ function FindBar({ viewRef }: { viewRef: RefObject<EditorView | null> }) {
   );
 }
 
+const MAP_UNIT = { s: 2.2, m: 3.6, l: 5.4 } as const;
+const MAP_FONT = { s: 1.8, m: 2.9, l: 4.4 } as const;
+
 function MiniMap({
   text,
   viewRef,
@@ -485,6 +488,7 @@ function MiniMap({
 }) {
   const box = useRef<HTMLDivElement>(null);
   const pre = useRef<HTMLPreElement>(null);
+  const shift = useRef(0);
   const [vp, setVp] = useState({ top: 0, h: 24 });
 
   function layout() {
@@ -494,42 +498,48 @@ function MiniMap({
     if (!map || !node) return;
     const lines = Math.max(1, view?.state.doc.lines ?? text.split("\n").length);
     const mapH = map.clientHeight;
-    const unit =
-      size === "l" ? 3.2 : size === "m" ? 2.6 : 2.2;
-    const contentH = lines * unit;
-    const scale = contentH > mapH && contentH > 0 ? mapH / contentH : 1;
-    const lh = unit * scale;
+    const lh = MAP_UNIT[size];
+    const fs = MAP_FONT[size];
+    const contentH = lines * lh;
     node.style.lineHeight = `${lh}px`;
-    node.style.fontSize = `${Math.max(1.2, lh * 0.78)}px`;
-    node.style.height = `${Math.max(lh, contentH * scale)}px`;
+    node.style.fontSize = `${fs}px`;
+    node.style.height = `${contentH}px`;
     node.style.width = "100%";
 
-    if (!view) return;
-    const sr = view.scrollDOM.getBoundingClientRect();
-    const nums: number[] = [];
-    view.scrollDOM.querySelectorAll(".cm-lineNumbers .cm-gutterElement").forEach((n) => {
-      const r = n.getBoundingClientRect();
-      if (r.bottom <= sr.top + 1 || r.top >= sr.bottom - 1) return;
-      const v = Number(n.textContent);
-      if (v > 0) nums.push(v);
-    });
-    let from: number;
-    let to: number;
-    if (nums.length) {
-      from = Math.min(...nums);
-      to = Math.max(...nums);
-    } else {
-      const cr = view.contentDOM.getBoundingClientRect();
-      const x = cr.left + Math.min(16, Math.max(4, cr.width * 0.15));
-      const start = view.posAtCoords({ x, y: sr.top + 2 });
-      const end = view.posAtCoords({ x, y: sr.bottom - 2 });
-      from = start == null ? 1 : view.state.doc.lineAt(start).number;
-      to = end == null ? lines : view.state.doc.lineAt(end).number;
+    let from = 1;
+    let to = Math.min(lines, Math.ceil(mapH / lh));
+    if (view) {
+      const sr = view.scrollDOM.getBoundingClientRect();
+      const nums: number[] = [];
+      view.scrollDOM.querySelectorAll(".cm-lineNumbers .cm-gutterElement").forEach((n) => {
+        const r = n.getBoundingClientRect();
+        if (r.bottom <= sr.top + 1 || r.top >= sr.bottom - 1) return;
+        const v = Number(n.textContent);
+        if (v > 0) nums.push(v);
+      });
+      if (nums.length) {
+        from = Math.min(...nums);
+        to = Math.max(...nums);
+      } else {
+        const cr = view.contentDOM.getBoundingClientRect();
+        const x = cr.left + Math.min(16, Math.max(4, cr.width * 0.15));
+        const start = view.posAtCoords({ x, y: sr.top + 2 });
+        const end = view.posAtCoords({ x, y: sr.bottom - 2 });
+        from = start == null ? 1 : view.state.doc.lineAt(start).number;
+        to = end == null ? lines : view.state.doc.lineAt(end).number;
+      }
     }
-    setVp({
-      top: (from - 1) * lh,
-      h: Math.max(lh, (to - from + 1) * lh),
-    });
+
+    const vpTop = (from - 1) * lh;
+    const vpH = Math.max(lh * 2, (to - from + 1) * lh);
+    let offset = 0;
+    if (contentH > mapH) {
+      const center = vpTop + vpH / 2;
+      offset = Math.min(0, Math.max(mapH - contentH, mapH / 2 - center));
+    }
+    shift.current = offset;
+    node.style.transform = `translateY(${offset}px)`;
+    setVp({ top: vpTop + offset, h: Math.min(vpH, mapH) });
   }
 
   useEffect(() => {
@@ -552,9 +562,10 @@ function MiniMap({
     const map = box.current;
     if (!view || !map) return;
     const lines = view.state.doc.lines;
-    const node = pre.current;
-    const span = Math.max(24, node?.offsetHeight || map.clientHeight);
-    const ratio = Math.max(0, Math.min(0.999, (clientY - map.getBoundingClientRect().top) / span));
+    const lh = MAP_UNIT[size];
+    const contentH = lines * lh;
+    const y = clientY - map.getBoundingClientRect().top - shift.current;
+    const ratio = Math.max(0, Math.min(0.999, y / Math.max(contentH, 1)));
     const line = Math.max(1, Math.min(lines, Math.floor(ratio * lines) + 1));
     view.dispatch({
       effects: EditorView.scrollIntoView(view.state.doc.line(line).from, { y: "start" }),

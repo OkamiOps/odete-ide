@@ -9,7 +9,8 @@ import { Check, X } from "lucide-react";
 import { extOf } from "@/lib/utils";
 import { usePatches } from "@/lib/agent/patches";
 import { chipsFor, coloCompletions } from "@/lib/workspace/complete";
-import { collectDiags } from "@/lib/workspace/plugins";
+import { linter, lintGutter } from "@codemirror/lint";
+import { lintFile } from "@/lib/workspace/plugins";
 import { emmetTab, extractColors, gitGutter, lineComment, rainbowBrackets, stickyContext, todoMarks, urlMarks } from "@/lib/workspace/editor-plugins";
 import { useChrome } from "@/lib/workspace/chrome";
 import { addedLines, hunksOf } from "@/lib/workspace/hunks";
@@ -310,7 +311,7 @@ export function CodeEditor({ path }: { path?: string }) {
           stickyOn ? stickyContext() : [],
           commentOn ? lineComment(active) : [],
           urlsOn ? urlMarks() : [],
-          linterOn ? lintLines(active, shown) : [],
+          linterOn ? [lintGutter(), fileLinter(active)] : [],
           patchDeco,
         ].flat()}
         basicSetup={{
@@ -404,20 +405,23 @@ export function CodeEditor({ path }: { path?: string }) {
   );
 }
 
-function lintLines(path: string, text: string) {
-  const diags = collectDiags({ [path]: text }, { linter: true, todos: false })
-    .filter((d) => d.path === path)
-    .sort((a, b) => a.line - b.line);
-  const err = Decoration.line({ class: "cm-lint-error" });
-  const warn = Decoration.line({ class: "cm-lint-warn" });
-  return EditorView.decorations.of((view) => {
-    const b = new RangeSetBuilder<Decoration>();
-    for (const d of diags) {
-      if (d.line < 1 || d.line > view.state.doc.lines) continue;
-      b.add(view.state.doc.line(d.line).from, view.state.doc.line(d.line).from, d.severity === "error" ? err : warn);
-    }
-    return b.finish();
-  });
+function fileLinter(path: string) {
+  return linter(
+    (view) => {
+      const text = view.state.doc.toString();
+      return lintFile(path, text).map((d) => {
+        const n = Math.min(Math.max(1, d.line), view.state.doc.lines);
+        const line = view.state.doc.line(n);
+        return {
+          from: line.from,
+          to: line.to,
+          severity: d.severity === "error" ? ("error" as const) : ("warning" as const),
+          message: d.message,
+        };
+      });
+    },
+    { delay: 200 },
+  );
 }
 
 function FindBar({ viewRef }: { viewRef: RefObject<EditorView | null> }) {

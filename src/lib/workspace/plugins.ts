@@ -22,7 +22,7 @@ export type PluginId =
   | "urls";
 
 export const PLUGINS: { id: PluginId; label: string; blurb: string }[] = [
-  { id: "linter", label: "Linter", blurb: "JSON, JS, HTML, CSS e Swift com linha." },
+  { id: "linter", label: "Linter", blurb: "CSS (ponto e vírgula), JSON, JS, HTML e Swift." },
   { id: "todos", label: "TODOs", blurb: "TODO, FIXME e HACK no workspace." },
   { id: "wrap", label: "Quebra de linha", blurb: "Word wrap no editor." },
   { id: "formatOnSave", label: "Formatar no ⌘S", blurb: "Indenta JSON e limpa espaços." },
@@ -54,17 +54,150 @@ function lineOf(text: string, index: number) {
   return text.slice(0, Math.max(0, index)).split("\n").length;
 }
 
-function braceLine(text: string, open: string, close: string) {
+function braceLine(text: string, open: string, close: string, slashComment = true) {
   let n = 0;
+  let inStr: string | null = null;
+  let comment = false;
   const lines = text.split("\n");
   for (let i = 0; i < lines.length; i++) {
-    for (const ch of lines[i] ?? "") {
+    const line = lines[i] ?? "";
+    for (let j = 0; j < line.length; j++) {
+      const ch = line[j]!;
+      const next = line[j + 1];
+      if (comment) {
+        if (ch === "*" && next === "/") {
+          comment = false;
+          j += 1;
+        }
+        continue;
+      }
+      if (inStr) {
+        if (ch === "\\") {
+          j += 1;
+          continue;
+        }
+        if (ch === inStr) inStr = null;
+        continue;
+      }
+      if (ch === "/" && next === "*") {
+        comment = true;
+        j += 1;
+        continue;
+      }
+      if (slashComment && ch === "/" && next === "/") break;
+      if (ch === "'" || ch === '"') {
+        inStr = ch;
+        continue;
+      }
       if (ch === open) n += 1;
       if (ch === close) n -= 1;
       if (n < 0) return i + 1;
     }
   }
   return n === 0 ? 0 : lines.length;
+}
+
+function stripCssLine(line: string, inComment: { v: boolean }) {
+  let out = "";
+  let str: string | null = null;
+  for (let j = 0; j < line.length; j++) {
+    const ch = line[j]!;
+    const next = line[j + 1];
+    if (inComment.v) {
+      if (ch === "*" && next === "/") {
+        inComment.v = false;
+        j += 1;
+      }
+      continue;
+    }
+    if (str) {
+      if (ch === "\\") {
+        j += 1;
+        continue;
+      }
+      if (ch === str) str = null;
+      continue;
+    }
+    if (ch === "/" && next === "*") {
+      inComment.v = true;
+      j += 1;
+      continue;
+    }
+    if (ch === "'" || ch === '"') {
+      str = ch;
+      out += " ";
+      continue;
+    }
+    out += ch;
+  }
+  return out;
+}
+
+function lintCss(path: string, text: string): Diag[] {
+  const out: Diag[] = [];
+  const lines = text.split("\n");
+  const inComment = { v: false };
+  const codes: string[] = [];
+  for (const line of lines) codes.push(stripCssLine(line, inComment));
+  if (inComment.v) {
+    out.push({ id: `${path}:css-com`, path, line: lines.length, message: "comentário /* sem fechar */", severity: "error" });
+  }
+
+  const brace = braceLine(text, "{", "}", false);
+  if (brace) out.push({ id: `${path}:css-brace`, path, line: brace, message: "chaves { } desbalanceadas", severity: "error" });
+  const paren = braceLine(text, "(", ")", false);
+  if (paren) out.push({ id: `${path}:css-paren`, path, line: paren, message: "parênteses desbalanceados", severity: "error" });
+
+  function nextCode(from: number) {
+    for (let i = from + 1; i < codes.length; i++) {
+      const t = codes[i]!.trim();
+      if (t) return t;
+    }
+    return "";
+  }
+
+  for (let i = 0; i < codes.length; i++) {
+    const t = codes[i]!.trim();
+    if (!t) continue;
+    if (t.startsWith("@") && !t.includes(":")) continue;
+    if (t === "{" || t === "}" || t.endsWith("{")) continue;
+
+    const chunks = t.split("}").map((s) => s.trim()).filter(Boolean);
+    for (const chunk of chunks) {
+      if (chunk.endsWith("{") || !chunk.includes(":")) continue;
+      const decls = chunk.split(";").map((s) => s.trim()).filter(Boolean);
+      const ended = chunk.endsWith(";");
+      const closedHere = t.includes("}");
+      decls.forEach((decl, di) => {
+        const m = /^(-?[\w-]+)\s*:\s*(.*)$/.exec(decl);
+        if (!m) return;
+        const [, prop, val] = m;
+        if (!val) {
+          out.push({
+            id: `${path}:css-empty:${i}:${prop}`,
+            path,
+            line: i + 1,
+            message: `propriedade ${prop} sem valor`,
+            severity: "error",
+          });
+        }
+        const isLast = di === decls.length - 1;
+        if (isLast && !ended && !closedHere) {
+          const nxt = nextCode(i);
+          if (nxt && !nxt.startsWith("}") && /^-?[\w-]+\s*:/.test(nxt)) {
+            out.push({
+              id: `${path}:css-semi:${i}`,
+              path,
+              line: i + 1,
+              message: `falta ';' depois de ${prop}`,
+              severity: "error",
+            });
+          }
+        }
+      });
+    }
+  }
+  return out;
 }
 
 export function lintFile(path: string, text: string): Diag[] {
@@ -102,7 +235,11 @@ export function lintFile(path: string, text: string): Diag[] {
       });
     }
   }
-  if (["js", "jsx", "ts", "tsx", "css", "json", "swift"].includes(ext)) {
+  if (ext === "css" || ext === "scss") {
+    out.push(...lintCss(path, text));
+    return out;
+  }
+  if (["js", "jsx", "ts", "tsx", "json", "swift"].includes(ext)) {
     const brace = braceLine(text, "{", "}");
     if (brace) {
       out.push({ id: `${path}:brace`, path, line: brace, message: "chaves { } desbalanceadas", severity: "error" });
@@ -110,11 +247,6 @@ export function lintFile(path: string, text: string): Diag[] {
     const paren = braceLine(text, "(", ")");
     if (paren) {
       out.push({ id: `${path}:paren`, path, line: paren, message: "parênteses desbalanceados", severity: "warn" });
-    }
-  }
-  if (ext === "css") {
-    if (text.includes("/*") && !text.includes("*/")) {
-      out.push({ id: `${path}:css-com`, path, line: 1, message: "comentário CSS sem fechar", severity: "error" });
     }
   }
   if (ext === "html") {

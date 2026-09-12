@@ -3,7 +3,7 @@ import { Archive, Copy, FileJson, Files, FolderOpen, Github, Lock, Tablet, Trash
 import { githubClone, githubCreateRepo, githubOrgs, githubRepos, type GithubOrg, type GithubRepo } from "@/lib/github/api";
 import { setSheet, useProjectUi, useProjects, type ProjectSheet } from "@/lib/workspace/projects";
 import { useWorkspace } from "@/lib/workspace/store";
-import { downloadZip, importZipFile } from "@/lib/workspace/zip";
+import { downloadZip, importZipFile, saveBlob } from "@/lib/workspace/zip";
 
 export function ProjectHub() {
   const sheet = useProjectUi((s) => s.sheet);
@@ -55,9 +55,8 @@ export function ProjectMenu({ onPick }: { onPick?: () => void }) {
       <button
         type="button"
         onClick={() => {
-          onPick?.();
           const s = useWorkspace.getState();
-          void downloadZip(s.projectName, s.files);
+          void downloadZip(s.projectName, s.files).finally(() => onPick?.());
         }}
       >
         Exportar / compartilhar zip
@@ -91,8 +90,7 @@ export function ProjectMenu({ onPick }: { onPick?: () => void }) {
       <button
         type="button"
         onClick={() => {
-          onPick?.();
-          exportJson();
+          void exportJson().finally(() => onPick?.());
         }}
       >
         Exportar JSON
@@ -876,15 +874,11 @@ async function readDirectoryHandle(
   return files;
 }
 
-function exportJson() {
+async function exportJson() {
   const s = useWorkspace.getState();
   const blob = new Blob(
     [JSON.stringify({ name: s.projectName, remote: s.remote, files: s.files }, null, 2)],
     { type: "application/json" },
   );
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = `${s.projectName || "colo"}.json`;
-  a.click();
-  URL.revokeObjectURL(a.href);
+  await saveBlob(blob, `${(s.projectName || "colo").replace(/[\\/:*?"<>|]+/g, "-")}.json`);
 }

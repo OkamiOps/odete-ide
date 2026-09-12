@@ -141,24 +141,78 @@ export async function importZipFile(file: File) {
   return unzipFiles(await file.arrayBuffer());
 }
 
-export async function downloadZip(name: string, files: Record<string, string>) {
-  const blob = zipFiles(files);
-  const file = new File([blob], `${name || "colo"}.zip`, { type: "application/zip" });
+function isAbort(e: unknown) {
+  return e instanceof DOMException && (e.name === "AbortError" || e.name === "NotAllowedError");
+}
+
+function safeName(name: string, ext: string) {
+  const base = (name || "colo").replace(/[\\/:*?"<>|]+/g, "-").trim() || "colo";
+  return base.toLowerCase().endsWith(`.${ext}`) ? base : `${base}.${ext}`;
+}
+
+export async function saveBlob(blob: Blob, filename: string) {
+  const file = new File([blob], filename, { type: blob.type || "application/octet-stream" });
   const nav = navigator as Navigator & {
-    share?: (d: { files?: File[]; title?: string }) => Promise<void>;
-    canShare?: (d: { files?: File[] }) => boolean;
+    share?: (d: ShareData) => Promise<void>;
+    canShare?: (d: ShareData) => boolean;
   };
-  if (nav.canShare?.({ files: [file] })) {
+
+  if (nav.share && nav.canShare) {
     try {
-      await nav.share({ files: [file], title: name });
-      return;
-    } catch {
-      /* user cancel or fallback */
+      if (nav.canShare({ files: [file] })) {
+        await nav.share({ files: [file], title: filename });
+        return;
+      }
+    } catch (e) {
+      if (isAbort(e)) return;
     }
   }
+
+  const picker = (
+    window as Window & {
+      showSaveFilePicker?: (opts: {
+        suggestedName: string;
+        types?: { description: string; accept: Record<string, string[]> }[];
+      }) => Promise<FileSystemFileHandle>;
+    }
+  ).showSaveFilePicker;
+  if (picker) {
+    try {
+      const handle = await picker({
+        suggestedName: filename,
+        types: [
+          {
+            description: filename.endsWith(".json") ? "JSON" : "ZIP",
+            accept: filename.endsWith(".json")
+              ? { "application/json": [".json"] }
+              : { "application/zip": [".zip"] },
+          },
+        ],
+      });
+      const w = await handle.createWritable();
+      await w.write(blob);
+      await w.close();
+      return;
+    } catch (e) {
+      if (isAbort(e)) return;
+    }
+  }
+
+  const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = file.name;
+  a.href = url;
+  a.download = filename;
+  a.rel = "noopener";
+  a.style.display = "none";
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(a.href);
+  window.setTimeout(() => {
+    a.remove();
+    URL.revokeObjectURL(url);
+  }, 4000);
+}
+
+export async function downloadZip(name: string, files: Record<string, string>) {
+  const blob = zipFiles(files);
+  await saveBlob(blob, safeName(name, "zip"));
 }

@@ -311,7 +311,7 @@ export function CodeEditor({ path }: { path?: string }) {
           stickyOn ? stickyContext() : [],
           commentOn ? lineComment(active) : [],
           urlsOn ? urlMarks() : [],
-          linterOn ? [lintGutter(), fileLinter(active)] : [],
+          linterOn ? [lintGutter(), fileLinter(active), lintLineMarks(active, shown)] : [],
           patchDeco,
         ].flat()}
         basicSetup={{
@@ -393,7 +393,7 @@ export function CodeEditor({ path }: { path?: string }) {
           </div>
         ) : null}
       </div>
-      {mapOn ? <MiniMap text={shown} viewRef={viewRef} size={minimap} /> : null}
+      {mapOn ? <MiniMap text={shown} path={active} linter={linterOn} viewRef={viewRef} size={minimap} /> : null}
       {uniqueColors.length ? (
         <div className="color-hints">
           {uniqueColors.map((c) => (
@@ -403,6 +403,23 @@ export function CodeEditor({ path }: { path?: string }) {
       ) : null}
     </div>
   );
+}
+
+function lintLineMarks(path: string, text: string) {
+  const diags = lintFile(path, text);
+  const err = Decoration.line({ class: "cm-lint-error" });
+  const warn = Decoration.line({ class: "cm-lint-warn" });
+  return EditorView.decorations.of((view) => {
+    const b = new RangeSetBuilder<Decoration>();
+    const seen = new Set<number>();
+    for (const d of diags) {
+      if (d.line < 1 || d.line > view.state.doc.lines || seen.has(d.line)) continue;
+      seen.add(d.line);
+      const from = view.state.doc.line(d.line).from;
+      b.add(from, from, d.severity === "error" ? err : warn);
+    }
+    return b.finish();
+  });
 }
 
 function fileLinter(path: string) {
@@ -485,17 +502,22 @@ const MAP_FONT = { s: 1.8, m: 2.9, l: 4.4 } as const;
 
 function MiniMap({
   text,
+  path,
+  linter,
   viewRef,
   size,
 }: {
   text: string;
+  path: string;
+  linter: boolean;
   viewRef: RefObject<EditorView | null>;
   size: "s" | "m" | "l";
 }) {
   const box = useRef<HTMLDivElement>(null);
   const pre = useRef<HTMLPreElement>(null);
   const shift = useRef(0);
-  const [vp, setVp] = useState({ top: 0, h: 24 });
+  const [vp, setVp] = useState({ top: 0, h: 24, off: 0 });
+  const marks = linter ? lintFile(path, text) : [];
 
   function layout() {
     const map = box.current;
@@ -545,7 +567,7 @@ function MiniMap({
     }
     shift.current = offset;
     node.style.transform = `translateY(${offset}px)`;
-    setVp({ top: vpTop + offset, h: Math.min(vpH, mapH) });
+    setVp({ top: vpTop + offset, h: Math.min(vpH, mapH), off: offset });
   }
 
   useEffect(() => {
@@ -599,6 +621,13 @@ function MiniMap({
       title="Minimap — arrasta pra navegar"
     >
       <pre ref={pre}>{text}</pre>
+      {marks.map((d) => (
+        <i
+          key={d.id}
+          className={`minimap-lint is-${d.severity}`}
+          style={{ top: (d.line - 1) * MAP_UNIT[size] + vp.off }}
+        />
+      ))}
       <i className="minimap-vp" style={{ top: vp.top, height: vp.h }} />
     </div>
   );

@@ -148,14 +148,6 @@ function lintCss(path: string, text: string): Diag[] {
   const paren = braceLine(text, "(", ")", false);
   if (paren) out.push({ id: `${path}:css-paren`, path, line: paren, message: "parênteses desbalanceados", severity: "error" });
 
-  function nextCode(from: number) {
-    for (let i = from + 1; i < codes.length; i++) {
-      const t = codes[i]!.trim();
-      if (t) return t;
-    }
-    return "";
-  }
-
   for (let i = 0; i < codes.length; i++) {
     const t = codes[i]!.trim();
     if (!t) continue;
@@ -167,7 +159,6 @@ function lintCss(path: string, text: string): Diag[] {
       if (chunk.endsWith("{") || !chunk.includes(":")) continue;
       const decls = chunk.split(";").map((s) => s.trim()).filter(Boolean);
       const ended = chunk.endsWith(";");
-      const closedHere = t.includes("}");
       decls.forEach((decl, di) => {
         const m = /^(-?[\w-]+)\s*:\s*(.*)$/.exec(decl);
         if (!m) return;
@@ -182,17 +173,14 @@ function lintCss(path: string, text: string): Diag[] {
           });
         }
         const isLast = di === decls.length - 1;
-        if (isLast && !ended && !closedHere) {
-          const nxt = nextCode(i);
-          if (nxt && !nxt.startsWith("}") && /^-?[\w-]+\s*:/.test(nxt)) {
-            out.push({
-              id: `${path}:css-semi:${i}`,
-              path,
-              line: i + 1,
-              message: `falta ';' depois de ${prop}`,
-              severity: "error",
-            });
-          }
+        if (isLast && !ended) {
+          out.push({
+            id: `${path}:css-semi:${i}`,
+            path,
+            line: i + 1,
+            message: `falta ';' depois de ${prop}`,
+            severity: "error",
+          });
         }
       });
     }

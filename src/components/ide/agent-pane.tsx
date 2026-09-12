@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, Eraser, ImagePlus, LoaderCircle, AtSign, Send, Square, Undo2, X } from "lucide-react";
+import { AtSign, Check, Eraser, FolderOpen, ImagePlus, LoaderCircle, Paperclip, Plus, Send, Square, Undo2, X } from "lucide-react";
 import { AgentConnect } from "@/components/ide/settings-pane";
 import { ModelSelect } from "@/components/ide/model-select";
 import { useAgentChats } from "@/lib/agent/chats";
@@ -69,7 +69,10 @@ export function AgentPane() {
   const draftRef = useRef("");
   const sendFn = useRef<(t: string) => void>(() => {});
   const fileRef = useRef<HTMLInputElement>(null);
+  const clipRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const [plus, setPlus] = useState(false);
+  const [picker, setPicker] = useState<false | "file" | "skill">(false);
   const agentMode = useChrome((s) => s.agentMode);
 
   useEffect(() => {
@@ -129,6 +132,10 @@ export function AgentPane() {
       .slice(0, 8);
   }, [draft, files]);
 
+  const skillMenu = slashHit ?? (picker === "skill" ? allSkills(files).slice(0, 24) : null);
+  const fileMenu =
+    atHit ?? (picker === "file" ? Object.keys(files).sort().slice(0, 24) : null);
+
   function clear() {
     cancel.current = true;
     history.current = [];
@@ -138,11 +145,21 @@ export function AgentPane() {
   }
 
   function pickFile(path: string) {
-    setDraft((d) => d.replace(/@([^\s]*)$/, `@${path} `));
+    setPicker(false);
+    setPlus(false);
+    setDraft((d) => {
+      if (/@([^\s]*)$/.test(d)) return d.replace(/@([^\s]*)$/, `@${path} `);
+      return `${d}${d && !/\s$/.test(d) ? " " : ""}@${path} `;
+    });
   }
 
   function pickSkill(id: string) {
-    setDraft((d) => d.replace(/(^|\s)\/[^\s]*$/, `$1/${id} `));
+    setPicker(false);
+    setPlus(false);
+    setDraft((d) => {
+      if (/(^|\s)\/[^\s]*$/.test(d)) return d.replace(/(^|\s)\/[^\s]*$/, `$1/${id} `);
+      return `${d}${d && !/\s$/.test(d) ? " " : ""}/${id} `;
+    });
   }
 
   async function send(text: string) {
@@ -332,10 +349,10 @@ export function AgentPane() {
 
       {connected ? (
         <div className="agent-compose-wrap">
-          {slashHit ? (
+          {skillMenu ? (
             <div className="mention-list">
-              {slashHit.length ? (
-                slashHit.map((s) => (
+              {skillMenu.length ? (
+                skillMenu.map((s) => (
                   <button
                     key={s.id}
                     type="button"
@@ -352,10 +369,10 @@ export function AgentPane() {
                 <span className="mention-empty">nenhuma skill</span>
               )}
             </div>
-          ) : atHit ? (
+          ) : fileMenu ? (
             <div className="mention-list">
-              {atHit.length ? (
-                atHit.map((p) => (
+              {fileMenu.length ? (
+                fileMenu.map((p) => (
                   <button
                     key={p}
                     type="button"
@@ -370,6 +387,49 @@ export function AgentPane() {
               ) : (
                 <span className="mention-empty">nenhum arquivo</span>
               )}
+            </div>
+          ) : plus ? (
+            <div className="plus-menu">
+              <button
+                type="button"
+                onClick={() => {
+                  setPlus(false);
+                  fileRef.current?.click();
+                }}
+              >
+                <ImagePlus size={18} />
+                Imagem
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPlus(false);
+                  clipRef.current?.click();
+                }}
+              >
+                <Paperclip size={18} />
+                Arquivo
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPlus(false);
+                  setPicker("file");
+                }}
+              >
+                <AtSign size={18} />
+                Mencionar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPlus(false);
+                  setPicker("skill");
+                }}
+              >
+                <FolderOpen size={18} />
+                Skills
+              </button>
             </div>
           ) : null}
           {quote ? (
@@ -443,26 +503,40 @@ export function AgentPane() {
                 });
               }}
             />
+            <input
+              ref={clipRef}
+              type="file"
+              hidden
+              multiple
+              onChange={(e) => {
+                const list = [...(e.target.files ?? [])];
+                e.target.value = "";
+                void (async () => {
+                  for (const f of list) {
+                    if (f.type.startsWith("image/")) {
+                      const img = await fileToImage(f);
+                      if (img) setShots((xs) => [...xs, img].slice(0, 4));
+                    } else if (f.size < 200_000) {
+                      const text = await f.text();
+                      setDraft((d) => `${d}${d ? "\n\n" : ""}Arquivo ${f.name}:\n\`\`\`\n${text.slice(0, 8000)}\n\`\`\`\n`);
+                    }
+                  }
+                })();
+              }}
+            />
             <div className="agent-compose-bar">
               <button
                 type="button"
-                className="agent-icon-btn"
-                title="Anexar imagem"
-                aria-label="Anexar imagem"
-                onClick={() => fileRef.current?.click()}
+                className={`agent-icon-btn${plus ? " is-on" : ""}`}
+                title="Anexar"
+                aria-label="Anexar"
+                onClick={() => {
+                  setPicker(false);
+                  setPlus((v) => !v);
+                }}
               >
-                <ImagePlus size={18} />
+                <Plus size={20} />
               </button>
-              <button
-                type="button"
-                className="agent-icon-btn"
-                title="Citar arquivo aberto"
-                aria-label="Citar arquivo aberto"
-                onClick={() => setDraft((d) => `${d}${d && !d.endsWith(" ") ? " " : ""}@${openPath} `)}
-              >
-                <AtSign size={18} />
-              </button>
-              <span className="agent-compose-hint">/skill · @arquivo</span>
               {busy ? (
                 <button
                   type="button"

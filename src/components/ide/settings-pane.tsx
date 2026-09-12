@@ -62,7 +62,7 @@ export function SettingsPane() {
               className={tab === t.id ? "is-on" : undefined}
               onClick={() => setTab(t.id)}
             >
-              <Icon size={16} strokeWidth={1.7} />
+              <Icon size={18} strokeWidth={1.7} />
               {t.label}
             </button>
           );

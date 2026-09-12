@@ -601,38 +601,19 @@ input, textarea, select { font: inherit; font-size: 16px; }
   gap: 6px;
 }
 .agent-effort button {
-  min-height: 48px;
-  padding: 6px 4px;
+  min-height: 36px;
+  padding: 0 4px;
   border: 1px solid var(--color-border);
-  border-radius: 12px;
+  border-radius: 10px;
   background: var(--color-bg);
   color: var(--color-fg-muted);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-}
-.agent-effort button small {
-  font-size: 10px;
-  font-weight: 400;
-  color: var(--color-fg-subtle);
-  letter-spacing: 0;
-  line-height: 1.1;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .agent-effort button.is-on {
   background: var(--color-fg);
   color: var(--color-bg);
   border-color: var(--color-fg);
-}
-.agent-effort button.is-on small {
-  color: color-mix(in srgb, var(--color-bg) 72%, transparent);
 }
 .agent-modes { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-top: 0; }
 .agent-modes button { min-height: 40px; border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-bg); color: var(--color-fg-muted); font-size: 13px; font-weight: 500; }
@@ -725,25 +706,25 @@ input, textarea, select { font: inherit; font-size: 16px; }
 .set-pane { display: flex; flex-direction: column; min-height: 0; height: 100%; }
 .set-tabs {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 4px;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
   padding: 8px;
   border-bottom: 1px solid var(--color-border);
   flex-shrink: 0;
 }
 .set-tabs button {
-  min-height: 52px;
+  min-height: 44px;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  padding: 6px 2px;
+  gap: 8px;
+  padding: 0 10px;
   border: 0;
   border-radius: 12px;
-  background: transparent;
+  background: var(--color-bg);
   color: var(--color-fg-muted);
-  font-size: 10px;
+  font-size: 13px;
   font-weight: 500;
   line-height: 1.1;
 }

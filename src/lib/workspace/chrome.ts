@@ -150,6 +150,7 @@ type ChromeState = {
   sideW: number;
   agentW: number;
   termH: number;
+  splitPct: number;
   altPath: string;
   editFocus: "a" | "b";
   cheatsheet: boolean;
@@ -206,6 +207,7 @@ type ChromeState = {
   setSideW: (n: number) => void;
   setAgentW: (n: number) => void;
   setTermH: (n: number) => void;
+  setSplitPct: (n: number) => void;
   setAltPath: (p: string) => void;
   setEditFocus: (f: "a" | "b") => void;
   setCheatsheet: (v: boolean) => void;
@@ -292,6 +294,7 @@ export const useChrome = create<ChromeState>()(
       sideW: 248,
       agentW: 320,
       termH: 200,
+      splitPct: 50,
       altPath: "index.html",
       editFocus: "a" as const,
       cheatsheet: false,
@@ -302,10 +305,11 @@ export const useChrome = create<ChromeState>()(
       toggleTerm: () => set((s) => ({ term: !s.term })),
       toggleSide: () => set((s) => ({ sideOpen: !s.sideOpen })),
       resetLayout: () =>
-        set({ sideOpen: true, agent: true, term: true, sideW: 248, agentW: 320, termH: 200 }),
+        set({ sideOpen: true, agent: true, term: true, sideW: 248, agentW: 320, termH: 200, splitPct: 50 }),
       setSideW: (sideW) => set({ sideW }),
       setAgentW: (agentW) => set({ agentW }),
       setTermH: (termH) => set({ termH }),
+      setSplitPct: (splitPct) => set({ splitPct }),
       setPalette: (palette, kind) =>
         set((s) => ({ palette, paletteKind: kind ?? (palette ? s.paletteKind : "all") })),
       setFindOpen: (findOpen) => set({ findOpen }),
@@ -456,6 +460,7 @@ export const useChrome = create<ChromeState>()(
         sideW: s.sideW,
         agentW: s.agentW,
         termH: s.termH,
+        splitPct: s.splitPct,
         altPath: s.altPath,
         editFocus: s.editFocus,
         mobile: s.mobile,
@@ -474,6 +479,7 @@ export const useChrome = create<ChromeState>()(
         if (typeof p.sideW !== "number" || p.sideW < 160) delete p.sideW;
         if (typeof p.agentW !== "number" || p.agentW < 200) delete p.agentW;
         if (typeof p.termH !== "number" || p.termH < 120) delete p.termH;
+        if (typeof p.splitPct !== "number" || p.splitPct < 22 || p.splitPct > 78) delete p.splitPct;
         for (const key of ACTIONS) delete p[key];
         const prev = (p.favModels ?? {}) as Record<string, string>;
         p.favModels = {

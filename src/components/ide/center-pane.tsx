@@ -1,9 +1,11 @@
+import { useRef } from "react";
 import { CodeEditor } from "@/components/ide/code-editor";
 import { DiffPane } from "@/components/ide/diff-pane";
 import { DropHint } from "@/components/ide/drag-ghost";
 import { EditorTabs } from "@/components/ide/editor-tabs";
 import { PickList } from "@/components/ide/pick-list";
 import { PreviewPane } from "@/components/ide/preview-pane";
+import { Splitter, clamp } from "@/components/ide/splitter";
 import { usePatches } from "@/lib/agent/patches";
 import { useChrome, type CenterId } from "@/lib/workspace/chrome";
 import { useDrag } from "@/lib/workspace/drag";
@@ -35,6 +37,9 @@ export function CenterPane() {
   const names = Object.keys(files).filter((p) => !isNoisePath(p)).sort();
   const opts = names.map((p) => ({ id: p, label: p }));
   const dragging = useDrag((s) => !!s.path);
+  const splitPct = useChrome((s) => s.splitPct);
+  const setSplitPct = useChrome((s) => s.setSplitPct);
+  const mainRef = useRef<HTMLDivElement>(null);
   const right =
     files[altPath] !== undefined && altPath !== openPath
       ? altPath
@@ -97,6 +102,7 @@ export function CenterPane() {
         </div>
       ) : null}
       <div
+        ref={mainRef}
         className={
           center === "split" || center === "dual"
             ? "center-main is-split min-h-0 flex-1"
@@ -115,7 +121,7 @@ export function CenterPane() {
           </div>
         ) : null}
         {center === "code" || center === "split" ? (
-          <div className="fill-pane">
+          <div className="fill-pane" style={center === "split" ? { flex: `0 0 ${splitPct}%` } : undefined}>
             <CodeEditor />
           </div>
         ) : null}
@@ -123,6 +129,7 @@ export function CenterPane() {
           <>
             <div
               className={editFocus === "a" ? "fill-pane is-focus" : "fill-pane"}
+              style={{ flex: `0 0 ${splitPct}%` }}
               onPointerDown={() => setEditFocus("a")}
             >
               <div className="dual-hd">
@@ -141,6 +148,13 @@ export function CenterPane() {
               <CodeEditor pane="a" />
               {dragging ? <DropHint side="left" label="Solta à esquerda" /> : null}
             </div>
+            <Splitter
+              axis="x"
+              onDelta={(d) => {
+                const w = mainRef.current?.clientWidth || 1;
+                setSplitPct(clamp(splitPct + (d / w) * 100, 22, 78));
+              }}
+            />
             <div
               className={editFocus === "b" ? "fill-pane is-focus" : "fill-pane"}
               onPointerDown={() => setEditFocus("b")}
@@ -162,6 +176,15 @@ export function CenterPane() {
               {dragging ? <DropHint side="right" label="Solta à direita" /> : null}
             </div>
           </>
+        ) : null}
+        {center === "split" ? (
+          <Splitter
+            axis="x"
+            onDelta={(d) => {
+              const w = mainRef.current?.clientWidth || 1;
+              setSplitPct(clamp(splitPct + (d / w) * 100, 22, 78));
+            }}
+          />
         ) : null}
         {center === "preview" || center === "split" ? (
           <div className="preview-slot">

@@ -72,7 +72,7 @@ export function IdeApp() {
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const meta = e.metaKey || e.ctrlKey;
-      if (!meta && e.key !== "Escape") return;
+      if (!meta && e.key !== "Escape" && e.key !== "F12") return;
       const code = e.code;
       const key = e.key.length === 1 ? e.key.toLowerCase() : e.key.toLowerCase();
       const is = (letter: string) => key === letter || code === `Key${letter.toUpperCase()}`;
@@ -210,6 +210,14 @@ function DesktopColumns({ agent, term }: { agent: boolean; term: boolean }) {
   const toggleSide = useChrome((s) => s.toggleSide);
   const toggleAgent = useChrome((s) => s.toggleAgent);
   const toggleTerm = useChrome((s) => s.toggleTerm);
+  const split = useHub((s) => s.agentSplit);
+  if (split) {
+    return (
+      <div className="agent-full">
+        <AgentDock />
+      </div>
+    );
+  }
   return (
     <div className="desk-wrap">
       <div className="desk">
@@ -253,7 +261,7 @@ function DesktopColumns({ agent, term }: { agent: boolean; term: boolean }) {
             <Splitter
               axis="x"
               onDelta={(d) =>
-                useChrome.setState((s) => ({ agentW: clamp(s.agentW - d, 240, 560) }))
+                useChrome.setState((s) => ({ agentW: clamp(s.agentW - d, 240, 720) }))
               }
             />
             <div className="agent-col" style={{ width: agentW, flex: `0 0 ${agentW}px` }}>

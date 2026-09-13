@@ -5,7 +5,9 @@ import {
   githubCommentPr,
   githubPrComments,
   githubPrFiles,
+  githubPulls,
 } from "@/lib/github/api";
+import { bindFolder, writeTree } from "@/lib/workspace/folder";
 import { useHub } from "@/lib/workspace/hub";
 import { useProjects } from "@/lib/workspace/projects";
 import { useWorkspace } from "@/lib/workspace/store";
@@ -18,8 +20,10 @@ export function GhSheet() {
     <div className="cheat-scrim" onClick={() => useHub.getState().setView(null)}>
       <div className="cheat-card gh-sheet" onClick={(e) => e.stopPropagation()} role="dialog">
         {view === "actions" ? <ActionsBody /> : null}
+        {view === "prs" ? <PrsBody /> : null}
         {view === "pr" ? <PrBody /> : null}
         {view === "compare" ? <CompareBody /> : null}
+        {view === "folder" ? <FolderBody /> : null}
       </div>
     </div>
   );
@@ -161,6 +165,82 @@ function CompareBody() {
           </pre>
         ))}
         {!changed.length ? <p>iguais</p> : null}
+      </div>
+    </>
+  );
+}
+
+function PrsBody() {
+  const remote = useWorkspace((s) => s.remote);
+  const token = useProjects((s) => s.github?.token);
+  const [rows, setRows] = useState<{ number: number; title: string; url: string }[]>([]);
+  const [err, setErr] = useState("");
+  useEffect(() => {
+    if (!remote || !token) return;
+    void githubPulls(remote, token)
+      .then(setRows)
+      .catch((e) => setErr(e instanceof Error ? e.message : "falhou"));
+  }, [remote, token]);
+  return (
+    <>
+      <Hd title="Pull requests" />
+      <div className="gh-sheet-body">
+        {err ? <p className="agent-err">{err}</p> : null}
+        {!token ? <p>conecta o GitHub nos Ajustes</p> : null}
+        {rows.map((p) => (
+          <button key={p.number} type="button" className="hit" onClick={() => useHub.getState().setPr(p.number)}>
+            <b>PR #{p.number}</b>
+            <span>{p.title}</span>
+          </button>
+        ))}
+        {token && !rows.length && !err ? <p>nenhuma PR aberta</p> : null}
+      </div>
+    </>
+  );
+}
+
+function FolderBody() {
+  const name = useHub((s) => s.folder);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [ok, setOk] = useState("");
+  const picker = typeof window !== "undefined" && "showDirectoryPicker" in window;
+  return (
+    <>
+      <Hd title="Salvar na pasta" />
+      <div className="gh-sheet-body">
+        <p>Tu escolhe a pasta no Files. O Colo só grava depois que tu apontar o lugar.</p>
+        {name ? <p>pasta atual: <b>{name}</b></p> : <p>nenhuma pasta escolhida ainda</p>}
+        {!picker ? (
+          <p className="agent-err">
+            este browser não deixa gravar pasta. no iPad abre o Files pelo app (Safari / TestFlight), não pelo preview do desktop.
+          </p>
+        ) : null}
+        <button
+          type="button"
+          className="chip is-on"
+          disabled={busy}
+          onClick={() => {
+            setErr("");
+            setOk("");
+            setBusy(true);
+            void bindFolder()
+              .then(async (dir) => {
+                useHub.getState().setFolder(dir.name);
+                await writeTree(dir, useWorkspace.getState().files);
+                setOk(`gravado em ${dir.name}`);
+              })
+              .catch((e) => {
+                if (e instanceof DOMException && e.name === "AbortError") return;
+                setErr(e instanceof Error ? e.message : "não deu pra abrir a pasta");
+              })
+              .finally(() => setBusy(false));
+          }}
+        >
+          {busy ? "abrindo Files…" : "Escolher pasta"}
+        </button>
+        {ok ? <p>{ok}</p> : null}
+        {err ? <p className="agent-err">{err}</p> : null}
       </div>
     </>
   );

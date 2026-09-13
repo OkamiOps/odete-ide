@@ -26,6 +26,7 @@ import { useChrome } from "@/lib/workspace/chrome";
 import { useNav } from "@/lib/workspace/nav";
 import { useProjects } from "@/lib/workspace/projects";
 import { useHub } from "@/lib/workspace/hub";
+import { useWorkspace } from "@/lib/workspace/store";
 
 export function GitPane() {
   const files = useWorkspace((s) => s.files);

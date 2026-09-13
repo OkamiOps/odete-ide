@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-type View = null | "actions" | "pr" | "compare";
+type View = null | "actions" | "pr" | "prs" | "compare" | "folder";
 
 type Hub = {
   view: View;

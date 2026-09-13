@@ -105,7 +105,6 @@ export function CodeEditor({ path }: { path?: string }) {
   const gitOn = useChrome((s) => s.pluginGitGutter);
   const todoOn = useChrome((s) => s.pluginTodoMark);
   const rainbowOn = useChrome((s) => s.pluginRainbow);
-  const emmetOn = useChrome((s) => s.pluginEmmet);
   const stickyOn = useChrome((s) => s.pluginSticky);
   const commentOn = useChrome((s) => s.pluginComment);
   const urlsOn = useChrome((s) => s.pluginUrls);
@@ -401,7 +400,7 @@ export function CodeEditor({ path }: { path?: string }) {
           gitOn ? gitGutter(headBody, shown) : [],
           todoOn ? todoMarks() : [],
           rainbowOn ? rainbowBrackets() : [],
-          emmetOn ? emmetTab(active) : [],
+          emmetTab(active),
           stickyOn ? stickyContext() : [],
           commentOn ? lineComment(active) : [],
           urlsOn ? urlMarks() : [],

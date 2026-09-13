@@ -20,6 +20,7 @@ let package = Package(
                 .product(name: "OdeteEditor", package: "OdeteEditor"),
                 .product(name: "OdeteFiles", package: "OdeteFiles"),
             ],
+            resources: [.process("Resources")],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
         .testTarget(name: "OdeteUITests", dependencies: ["OdeteUI"]),

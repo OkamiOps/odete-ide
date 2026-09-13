@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { AtSign, Bot, Check, FolderOpen, History, ImagePlus, LoaderCircle, Lock, Paperclip, Plus, Send, Square, SquarePen, Undo2, Unlock, X } from "lucide-react";
+import { AtSign, Bot, Check, FolderOpen, History, ImagePlus, LoaderCircle, Lock, Paperclip, Plus, Send, Square, SquarePen, Undo2, Unlock, Wrench, X } from "lucide-react";
 import { AgentConnect } from "@/components/ide/settings-pane";
 import { ModelSelect } from "@/components/ide/model-select";
 import { contextWindow, estimateTokens, fmtTok, useAgentChats } from "@/lib/agent/chats";
@@ -407,9 +407,13 @@ export function AgentPane() {
         ) : null}
 
         {!histOpen
-          ? items.map((item) => (
-              <Message key={item.id} item={item} />
-            ))
+          ? groupChat(items).map((g) =>
+              g.type === "tools" ? (
+                <ToolGroup key={g.items[0]!.id} items={g.items} />
+              ) : (
+                <Message key={g.item.id} item={g.item} />
+              ),
+            )
           : null}
 
         {!histOpen && pendingCount > 1 ? (
@@ -721,6 +725,55 @@ function FileLink({ path, label }: { path: string; label?: string }) {
   );
 }
 
+function groupChat(items: ChatItem[]) {
+  const out: Array<{ type: "tools"; items: ChatItem[] } | { type: "one"; item: ChatItem }> = [];
+  for (const item of items) {
+    const fold =
+      item.kind === "tool" || (item.kind === "permit" && item.status !== "pending");
+    if (fold) {
+      const last = out[out.length - 1];
+      if (last?.type === "tools") last.items.push(item);
+      else out.push({ type: "tools", items: [item] });
+    } else {
+      out.push({ type: "one", item });
+    }
+  }
+  return out;
+}
+
+function ToolGroup({ items }: { items: ChatItem[] }) {
+  const files = useWorkspace((s) => s.files);
+  const n = items.length;
+  return (
+    <details className="tool-group">
+      <summary>
+        <Wrench size={13} />
+        {n === 1 ? toolLabel(items[0]!) : `usou ${n} tools`}
+      </summary>
+      <div className="tool-group-list">
+        {items.map((it) => {
+          if (it.kind !== "tool" && it.kind !== "permit") return null;
+          const path = resolvePath(it.detail, files);
+          return (
+            <div key={it.id} className="tool-row">
+              <b>{it.name}</b>
+              {path ? <FileLink path={path} label={it.detail} /> : <span>{it.detail}</span>}
+              {it.kind === "permit" ? <em>{it.status === "ok" ? "ok" : "recusado"}</em> : null}
+            </div>
+          );
+        })}
+      </div>
+    </details>
+  );
+}
+
+function toolLabel(item: ChatItem) {
+  if (item.kind === "tool" || item.kind === "permit") {
+    return item.detail ? `${item.name} ${item.detail}` : item.name;
+  }
+  return "tool";
+}
+
 function Message({ item }: { item: ChatItem }) {
   const files = useWorkspace((s) => s.files);
   if (item.kind === "tool") {
@@ -808,19 +861,40 @@ function RichText({ text, files }: { text: string; files: Record<string, string>
           <div key={i} className="md-block">
             {chunk.split(/\n{2,}/).map((p, j) => {
               const lines = p.split("\n");
-              const list = lines.filter((l) => l.trim()).every((l) => /^\s*[-*]\s/.test(l));
-              if (list) {
+              const filled = lines.filter((l) => l.trim());
+              if (/^#{1,3}\s/.test(p.trim())) {
+                return <h4 key={j}>{inline(p.replace(/^#{1,3}\s/, ""), files)}</h4>;
+              }
+              const ul = filled.length > 0 && filled.every((l) => /^\s*[-*]\s/.test(l));
+              if (ul) {
                 return (
                   <ul key={j}>
-                    {lines
-                      .filter((l) => l.trim())
-                      .map((l, k) => (
-                        <li key={k}>{inline(l.replace(/^\s*[-*]\s/, ""), files)}</li>
-                      ))}
+                    {filled.map((l, k) => (
+                      <li key={k}>{inline(l.replace(/^\s*[-*]\s/, ""), files)}</li>
+                    ))}
                   </ul>
                 );
               }
-              return <p key={j}>{inline(p, files)}</p>;
+              const ol = filled.length > 0 && filled.every((l) => /^\s*\d+[.)]\s/.test(l));
+              if (ol) {
+                return (
+                  <ol key={j}>
+                    {filled.map((l, k) => (
+                      <li key={k}>{inline(l.replace(/^\s*\d+[.)]\s/, ""), files)}</li>
+                    ))}
+                  </ol>
+                );
+              }
+              return (
+                <p key={j}>
+                  {lines.map((l, k) => (
+                    <span key={k}>
+                      {k ? <br /> : null}
+                      {inline(l, files)}
+                    </span>
+                  ))}
+                </p>
+              );
             })}
           </div>
         );

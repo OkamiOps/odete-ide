@@ -8,11 +8,13 @@ public struct GitError: LocalizedError, Sendable, Equatable {
     public var code: Int32
     public var message: String
 
-    public var errorDescription: String? { message }
+    public var errorDescription: String? {
+        message
+    }
 
     /// Lê `git_error_last()` para o código devolvido.
     static func last(_ code: Int32, _ fallback: String = "erro no git") -> GitError {
-        let raw = git_error_last().flatMap { $0.pointee.message }.map { String(cString: $0) } ?? fallback
+        let raw = git_error_last().flatMap(\.pointee.message).map { String(cString: $0) } ?? fallback
         let kind: Kind
         switch code {
         case GIT_EAUTH.rawValue, GIT_ECERTIFICATE.rawValue: kind = .auth
@@ -29,9 +31,15 @@ public struct GitError: LocalizedError, Sendable, Equatable {
     }
 
     static func translate(_ s: String) -> String {
-        if s.contains("authentication") || s.contains("401") { return "autenticação recusada pelo remoto" }
-        if s.contains("could not resolve") || s.contains("failed to connect") { return "sem conexão com o remoto" }
-        if s.contains("conflict") { return "há conflitos para resolver" }
+        if s.contains("authentication") || s.contains("401") {
+            return "autenticação recusada pelo remoto"
+        }
+        if s.contains("could not resolve") || s.contains("failed to connect") {
+            return "sem conexão com o remoto"
+        }
+        if s.contains("conflict") {
+            return "há conflitos para resolver"
+        }
         return s
     }
 }
@@ -39,16 +47,20 @@ public struct GitError: LocalizedError, Sendable, Equatable {
 /// Executa uma chamada do libgit2 e lança `GitError` se falhar.
 @discardableResult
 func check(_ code: Int32, _ what: String = "git") throws -> Int32 {
-    if code < 0 { throw GitError.last(code, what) }
+    if code < 0 {
+        throw GitError.last(code, what)
+    }
     return code
 }
 
 /// Garante `git_libgit2_init()` uma vez por processo.
 enum Libgit2 {
-    nonisolated(unsafe) private static var started = false
+    private nonisolated(unsafe) static var started = false
     private static let lock = NSLock()
     static func start() {
         lock.lock(); defer { lock.unlock() }
-        if !started { git_libgit2_init(); started = true }
+        if !started {
+            git_libgit2_init(); started = true
+        }
     }
 }

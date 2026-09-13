@@ -52,7 +52,12 @@ public extension Repository {
 
     // MARK: rede
 
-    static func clone(_ url: String, to dir: URL, credentials: Credentials? = nil, progress: (@Sendable (CloneProgress) -> Void)? = nil) async throws -> Repository {
+    static func clone(
+        _ url: String,
+        to dir: URL,
+        credentials: Credentials? = nil,
+        progress: (@Sendable (CloneProgress) -> Void)? = nil
+    ) async throws -> Repository {
         Libgit2.start()
         let box = RemotePayload(credentials: credentials, progress: progress)
         let payload = Unmanaged.passRetained(box)
@@ -78,7 +83,11 @@ public extension Repository {
         try setUpstream(branch: local, to: rb.name)
     }
 
-    func fetch(remote: String = "origin", credentials: Credentials? = nil, progress: (@Sendable (CloneProgress) -> Void)? = nil) throws {
+    func fetch(
+        remote: String = "origin",
+        credentials: Credentials? = nil,
+        progress: (@Sendable (CloneProgress) -> Void)? = nil
+    ) throws {
         var r: OpaquePointer?
         try check(git_remote_lookup(&r, repo, remote), "remoto \(remote)")
         defer { git_remote_free(r) }
@@ -106,7 +115,12 @@ public extension Repository {
         return try mergeAnnotated(their!, label: up, author: author)
     }
 
-    func push(remote: String = "origin", branch: String? = nil, credentials: Credentials? = nil, setUpstream: Bool = true) throws {
+    func push(
+        remote: String = "origin",
+        branch: String? = nil,
+        credentials: Credentials? = nil,
+        setUpstream: Bool = true
+    ) throws {
         let name = try branch ?? currentBranch()?.name ?? headBranchName() ?? "main"
         var r: OpaquePointer?
         try check(git_remote_lookup(&r, repo, remote), "remoto \(remote)")
@@ -120,6 +134,8 @@ public extension Repository {
         var arr = Self.strarray(["refs/heads/\(name):refs/heads/\(name)"])
         defer { Self.free(&arr) }
         try check(git_remote_push(r, &arr.array, &opts), "push")
-        if setUpstream { try? self.setUpstream(branch: name, to: "\(remote)/\(name)") }
+        if setUpstream {
+            try? self.setUpstream(branch: name, to: "\(remote)/\(name)")
+        }
     }
 }

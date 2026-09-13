@@ -17,7 +17,10 @@ enum PatchText {
             : (hunk.oldStart, hunk.oldLines, hunk.newStart, hunk.newLines)
         out += "@@ -\(os),\(ol) +\(ns),\(nl) @@\n"
         for l in hunk.lines {
-            let kind = reverse ? (l.kind == .addition ? LineKind.deletion : l.kind == .deletion ? .addition : .context) : l.kind
+            let kind = reverse ? (
+                l.kind == .addition ? LineKind.deletion : l.kind == .deletion ? .addition : .context
+            ) :
+                l.kind
             let prefix = kind == .addition ? "+" : kind == .deletion ? "-" : " "
             out += prefix + l.text + "\n"
         }

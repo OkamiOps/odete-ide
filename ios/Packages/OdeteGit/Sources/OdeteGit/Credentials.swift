@@ -10,8 +10,13 @@ public struct Credentials: Sendable, Hashable {
         self.token = token
     }
 
-    public static func github(token: String) -> Credentials { Credentials(username: "x-access-token", token: token) }
-    public static func oauth2(token: String) -> Credentials { Credentials(username: "oauth2", token: token) }
+    public static func github(token: String) -> Credentials {
+        Credentials(username: "x-access-token", token: token)
+    }
+
+    public static func oauth2(token: String) -> Credentials {
+        Credentials(username: "oauth2", token: token)
+    }
 }
 
 /// Caixa que os callbacks C do libgit2 recebem como payload.
@@ -37,9 +42,16 @@ let credentialCB: git_credential_acquire_cb = { out, _, _, _, payload in
 let transferCB: git_indexer_progress_cb = { stats, payload in
     guard let stats, let payload else { return 0 }
     let box = Unmanaged<RemotePayload>.fromOpaque(payload).takeUnretainedValue()
-    if box.cancelled { return -1 }
+    if box.cancelled {
+        return -1
+    }
     let s = stats.pointee
-    box.progress?(CloneProgress(received: Int(s.received_objects), total: Int(s.total_objects), bytes: Int(s.received_bytes), indexed: Int(s.indexed_objects)))
+    box.progress?(CloneProgress(
+        received: Int(s.received_objects),
+        total: Int(s.total_objects),
+        bytes: Int(s.received_bytes),
+        indexed: Int(s.indexed_objects)
+    ))
     return 0
 }
 

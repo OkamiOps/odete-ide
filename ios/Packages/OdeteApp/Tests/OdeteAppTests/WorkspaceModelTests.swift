@@ -1,4 +1,5 @@
 import Foundation
+import OdeteAccounts
 @testable import OdeteApp
 import OdeteCore
 import OdeteFiles
@@ -11,7 +12,8 @@ struct WorkspaceModelTests {
         let store = ProjectStore(root: root)
         let p = try store.create(name: "T", template: .blank)
         let chrome = ChromeState()
-        let ws = WorkspaceModel(project: p, root: store.url(for: p), chrome: chrome)
+        let accounts = AccountStore(url: root.appending(path: "accounts.json"), keychain: MemorySecrets())
+        let ws = WorkspaceModel(project: p, root: store.url(for: p), chrome: chrome, accounts: accounts)
         return (ws, chrome, store.url(for: p))
     }
 

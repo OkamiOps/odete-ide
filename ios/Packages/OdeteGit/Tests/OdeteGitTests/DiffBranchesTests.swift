@@ -1,8 +1,8 @@
 import Foundation
-import Testing
 @testable import OdeteGit
+import Testing
 
-@Suite struct DiffBranchesTests {
+struct DiffBranchesTests {
     func seeded() async throws -> (Repository, URL) {
         let (repo, url) = try tempRepo()
         try write(url, "a.txt", (1 ... 20).map(String.init).joined(separator: "\n") + "\n")
@@ -65,7 +65,9 @@ import Testing
         let names = try await repo.branches().map(\.name)
         #expect(names == ["feature", "main"])
         let r = try await repo.merge("feature", author: me)
-        if case .fastForward = r {} else { Issue.record("esperava fast-forward, veio \(r)") }
+        if case .fastForward = r {} else {
+            Issue.record("esperava fast-forward, veio \(r)")
+        }
         #expect(FileManager.default.fileExists(atPath: url.appending(path: "f.txt").path))
         try await repo.deleteBranch("feature")
         #expect(try await repo.branches().map(\.name) == ["main"])
@@ -91,7 +93,7 @@ import Testing
         try await repo.resolveConflict(path: "a.txt", contents: "meu e deles\n")
         let sha = try await repo.finishMerge(message: "Merge outra", author: me)
         #expect(sha.count == 40)
-        #expect(!(await repo.mergeInProgress))
+        #expect(await !(repo.mergeInProgress))
         #expect(try await repo.log().first?.parents.count == 2)
         #expect(try await repo.status().isEmpty)
     }

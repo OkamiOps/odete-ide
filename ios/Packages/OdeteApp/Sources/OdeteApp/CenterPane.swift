@@ -60,12 +60,7 @@ struct CenterPane: View {
     @ViewBuilder var content: some View {
         switch chrome.snapshot.center {
         case .code: editor(ws.active)
-        case .diff: ShellPanel(
-                "Diff",
-                symbol: "plus.forwardslash.minus",
-                phase: 2,
-                blurb: "Diferenças contra o último commit."
-            )
+        case .diff: DiffPane()
         case .dual:
             HStack(spacing: 0) {
                 editor(ws.active)
@@ -93,7 +88,11 @@ struct CenterPane: View {
     }
 
     @ViewBuilder func editor(_ path: String?) -> some View {
-        if let path {
+        if let path, ws.git.conflicts.contains(path), !ws.forceTextEdit.contains(path),
+           ConflictParser.hasMarkers(ws.text(for: path))
+        {
+            ConflictView(path: path)
+        } else if let path {
             VStack(spacing: 0) {
                 Crumbs(path: path)
                 CodeEditorView(

@@ -6,8 +6,14 @@ import Observation
 @Observable
 public final class AccountStore {
     public private(set) var accounts: [HostAccount] = []
-    public var authorName: String { didSet { save() } }
-    public var authorEmail: String { didSet { save() } }
+    public var authorName: String {
+        didSet { save() }
+    }
+
+    public var authorEmail: String {
+        didSet { save() }
+    }
+
     private let url: URL
     private let keychain: any SecretStore
 
@@ -38,15 +44,22 @@ public final class AccountStore {
         enc.dateEncodingStrategy = .iso8601
         enc.outputFormatting = [.prettyPrinted, .sortedKeys]
         try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try? enc.encode(File(accounts: accounts, authorName: authorName, authorEmail: authorEmail)).write(to: url, options: .atomic)
+        try? enc.encode(File(accounts: accounts, authorName: authorName, authorEmail: authorEmail)).write(
+            to: url,
+            options: .atomic
+        )
     }
 
     public func add(_ account: HostAccount, token: String) throws {
         try keychain.set(token, for: account.keychainKey)
         accounts.removeAll { $0.host == account.host && $0.login == account.login }
         accounts.append(account)
-        if authorName.isEmpty, let n = account.name ?? Optional(account.login) { authorName = n }
-        if authorEmail.isEmpty, let e = account.email { authorEmail = e }
+        if authorName.isEmpty, let n = account.name ?? Optional(account.login) {
+            authorName = n
+        }
+        if authorEmail.isEmpty, let e = account.email {
+            authorEmail = e
+        }
         save()
     }
 
@@ -56,7 +69,9 @@ public final class AccountStore {
         save()
     }
 
-    public func token(for account: HostAccount) -> String? { keychain.get(account.keychainKey) }
+    public func token(for account: HostAccount) -> String? {
+        keychain.get(account.keychainKey)
+    }
 
     /// Conta que atende um host de remoto.
     public func account(forHost host: String) -> HostAccount? {
@@ -67,5 +82,7 @@ public final class AccountStore {
         HostAccount.host(ofRemote: url).flatMap(account(forHost:))
     }
 
-    public var github: HostAccount? { accounts.first { $0.kind == .github && $0.host == "github.com" } }
+    public var github: HostAccount? {
+        accounts.first { $0.kind == .github && $0.host == "github.com" }
+    }
 }

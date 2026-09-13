@@ -97,12 +97,7 @@ struct SidebarView: View {
         switch chrome.snapshot.side {
         case .files: FileTreeView()
         case .search: SearchPane()
-        case .git: ShellPanel(
-                "Git",
-                symbol: "arrow.triangle.branch",
-                phase: 2,
-                blurb: "Commits, branches e GitHub com libgit2."
-            )
+        case .git: GitPane()
         case .problems: ShellPanel(
                 "Problemas",
                 symbol: "exclamationmark.circle",
@@ -167,8 +162,10 @@ struct SettingsShell: View {
                     Toggle("Agente", isOn: $chrome.snapshot.agentVisible)
                     Toggle("Terminal", isOn: $chrome.snapshot.termVisible)
                     Button("Restaurar layout") { chrome.resetLayout() }
+                    label("Contas e Git").padding(.top, 6)
+                    AccountsSettings()
                     label("Em breve").padding(.top, 6)
-                    Text("Agente (Fase 4) · Git (Fase 2) · Segurança e chaves (Fase 4)")
+                    Text("Agente e chaves de IA (Fase 4)")
                         .font(OdeteFont.ui(12)).foregroundStyle(theme.fgMuted)
                 }
                 .font(OdeteFont.ui(13))

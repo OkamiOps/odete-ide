@@ -32,10 +32,18 @@ public enum HostKind: String, Codable, CaseIterable, Sendable {
 
     public static func detect(host: String) -> HostKind {
         let h = host.lowercased()
-        if h.contains("github") { return .github }
-        if h.contains("gitlab") { return .gitlab }
-        if h.contains("bitbucket") { return .bitbucket }
-        if h.contains("gitea") || h.contains("codeberg") || h.contains("forgejo") { return .gitea }
+        if h.contains("github") {
+            return .github
+        }
+        if h.contains("gitlab") {
+            return .gitlab
+        }
+        if h.contains("bitbucket") {
+            return .bitbucket
+        }
+        if h.contains("gitea") || h.contains("codeberg") || h.contains("forgejo") {
+            return .gitea
+        }
         return .other
     }
 }
@@ -44,14 +52,23 @@ public enum HostKind: String, Codable, CaseIterable, Sendable {
 public struct HostAccount: Codable, Hashable, Identifiable, Sendable {
     public var id: UUID
     public var kind: HostKind
-    public var host: String        // "github.com"
-    public var login: String       // usuário exibido
+    public var host: String // "github.com"
+    public var login: String // usuário exibido
     public var name: String?
     public var email: String?
     public var avatarURL: String?
     public var addedAt: Date
 
-    public init(id: UUID = UUID(), kind: HostKind, host: String, login: String, name: String? = nil, email: String? = nil, avatarURL: String? = nil, addedAt: Date = .now) {
+    public init(
+        id: UUID = UUID(),
+        kind: HostKind,
+        host: String,
+        login: String,
+        name: String? = nil,
+        email: String? = nil,
+        avatarURL: String? = nil,
+        addedAt: Date = .now
+    ) {
         self.id = id
         self.kind = kind
         self.host = host
@@ -62,11 +79,15 @@ public struct HostAccount: Codable, Hashable, Identifiable, Sendable {
         self.addedAt = addedAt
     }
 
-    public var keychainKey: String { "token:\(host):\(login)" }
+    public var keychainKey: String {
+        "token:\(host):\(login)"
+    }
 
     /// Host de uma URL de remoto ("https://github.com/a/b.git" → "github.com").
     public static func host(ofRemote url: String) -> String? {
-        if let u = URL(string: url), let h = u.host() { return h.lowercased() }
+        if let u = URL(string: url), let h = u.host() {
+            return h.lowercased()
+        }
         if let at = url.firstIndex(of: "@"), let colon = url[at...].firstIndex(of: ":") {
             return String(url[url.index(after: at) ..< colon]).lowercased()
         }

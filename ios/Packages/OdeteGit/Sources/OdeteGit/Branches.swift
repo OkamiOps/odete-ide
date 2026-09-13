@@ -14,12 +14,16 @@ public extension Repository {
             if let b = branch(from: ref!, isHead: false) {
                 var bb = b
                 bb.isHead = !b.isRemote && b.name == head?.name
-                if !(bb.isRemote && bb.name.hasSuffix("/HEAD")) { out.append(bb) }
+                if !(bb.isRemote && bb.name.hasSuffix("/HEAD")) {
+                    out.append(bb)
+                }
             }
             git_reference_free(ref)
         }
         return out.sorted { a, b in
-            if a.isRemote != b.isRemote { return !a.isRemote }
+            if a.isRemote != b.isRemote {
+                return !a.isRemote
+            }
             return a.name.localizedCaseInsensitiveCompare(b.name) == .orderedAscending
         }
     }
@@ -34,11 +38,14 @@ public extension Repository {
         var ref: OpaquePointer?
         try check(git_branch_create(&ref, repo, name, c, 0), "criar branch")
         git_reference_free(ref)
-        if checkout { try self.checkout(name) }
+        if checkout {
+            try self.checkout(name)
+        }
     }
 
     func checkout(_ name: String) throws {
-        let refName = name.contains("/") && (try? branches()).map { $0.contains { $0.isRemote && $0.name == name } } == true
+        let refName = name.contains("/") && (try? branches())
+            .map { $0.contains { $0.isRemote && $0.name == name } } == true
             ? "refs/remotes/\(name)" : "refs/heads/\(name)"
         var obj: OpaquePointer?
         try check(git_revparse_single(&obj, repo, refName), "branch \(name)")

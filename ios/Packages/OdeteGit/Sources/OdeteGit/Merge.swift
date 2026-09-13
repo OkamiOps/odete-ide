@@ -22,9 +22,13 @@ public extension Repository {
         try heads.withUnsafeMutableBufferPointer { buf in
             try check(git_merge_analysis(&analysis, &pref, repo, buf.baseAddress, 1), "análise do merge")
         }
-        if analysis.rawValue & GIT_MERGE_ANALYSIS_UP_TO_DATE.rawValue != 0 { return .upToDate }
+        if analysis.rawValue & GIT_MERGE_ANALYSIS_UP_TO_DATE.rawValue != 0 {
+            return .upToDate
+        }
         let theirOid = git_annotated_commit_id(their).pointee
-        if analysis.rawValue & GIT_MERGE_ANALYSIS_UNBORN.rawValue != 0 || analysis.rawValue & GIT_MERGE_ANALYSIS_FASTFORWARD.rawValue != 0 {
+        if analysis.rawValue & GIT_MERGE_ANALYSIS_UNBORN.rawValue != 0 || analysis
+            .rawValue & GIT_MERGE_ANALYSIS_FASTFORWARD.rawValue != 0
+        {
             var oid = theirOid
             var obj: OpaquePointer?
             try check(git_object_lookup(&obj, repo, &oid, GIT_OBJECT_COMMIT), "commit")
@@ -57,7 +61,9 @@ public extension Repository {
             try check(git_merge(repo, buf.baseAddress, 1, &mopts, &copts), "merge")
         }
         let conflicts = try conflictedPaths()
-        if !conflicts.isEmpty { return .conflicts(conflicts) }
+        if !conflicts.isEmpty {
+            return .conflicts(conflicts)
+        }
         let sha = try finishMerge(message: "Merge \(label)", author: author, theirs: theirOid)
         return .merged(sha)
     }
@@ -68,10 +74,13 @@ public extension Repository {
             var it: OpaquePointer?
             try check(git_index_conflict_iterator_new(&it, idx), "conflitos")
             defer { git_index_conflict_iterator_free(it) }
-            var a: UnsafePointer<git_index_entry>?, o: UnsafePointer<git_index_entry>?, t: UnsafePointer<git_index_entry>?
+            var a: UnsafePointer<git_index_entry>?, o: UnsafePointer<git_index_entry>?,
+                t: UnsafePointer<git_index_entry>?
             var out: Set<String> = []
             while git_index_conflict_next(&a, &o, &t, it) == 0 {
-                if let e = o ?? t ?? a { out.insert(String(cString: e.pointee.path)) }
+                if let e = o ?? t ?? a {
+                    out.insert(String(cString: e.pointee.path))
+                }
             }
             return out.sorted()
         }
@@ -87,12 +96,20 @@ public extension Repository {
         }
     }
 
-    var mergeInProgress: Bool { git_repository_state(repo) == GIT_REPOSITORY_STATE_MERGE.rawValue }
+    var mergeInProgress: Bool {
+        git_repository_state(repo) == GIT_REPOSITORY_STATE_MERGE.rawValue
+    }
 
     /// Conclui um merge em andamento (após resolver conflitos) com um commit de duas mães.
     @discardableResult
     func finishMerge(message: String, author: Signature, theirs: git_oid? = nil) throws -> String {
-        if try !conflictedPaths().isEmpty { throw GitError(kind: .conflict, code: -1, message: "há conflitos para resolver") }
+        if try !conflictedPaths().isEmpty {
+            throw GitError(
+                kind: .conflict,
+                code: -1,
+                message: "há conflitos para resolver"
+            )
+        }
         var theirOid = theirs ?? git_oid()
         if theirs == nil {
             try check(git_reference_name_to_id(&theirOid, repo, "MERGE_HEAD"), "MERGE_HEAD")

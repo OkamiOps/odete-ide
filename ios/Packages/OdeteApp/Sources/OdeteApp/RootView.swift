@@ -26,6 +26,7 @@ public struct RootView: View {
         }
         .environment(chrome)
         .environment(app)
+        .environment(app.accounts)
         .odeteTheme(Theme(chrome.palette))
         .onAppear {
             chrome.onChange = { [store] snap in store.scheduleSave(snap) }

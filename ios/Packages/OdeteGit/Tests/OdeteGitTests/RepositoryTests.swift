@@ -1,13 +1,16 @@
 import Foundation
-import Testing
 @testable import OdeteGit
+import Testing
 
 let me = Signature(name: "Teste", email: "t@odete.app")
 
 func tempRepo() throws -> (Repository, URL) {
-    let url = FileManager.default.temporaryDirectory.appending(path: "odete-git-\(UUID().uuidString)", directoryHint: .isDirectory)
+    let url = FileManager.default.temporaryDirectory.appending(
+        path: "odete-git-\(UUID().uuidString)",
+        directoryHint: .isDirectory
+    )
     try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
-    return (try Repository.initialize(at: url), url)
+    return try (Repository.initialize(at: url), url)
 }
 
 func write(_ url: URL, _ rel: String, _ text: String) throws {
@@ -16,7 +19,7 @@ func write(_ url: URL, _ rel: String, _ text: String) throws {
     try text.write(to: f, atomically: true, encoding: .utf8)
 }
 
-@Suite struct RepositoryTests {
+struct RepositoryTests {
     @Test func initStatusStageCommitLog() async throws {
         let (repo, url) = try tempRepo()
         #expect(Repository.isRepository(url))

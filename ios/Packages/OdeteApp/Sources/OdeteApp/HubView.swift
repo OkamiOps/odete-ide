@@ -10,6 +10,7 @@ struct HubView: View {
     @Environment(\.theme) private var theme
     @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var creating = false
+    @State private var cloning = false
     @State private var renaming: Project?
     @State private var deleting: Project?
     @State private var newName = ""
@@ -50,6 +51,7 @@ struct HubView: View {
             }
         }
         .sheet(isPresented: $creating) { NewProjectSheet() }
+        .sheet(isPresented: $cloning) { CloneSheet() }
         .alert("Renomear projeto", isPresented: Binding(get: { renaming != nil }, set: {
             if !$0 {
                 renaming = nil
@@ -107,6 +109,11 @@ struct HubView: View {
                 }
             } label: {
                 Label("Tema", systemImage: "paintpalette")
+                    .labelStyle(sizeClass == .compact ? AnyLabelStyle(.iconOnly) : AnyLabelStyle(.titleAndIcon))
+            }
+            .buttonStyle(.glass)
+            Button { cloning = true } label: {
+                Label("Clonar", systemImage: "arrow.down.circle")
                     .labelStyle(sizeClass == .compact ? AnyLabelStyle(.iconOnly) : AnyLabelStyle(.titleAndIcon))
             }
             .buttonStyle(.glass)

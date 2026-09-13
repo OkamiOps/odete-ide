@@ -7,14 +7,13 @@ final class DiffCollector {
     func file(_ delta: git_diff_delta) {
         let new = String(cString: delta.new_file.path)
         let old = String(cString: delta.old_file.path)
-        let change: Change
-        switch delta.status {
-        case GIT_DELTA_ADDED, GIT_DELTA_UNTRACKED: change = .added
-        case GIT_DELTA_DELETED: change = .deleted
-        case GIT_DELTA_RENAMED: change = .renamed
-        case GIT_DELTA_TYPECHANGE: change = .typeChange
-        case GIT_DELTA_CONFLICTED: change = .conflicted
-        default: change = .modified
+        let change: Change = switch delta.status {
+        case GIT_DELTA_ADDED, GIT_DELTA_UNTRACKED: .added
+        case GIT_DELTA_DELETED: .deleted
+        case GIT_DELTA_RENAMED: .renamed
+        case GIT_DELTA_TYPECHANGE: .typeChange
+        case GIT_DELTA_CONFLICTED: .conflicted
+        default: .modified
         }
         let binary = delta.flags & GIT_DIFF_FLAG_BINARY.rawValue != 0
         files.append(FileDiff(path: new, oldPath: old == new ? nil : old, change: change, isBinary: binary, hunks: []))
@@ -25,7 +24,14 @@ final class DiffCollector {
         let header = withUnsafePointer(to: &hh.header) { p in
             p.withMemoryRebound(to: CChar.self, capacity: Int(h.header_len)) { String(cString: $0) }
         }.trimmingCharacters(in: .newlines)
-        files[files.count - 1].hunks.append(Hunk(header: header, oldStart: Int(h.old_start), oldLines: Int(h.old_lines), newStart: Int(h.new_start), newLines: Int(h.new_lines), lines: []))
+        files[files.count - 1].hunks.append(Hunk(
+            header: header,
+            oldStart: Int(h.old_start),
+            oldLines: Int(h.old_lines),
+            newStart: Int(h.new_start),
+            newLines: Int(h.new_lines),
+            lines: []
+        ))
     }
 
     func line(_ l: git_diff_line) {
@@ -38,7 +44,12 @@ final class DiffCollector {
         }
         let text = String(decoding: UnsafeRawBufferPointer(start: l.content, count: l.content_len), as: UTF8.self)
             .trimmingCharacters(in: .newlines)
-        let line = DiffLine(kind: kind, text: text, oldLine: l.old_lineno >= 0 ? Int(l.old_lineno) : nil, newLine: l.new_lineno >= 0 ? Int(l.new_lineno) : nil)
+        let line = DiffLine(
+            kind: kind,
+            text: text,
+            oldLine: l.old_lineno >= 0 ? Int(l.old_lineno) : nil,
+            newLine: l.new_lineno >= 0 ? Int(l.new_lineno) : nil
+        )
         guard !files.isEmpty, !files[files.count - 1].hunks.isEmpty else { return }
         let fi = files.count - 1
         let hi = files[fi].hunks.count - 1
@@ -51,11 +62,13 @@ private let fileCB: git_diff_file_cb = { delta, _, payload in
     Unmanaged<DiffCollector>.fromOpaque(payload).takeUnretainedValue().file(delta.pointee)
     return 0
 }
+
 private let hunkCB: git_diff_hunk_cb = { _, hunk, payload in
     guard let hunk, let payload else { return 0 }
     Unmanaged<DiffCollector>.fromOpaque(payload).takeUnretainedValue().hunk(hunk.pointee)
     return 0
 }
+
 private let lineCB: git_diff_line_cb = { _, _, line, payload in
     guard let line, let payload else { return 0 }
     Unmanaged<DiffCollector>.fromOpaque(payload).takeUnretainedValue().line(line.pointee)
@@ -64,21 +77,24 @@ private let lineCB: git_diff_line_cb = { _, _, line, payload in
 
 public extension Repository {
     enum DiffSource: Sendable, Hashable {
-        case workdir            // índice → workdir (não staged)
-        case index              // HEAD → índice (staged)
-        case headToWorkdir      // HEAD → workdir (tudo)
+        case workdir // índice → workdir (não staged)
+        case index // HEAD → índice (staged)
+        case headToWorkdir // HEAD → workdir (tudo)
         case commits(String, String)
-        case commit(String)     // pai → commit
+        case commit(String) // pai → commit
     }
 
     func diff(_ source: DiffSource, path: String? = nil, context: Int = 3) throws -> Diff {
         var opts = git_diff_options()
         git_diff_options_init(&opts, UInt32(GIT_DIFF_OPTIONS_VERSION))
         opts.context_lines = UInt32(context)
-        opts.flags = GIT_DIFF_INCLUDE_UNTRACKED.rawValue | GIT_DIFF_SHOW_UNTRACKED_CONTENT.rawValue | GIT_DIFF_RECURSE_UNTRACKED_DIRS.rawValue
+        opts.flags = GIT_DIFF_INCLUDE_UNTRACKED.rawValue | GIT_DIFF_SHOW_UNTRACKED_CONTENT
+            .rawValue | GIT_DIFF_RECURSE_UNTRACKED_DIRS.rawValue
         var arr = Self.strarray(path.map { [$0] } ?? [])
         defer { Self.free(&arr) }
-        if path != nil { opts.pathspec = arr.array }
+        if path != nil {
+            opts.pathspec = arr.array
+        }
 
         var d: OpaquePointer?
         switch source {
@@ -125,7 +141,9 @@ public extension Repository {
     }
 
     internal func headTree() throws -> OpaquePointer? {
-        if isUnborn() { return nil }
+        if isUnborn() {
+            return nil
+        }
         var obj: OpaquePointer?
         try check(git_revparse_single(&obj, repo, "HEAD^{tree}"), "árvore do HEAD")
         return obj

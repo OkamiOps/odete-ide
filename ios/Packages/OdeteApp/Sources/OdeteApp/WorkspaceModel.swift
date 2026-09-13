@@ -1,7 +1,9 @@
 import Foundation
 import Observation
+import OdeteAccounts
 import OdeteCore
 import OdeteFiles
+import OdeteGit
 
 /// Estado de um projeto aberto: árvore, abas, buffers e salvamento.
 @MainActor
@@ -22,16 +24,20 @@ public final class WorkspaceModel {
     public var reveal: (line: Int, token: Int)?
     public var paletteOpen = false
     public var paletteQuery = ""
+    public let git: GitModel
+    /// Arquivos em conflito que o usuário quer editar como texto puro.
+    public var forceTextEdit: Set<String> = []
 
     private let chrome: ChromeState
     private var watcher: DirectoryWatcher?
     private var saveTasks: [String: Task<Void, Never>] = [:]
 
-    init(project: Project, root: URL, chrome: ChromeState) {
+    init(project: Project, root: URL, chrome: ChromeState, accounts: AccountStore) {
         self.project = project
         self.root = root
         self.chrome = chrome
         ops = FileOps(root: root)
+        git = GitModel(root: root, accounts: accounts)
         tabs = chrome.tabs(for: project.id).filter { ops.exists($0.path) }.map { EditorTab(path: $0.path) }
         active = chrome.activeTab(for: project.id).flatMap { p in tabs.contains { $0.path == p } ? p : nil } ?? tabs
             .first?.path
@@ -69,6 +75,7 @@ public final class WorkspaceModel {
 
     private func externalReload() {
         reload()
+        git.scheduleRefresh()
         for t in tabs where !t.isDirty {
             if ops.exists(t.path) {
                 if let disk = try? ops.read(t.path), disk != buffers[t.path] {
@@ -165,6 +172,7 @@ public final class WorkspaceModel {
         do {
             try ops.write(path, text)
             markDirty(path, false)
+            git.scheduleRefresh()
         } catch {
             self.error = error.localizedDescription
         }

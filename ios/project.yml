@@ -28,6 +28,10 @@ packages:
     path: Packages/OdeteEditor
   OdeteUI:
     path: Packages/OdeteUI
+  OdeteGit:
+    path: Packages/OdeteGit
+  OdeteAccounts:
+    path: Packages/OdeteAccounts
   OdeteApp:
     path: Packages/OdeteApp
 targets:

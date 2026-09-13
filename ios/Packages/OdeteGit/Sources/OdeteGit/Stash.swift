@@ -8,7 +8,10 @@ private final class StashCollector {
 private let stashCB: git_stash_cb = { index, message, _, payload in
     guard let payload else { return 0 }
     let msg = message.map { String(cString: $0) } ?? ""
-    Unmanaged<StashCollector>.fromOpaque(payload).takeUnretainedValue().items.append(StashEntry(index: index, message: msg))
+    Unmanaged<StashCollector>.fromOpaque(payload).takeUnretainedValue().items.append(StashEntry(
+        index: index,
+        message: msg
+    ))
     return 0
 }
 

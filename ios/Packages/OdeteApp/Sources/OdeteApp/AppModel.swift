@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import OdeteAccounts
 import OdeteCore
 import OdeteFiles
 
@@ -12,8 +13,9 @@ public final class AppModel {
     public var workspace: WorkspaceModel?
     public var error: String?
 
-    public init(store: ProjectStore = ProjectStore()) {
+    public init(store: ProjectStore = ProjectStore(), accounts: AccountStore = AccountStore()) {
         self.store = store
+        self.accounts = accounts
         refresh()
     }
 
@@ -44,9 +46,11 @@ public final class AppModel {
         do { try store.delete(p); refresh() } catch { self.error = error.localizedDescription }
     }
 
+    public let accounts: AccountStore
+
     public func open(_ p: Project, chrome: ChromeState) {
         let touched = (try? store.touch(p)) ?? p
-        workspace = WorkspaceModel(project: touched, root: store.url(for: touched), chrome: chrome)
+        workspace = WorkspaceModel(project: touched, root: store.url(for: touched), chrome: chrome, accounts: accounts)
         chrome.snapshot.lastProjectId = touched.id
         refresh()
     }

@@ -12,7 +12,9 @@ public struct GitHubDeviceFlow: Sendable {
         public var expiresIn: Int
         public var interval: Int
         enum CodingKeys: String, CodingKey {
-            case deviceCode = "device_code", userCode = "user_code", verificationUri = "verification_uri", expiresIn = "expires_in", interval
+            case deviceCode = "device_code", userCode = "user_code", verificationUri = "verification_uri",
+                 expiresIn = "expires_in",
+                 interval
         }
     }
 
@@ -31,10 +33,13 @@ public struct GitHubDeviceFlow: Sendable {
         self.session = session
     }
 
-    public var isConfigured: Bool { !clientId.isEmpty }
+    public var isConfigured: Bool {
+        !clientId.isEmpty
+    }
 
     static func form(_ items: [String: String]) -> Data {
-        Data(items.map { "\($0.key)=\($0.value.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? "")" }.joined(separator: "&").utf8)
+        Data(items.map { "\($0.key)=\($0.value.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? "")" }
+            .joined(separator: "&").utf8)
     }
 
     public func requestCode() async throws -> DeviceCode {
@@ -56,14 +61,21 @@ public struct GitHubDeviceFlow: Sendable {
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Accept")
         req.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
-        req.httpBody = Self.form(["client_id": clientId, "device_code": code.deviceCode, "grant_type": "urn:ietf:params:oauth:grant-type:device_code"])
+        req.httpBody = Self.form([
+            "client_id": clientId,
+            "device_code": code.deviceCode,
+            "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
+        ])
         let (data, _) = try await session.data(for: req)
         return Self.parsePoll(data)
     }
 
     public static func parsePoll(_ data: Data) -> Poll {
-        guard let j = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return .failed("resposta inválida") }
-        if let t = j["access_token"] as? String { return .token(t) }
+        guard let j = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { return .failed("resposta inválida") }
+        if let t = j["access_token"] as? String {
+            return .token(t)
+        }
         switch j["error"] as? String {
         case "authorization_pending": return .pending
         case "slow_down": return .slowDown

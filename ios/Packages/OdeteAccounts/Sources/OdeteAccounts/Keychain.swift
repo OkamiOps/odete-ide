@@ -13,18 +13,32 @@ public protocol SecretStore: Sendable {
 public final class MemorySecrets: SecretStore {
     private let store = Mutex<[String: String]>([:])
     public init() {}
-    public func set(_ value: String, for key: String) throws { store.withLock { $0[key] = value } }
-    public func get(_ key: String) -> String? { store.withLock { $0[key] } }
-    public func delete(_ key: String) { store.withLock { _ = $0.removeValue(forKey: key) } }
+    public func set(_ value: String, for key: String) throws {
+        store.withLock { $0[key] = value }
+    }
+
+    public func get(_ key: String) -> String? {
+        store.withLock { $0[key] }
+    }
+
+    public func delete(_ key: String) {
+        store.withLock { _ = $0.removeValue(forKey: key) }
+    }
 }
 
 /// Segredos no Keychain do app (kSecClassGenericPassword), acessíveis após o primeiro desbloqueio.
 public struct Keychain: SecretStore {
     public let service: String
-    public init(service: String = "com.okamiops.odete") { self.service = service }
+    public init(service: String = "com.okamiops.odete") {
+        self.service = service
+    }
 
     private func query(_ key: String) -> [String: Any] {
-        [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service, kSecAttrAccount as String: key]
+        [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: key,
+        ]
     }
 
     public func set(_ value: String, for key: String) throws {
@@ -58,5 +72,7 @@ public struct Keychain: SecretStore {
 
 public struct KeychainError: LocalizedError {
     public var status: OSStatus
-    public var errorDescription: String? { "Keychain: \(SecCopyErrorMessageString(status, nil).map { String($0) } ?? "\(status)")" }
+    public var errorDescription: String? {
+        "Keychain: \(SecCopyErrorMessageString(status, nil).map { String($0) } ?? "\(status)")"
+    }
 }

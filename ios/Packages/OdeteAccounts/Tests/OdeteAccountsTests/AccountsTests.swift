@@ -1,8 +1,8 @@
 import Foundation
-import Testing
 @testable import OdeteAccounts
+import Testing
 
-@Suite struct DeviceFlowTests {
+struct DeviceFlowTests {
     @Test func parsesCode() throws {
         let json = #"{"device_code":"dc","user_code":"ABCD-1234","verification_uri":"https://github.com/login/device","expires_in":900,"interval":5}"#
         let c = try GitHubDeviceFlow.parseCode(Data(json.utf8))
@@ -12,13 +12,15 @@ import Testing
     @Test func parsesPoll() {
         #expect(GitHubDeviceFlow.parsePoll(Data(#"{"error":"authorization_pending"}"#.utf8)) == .pending)
         #expect(GitHubDeviceFlow.parsePoll(Data(#"{"error":"slow_down","interval":10}"#.utf8)) == .slowDown)
-        #expect(GitHubDeviceFlow.parsePoll(Data(#"{"access_token":"gho_x","token_type":"bearer"}"#.utf8)) == .token("gho_x"))
-        #expect(GitHubDeviceFlow.parsePoll(Data(#"{"error":"expired_token","error_description":"expirou"}"#.utf8)) == .failed("expirou"))
+        #expect(GitHubDeviceFlow
+            .parsePoll(Data(#"{"access_token":"gho_x","token_type":"bearer"}"#.utf8)) == .token("gho_x"))
+        #expect(GitHubDeviceFlow
+            .parsePoll(Data(#"{"error":"expired_token","error_description":"expirou"}"#.utf8)) == .failed("expirou"))
         #expect(GitHubDeviceFlow.parsePoll(Data("x".utf8)) == .failed("resposta inválida"))
     }
 }
 
-@Suite struct HostAccountTests {
+struct HostAccountTests {
     @Test func hostOfRemote() {
         #expect(HostAccount.host(ofRemote: "https://github.com/a/b.git") == "github.com")
         #expect(HostAccount.host(ofRemote: "git@gitlab.com:a/b.git") == "gitlab.com")
@@ -33,7 +35,7 @@ import Testing
     }
 }
 
-@Suite struct GitHubAPITests {
+struct GitHubAPITests {
     @Test func decodesPullsAndRuns() throws {
         let pulls = #"[{"id":1,"number":7,"title":"t","state":"open","html_url":"u","head":{"ref":"f","sha":"a"},"base":{"ref":"main","sha":"b"},"user":{"login":"me"},"created_at":"2026-09-14T00:00:00Z"}]"#
         let p = try GitHubAPI.decoder.decode([GitHubPull].self, from: Data(pulls.utf8))
@@ -49,7 +51,7 @@ import Testing
 }
 
 @MainActor
-@Suite struct AccountStoreTests {
+struct AccountStoreTests {
     @Test func addRemoveAndLookup() throws {
         let url = FileManager.default.temporaryDirectory.appending(path: "odete-acc-\(UUID().uuidString)/accounts.json")
         let secrets = MemorySecrets()

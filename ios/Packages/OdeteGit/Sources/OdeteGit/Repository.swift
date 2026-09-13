@@ -22,7 +22,22 @@ public actor Repository {
         Libgit2.start()
         var r: OpaquePointer?
         try check(git_repository_open(&r, url.path), "abrir repositório")
+        excludeOdeteMetadata(url)
         return Repository(repo: r!, workdir: url)
+    }
+
+    /// Garante `.odete/` em `.git/info/exclude`, sem tocar no `.gitignore` do usuário.
+    static func excludeOdeteMetadata(_ url: URL) {
+        let info = url.appending(path: ".git/info")
+        let exclude = info.appending(path: "exclude")
+        let current = (try? String(contentsOf: exclude, encoding: .utf8)) ?? ""
+        guard !current.contains(".odete/") else { return }
+        try? FileManager.default.createDirectory(at: info, withIntermediateDirectories: true)
+        try? (current + (current.hasSuffix("\n") || current.isEmpty ? "" : "\n") + ".odete/\n").write(
+            to: exclude,
+            atomically: true,
+            encoding: .utf8
+        )
     }
 
     public static func initialize(at url: URL, defaultBranch: String = "main") throws -> Repository {
@@ -35,6 +50,7 @@ public actor Repository {
             opts.initial_head = cstr
             try check(git_repository_init_ext(&r, url.path, &opts), "iniciar repositório")
         }
+        excludeOdeteMetadata(url)
         return Repository(repo: r!, workdir: url)
     }
 
@@ -43,12 +59,16 @@ public actor Repository {
     public func headSha() throws -> String? {
         var oid = git_oid()
         let code = git_reference_name_to_id(&oid, repo, "HEAD")
-        if code == GIT_ENOTFOUND.rawValue || code == GIT_EUNBORNBRANCH.rawValue { return nil }
+        if code == GIT_ENOTFOUND.rawValue || code == GIT_EUNBORNBRANCH.rawValue {
+            return nil
+        }
         try check(code, "HEAD")
         return Self.hex(oid)
     }
 
-    public func isUnborn() -> Bool { git_repository_head_unborn(repo) == 1 }
+    public func isUnborn() -> Bool {
+        git_repository_head_unborn(repo) == 1
+    }
 
     public func currentBranch() throws -> Branch? {
         var ref: OpaquePointer?
@@ -83,7 +103,9 @@ public actor Repository {
             var up: OpaquePointer?
             if git_branch_upstream(&up, ref) == 0, let up {
                 var upName: UnsafePointer<CChar>?
-                if git_branch_name(&upName, up) == 0, let upName { upstream = String(cString: upName) }
+                if git_branch_name(&upName, up) == 0, let upName {
+                    upstream = String(cString: upName)
+                }
                 git_reference_free(up)
             }
         }
@@ -110,21 +132,45 @@ public actor Repository {
             let s = e.status.rawValue
             var staged: Change?
             var unstaged: Change?
-            if s & GIT_STATUS_INDEX_NEW.rawValue != 0 { staged = .added }
-            if s & GIT_STATUS_INDEX_MODIFIED.rawValue != 0 { staged = .modified }
-            if s & GIT_STATUS_INDEX_DELETED.rawValue != 0 { staged = .deleted }
-            if s & GIT_STATUS_INDEX_RENAMED.rawValue != 0 { staged = .renamed }
-            if s & GIT_STATUS_INDEX_TYPECHANGE.rawValue != 0 { staged = .typeChange }
-            if s & GIT_STATUS_WT_NEW.rawValue != 0 { unstaged = .untracked }
-            if s & GIT_STATUS_WT_MODIFIED.rawValue != 0 { unstaged = .modified }
-            if s & GIT_STATUS_WT_DELETED.rawValue != 0 { unstaged = .deleted }
-            if s & GIT_STATUS_WT_RENAMED.rawValue != 0 { unstaged = .renamed }
-            if s & GIT_STATUS_WT_TYPECHANGE.rawValue != 0 { unstaged = .typeChange }
-            if s & GIT_STATUS_CONFLICTED.rawValue != 0 { unstaged = .conflicted }
+            if s & GIT_STATUS_INDEX_NEW.rawValue != 0 {
+                staged = .added
+            }
+            if s & GIT_STATUS_INDEX_MODIFIED.rawValue != 0 {
+                staged = .modified
+            }
+            if s & GIT_STATUS_INDEX_DELETED.rawValue != 0 {
+                staged = .deleted
+            }
+            if s & GIT_STATUS_INDEX_RENAMED.rawValue != 0 {
+                staged = .renamed
+            }
+            if s & GIT_STATUS_INDEX_TYPECHANGE.rawValue != 0 {
+                staged = .typeChange
+            }
+            if s & GIT_STATUS_WT_NEW.rawValue != 0 {
+                unstaged = .untracked
+            }
+            if s & GIT_STATUS_WT_MODIFIED.rawValue != 0 {
+                unstaged = .modified
+            }
+            if s & GIT_STATUS_WT_DELETED.rawValue != 0 {
+                unstaged = .deleted
+            }
+            if s & GIT_STATUS_WT_RENAMED.rawValue != 0 {
+                unstaged = .renamed
+            }
+            if s & GIT_STATUS_WT_TYPECHANGE.rawValue != 0 {
+                unstaged = .typeChange
+            }
+            if s & GIT_STATUS_CONFLICTED.rawValue != 0 {
+                unstaged = .conflicted
+            }
             let delta = e.index_to_workdir?.pointee ?? e.head_to_index?.pointee
             guard let delta else { continue }
             let path = String(cString: delta.new_file.path ?? delta.old_file.path)
-            if staged == nil, unstaged == nil { continue }
+            if staged == nil, unstaged == nil {
+                continue
+            }
             out.append(StatusEntry(path: path, staged: staged, unstaged: unstaged))
         }
         return out
@@ -171,7 +217,9 @@ public actor Repository {
         defer { git_object_free(head) }
         if code == GIT_ENOTFOUND.rawValue || isUnborn() {
             try withIndex { idx in
-                for p in paths { git_index_remove_bypath(idx, p) }
+                for p in paths {
+                    git_index_remove_bypath(idx, p)
+                }
                 try check(git_index_write(idx), "gravar índice")
             }
             return
@@ -183,7 +231,7 @@ public actor Repository {
     }
 
     public func unstageAll() throws {
-        try unstage(try status().filter { $0.staged != nil }.map(\.path))
+        try unstage(status().filter { $0.staged != nil }.map(\.path))
     }
 
     /// Descarta alterações do workdir (volta ao índice). Untracked é apagado.
@@ -234,7 +282,9 @@ public actor Repository {
         let parentsArr: [OpaquePointer?] = parent == nil ? [] : [parent]
         let buf = UnsafeMutablePointer<OpaquePointer?>.allocate(capacity: max(parentsArr.count, 1))
         defer { buf.deallocate() }
-        for (i, p) in parentsArr.enumerated() { buf[i] = p }
+        for (i, p) in parentsArr.enumerated() {
+            buf[i] = p
+        }
         let code = git_commit_create(&oid, repo, "HEAD", sig, sig, "UTF-8", message, treeObj, parentsArr.count, buf)
         try check(code, "commit")
         return try lookupCommit(Self.hex(oid))
@@ -267,14 +317,18 @@ public actor Repository {
         let date = Date(timeIntervalSince1970: TimeInterval(git_commit_time(c)))
         var parents: [String] = []
         for i in 0 ..< git_commit_parentcount(c) {
-            if let p = git_commit_parent_id(c, i) { parents.append(hex(p.pointee)) }
+            if let p = git_commit_parent_id(c, i) {
+                parents.append(hex(p.pointee))
+            }
         }
         _ = full
         return Commit(id: id, summary: summary, body: body, author: sig, date: date, parents: parents)
     }
 
     public func log(limit: Int = 200, from: String? = nil) throws -> [Commit] {
-        if isUnborn() { return [] }
+        if isUnborn() {
+            return []
+        }
         var walk: OpaquePointer?
         try check(git_revwalk_new(&walk, repo), "log")
         defer { git_revwalk_free(walk) }
@@ -318,7 +372,9 @@ public actor Repository {
     }
 
     static func free(_ a: inout StrArray) {
-        for p in a.storage { Foundation.free(p) }
+        for p in a.storage {
+            Foundation.free(p)
+        }
         a.storage.removeAll()
     }
 }

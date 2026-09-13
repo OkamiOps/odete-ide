@@ -96,20 +96,27 @@ export function toolsForMode(mode: AgentMode): AgentTool[] {
   return AGENT_TOOLS.filter((t) => READ_TOOLS.has(t.function.name));
 }
 
+export function formatWorkspace(files: Record<string, string>) {
+  const names = Object.keys(files).sort();
+  if (!names.length) return "(vazio)";
+  return names.join("\n");
+}
+
 export function modePrompt(mode: AgentMode) {
+  const read = `Pode e deve usar read_file, list_dir e grep em QUALQUER modo. Nunca diga que não consegue ler arquivo. Não invente conteúdo — leia com a tool.`;
   if (mode === "chat") {
-    return `Modo CHAT: conversa. Use read_file / list_dir / grep se precisar do código. Não edite arquivos. Não rode comandos que mudam estado. Responda com o que leu — não invente conteúdo de arquivo.`;
+    return `Modo CHAT: conversa. ${read} Não edite. Não rode comandos que mudam estado.`;
   }
   if (mode === "plan") {
-    return `Modo PLAN: primeiro INVESTIGUE com tools (list_dir, grep, read_file). Só depois escreva o plano. Não edite. Não rode npm/git que altera estado.
+    return `Modo PLAN: investigue o repo com tools e entregue um plano. ${read} Não edite. Não rode npm/git que altera estado.
 
-Formato obrigatório:
+Formato:
 
 ## Objetivo
 uma linha
 
 ## O que vi
-- arquivo — o que importa nele
+- arquivo — o que importa
 
 ## Passos
 1. arquivo — mudança
@@ -119,14 +126,13 @@ uma linha
 - …
 
 ## Fora de escopo
-- o que NÃO vamos fazer agora
-
-Se faltar contexto, leia mais arquivos antes de fechar o plano. Sem código completo — só o plano.`;
+- o que não vamos fazer agora`;
   }
-  return "Modo BUILD: pode editar. Prefira str_replace (trecho). write_file só pra arquivo novo ou reescrita total. Leia o arquivo antes. Depois dos patches, 1–3 linhas do que mudou.";
+  return `Modo BUILD: pode editar. ${read} Prefira str_replace. write_file só pra arquivo novo ou reescrita total. Depois dos patches, 1–3 linhas do que mudou.`;
 }
 
 export const SYSTEM_PROMPT = `Você é o agente da Colo, uma IDE que roda 100% no dispositivo.
-O workspace é um filesystem virtual. Não invente conteúdo de arquivo — leia antes de editar.
+O workspace é um filesystem virtual. Em TODOS os modos você lê qualquer arquivo com read_file / list_dir / grep.
+Não invente conteúdo de arquivo — chame a tool.
 Responda em português brasileiro, curto e direto.
 Se o turno trouxer skills aplicadas, siga essas instruções.`;

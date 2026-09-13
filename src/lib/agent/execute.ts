@@ -2,7 +2,7 @@ import { runShell } from "@/lib/workspace/shell";
 import { useWorkspace } from "@/lib/workspace/store";
 import { usePatches } from "./patches";
 
-function clip(s: string, max = 8000) {
+function clip(s: string, max = 200_000) {
   if (s.length <= max) return s;
   return s.slice(0, max) + "\n… truncado";
 }
@@ -21,7 +21,7 @@ export function executeTool(name: string, rawArgs: string): string {
     case "read_file": {
       const path = str("path").replace(/^\/+/, "");
       const body = w.readFile(path);
-      return body === undefined ? `não existe: ${path}` : clip(body);
+      return body === undefined ? `não existe: ${path}` : body;
     }
     case "str_replace": {
       const path = str("path").replace(/^\/+/, "");

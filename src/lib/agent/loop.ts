@@ -6,6 +6,7 @@ import type { AgentMode } from "./tools";
 import { useWorkspace } from "@/lib/workspace/store";
 import { usePatches } from "./patches";
 import { allSkills, formatSkillsPrompt } from "@/lib/workspace/skills";
+import { formatWorkspace } from "./tools";
 
 const MAX_ROUNDS = 8;
 
@@ -132,8 +133,8 @@ export async function runAgentLoop(
 
   for (let round = 0; round < MAX_ROUNDS; round++) {
     if (shouldStop?.()) break;
-    const fileList = Object.keys(useWorkspace.getState().files).sort().join("\n");
     const files = useWorkspace.getState().files;
+    const fileList = formatWorkspace(files);
     const skills = formatSkillsPrompt(allSkills(files), userText);
     const thinkId = crypto.randomUUID();
     const textId = crypto.randomUUID();

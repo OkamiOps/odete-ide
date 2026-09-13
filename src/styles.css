@@ -11,8 +11,8 @@
   --color-fg-subtle: #6f6d68;
   --color-border: #2a2a2e;
   --color-border-strong: #3a3a40;
-  --color-accent: #e6e4df;
-  --color-accent-fg: #0c0c0d;
+  --color-accent: #e4572e;
+  --color-accent-fg: #fff;
   --color-ring: #6ea8ff;
   --color-danger: #e25d5d;
   --color-ok: #7dce9a;
@@ -180,7 +180,7 @@ html, body, #app {
   overscroll-behavior: none;
 }
 button, [role="button"] { cursor: pointer; touch-action: manipulation; }
-button { font: inherit; color: inherit; font-size: inherit; }
+button { font: inherit; font-size: inherit; }
 input, textarea, select { font: inherit; font-size: 16px; }
 * { box-sizing: border-box; }
 * {
@@ -1382,6 +1382,12 @@ input, textarea, select { font: inherit; font-size: 16px; }
   padding: 8px;
   border-bottom: 1px solid var(--color-border);
   flex-shrink: 0;
+}
+.set-pane button.bg-accent,
+.set-pane a.bg-accent {
+  background: #e4572e;
+  color: #fff;
+  -webkit-text-fill-color: #fff;
 }
 .set-tabs button {
   min-height: 44px;

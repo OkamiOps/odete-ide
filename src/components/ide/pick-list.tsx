@@ -23,7 +23,7 @@ export function PickList({
   const menu = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [box, setBox] = useState({ top: 0, left: 0, width: 220, up: false });
-  const current = options.find((o) => o.id === value)?.label ?? (value || "escolher");
+  const current = options.find((o) => o.id === value)?.label ?? "escolher";
 
   function place() {
     const r = btn.current?.getBoundingClientRect();

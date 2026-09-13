@@ -67,11 +67,7 @@ export function ModelSelect({ provider, compact }: { provider: AgentId; compact?
     void load();
   }, [provider, claudeAuth?.access, openaiAuth?.access]);
 
-  const options = models.some((m) => m.id === value)
-    ? models
-    : value
-      ? [{ id: value, label: value }, ...models]
-      : models;
+  const options = models;
 
   if (compact) {
     return (

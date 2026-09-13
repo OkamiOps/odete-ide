@@ -346,7 +346,7 @@ function CodexAuth() {
       <p className="text-xs text-fg-subtle">
         ChatGPT → Ajustes → Segurança → ative Device code authorization.
       </p>
-      <ModelSelect provider="codex" />
+      {auth?.access ? <ModelSelect provider="codex" /> : null}
       {auth?.access ? (
         <div className="flex flex-wrap items-center gap-2">
           <p className="text-xs text-ok">ChatGPT conectado.</p>

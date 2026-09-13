@@ -25,7 +25,7 @@ type ChatState = {
   list: (projectId: string) => ChatThread[];
   newChat: (projectId: string, slot?: "a" | "b") => ChatThread;
   open: (projectId: string, threadId: string, slot?: "a" | "b") => ChatThread | null;
-  remove: (projectId: string, threadId: string) => ChatThread;
+  remove: (projectId: string, threadId: string, slot?: "a" | "b") => ChatThread;
   addUsage: (projectId: string, use: TokenUse, slot?: "a" | "b") => void;
 };
 
@@ -174,7 +174,7 @@ export const useAgentChats = create<ChatState>()(
           };
         });
       },
-      remove: (projectId, threadId) => {
+      remove: (projectId, threadId, slot = "a") => {
         const s = get();
         const threads = { ...s.threads };
         delete threads[threadId];
@@ -192,7 +192,7 @@ export const useAgentChats = create<ChatState>()(
           }
         }
         set({ threads, active });
-        const aid = active[keyOf(projectId, "a")] ?? active[projectId];
+        const aid = active[keyOf(projectId, slot)] ?? active[projectId];
         return threads[aid ?? ""] ?? blank(projectId);
       },
     }),

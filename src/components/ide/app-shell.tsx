@@ -26,11 +26,10 @@ import { useWorkspace } from "@/lib/workspace/store";
 
 function AgentDock() {
   const split = useHub((s) => s.agentSplit);
-  if (!split) return <AgentPane slot="a" />;
   return (
-    <div className="agent-dock is-split">
+    <div className={split ? "agent-dock is-split" : "agent-dock"}>
       <AgentPane slot="a" />
-      <AgentPane slot="b" />
+      {split ? <AgentPane slot="b" /> : null}
     </div>
   );
 }

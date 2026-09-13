@@ -608,12 +608,14 @@ input, textarea, select { font: inherit; font-size: 16px; }
 .ex-add:hover { background: var(--color-bg-subtle); color: var(--color-fg); }
 .ex-menu {
   position: fixed;
-  z-index: 40;
+  z-index: 60;
   border: 1px solid var(--color-border);
   border-radius: 12px;
   background: var(--color-bg-elevated);
   box-shadow: 0 16px 40px rgb(0 0 0 / 0.45);
-  overflow: hidden;
+  max-height: min(70vh, 420px);
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
 }
 .ex-menu-list { display: flex; flex-direction: column; }
 .ex-menu-list button {
@@ -781,6 +783,10 @@ input, textarea, select { font: inherit; font-size: 16px; }
 }
 .git-branch-row { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 6px; align-items: center; min-width: 0; }
 .git-branch-row .field { min-width: 0; width: 100%; }
+.git-issue-form { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; min-width: 0; }
+.git-issue-form .field { min-width: 0; width: 100%; }
+.git-issue-form-ops { display: flex; flex-wrap: wrap; gap: 6px; }
+.git-issue-form-ops .chip { min-width: 0; flex: 1 1 auto; justify-content: center; }
 .git-stash-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; min-width: 0; }
 .git-stash-row .chip { min-width: 0; justify-content: center; width: 100%; }
 .git-compare { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
@@ -2028,7 +2034,8 @@ html[data-dragging] { cursor: grabbing; user-select: none; }
 }
 .git-pr { border-bottom: 1px solid var(--color-border); }
 .git-pr .hit { width: 100%; }
-.git-pr-ops { display: flex; gap: 6px; padding: 0 10px 8px; }
+.git-pr-ops { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 10px 8px; }
+.git-pr-ops .chip { min-width: 0; flex: 1 1 auto; justify-content: center; }
 .git-pr-diff { padding: 0 10px 10px; }
 .git-pr-diff details { margin-top: 6px; }
 .git-pr-diff summary { font-size: 12px; color: var(--color-fg); }
@@ -2124,6 +2131,7 @@ html[data-dragging] { cursor: grabbing; user-select: none; }
   height: 100%;
   width: 100%;
 }
+.agent-dock > .agent-pane { flex: 1; min-height: 0; height: 100%; }
 .agent-dock.is-split {
   display: grid;
   grid-template-columns: 1fr;

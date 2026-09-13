@@ -459,20 +459,22 @@ function OpenForm() {
     setBusy("lendo pasta…");
     try {
       const root = await picker({ mode: "readwrite" } as never);
-      const { saveHandle } = await import("@/lib/workspace/folder");
-      await saveHandle(root);
       const files = await readDirectoryHandle(root);
       if (!Object.keys(files).length) {
         setErr("pasta vazia ou só binários");
         return;
       }
+      const id = `local-${Date.now()}`;
       useWorkspace.getState().loadProject({
-        id: `local-${Date.now()}`,
-        name: root.name || "projeto",
+        id,
+        name: root.name || "pasta",
         files,
         remote: null,
-        message: `abrir ${root.name}`,
+        message: "abrir pasta",
+        pushed: true,
       });
+      const { saveHandle } = await import("@/lib/workspace/folder");
+      await saveHandle(root, id);
       setSheet(false);
     } catch (e) {
       if (e instanceof DOMException && e.name === "AbortError") return;
@@ -602,6 +604,7 @@ function CloneForm() {
         remote: r.remote,
         branch: r.branch,
         message: `clone ${r.remote}`,
+        pushed: true,
       });
       setSheet(false);
     } catch (e) {

@@ -230,10 +230,11 @@ function FolderBody() {
             setErr("");
             setOk("");
             setBusy(true);
-            void bindFolder()
+            void bindFolder(useWorkspace.getState().projectId)
               .then(async (dir) => {
                 useHub.getState().setFolder(dir.name);
-                await writeTree(dir, useWorkspace.getState().files);
+                const s = useWorkspace.getState();
+                await writeTree(dir, s.files, s.projectId);
                 setOk(`gravado em ${dir.name}`);
               })
               .catch((e) => {

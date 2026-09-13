@@ -15,23 +15,37 @@ function openDb(): Promise<IDBDatabase> {
   });
 }
 
-async function putHandle(dir: FileSystemDirectoryHandle) {
+async function putHandle(dir: FileSystemDirectoryHandle, projectId: string) {
   const db = await openDb();
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction(STORE, "readwrite");
-    tx.objectStore(STORE).put(dir, "root");
+    tx.objectStore(STORE).put(dir, `dir:${projectId}`);
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
 }
 
-export async function getHandle(opts?: { prompt?: boolean }): Promise<FileSystemDirectoryHandle | null> {
+export async function getHandle(opts?: { prompt?: boolean; projectId?: string }): Promise<FileSystemDirectoryHandle | null> {
+  const projectId = opts?.projectId || "root";
   try {
     const db = await openDb();
     const dir = await new Promise<FileSystemDirectoryHandle | undefined>((resolve, reject) => {
       const tx = db.transaction(STORE, "readonly");
-      const g = tx.objectStore(STORE).get("root");
-      g.onsuccess = () => resolve(g.result as FileSystemDirectoryHandle | undefined);
+      const store = tx.objectStore(STORE);
+      const g = store.get(`dir:${projectId}`);
+      g.onsuccess = () => {
+        if (g.result) {
+          resolve(g.result as FileSystemDirectoryHandle);
+          return;
+        }
+        if (projectId === "root") {
+          resolve(undefined);
+          return;
+        }
+        const legacy = store.get("root");
+        legacy.onsuccess = () => resolve(legacy.result as FileSystemDirectoryHandle | undefined);
+        legacy.onerror = () => reject(legacy.error);
+      };
       g.onerror = () => reject(g.error);
     });
     if (!dir) return null;
@@ -70,12 +84,12 @@ function bytesOf(content: string) {
   return new TextEncoder().encode(content);
 }
 
-async function getWritten(): Promise<string[]> {
+async function getWritten(projectId: string): Promise<string[]> {
   try {
     const db = await openDb();
     return await new Promise((resolve, reject) => {
       const tx = db.transaction(STORE, "readonly");
-      const g = tx.objectStore(STORE).get("written");
+      const g = tx.objectStore(STORE).get(`written:${projectId}`);
       g.onsuccess = () => resolve((g.result as string[] | undefined) ?? []);
       g.onerror = () => reject(g.error);
     });
@@ -84,12 +98,12 @@ async function getWritten(): Promise<string[]> {
   }
 }
 
-async function putWritten(paths: string[]) {
+async function putWritten(projectId: string, paths: string[]) {
   try {
     const db = await openDb();
     await new Promise<void>((resolve, reject) => {
       const tx = db.transaction(STORE, "readwrite");
-      tx.objectStore(STORE).put(paths, "written");
+      tx.objectStore(STORE).put(paths, `written:${projectId}`);
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
     });
@@ -107,8 +121,8 @@ async function dropPath(root: FileSystemDirectoryHandle, path: string) {
   await cur.removeEntry(file);
 }
 
-export async function writeTree(dir: FileSystemDirectoryHandle, files: FileMap) {
-  const prev = await getWritten();
+export async function writeTree(dir: FileSystemDirectoryHandle, files: FileMap, projectId = "root") {
+  const prev = await getWritten(projectId);
   for (const path of prev) {
     if (files[path] !== undefined) continue;
     try {
@@ -117,50 +131,65 @@ export async function writeTree(dir: FileSystemDirectoryHandle, files: FileMap) 
       /* already gone */
     }
   }
+  const skipNm = paused > 0;
   for (const [path, body] of Object.entries(files)) {
+    if (skipNm && (path.startsWith("node_modules/") || path.includes("/node_modules/"))) continue;
     const fh = await ensurePath(dir, path);
     const w = await fh.createWritable();
     await w.write(bytesOf(body));
     await w.close();
   }
-  await putWritten(Object.keys(files));
+  await putWritten(projectId, Object.keys(files));
 }
 
-export async function removeFromFolder(path: string) {
-  const dir = await getHandle();
+export async function removeFromFolder(path: string, projectId?: string) {
+  const dir = await getHandle({ projectId });
   if (!dir) return;
   try {
-    const parts = path.split("/").filter(Boolean);
-    const file = parts.pop();
-    if (!file) return;
-    let cur = dir;
-    for (const p of parts) cur = await cur.getDirectoryHandle(p);
-    await cur.removeEntry(file);
+    await dropPath(dir, path);
   } catch {
     /* ignore */
   }
 }
 
-export async function saveHandle(dir: FileSystemDirectoryHandle) {
-  await putHandle(dir);
+export async function saveHandle(dir: FileSystemDirectoryHandle, projectId?: string) {
+  await putHandle(dir, projectId || "root");
 }
 
-export async function bindFolder() {
+export async function bindFolder(projectId?: string) {
   const w = window as Window & {
     showDirectoryPicker?: (opts?: { mode?: string }) => Promise<FileSystemDirectoryHandle>;
   };
   if (!w.showDirectoryPicker) throw new Error("este browser não abre pasta do Files");
   const dir = await w.showDirectoryPicker({ mode: "readwrite" });
-  await putHandle(dir);
+  await putHandle(dir, projectId || "root");
   return dir;
 }
 
 let timer: number | null = null;
-export function scheduleSync(files: FileMap) {
+let paused = 0;
+let pending: { files: FileMap; projectId: string } | null = null;
+
+export function pauseSync() {
+  paused += 1;
+}
+
+export function resumeSync(files: FileMap, projectId: string) {
+  paused = Math.max(0, paused - 1);
+  if (!paused) scheduleSync(files, projectId);
+}
+
+export function scheduleSync(files: FileMap, projectId = "root") {
+  if (paused) {
+    pending = { files, projectId };
+    return;
+  }
   if (timer) window.clearTimeout(timer);
+  const id = projectId;
+  const snap = files;
   timer = window.setTimeout(() => {
-    void getHandle().then((dir) => {
-      if (dir) return writeTree(dir, files);
+    void getHandle({ projectId: id }).then((dir) => {
+      if (dir) return writeTree(dir, snap, id);
     });
   }, 800);
 }

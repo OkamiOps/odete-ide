@@ -86,6 +86,7 @@ const ACTIONS = [
   "setSlotAgent",
   "setSlotMode",
   "setSlotPermit",
+  "setSlotModel",
 ] as const;
 export type PaletteKind = "all" | "files" | "cmds";
 
@@ -109,6 +110,7 @@ type ChromeState = {
   slotAgent: Record<SlotId, AgentId>;
   slotMode: Record<SlotId, AgentMode>;
   slotPermit: Record<SlotId, PermitMode>;
+  slotModel: Record<SlotId, string>;
   grokModel: string;
   claudeModel: string;
   codexModel: string;
@@ -162,6 +164,7 @@ type ChromeState = {
   setSlotAgent: (slot: SlotId, id: AgentId) => void;
   setSlotMode: (slot: SlotId, m: AgentMode) => void;
   setSlotPermit: (slot: SlotId, m: PermitMode) => void;
+  setSlotModel: (slot: SlotId, m: string) => void;
   setGrokModel: (m: string) => void;
   setClaudeModel: (m: string) => void;
   setCodexModel: (m: string) => void;
@@ -249,6 +252,7 @@ export const useChrome = create<ChromeState>()(
       slotAgent: { a: "grok", b: "grok" },
       slotMode: { a: "build", b: "build" },
       slotPermit: { a: "auto", b: "auto" },
+      slotModel: { a: "", b: "" },
       grokModel: "grok-4-1-fast-reasoning",
       claudeModel: "",
       codexModel: "",
@@ -317,28 +321,40 @@ export const useChrome = create<ChromeState>()(
         }),
       setSlotAgent: (slot, id) =>
         set((s) => {
-          const slotAgent = { ...s.slotAgent, [slot]: id };
-          const fav = s.favModels?.[id];
-          const models =
-            !fav
+          const slotAgent = { a: s.slotAgent?.a ?? s.agentId, b: s.slotAgent?.b ?? "grok", [slot]: id };
+          const fav = s.favModels?.[id] || "";
+          const slotModel = { a: s.slotModel?.a ?? "", b: s.slotModel?.b ?? "", [slot]: fav };
+          if (slot === "a") {
+            const extra = !fav
               ? {}
               : id === "claude"
                 ? { claudeModel: fav }
                 : id === "codex"
                   ? { codexModel: fav }
                   : { grokModel: fav };
-          return slot === "a" ? { agentId: id, slotAgent, ...models } : { slotAgent, ...models };
+            return { agentId: id, slotAgent, slotModel, ...extra };
+          }
+          return { slotAgent, slotModel };
         }),
       setSlotMode: (slot, m) =>
         set((s) => ({
-          slotMode: { ...s.slotMode, [slot]: m },
+          slotMode: { a: s.slotMode?.a ?? s.agentMode, b: s.slotMode?.b ?? "build", [slot]: m },
           ...(slot === "a" ? { agentMode: m } : {}),
         })),
       setSlotPermit: (slot, m) =>
         set((s) => ({
-          slotPermit: { ...s.slotPermit, [slot]: m },
+          slotPermit: { a: s.slotPermit?.a ?? s.permitMode, b: s.slotPermit?.b ?? "auto", [slot]: m },
           ...(slot === "a" ? { permitMode: m } : {}),
         })),
+      setSlotModel: (slot, m) =>
+        set((s) => {
+          const slotModel = { a: s.slotModel?.a ?? "", b: s.slotModel?.b ?? "", [slot]: m };
+          if (slot !== "a") return { slotModel };
+          const id = s.slotAgent?.[slot] ?? s.agentId;
+          if (id === "claude") return { slotModel, claudeModel: m };
+          if (id === "codex") return { slotModel, codexModel: m };
+          return { slotModel, grokModel: m };
+        }),
       setGrokModel: (grokModel) => set({ grokModel }),
       setClaudeModel: (claudeModel) => set({ claudeModel }),
       setCodexModel: (codexModel) => set({ codexModel }),
@@ -400,6 +416,7 @@ export const useChrome = create<ChromeState>()(
         slotAgent: s.slotAgent,
         slotMode: s.slotMode,
         slotPermit: s.slotPermit,
+        slotModel: s.slotModel,
         grokModel: s.grokModel,
         claudeModel: s.claudeModel,
         codexModel: s.codexModel,
@@ -467,6 +484,8 @@ export const useChrome = create<ChromeState>()(
         p.slotMode = { a: sm.a || p.agentMode || "build", b: sm.b || "build" };
         const sp = (p.slotPermit ?? {}) as Record<string, string>;
         p.slotPermit = { a: sp.a || p.permitMode || "auto", b: sp.b || "auto" };
+        const sml = (p.slotModel ?? {}) as Record<string, string>;
+        p.slotModel = { a: sml.a || (p.grokModel as string) || "", b: sml.b || "" };
         return { ...current, ...p } as ChromeState;
       },
     },
@@ -478,9 +497,14 @@ export function currentAgentModel(s: {
   grokModel: string;
   claudeModel: string;
   codexModel: string;
-}) {
-  if (s.agentId === "claude") return s.claudeModel;
-  if (s.agentId === "codex") return s.codexModel;
+  slotAgent?: Record<SlotId, AgentId>;
+  slotModel?: Record<SlotId, string>;
+}, slot?: SlotId) {
+  const id = slot ? (s.slotAgent?.[slot] ?? s.agentId) : s.agentId;
+  const slotM = slot ? s.slotModel?.[slot] : "";
+  if (slotM) return slotM;
+  if (id === "claude") return s.claudeModel;
+  if (id === "codex") return s.codexModel;
   return s.grokModel || agentById("grok").defaultModel;
 }
 
@@ -490,9 +514,12 @@ export function currentEffort(s: {
   claudeModel: string;
   codexModel: string;
   effortByKey: Record<string, EffortId>;
-}): EffortId | "" {
-  const model = currentAgentModel(s);
-  return s.effortByKey[`${s.agentId}:${model}`] ?? "";
+  slotAgent?: Record<SlotId, AgentId>;
+  slotModel?: Record<SlotId, string>;
+}, slot?: SlotId): EffortId | "" {
+  const id = slot ? (s.slotAgent?.[slot] ?? s.agentId) : s.agentId;
+  const model = currentAgentModel(s, slot);
+  return s.effortByKey[`${id}:${model}`] ?? "";
 }
 
 export function agentConnected(s: {

@@ -217,6 +217,7 @@ export async function runShellAsync(raw: string): Promise<string> {
                 remote: r.remote,
                 branch: r.branch,
                 message: `clone ${r.remote}`,
+                pushed: true,
               });
               out = `ok ${r.remote}  ${Object.keys(r.files).length} arquivos`;
             } catch (e) {

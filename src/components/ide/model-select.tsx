@@ -15,10 +15,19 @@ function usable(m: ModelInfo) {
   return true;
 }
 
-export function ModelSelect({ provider, compact }: { provider: AgentId; compact?: boolean }) {
+export function ModelSelect({
+  provider,
+  compact,
+  slot,
+}: {
+  provider: AgentId;
+  compact?: boolean;
+  slot?: "a" | "b";
+}) {
   const grokModel = useChrome((s) => s.grokModel);
   const claudeModel = useChrome((s) => s.claudeModel);
   const codexModel = useChrome((s) => s.codexModel);
+  const slotModel = useChrome((s) => (slot ? s.slotModel?.[slot] ?? "" : ""));
   const fav = useChrome((s) => s.favModels?.[provider] ?? "");
   const setGrok = useChrome((s) => s.setGrokModel);
   const setClaude = useChrome((s) => s.setClaudeModel);
@@ -31,10 +40,16 @@ export function ModelSelect({ provider, compact }: { provider: AgentId; compact?
   const [busy, setBusy] = useState(false);
   const [custom, setCustom] = useState("");
 
-  const value =
+  const fallback =
     provider === "claude" ? claudeModel : provider === "codex" ? codexModel : grokModel;
+  const value = slotModel || fallback;
   const setValue =
     provider === "claude" ? setClaude : provider === "codex" ? setCodex : setGrok;
+
+  function apply(id: string) {
+    if (slot) useChrome.getState().setSlotModel(slot, id);
+    else setValue(id);
+  }
 
   async function load() {
     setBusy(true);
@@ -52,12 +67,18 @@ export function ModelSelect({ provider, compact }: { provider: AgentId; compact?
       setModels(list);
       if (!r.ok) setErr(r.error);
       const cur = useChrome.getState();
-      const current =
-        provider === "claude" ? cur.claudeModel : provider === "codex" ? cur.codexModel : cur.grokModel;
+      const current = slot
+        ? cur.slotModel?.[slot] ||
+          (provider === "claude" ? cur.claudeModel : provider === "codex" ? cur.codexModel : cur.grokModel)
+        : provider === "claude"
+          ? cur.claudeModel
+          : provider === "codex"
+            ? cur.codexModel
+            : cur.grokModel;
       const favorite = cur.favModels?.[provider] ?? "";
       if (!current) {
         const next = (favorite && list.some((m) => m.id === favorite) ? favorite : "") || list[0]?.id || favorite;
-        if (next) setValue(next);
+        if (next) apply(next);
       }
     } catch (e) {
       setErr(e instanceof Error ? e.message : "falha ao listar modelos");
@@ -68,7 +89,7 @@ export function ModelSelect({ provider, compact }: { provider: AgentId; compact?
 
   useEffect(() => {
     void load();
-  }, [provider, claudeAuth?.access, openaiAuth?.access]);
+  }, [provider, claudeAuth?.access, openaiAuth?.access, slot]);
 
   const options = (() => {
     const list = [...models];
@@ -79,7 +100,7 @@ export function ModelSelect({ provider, compact }: { provider: AgentId; compact?
   })();
 
   function pick(id: string) {
-    setValue(id);
+    apply(id);
     if (!fav) setFav(provider, id);
   }
 

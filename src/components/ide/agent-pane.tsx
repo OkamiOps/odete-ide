@@ -83,6 +83,7 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
   const history = useRef<AgentMessage[]>([]);
   const box = useRef<HTMLDivElement>(null);
   const cancel = useRef(false);
+  const gen = useRef(0);
   const draftRef = useRef("");
   const sendFn = useRef<(t: string) => void>(() => {});
   const fileRef = useRef<HTMLInputElement>(null);
@@ -139,6 +140,8 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
   useEffect(() => {
     if (!chatsReady) return;
     booted.current = false;
+    gen.current += 1;
+    answerPermit(false, slot);
     const t = useAgentChats.getState().load(projectId, slot);
     history.current = t.messages;
     setItems(t.items);
@@ -160,12 +163,18 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
     setCaret(pos);
   }, [draft]);
   useEffect(() => {
-    if (!projectId || !chatsReady || !booted.current) return;
-    const flush = () => useAgentChats.getState().save(projectId, items, history.current, slot);
+    if (!booted.current) return;
+    const flush = () => {
+      if (!booted.current) return;
+      useAgentChats.getState().save(projectId, items, history.current, slot);
+    };
     flush();
     window.addEventListener("pagehide", flush);
-    return () => window.removeEventListener("pagehide", flush);
-  }, [items, projectId, chatsReady]);
+    return () => {
+      flush();
+      window.removeEventListener("pagehide", flush);
+    };
+  }, [items, projectId, chatsReady, slot]);
 
   useEffect(() => {
     draftRef.current = draft;
@@ -229,7 +238,8 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
 
   function clear() {
     cancel.current = true;
-    answerPermit(false);
+    gen.current += 1;
+    answerPermit(false, slot);
     setBusy(false);
     const t = useAgentChats.getState().newChat(projectId, slot);
     history.current = t.messages;
@@ -241,6 +251,8 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
     const t = useAgentChats.getState().open(projectId, id, slot);
     if (!t) return;
     cancel.current = true;
+    gen.current += 1;
+    answerPermit(false, slot);
     setBusy(false);
     history.current = t.messages;
     setItems(t.items);
@@ -290,6 +302,7 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
         : `explica este trecho:\n\`\`\`\n${quote}\n\`\`\``
       : prompt;
     if ((!body && !pics.length) || busy || !connected) return;
+    const my = ++gen.current;
     useCheckpoints.getState().take(prompt.slice(0, 40) || "turno");
     armNotify();
     useNav.getState().setQuote("");
@@ -312,7 +325,7 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
         history.current,
         expandMentions(body),
         (extra) => {
-          if (cancel.current) return;
+          if (cancel.current || gen.current !== my) return;
           setItems((prev) => {
             const i = prev.findIndex((p) => p.id === userItem.id);
             const head = i >= 0 ? prev.slice(0, i + 1) : [...prev, userItem];
@@ -324,26 +337,27 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
         },
         {
           provider: agentId,
-          model: currentAgentModel({ ...chrome, agentId }),
+          model: currentAgentModel(chrome, slot),
           access: tokens.access,
           accountId: tokens.accountId,
           mode: agentMode,
           permit: permitMode,
+          slot,
           effort: (() => {
-            const modelNow = currentAgentModel({ ...chrome, agentId });
+            const modelNow = currentAgentModel(chrome, slot);
             const opts = effortsForModel(agentId, modelNow);
-            const stored = currentEffort({ ...chrome, agentId });
+            const stored = currentEffort(chrome, slot);
             const pick = opts.includes(stored as EffortId) ? stored : defaultEffort(opts);
             return pick || undefined;
           })(),
         },
-        () => cancel.current,
+        () => cancel.current || gen.current !== my,
         pics,
         (use) => useAgentChats.getState().addUsage(projectId, use, slot),
       );
       if (!cancel.current) history.current = next;
     } catch (e) {
-      if (cancel.current) return;
+      if (cancel.current || gen.current !== my) return;
       setItems((prev) => [
         ...prev,
         {
@@ -353,8 +367,8 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
         },
       ]);
     } finally {
-      setBusy(false);
-      if (!cancel.current) pingDone("Colo", "agente terminou");
+      if (gen.current === my) setBusy(false);
+      if (!cancel.current && gen.current === my) pingDone("Colo", "agente terminou");
     }
   }
   sendFn.current = (t: string) => {
@@ -388,8 +402,8 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
   const pendingCount = usePatches((s) => s.items.filter((p) => p.status === "pending").length);
   const quote = useNav((s) => s.quote);
 
-  const model = useChrome((s) => currentAgentModel({ ...s, agentId }));
-  const effortStored = useChrome((s) => currentEffort({ ...s, agentId }));
+  const model = useChrome((s) => currentAgentModel({ ...s, agentId }, slot));
+  const effortStored = useChrome((s) => currentEffort({ ...s, agentId }, slot));
   const options = effortsForModel(agentId, model);
   const effort = (options.includes(effortStored as EffortId) ? effortStored : defaultEffort(options)) as EffortId | "";
   const usedTok = lastInput || estimateTokens({
@@ -454,7 +468,7 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
             options={MODE_META.map((m) => ({ id: m.id, label: m.label }))}
             onChange={(id) => useChrome.getState().setSlotMode(slot, id as AgentMode)}
           />
-          {connected ? <ModelSelect provider={agentId} compact /> : <div className="pick-ghost">conecte o provider</div>}
+          {connected ? <ModelSelect provider={agentId} compact slot={slot} /> : <div className="pick-ghost">conecte o provider</div>}
           <PickList
             compact
             fill
@@ -511,7 +525,7 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
                     className="agent-icon"
                     aria-label="apagar conversa"
                     onClick={() => {
-                      const next = useAgentChats.getState().remove(projectId, t.id);
+                      const next = useAgentChats.getState().remove(projectId, t.id, slot);
                       history.current = next.messages;
                       setItems(next.items);
                     }}
@@ -527,7 +541,7 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
         ) : null}
         {!histOpen && !connected ? (
           <div className="agent-auth">
-            <AgentConnect embedded />
+            <AgentConnect embedded provider={agentId} />
           </div>
         ) : null}
 
@@ -535,7 +549,7 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
           <div className="agent-empty">
             <p className="agent-empty-kicker">{def.vendor}</p>
             <h3>{def.label} pronto</h3>
-            <p>Edita arquivo, git, npm e vite neste iPad. Sem outra máquina.</p>
+            <p>Edita arquivo, git e npm neste iPad. Vite no preview. Sem outra máquina.</p>
             <div className="agent-starts">
               {STARTERS.map((s) => (
                 <button key={s.label} type="button" onClick={() => void send(s.prompt)}>
@@ -554,6 +568,7 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
                 <Message
                   key={g.item.id}
                   item={g.item}
+                  slot={slot}
                   lastUser={g.item.id === lastUserId}
                   onEdit={() => {
                     const t = dropFromUser(g.item.id);
@@ -887,7 +902,8 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
                   aria-label="parar"
                   onClick={() => {
                     cancel.current = true;
-                    answerPermit(false);
+                    gen.current += 1;
+                    answerPermit(false, slot);
                     setBusy(false);
                   }}
                 >
@@ -1094,11 +1110,13 @@ function Message({
   lastUser,
   onEdit,
   onRetry,
+  slot = "a",
 }: {
   item: ChatItem;
   lastUser?: boolean;
   onEdit?: () => void;
   onRetry?: () => void;
+  slot?: "a" | "b";
 }) {
   const files = useWorkspace((s) => s.files);
   if (item.kind === "tool") {
@@ -1119,10 +1137,10 @@ function Message({
         </div>
         {item.status === "pending" ? (
           <div className="agent-permit-ops">
-            <button type="button" className="is-ok" onClick={() => answerPermit(true)}>
+            <button type="button" className="is-ok" onClick={() => answerPermit(true, slot)}>
               Permitir
             </button>
-            <button type="button" onClick={() => answerPermit(false)}>
+            <button type="button" onClick={() => answerPermit(false, slot)}>
               Recusar
             </button>
           </div>

@@ -729,9 +729,10 @@ function GithubBox({ remote, branch, token }: { remote: string; branch: string; 
           <span>{i.title}</span>
         </a>
       ))}
-      <div className="git-branch-row" style={{ padding: "8px 10px" }}>
+      <div className="git-issue-form">
         <input className="field" placeholder="título da issue / PR" value={title} onChange={(e) => setTitle(e.target.value)} />
         <input className="field" placeholder="base da PR" value={base} onChange={(e) => setBase(e.target.value)} />
+        <div className="git-issue-form-ops">
         <button
           type="button"
           className="chip"
@@ -788,6 +789,7 @@ function GithubBox({ remote, branch, token }: { remote: string; branch: string; 
         >
           fork
         </button>
+        </div>
       </div>
       {note ? <p className="git-note">{note}</p> : null}
     </section>

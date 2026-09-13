@@ -12,14 +12,17 @@ export async function remotePush(message = "colo push", onNote?: (s: string) => 
   const { remote, token, ok } = gitRemoteReady();
   const w = useWorkspace.getState();
   if (!ok || !remote || !token) return `${w.gitPush()}\n(sem GitHub — só local)`;
+  if (w.isDirty()) return "error: commite antes de push — o GitHub recebe o HEAD, não o rascunho";
+  const head = w.commits[w.commits.length - 1];
+  if (!head) return "nada para enviar";
   const sha = await githubPushTree(
     remote,
     w.branch || "main",
-    w.files,
+    head.files,
     token,
     message,
     onNote,
-    Object.keys(w.origin?.files ?? {}).filter((p) => w.files[p] === undefined),
+    Object.keys(w.origin?.files ?? {}).filter((p) => head.files[p] === undefined),
   );
   w.gitPush();
   return `pushed ${sha}  ${remote}`;

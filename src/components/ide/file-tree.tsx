@@ -188,7 +188,15 @@ export function FileTree() {
 
   function toggleMenu(e: MouseEvent<HTMLButtonElement>) {
     const r = e.currentTarget.getBoundingClientRect();
-    setMenu({ top: r.bottom + 6, left: r.left, width: Math.max(248, r.width + 48) });
+    const width = Math.max(248, r.width + 48);
+    const maxH = Math.min(420, window.innerHeight * 0.7);
+    let top = r.bottom + 6;
+    let left = r.left;
+    if (top + Math.min(280, maxH) > window.innerHeight - 8) {
+      top = Math.max(8, window.innerHeight - maxH - 8);
+    }
+    if (left + width > window.innerWidth - 8) left = Math.max(8, window.innerWidth - width - 8);
+    setMenu({ top, left, width });
     setMenuOpen((v) => !v);
   }
 

@@ -30,6 +30,7 @@ export type LoopAuth = {
   mode?: AgentMode;
   effort?: string;
   permit?: PermitMode;
+  slot?: string;
 };
 
 async function streamTurn(
@@ -62,6 +63,7 @@ async function streamTurn(
       signal: ac.signal,
     });
     if (!res.ok || !res.body) {
+      if (shouldStop?.() || ac.signal.aborted) return { ok: false, error: "parado" };
       return agentTurn({ data: payload });
     }
     const reader = res.body.getReader();
@@ -156,6 +158,7 @@ export async function runAgentLoop(
   const messages: AgentMessage[] = [...history, userMsg];
   const mode = auth.mode ?? "build";
   const permit = auth.permit ?? "auto";
+  const slot = auth.slot ?? "a";
   let hitCap = false;
 
   for (let round = 0; round < MAX_ROUNDS; round++) {
@@ -245,7 +248,7 @@ export async function runAgentLoop(
         name;
       if (needsPermit(permit, name)) {
         upsert({ id: call.id, kind: "permit", name, detail: hint, status: "pending" });
-        const ok = await waitPermit();
+        const ok = await waitPermit(slot);
         if (shouldStop?.() || !ok) {
           upsert({ id: call.id, kind: "permit", name, detail: hint, status: "no" });
           messages.push({

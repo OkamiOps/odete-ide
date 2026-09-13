@@ -62,14 +62,20 @@ export function unpackBin(s: string): { mime: string; b64: string } | null {
 
 export function parseRepo(input: string) {
   const raw = input.trim().replace(/\.git$/, "");
-  const tree = raw.match(/github\.com[/:]([^/]+)\/([^/#?]+)(?:\/(?:tree|blob)\/([^?#]+))?/i);
-  if (tree) {
-    const branch = (tree[3] || "").replace(/\/$/, "").replace(/^blob\/|tree\//, "");
-    return { owner: tree[1]!, repo: tree[2]!.replace(/\.git$/, ""), branch };
+  const m = raw.match(/github\.com[/:]([^/]+)\/([^/#?]+)(?:\/(tree|blob)\/([^?#]+))?/i);
+  if (m) {
+    const kind = (m[3] || "").toLowerCase();
+    const rest = (m[4] || "").replace(/\/$/, "");
+    const branch = kind === "blob" ? rest.split("/")[0] || "" : rest;
+    return { owner: m[1]!, repo: m[2]!.replace(/\.git$/, ""), branch };
   }
   const short = raw.match(/^([\w.-]+)\/([\w.-]+)$/);
   if (short) return { owner: short[1]!, repo: short[2]!, branch: "" };
   return null;
+}
+
+function encRef(ref: string) {
+  return encodeURIComponent(ref).replaceAll("%2F", "/");
 }
 
 function headers(token?: string): HeadersInit {
@@ -278,8 +284,8 @@ async function cloneViaZip(
   try {
     onProgress?.("baixando zip do GitHub…");
     const url = token
-      ? `https://api.github.com/repos/${owner}/${slug}/zipball/${encodeURIComponent(branch)}`
-      : `https://codeload.github.com/${owner}/${slug}/zip/refs/heads/${encodeURIComponent(branch)}`;
+      ? `https://api.github.com/repos/${owner}/${slug}/zipball/${encRef(branch)}`
+      : `https://codeload.github.com/${owner}/${slug}/zip/refs/heads/${encRef(branch)}`;
     const r = await fetch(url, token ? { headers: headers(token) } : undefined);
     if (!r.ok) return null;
     const buf = await r.arrayBuffer();
@@ -321,7 +327,7 @@ async function cloneViaTree(
 ): Promise<CloneResult> {
   onProgress?.(`árvore ${branch}…`);
   const tree = await gh<{ tree: { path: string; type: string; size?: number }[] }>(
-    `https://api.github.com/repos/${owner}/${slug}/git/trees/${encodeURIComponent(branch)}?recursive=1`,
+    `https://api.github.com/repos/${owner}/${slug}/git/trees/${encRef(branch)}?recursive=1`,
     token,
   );
   const blobs = tree.tree.filter(
@@ -352,7 +358,7 @@ async function cloneViaTree(
           if (body.encoding === "base64" && body.content) b64content = body.content.replace(/\n/g, "");
         } else {
           const raw = await fetch(
-            `https://raw.githubusercontent.com/${owner}/${slug}/${encodeURIComponent(branch)}/${path}`,
+            `https://raw.githubusercontent.com/${owner}/${slug}/${encRef(branch)}/${path}`,
           );
           if (!raw.ok) continue;
           const buf = new Uint8Array(await raw.arrayBuffer());
@@ -439,7 +445,7 @@ export async function githubPushTree(
   const { owner, repo } = spec;
   onProgress?.("lendo HEAD…");
   const ref = await gh<{ object: { sha: string } }>(
-    `https://api.github.com/repos/${owner}/${repo}/git/ref/heads/${encodeURIComponent(branch)}`,
+    `https://api.github.com/repos/${owner}/${repo}/git/ref/heads/${encRef(branch)}`,
     token,
   );
   const parent = ref.object.sha;
@@ -497,7 +503,7 @@ export async function githubPushTree(
     { message, tree: made.sha, parents: [parent] },
   );
   await ghWrite(
-    `https://api.github.com/repos/${owner}/${repo}/git/refs/heads/${encodeURIComponent(branch)}`,
+    `https://api.github.com/repos/${owner}/${repo}/git/refs/heads/${encRef(branch)}`,
     token,
     "PATCH",
     { sha: madeCommit.sha },

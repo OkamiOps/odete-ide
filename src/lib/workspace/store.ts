@@ -15,6 +15,19 @@ function cloneFiles(files: FileMap): FileMap {
   return { ...files };
 }
 
+function persistFiles(files: FileMap): FileMap {
+  const out: FileMap = {};
+  for (const [k, v] of Object.entries(files)) {
+    if (k.startsWith("node_modules/") || k.includes("/node_modules/")) continue;
+    out[k] = v;
+  }
+  return out;
+}
+
+function persistCommit(c: Commit): Commit {
+  return { ...c, files: persistFiles(c.files) };
+}
+
 function filesEqual(a: FileMap, b: FileMap) {
   const ak = Object.keys(a);
   const bk = Object.keys(b);
@@ -114,6 +127,7 @@ export type WorkspaceState = {
     remote?: string | null;
     branch?: string;
     message?: string;
+    pushed?: boolean;
   }) => void;
   newProject: (name: string) => void;
   closeProject: () => void;
@@ -196,7 +210,7 @@ export const useWorkspace = create<WorkspaceState>()(
               : [...s.tabs, clean],
         }));
         rememberEdit(clean, content);
-        scheduleSync({ ...get().files, [clean]: content });
+        scheduleSync({ ...get().files, [clean]: content }, get().projectId);
         return undefined;
       },
       createFile: (path) => {
@@ -217,8 +231,8 @@ export const useWorkspace = create<WorkspaceState>()(
           tabs: nextTabs.length ? nextTabs : [fallback],
           openPath: openPath === path ? fallback : openPath,
         });
-        scheduleSync(next);
-        void import("./folder").then((m) => m.removeFromFolder(path));
+        scheduleSync(next, get().projectId);
+        void import("./folder").then((m) => m.removeFromFolder(path, get().projectId));
         return undefined;
       },
       readFile: (path) => get().files[path],
@@ -251,7 +265,7 @@ export const useWorkspace = create<WorkspaceState>()(
         }
         const next = { ...files, [keep]: "" };
         set({ files: next });
-        scheduleSync(next);
+        scheduleSync(next, get().projectId);
         return `criado ${p}/`;
       },
       grep: (pattern, path) => {
@@ -392,6 +406,7 @@ export const useWorkspace = create<WorkspaceState>()(
         if (!head || head.files[path] === undefined) delete next[path];
         else next[path] = head.files[path];
         set({ files: next, staged: staged.filter((p) => p !== path) });
+        scheduleSync(next, get().projectId);
         return `descartado ${path}`;
       },
       gitDiscardAll: () => {
@@ -399,6 +414,7 @@ export const useWorkspace = create<WorkspaceState>()(
         const head = commits[commits.length - 1];
         if (!head) return "nada para descartar";
         set({ files: cloneFiles(head.files), staged: [] });
+        scheduleSync(head.files, get().projectId);
         return "working tree restaurada para HEAD";
       },
       gitUndoCommit: () => {
@@ -448,6 +464,7 @@ export const useWorkspace = create<WorkspaceState>()(
           lastPushedId: dest.lastPushedId,
           origin: dest.origin,
         });
+        scheduleSync(dest.files, get().projectId);
         return `trocou para ${n}`;
       },
       gitStash: () => {
@@ -467,6 +484,7 @@ export const useWorkspace = create<WorkspaceState>()(
           files: cloneFiles(head.files),
           staged: [],
         });
+        scheduleSync(head.files, get().projectId);
         return `stash@{0}: ${entry.message}`;
       },
       gitStashPop: () => {
@@ -479,6 +497,7 @@ export const useWorkspace = create<WorkspaceState>()(
           staged: top.staged,
           stash: s.stash.slice(1),
         });
+        scheduleSync(top.files, get().projectId);
         return `aplicado ${top.id}`;
       },
       gitCherryPick: (id) => {
@@ -578,7 +597,9 @@ export const useWorkspace = create<WorkspaceState>()(
       gitRestoreCommit: (id) => {
         const c = get().commits.find((x) => x.id === id);
         if (!c) return "commit não encontrado";
+        if (!c.files || !Object.keys(c.files).length) return "commit sem snapshot — não dá pra restaurar";
         set({ files: cloneFiles(c.files), staged: [] });
+        scheduleSync(c.files, get().projectId);
         return `arquivos restaurados de ${c.id}  ${c.message}`;
       },
       gitApplyHunk: (path, index, keep) => {
@@ -606,8 +627,8 @@ export const useWorkspace = create<WorkspaceState>()(
           openPath: openPath === src ? dest : openPath,
           staged: staged.map((t) => (t === src ? dest : t)),
         });
-        scheduleSync(next);
-        void import("./folder").then((m) => m.removeFromFolder(src));
+        scheduleSync(next, get().projectId);
+        void import("./folder").then((m) => m.removeFromFolder(src, get().projectId));
         return undefined;
       },
       replaceInFiles: (pattern, replacement, onlyPath) => {
@@ -685,7 +706,7 @@ export const useWorkspace = create<WorkspaceState>()(
           conflicts,
           staged: [],
         });
-        scheduleSync(files);
+        scheduleSync(files, get().projectId);
         return conflicts.length
           ? `merge com ${conflicts.length} conflito(s)`
           : `pull ok · ${Object.keys(incoming).length} arquivos`;
@@ -757,7 +778,7 @@ export const useWorkspace = create<WorkspaceState>()(
           openPath: files[first] !== undefined ? first : Object.keys(files)[0] ?? "README.md",
           tabs: [first],
           commits: [commit],
-          lastPushedId: p.remote ? null : commit.id,
+          lastPushedId: p.pushed === false ? null : p.remote && p.pushed !== true ? null : commit.id,
           origin: { ...commit, files: cloneFiles(files) },
           staged: [],
           branch: p.branch || "main",
@@ -770,7 +791,7 @@ export const useWorkspace = create<WorkspaceState>()(
           conflicts: [],
           terminal: [{ id: uid(), kind: "ok", text: `projeto ${p.name}` }],
         });
-        scheduleSync(files);
+        scheduleSync(files, get().projectId);
       },
       newProject: (name) => {
         const title = name.trim() || "sem título";
@@ -794,7 +815,7 @@ export const useWorkspace = create<WorkspaceState>()(
           openPath: files[get().openPath] !== undefined ? get().openPath : first,
           tabs: replace ? [first] : get().tabs,
         });
-        scheduleSync(files);
+        scheduleSync(files, get().projectId);
       },
       resetWorkspace: () =>
         set({
@@ -811,14 +832,12 @@ export const useWorkspace = create<WorkspaceState>()(
       name: "colo-workspace-v2",
       storage: createJSONStorage(() => idbKv),
       partialize: (s) => ({
-        files: s.files,
+        files: persistFiles(s.files),
         openPath: s.openPath,
         tabs: s.tabs.filter((t) => !t.startsWith("node_modules/")),
-        commits: s.commits.slice(-8).map((c, i, arr) =>
-          i < arr.length - 3 ? { ...c, files: {} } : c,
-        ),
+        commits: s.commits.slice(-12).map(persistCommit),
         lastPushedId: s.lastPushedId,
-        origin: s.origin,
+        origin: s.origin ? persistCommit(s.origin) : s.origin,
         branch: s.branch,
         cwd: s.cwd,
         projectId: s.projectId,
@@ -827,10 +846,14 @@ export const useWorkspace = create<WorkspaceState>()(
         branchSnaps: Object.fromEntries(
           Object.entries(s.branchSnaps).slice(0, 6).map(([k, v]) => [
             k,
-            { ...v, commits: v.commits.slice(-4).map((c) => ({ ...c, files: {} })), files: v.files },
+            {
+              ...v,
+              files: persistFiles(v.files),
+              commits: v.commits.slice(-8).map(persistCommit),
+            },
           ]),
         ),
-        stash: s.stash.slice(0, 4),
+        stash: s.stash.slice(0, 4).map((x) => ({ ...x, files: persistFiles(x.files) })),
         conflicts: s.conflicts,
         staged: s.staged,
       }),

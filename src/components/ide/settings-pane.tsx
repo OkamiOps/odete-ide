@@ -138,8 +138,15 @@ export function SettingsPane() {
   );
 }
 
-export function AgentConnect({ embedded = false }: { embedded?: boolean }) {
-  const agentId = useChrome((s) => s.agentId);
+export function AgentConnect({
+  embedded = false,
+  provider,
+}: {
+  embedded?: boolean;
+  provider?: AgentId;
+}) {
+  const fallback = useChrome((s) => s.agentId);
+  const agentId = provider ?? fallback;
   const body = (
     <>
       {agentId === "grok" ? <GrokInfo /> : null}

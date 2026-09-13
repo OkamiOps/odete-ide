@@ -13,7 +13,9 @@ function findFile(files: FileMap, href: string) {
   const clean = normalize(href);
   if (files[clean]) return files[clean];
   const name = clean.split("/").pop() ?? clean;
-  const key = Object.keys(files).find((k) => k === name || k.endsWith(`/${name}`));
+  const key = Object.keys(files).find(
+    (k) => !k.includes("node_modules/") && (k === name || k.endsWith(`/${name}`)),
+  );
   return key ? files[key] : undefined;
 }
 
@@ -41,17 +43,19 @@ const HOOK = `<script>
   window.addEventListener("unhandledrejection", (e) => send("error", [String(e.reason)]));
   try { window.localStorage.getItem("__colo_probe"); }
   catch (e) {
-    const mem = {};
-    const store = {
-      getItem: (k) => (Object.prototype.hasOwnProperty.call(mem, k) ? mem[k] : null),
-      setItem: (k, v) => { mem[k] = String(v); },
-      removeItem: (k) => { delete mem[k]; },
-      clear: () => { for (const k of Object.keys(mem)) delete mem[k]; },
-      key: (i) => Object.keys(mem)[i] || null,
-      get length() { return Object.keys(mem).length; }
+    const store = function(){
+      const mem = {};
+      return {
+        getItem: function(k){ return Object.prototype.hasOwnProperty.call(mem, k) ? mem[k] : null; },
+        setItem: function(k, v){ mem[k] = String(v); },
+        removeItem: function(k){ delete mem[k]; },
+        clear: function(){ for (const x of Object.keys(mem)) delete mem[x]; },
+        key: function(i){ return Object.keys(mem)[i] || null; },
+        get length(){ return Object.keys(mem).length; }
+      };
     };
-    try { Object.defineProperty(window, "localStorage", { value: store }); } catch (err) {}
-    try { Object.defineProperty(window, "sessionStorage", { value: store }); } catch (err) {}
+    try { Object.defineProperty(window, "localStorage", { value: store() }); } catch (err) {}
+    try { Object.defineProperty(window, "sessionStorage", { value: store() }); } catch (err) {}
   }
 })();
 </script>`;
@@ -86,15 +90,34 @@ export function buildPreviewHtml(files: FileMap) {
     [...html.matchAll(/data-colo="([^"]+)"/g)].map((m) => m[1]),
   );
   const extraCss = Object.entries(files)
-    .filter(([k]) => k.endsWith(".css") && !linked.has(k) && !linked.has(k.split("/").pop() ?? ""))
+    .filter(([k]) => k.endsWith(".css") && !k.includes("node_modules/") && !linked.has(k) && !linked.has(k.split("/").pop() ?? ""))
     .map(([, v]) => rewriteViewportUnits(v))
     .join("\n");
 
-  const inject = `${BASE}${HOOK}${extraCss ? `<style>${escapeClose("style", extraCss)}</style>` : ""}${importMap(files)}`;
-  if (html.includes("</head>")) html = html.replace("</head>", `${inject}</head>`);
-  else html = inject + html;
+  const local = importMap(files).imports;
+  const prevMaps = collectImportMaps(html);
+  html = html.replace(/<script type=["']importmap["']>[\s\S]*?<\/script>/g, "");
+  const imports = { ...prevMaps, ...local };
+  const tag = Object.keys(imports).length
+    ? `<script type="importmap">${JSON.stringify({ imports })}</script>`
+    : "";
+  const inject = `${BASE}${HOOK}${extraCss ? `<style>${escapeClose("style", extraCss)}</style>` : ""}`;
+  if (html.includes("</head>")) html = html.replace("</head>", `${inject}${tag}</head>`);
+  else html = inject + tag + html;
 
   return html;
+}
+
+function collectImportMaps(html: string) {
+  const imports: Record<string, string> = {};
+  for (const m of html.matchAll(/<script type=["']importmap["']>([\s\S]*?)<\/script>/g)) {
+    try {
+      Object.assign(imports, (JSON.parse(m[1]!) as { imports?: Record<string, string> }).imports ?? {});
+    } catch {
+      /* ignore broken map */
+    }
+  }
+  return imports;
 }
 
 function resolveRel(from: string, spec: string) {
@@ -112,8 +135,7 @@ function resolveRel(from: string, spec: string) {
 }
 
 function importMap(files: FileMap) {
-  const js = Object.keys(files).filter((k) => /\.(m?js|jsx)$/.test(k));
-  if (!js.length) return "";
+  const js = Object.keys(files).filter((k) => /\.(m?js|jsx)$/.test(k) && !k.includes("node_modules/"));
   const imports: Record<string, string> = {};
   for (const p of js) {
     let code = files[p]!;
@@ -129,5 +151,5 @@ function importMap(files: FileMap) {
     imports[`/${p}`] = url;
     imports[p] = url;
   }
-  return `<script type="importmap">${JSON.stringify({ imports })}</script>`;
+  return { imports };
 }

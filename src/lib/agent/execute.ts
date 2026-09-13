@@ -1,7 +1,7 @@
 import { runShellAsync, isReadShell } from "@/lib/workspace/shell";
 import { useWorkspace } from "@/lib/workspace/store";
 import { useTerms } from "@/lib/workspace/terms";
-import { usePatches } from "./patches";
+import { usePatches, type AgentSlot } from "./patches";
 import type { AgentMode } from "./tools";
 
 function clip(s: string, max = 200_000) {
@@ -9,7 +9,12 @@ function clip(s: string, max = 200_000) {
   return s.slice(0, max) + "\n… truncado";
 }
 
-export async function executeTool(name: string, rawArgs: string, mode: AgentMode = "build"): Promise<string> {
+export async function executeTool(
+  name: string,
+  rawArgs: string,
+  mode: AgentMode = "build",
+  slot: AgentSlot = "a",
+): Promise<string> {
   let args: Record<string, unknown> = {};
   try {
     args = rawArgs ? (JSON.parse(rawArgs) as Record<string, unknown>) : {};
@@ -43,7 +48,7 @@ export async function executeTool(name: string, rawArgs: string, mode: AgentMode
         w.writeFile(path, after);
         return `escrito ${path}`;
       }
-      const patch = usePatches.getState().queue(path, before, after);
+      const patch = usePatches.getState().queue(path, before, after, slot);
       return `PATCH:${patch.id}`;
     }
     case "write_file": {
@@ -57,7 +62,7 @@ export async function executeTool(name: string, rawArgs: string, mode: AgentMode
         return `escrito ${path}`;
       }
       const before = w.readFile(path) ?? "";
-      const patch = usePatches.getState().queue(path, before, content);
+      const patch = usePatches.getState().queue(path, before, content, slot);
       return `PATCH:${patch.id}`;
     }
     case "list_dir": {

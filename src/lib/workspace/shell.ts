@@ -66,7 +66,7 @@ export async function runShellAsync(raw: string): Promise<string> {
           "ls  cat  pwd  cd  mkdir  touch  rm  echo",
           "git status | log | diff | add | restore | commit -m | pull | push | fetch | sync | clone",
           "git branch | checkout | stash | stash pop | blame",
-          "npm i [pkg] [-D]   npm run [script]   npm ls   npx vite   clear",
+          "npm i [pkg] [-D]   pnpm i   npm run [script]   npm ls   npx vite   clear",
         ].join("\n");
         break;
       case "clear":
@@ -247,23 +247,26 @@ export async function runShellAsync(raw: string): Promise<string> {
         }
         break;
       }
+      case "pnpm":
       case "npm": {
-        if (args[0] === "i" || args[0] === "install") {
-          out = await npmInstall(args.slice(1), (m) => w.termPrint("out", m));
-        } else if (args[0] === "ls") {
+        const sub = args[0];
+        const rest = args.slice(1);
+        if (sub === "i" || sub === "install" || sub === "add") {
+          out = await npmInstall(rest, (m) => w.termPrint("out", m));
+        } else if (sub === "ls") {
           const { parseLock } = await import("./npm-lock");
           const lock = parseLock(w.readFile("package-lock.colo.json"));
           const keys = Object.keys(lock);
           out = keys.length ? keys.map((k) => `${k}@${lock[k]}`).join("\n") : "(lock vazio — npm i)";
-        } else if (args[0] === "run" || args[0] === "start" || args[0] === "dev") {
-          const name = args[0] === "run" ? args[1] : args[0];
+        } else if (sub === "run" || sub === "start" || sub === "dev") {
+          const name = sub === "run" ? args[1] : sub;
           const r = npmRunScript(name);
           if (r.openPreview) {
             useChrome.getState().setCenter("preview");
             useChrome.getState().setMobile("preview");
           }
           out = r.out;
-        } else out = "npm — use: npm i [pkg]  |  npm run [script]  |  npm ls";
+        } else out = `${cmd} — use: ${cmd} i [pkg]  |  ${cmd} run [script]  |  ${cmd} ls`;
         break;
       }
       case "npx":

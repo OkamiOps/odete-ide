@@ -260,7 +260,7 @@ export async function runAgentLoop(
         }
         upsert({ id: call.id, kind: "permit", name, detail: hint, status: "ok" });
       }
-      const detail = await executeTool(name, call.function.arguments, mode);
+      const detail = await executeTool(name, call.function.arguments, mode, slot === "b" ? "b" : "a");
       if (detail.startsWith("PATCH:")) {
         const patchId = detail.slice(6);
         const patch = usePatches.getState().items.find((p) => p.id === patchId);

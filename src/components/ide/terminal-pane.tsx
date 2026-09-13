@@ -30,6 +30,7 @@ const CMDS = [
   "git stash pop",
   "git blame",
   "npm i",
+  "pnpm i",
   "npx vite",
 ];
 

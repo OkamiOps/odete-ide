@@ -6,6 +6,8 @@ import { uid } from "@/lib/utils";
 import { hunksOf, keepOnlyHunk } from "@/lib/workspace/hunks";
 import { idbKv } from "@/lib/workspace/idb";
 
+export type AgentSlot = "a" | "b";
+
 export type Patch = {
   id: string;
   path: string;
@@ -13,17 +15,18 @@ export type Patch = {
   after: string;
   orig: string;
   status: "pending" | "accepted" | "rejected" | "undone";
+  slot: AgentSlot;
 };
 
 type PatchState = {
   items: Patch[];
-  queue: (path: string, before: string, after: string) => Patch;
+  queue: (path: string, before: string, after: string, slot?: AgentSlot) => Patch;
   accept: (id: string) => void;
   reject: (id: string) => void;
   acceptHunk: (id: string, index: number) => void;
   undo: (id: string) => void;
-  acceptAll: () => void;
-  rejectAll: () => void;
+  acceptAll: (slot?: AgentSlot) => void;
+  rejectAll: (slot?: AgentSlot) => void;
   get: (id: string) => Patch | undefined;
 };
 
@@ -31,13 +34,22 @@ function clipOk(p: Patch) {
   return p.before.length + p.after.length < 80_000;
 }
 
+function asSlot(s?: string): AgentSlot {
+  return s === "b" ? "b" : "a";
+}
+
 export const usePatches = create<PatchState>()(
   persist(
     (set, get) => ({
       items: [],
-      queue: (path, before, after) => {
-        const patch: Patch = { id: uid(), path, before, after, orig: before, status: "pending" };
-        set((s) => ({ items: [...s.items.filter((p) => p.status === "pending"), patch].slice(-20) }));
+      queue: (path, before, after, slot = "a") => {
+        const patch: Patch = { id: uid(), path, before, after, orig: before, status: "pending", slot };
+        set((s) => {
+          const pending = s.items.filter((p) => p.status === "pending");
+          const mine = pending.filter((p) => asSlot(p.slot) === slot);
+          const others = pending.filter((p) => asSlot(p.slot) !== slot);
+          return { items: [...others, ...mine, patch].slice(-24) };
+        });
         return patch;
       },
       accept: (id) => {
@@ -84,12 +96,17 @@ export const usePatches = create<PatchState>()(
           items: s.items.map((p) => (p.id === id ? { ...p, status: "rejected" } : p)),
         }));
       },
-      acceptAll: () => {
-        for (const p of get().items.filter((x) => x.status === "pending")) get().accept(p.id);
+      acceptAll: (slot) => {
+        const pending = get().items.filter(
+          (x) => x.status === "pending" && (!slot || asSlot(x.slot) === slot),
+        );
+        for (const p of pending) get().accept(p.id);
       },
-      rejectAll: () => {
+      rejectAll: (slot) => {
         set((s) => ({
-          items: s.items.map((p) => (p.status === "pending" ? { ...p, status: "rejected" } : p)),
+          items: s.items.map((p) =>
+            p.status === "pending" && (!slot || asSlot(p.slot) === slot) ? { ...p, status: "rejected" } : p,
+          ),
         }));
       },
       get: (id) => get().items.find((p) => p.id === id),
@@ -98,7 +115,7 @@ export const usePatches = create<PatchState>()(
       name: "colo-patches-v1",
       storage: createJSONStorage(() => idbKv),
       partialize: (s) => ({
-        items: s.items.filter((p) => p.status === "pending" && clipOk(p)).slice(-12),
+        items: s.items.filter((p) => p.status === "pending" && clipOk(p)).slice(-16),
       }),
     },
   ),

@@ -61,7 +61,7 @@ export function lockOfFiles(files: Record<string, string>) {
 export function esmImports(lock: Record<string, string>) {
   const imports: Record<string, string> = {};
   for (const [name, ver] of Object.entries(lock)) {
-    if (!ver || isToolPkg(name)) continue;
+    if (!ver || isToolPkg(name) || /^(workspace|file|link|catalog):/.test(ver)) continue;
     imports[name] = `https://esm.sh/${name}@${ver}`;
     imports[`${name}/`] = `https://esm.sh/${name}@${ver}/`;
   }

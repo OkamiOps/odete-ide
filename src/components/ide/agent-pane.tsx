@@ -98,7 +98,8 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
   const [ctxOpen, setCtxOpen] = useState(false);
   const [listening, setListening] = useState(false);
   const [voiceErr, setVoiceErr] = useState("");
-  const ckItems = useCheckpoints((s) => s.items);
+  const ckAll = useCheckpoints((s) => s.items);
+  const ckItems = ckAll.filter((x) => (x.slot ?? "a") === slot);
 
   function startVoice() {
     const w = window as unknown as {
@@ -303,7 +304,7 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
       : prompt;
     if ((!body && !pics.length) || busy || !connected) return;
     const my = ++gen.current;
-    useCheckpoints.getState().take(prompt.slice(0, 40) || "turno");
+    useCheckpoints.getState().take(prompt.slice(0, 40) || "turno", slot);
     armNotify();
     useNav.getState().setQuote("");
     setDraft("");
@@ -399,7 +400,8 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
     if (u >= 0) history.current = h.slice(0, u);
     return user.kind === "user" ? user.text : "";
   }
-  const pendingCount = usePatches((s) => s.items.filter((p) => p.status === "pending").length);
+  const patchItems = usePatches((s) => s.items);
+  const pendingCount = patchItems.filter((p) => p.status === "pending" && (p.slot ?? "a") === slot).length;
   const quote = useNav((s) => s.quote);
 
   const model = useChrome((s) => currentAgentModel({ ...s, agentId }, slot));
@@ -437,8 +439,8 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
               aria-label="desfazer turno"
               title="Checkpoints"
               onClick={() => {
-                if (useCheckpoints.getState().items.length > 1) setCkOpen((v) => !v);
-                else useCheckpoints.getState().undo();
+                if (ckItems.length > 1) setCkOpen((v) => !v);
+                else useCheckpoints.getState().undo(slot);
               }}
             >
               <Undo2 size={16} />
@@ -549,7 +551,7 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
           <div className="agent-empty">
             <p className="agent-empty-kicker">{def.vendor}</p>
             <h3>{def.label} pronto</h3>
-            <p>npm i no lock + esm.sh. npm run dev abre o Preview com JSX/TS. Next/Nest precisam de Node.</p>
+            <p>npm i / pnpm i (workspace e catalog). Preview com HMR e fetch('/api') pra JSON em public/. Next/Nest server precisam de Node — iPad não tem.</p>
             <div className="agent-starts">
               {STARTERS.map((s) => (
                 <button key={s.label} type="button" onClick={() => void send(s.prompt)}>
@@ -585,10 +587,10 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
 
         {!histOpen && pendingCount > 1 ? (
           <div className="patch-bar">
-            <button type="button" onClick={() => usePatches.getState().acceptAll()}>
+            <button type="button" onClick={() => usePatches.getState().acceptAll(slot)}>
               Aceitar todos ({pendingCount})
             </button>
-            <button type="button" onClick={() => usePatches.getState().rejectAll()}>
+            <button type="button" onClick={() => usePatches.getState().rejectAll(slot)}>
               Rejeitar
             </button>
           </div>

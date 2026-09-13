@@ -90,7 +90,7 @@ export const AGENT_TOOLS = [
     function: {
       name: "run_shell",
       description:
-        "Terminal do workspace. ls, cat, mkdir, git, npm i, npm run dev (Preview JSX/TS). Chat só lê. Next/Nest/Astro SSR não sobem no iPad.",
+        "Terminal do workspace. ls, cat, mkdir, git, npm i / pnpm i (workspace e catalog), npm run dev (Preview JSX/TS com HMR). Chat só lê. Next/Nest/Astro SSR não sobem no iPad (sem Node).",
       parameters: {
         type: "object",
         properties: { command: { type: "string" } },

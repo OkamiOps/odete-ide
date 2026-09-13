@@ -1,6 +1,7 @@
 import { useWorkspace } from "./store";
 import { pauseSync, resumeSync } from "./folder";
 import { isToolPkg, parseLock } from "./npm-lock";
+import { pnpmContext, resolveDepSpec } from "./pnpm";
 
 export type NpmInfo = {
   name: string;
@@ -67,12 +68,12 @@ export function detectStack(pkg: {
 
 export function stackHint(stack: Stack) {
   if (stack.kind === "spa") {
-    return `${stack.label}: npm run dev abre o Preview (JSX/TS no Colo, pacotes via esm.sh). Sem binário Node.`;
+    return `${stack.label}: npm run dev abre o Preview (JSX/TS no Colo, HMR CSS/JS, pacotes via esm.sh). Sem binário Node.`;
   }
   if (stack.id === "nest") {
-    return `Nest é API Node — não sobe neste iPad. npm i grava o lock; o Preview não emula o servidor.`;
+    return `Nest é API Node — não sobe neste iPad (nem no TestFlight). npm i grava o lock; o Preview não emula o servidor.`;
   }
-  return `${stack.label} precisa de Node/SSR. Colo instala o lock e tenta o client se houver index.html. O servidor (${stack.label} dev) não roda aqui.`;
+  return `${stack.label} precisa de Node/SSR. Colo instala o lock e tenta o client se houver index.html. fetch('/api') serve JSON em public/api. O servidor (${stack.label} dev) não roda aqui — iPad não tem Node.`;
 }
 
 async function lookup(name: string, want?: string): Promise<NpmInfo> {
@@ -107,20 +108,21 @@ export async function npmInstall(args: string[], onNote?: (s: string) => void): 
     const saveDev = flags.includes("-D") || flags.includes("--save-dev");
     const production = flags.includes("--production") || flags.includes("--omit=dev");
     const unknown = flags.filter(
-      (a) => !["-D", "--save-dev", "--production", "--omit=dev", "-P", "--save"].includes(a),
+      (a) => !["-D", "--save-dev", "--production", "--omit=dev", "-P", "--save", "--offline", "--frozen-lockfile"].includes(a),
     );
     const requested = args.filter((a) => a && !a.startsWith("-")).map(specName);
+    const ctx = pnpmContext(w.files);
     const fromFile = [
       ...Object.entries(pkg.dependencies ?? {}).map(([name, ver]) => ({
         name,
-        ver: ver.replace(/^[\^~>=<]+/, ""),
+        ver,
         kind: "runtime" as const,
       })),
       ...(production
         ? []
         : Object.entries(pkg.devDependencies ?? {}).map(([name, ver]) => ({
             name,
-            ver: ver.replace(/^[\^~>=<]+/, ""),
+            ver,
             kind: "tool" as const,
           }))),
     ];
@@ -138,6 +140,15 @@ export async function npmInstall(args: string[], onNote?: (s: string) => void): 
           recurse: n.kind === "runtime" && !isToolPkg(n.name),
           top: true,
         }));
+    if (!requested.length) {
+      for (const wp of ctx.packages) {
+        if (!wp.dir) continue;
+        seed.push({ name: wp.name, want: `workspace:${wp.version}`, recurse: true, top: false });
+        for (const [dep, range] of Object.entries(wp.dependencies)) {
+          seed.push({ name: dep, want: range, recurse: !isToolPkg(dep), top: false });
+        }
+      }
+    }
     if (!seed.length) return "package.json sem dependências. use: npm i react";
 
     const prev = parseLock(w.readFile("package-lock.colo.json"));
@@ -155,10 +166,30 @@ export async function npmInstall(args: string[], onNote?: (s: string) => void): 
 
     async function process(job: Job) {
       if (Object.keys(lock).length >= MAX_PACKAGES) return;
+      const resolved = resolveDepSpec(job.name, job.want || "*", ctx);
+      if (resolved.kind === "workspace-missing") {
+        failed.push(`${job.name}: workspace sem pacote local`);
+        return;
+      }
+      if (resolved.kind === "workspace") {
+        lock[job.name] = `workspace:${resolved.want}`;
+        lines.push(`ws ${job.name}@${resolved.want}`);
+        if (!job.recurse) return;
+        const deps = { ...resolved.local.dependencies, ...resolved.local.peerDependencies };
+        for (const [dep, range] of Object.entries(deps)) {
+          enqueue({ name: dep, want: range, recurse: !isToolPkg(dep), top: false });
+        }
+        return;
+      }
+      if (resolved.kind === "file") {
+        lock[job.name] = resolved.want;
+        lines.push(`file ${job.name} ${resolved.want}`);
+        return;
+      }
       onNote?.(`resolvendo ${job.name}…`);
       let info: NpmInfo;
       try {
-        info = await lookup(job.name, job.want);
+        info = await lookup(job.name, resolved.want === "*" ? undefined : resolved.want);
       } catch (e) {
         failed.push(`${job.name}: ${e instanceof Error ? e.message : "falhou"}`);
         return;
@@ -210,7 +241,9 @@ export async function npmInstall(args: string[], onNote?: (s: string) => void): 
     const extra = unknown.length ? `\nflag ignorada: ${unknown.join(" ")}` : "";
     const miss = failed.length ? `\nfalhou:\n${failed.slice(0, 12).join("\n")}` : "";
     const cap = Object.keys(lock).length >= MAX_PACKAGES ? `\nparou em ${MAX_PACKAGES} pacotes` : "";
-    return `added ${lines.length} · lock ${Object.keys(lock).length}  (${stack.label})\n${lines.slice(0, 40).join("\n")}${lines.length > 40 ? `\n… +${lines.length - 40}` : ""}\n${stackHint(stack)}\nnode_modules não entra no editor (quota). Preview usa esm.sh + JSX/TS do Colo.${extra}${miss}${cap}`;
+    const wsN = ctx.packages.filter((p) => p.dir).length;
+    const wsLine = wsN ? `\nworkspace ${wsN} pacote${wsN > 1 ? "s" : ""} · catalog ${Object.keys(ctx.catalog).length}` : "";
+    return `added ${lines.length} · lock ${Object.keys(lock).length}  (${stack.label})${wsLine}\n${lines.slice(0, 40).join("\n")}${lines.length > 40 ? `\n… +${lines.length - 40}` : ""}\n${stackHint(stack)}\nnode_modules não entra no editor (quota). Preview usa esm.sh + JSX/TS do Colo.${extra}${miss}${cap}`;
   } finally {
     resumeSync(useWorkspace.getState().files, useWorkspace.getState().projectId);
   }

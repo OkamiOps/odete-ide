@@ -19,7 +19,8 @@ import { TerminalPane } from "@/components/ide/terminal-pane";
 import { applyTheme } from "@/components/ide/settings-pane";
 import { Splitter, clamp } from "@/components/ide/splitter";
 import { useChrome, type MobileTab } from "@/lib/workspace/chrome";
-import { setSheet } from "@/lib/workspace/projects";
+import { freeWorkspaceQuota, restoreAuth } from "@/lib/workspace/secrets";
+import { setSheet, useProjects } from "@/lib/workspace/projects";
 import { formatFile } from "@/lib/workspace/plugins";
 import { useWorkspace } from "@/lib/workspace/store";
 
@@ -64,6 +65,20 @@ export function IdeApp() {
   useEffect(() => {
     applyTheme(theme, synCustom);
   }, [theme, synCustom]);
+
+  useEffect(() => {
+    freeWorkspaceQuota();
+    function wait(api: { persist: { hasHydrated: () => boolean; onFinishHydration: (cb: () => void) => () => void } }) {
+      return new Promise<void>((res) => {
+        if (api.persist.hasHydrated()) return res();
+        const un = api.persist.onFinishHydration(() => {
+          un();
+          res();
+        });
+      });
+    }
+    void Promise.all([wait(useChrome), wait(useProjects)]).then(() => restoreAuth());
+  }, []);
 
   useEffect(() => {
     setSheet(false);

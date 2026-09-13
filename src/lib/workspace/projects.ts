@@ -1,5 +1,7 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
+import { idbKv } from "./idb";
+import { persistAuth } from "./secrets";
 import type { FileMap } from "./types";
 import { githubUser, type GithubUser } from "@/lib/github/api";
 
@@ -103,35 +105,17 @@ export const useProjects = create<ProjectsState>()(
       connect: async (token) => {
         const user = await githubUser(token.trim());
         set({ github: { token: token.trim(), user } });
+        void persistAuth();
       },
-      disconnect: () => set({ github: null }),
+      disconnect: () => {
+        set({ github: null });
+        void persistAuth();
+      },
     }),
     {
       name: "colo-projects-v2",
       partialize: (s) => ({ recents: s.recents, library: s.library, github: s.github }),
-      storage: createJSONStorage(() => ({
-        getItem: (name) => {
-          try {
-            return localStorage.getItem(name);
-          } catch {
-            return null;
-          }
-        },
-        setItem: (name, value) => {
-          try {
-            localStorage.setItem(name, value);
-          } catch {
-            /* quota */
-          }
-        },
-        removeItem: (name) => {
-          try {
-            localStorage.removeItem(name);
-          } catch {
-            /* */
-          }
-        },
-      })),
+      storage: createJSONStorage(() => idbKv),
     },
   ),
 );

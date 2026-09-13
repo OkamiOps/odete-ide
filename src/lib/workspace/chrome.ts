@@ -1,5 +1,7 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
+import { idbKv } from "./idb";
+import { persistAuth } from "./secrets";
 import { type AgentId, agentById } from "@/lib/agent/providers";
 import type { EffortId } from "@/lib/agent/effort";
 import type { TokenBundle } from "@/lib/agent/oauth";
@@ -290,8 +292,14 @@ export const useChrome = create<ChromeState>()(
       setGrokModel: (grokModel) => set({ grokModel }),
       setClaudeModel: (claudeModel) => set({ claudeModel }),
       setCodexModel: (codexModel) => set({ codexModel }),
-      setClaudeAuth: (claudeAuth) => set({ claudeAuth }),
-      setOpenaiAuth: (openaiAuth) => set({ openaiAuth }),
+      setClaudeAuth: (claudeAuth) => {
+        set({ claudeAuth });
+        void persistAuth();
+      },
+      setOpenaiAuth: (openaiAuth) => {
+        set({ openaiAuth });
+        void persistAuth();
+      },
       setTheme: (theme) => set({ theme }),
       setSynColor: (key, color) =>
         set((s) => ({ synCustom: { ...s.synCustom, [key]: color } })),
@@ -327,7 +335,7 @@ export const useChrome = create<ChromeState>()(
     }),
     {
       name: "colo-chrome-v3",
-      storage: createJSONStorage(safeStorage),
+      storage: createJSONStorage(() => idbKv),
       partialize: (s) => ({
         side: s.side,
         center: s.center,

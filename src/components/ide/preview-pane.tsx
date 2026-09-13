@@ -181,7 +181,7 @@ export function PreviewPane() {
             : md
               ? openPath
               : swift
-                ? openPath
+                ? "Playground SwiftUI"
                 : hmrKind === "hmr"
                   ? "HMR"
                   : "index.html"}

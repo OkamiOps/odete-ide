@@ -13,7 +13,7 @@ export type GithubRepo = {
   stars: number;
   issues: number;
 };
-export type CloneCommit = { sha: string; message: string; at: number };
+export type CloneCommit = { sha: string; message: string; at: number; files?: Record<string, string> };
 export type CloneResult = {
   name: string;
   branch: string;
@@ -276,11 +276,13 @@ export async function githubClone(
   const zipped = await cloneViaZip(owner, slug, branch, token, onProgress);
   const log = await githubCommitLog(owner, slug, branch, token);
   if (zipped && Object.keys(zipped).length) {
-    onProgress?.(`${Object.keys(zipped).length} arquivos · ${log.length || 1} commits`);
-    return { name: info.name, branch, remote: info.full_name, files: zipped, commits: log };
+    const commits = await attachCommitTrees(owner, slug, token, zipped, log, onProgress);
+    onProgress?.(`${Object.keys(zipped).length} arquivos · ${commits.length || 1} commits`);
+    return { name: info.name, branch, remote: info.full_name, files: zipped, commits };
   }
   const tree = await cloneViaTree(owner, slug, branch, info, token, onProgress);
-  return { ...tree, commits: log.length ? log : tree.commits };
+  const commits = await attachCommitTrees(owner, slug, token, tree.files, log, onProgress);
+  return { ...tree, commits: commits.length ? commits : log };
 }
 
 async function cloneViaZip(
@@ -434,6 +436,42 @@ export async function githubCommitLog(
   } catch {
     return [];
   }
+}
+
+async function attachCommitTrees(
+  owner: string,
+  repo: string,
+  token: string | undefined,
+  head: Record<string, string>,
+  log: CloneCommit[],
+  onProgress?: (msg: string) => void,
+): Promise<CloneCommit[]> {
+  if (!log.length) return [{ sha: "HEAD", message: "clone", at: Date.now(), files: head }];
+  const { reverseApply } = await import("./patch");
+  const cap = token ? Math.min(log.length, 12) : Math.min(log.length, 4);
+  const slice = log.slice(-cap);
+  let tree = { ...head };
+  const out: CloneCommit[] = [];
+  for (let i = slice.length - 1; i >= 0; i--) {
+    const c = slice[i]!;
+    out.unshift({ ...c, files: { ...tree } });
+    if (i === 0) break;
+    try {
+      onProgress?.(`árvore ${c.sha.slice(0, 7)}…`);
+      const detail = await gh<{ files?: { filename: string; status: string; patch?: string; previous_filename?: string; truncated?: boolean }[] }>(
+        `https://api.github.com/repos/${owner}/${repo}/commits/${c.sha}`,
+        token,
+      );
+      tree = reverseApply(tree, detail.files ?? []);
+    } catch {
+      /* fica o snapshot atual nesse commit */
+    }
+  }
+  if (log.length > slice.length) {
+    const older = log.slice(0, log.length - slice.length).map((c) => ({ ...c, files: undefined }));
+    return [...older, ...out];
+  }
+  return out;
 }
 
 export async function githubTreeAtSha(

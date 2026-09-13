@@ -102,7 +102,7 @@ export async function executeTool(
           return "plan só cria coisas em .colo/";
         }
       }
-      return clip(await runShellAsync(command));
+      return clip(await runShellAsync(command, slot));
     }
     default:
       return `tool desconhecida: ${name}`;

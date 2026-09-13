@@ -35,6 +35,8 @@ let mountedFor = HOST.__coloWcMount?.projectId ?? "";
 let lastFiles: FileMap = HOST.__coloWcMount?.lastFiles ?? {};
 let running: WebContainerProcess | null = null;
 let jobs = new Set<WebContainerProcess>();
+let jobOwner = new WeakMap<WebContainerProcess, string>();
+let jobSlot = "";
 let pulling = false;
 let unsubWs: (() => void) | null = null;
 let unsubReady: (() => void) | null = null;
@@ -114,8 +116,17 @@ function cleanChunk(chunk: string) {
 
 function watchJob(proc: WebContainerProcess) {
   jobs.add(proc);
+  if (jobSlot) jobOwner.set(proc, jobSlot);
   void proc.exit.then(() => jobs.delete(proc));
   return proc;
+}
+
+export function setNodeJobSlot(slot: string) {
+  jobSlot = slot;
+}
+
+export function clearNodeJobSlot() {
+  jobSlot = "";
 }
 
 async function stream(proc: WebContainerProcess, onLog: (s: string) => void) {
@@ -161,18 +172,33 @@ async function hydrateFromDisk(projectId: string, files: FileMap): Promise<FileM
   }
 }
 
+async function pullChanged(wcInst: WebContainer, dir = "", depth = 0, budget = { n: 0 }) {
+  if (depth > 8 || budget.n > 400) return;
+  const w = useWorkspace.getState();
+  let names: string[] = [];
+  try {
+    names = await wcInst.fs.readdir(dir || ".");
+  } catch {
+    return;
+  }
+  for (const name of names) {
+    if (name === "node_modules" || name === ".git" || name === "dist" || name === ".next" || name === "coverage") continue;
+    const path = dir ? `${dir}/${name}` : name;
+    if (isNoisePath(path)) continue;
+    try {
+      const txt = await wcInst.fs.readFile(path, "utf-8");
+      if (txt && txt !== w.files[path]) w.writeFile(path, txt);
+      budget.n += 1;
+    } catch {
+      await pullChanged(wcInst, path, depth + 1, budget);
+    }
+  }
+}
+
 async function pullManifest(wcInst: WebContainer) {
   pulling = true;
   try {
-    const w = useWorkspace.getState();
-    for (const f of ["package.json", "package-lock.json", "pnpm-lock.yaml", "yarn.lock"]) {
-      try {
-        const txt = await wcInst.fs.readFile(f, "utf-8");
-        if (txt && txt !== w.files[f]) w.writeFile(f, txt);
-      } catch {
-        /* missing */
-      }
-    }
+    await pullChanged(wcInst);
     try {
       const { saveProject } = await import("./disk");
       const snap = useWorkspace.getState();
@@ -420,17 +446,20 @@ export async function nodeExecFile(file: string, argv: string[], onLog: (s: stri
   return nodeSpawn("node", [file, ...argv], onLog);
 }
 
-export function abortNodeJobs() {
+export function abortNodeJobs(slot?: string) {
   for (const p of [...jobs]) {
+    if (slot && jobOwner.get(p) !== slot) continue;
     try {
       p.kill();
     } catch {
       /* */
     }
+    jobs.delete(p);
   }
-  jobs.clear();
-  running = null;
-  useNodeRuntime.setState({ previewUrl: "", status: wc ? "ready" : "off" });
+  if (running && (!slot || jobOwner.get(running) === slot)) {
+    running = null;
+    useNodeRuntime.setState({ previewUrl: "", status: wc ? "ready" : "off" });
+  }
 }
 
 export function stopNodeDev() {

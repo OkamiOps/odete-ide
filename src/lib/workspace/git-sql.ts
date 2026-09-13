@@ -46,10 +46,9 @@ export async function saveGit(projectId: string, commits: Commit[], origin: Comm
   }
   await sqlQuery("DELETE FROM git_commits WHERE project_id = ?", [projectId]);
   for (const c of slim) {
-    const keepFiles = slim.indexOf(c) >= slim.length - 4;
     await sqlQuery(
       "INSERT INTO git_commits(project_id, id, sha, message, at, files) VALUES(?, ?, ?, ?, ?, ?)",
-      [projectId, c.id, c.sha ?? "", c.message, c.at, keepFiles ? JSON.stringify(c.files) : "{}"],
+      [projectId, c.id, c.sha ?? "", c.message, c.at, JSON.stringify(c.files)],
     );
   }
   await kvSet(`git-origin:${projectId}`, originSlim ? JSON.stringify(originSlim) : "");

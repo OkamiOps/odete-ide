@@ -73,8 +73,8 @@ export async function initSql(): Promise<SqlBackend> {
     } catch (e) {
       useSql.setState({
         backend: "memory",
-        ok: false,
-        lastError: e instanceof Error ? e.message : "sql falhou",
+        ok: true,
+        lastError: e instanceof Error ? e.message : "sql wasm falhou — usando índice local",
       });
       return "memory" as const;
     }

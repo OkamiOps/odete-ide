@@ -13,7 +13,7 @@ export function abortFetch(slot: string) {
 
 export function fireAbort(slot: string) {
   abortFetch(slot);
-  void import("@/lib/workspace/node-runtime").then((m) => m.abortNodeJobs());
+  void import("@/lib/workspace/node-runtime").then((m) => m.abortNodeJobs(slot));
 }
 
 export function isAborted(slot: string) {

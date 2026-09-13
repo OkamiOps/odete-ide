@@ -134,7 +134,7 @@ export type WorkspaceState = {
     branch?: string;
     message?: string;
     pushed?: boolean;
-    history?: { sha: string; message: string; at: number }[];
+    history?: { sha: string; message: string; at: number; files?: FileMap }[];
   }) => void;
   newProject: (name: string) => void;
   closeProject: () => void;
@@ -840,7 +840,12 @@ export const useWorkspace = create<WorkspaceState>()(
               sha: h.sha,
               message: h.message,
               at: h.at,
-              files: i === arr.length - 1 ? cloneFiles(files) : {},
+              files:
+                h.files && Object.keys(h.files).length
+                  ? cloneFiles(h.files)
+                  : i === arr.length - 1
+                    ? cloneFiles(files)
+                    : {},
             }))
           : null;
         const commit: Commit = history?.at(-1) ?? {

@@ -46,7 +46,20 @@ export function runShell(raw: string): string {
   return "";
 }
 
-export async function runShellAsync(raw: string): Promise<string> {
+export async function runShellAsync(raw: string, slot?: string): Promise<string> {
+  if (slot) {
+    const { setNodeJobSlot, clearNodeJobSlot } = await import("./node-runtime");
+    setNodeJobSlot(slot);
+    try {
+      return await runShellInner(raw);
+    } finally {
+      clearNodeJobSlot();
+    }
+  }
+  return runShellInner(raw);
+}
+
+async function runShellInner(raw: string): Promise<string> {
   const line = raw.trim();
   if (!line) return "";
   const w = useWorkspace.getState();

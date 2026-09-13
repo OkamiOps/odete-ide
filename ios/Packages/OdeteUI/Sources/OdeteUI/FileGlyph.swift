@@ -25,7 +25,9 @@ public struct FileGlyph: View {
     }
 
     var glyph: (symbol: String, color: Color?) {
-        if isDirectory { return (expanded ? "folder.fill" : "folder", theme.fgMuted) }
+        if isDirectory {
+            return (expanded ? "folder.fill" : "folder", theme.fgMuted)
+        }
         let name = path.split(separator: "/").last.map(String.init) ?? path
         switch name.lowercased() {
         case "package.json": return ("shippingbox", Color(hex: "#cb3837"))

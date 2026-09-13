@@ -16,7 +16,9 @@ final class KeyboardBar: UIInputView {
     }
 
     @available(*, unavailable)
-    required init?(coder: NSCoder) { nil }
+    required init?(coder: NSCoder) {
+        nil
+    }
 
     private func build() {
         let scroll = UIScrollView()
@@ -60,9 +62,15 @@ final class KeyboardBar: UIInputView {
             cfg.cornerStyle = .medium
             cfg.contentInsets = NSDirectionalEdgeInsets(top: 4, leading: 10, bottom: 4, trailing: 10)
             if let symbol {
-                cfg.image = UIImage(systemName: symbol, withConfiguration: UIImage.SymbolConfiguration(pointSize: 14, weight: .medium))
+                cfg.image = UIImage(
+                    systemName: symbol,
+                    withConfiguration: UIImage.SymbolConfiguration(pointSize: 14, weight: .medium)
+                )
             } else {
-                cfg.attributedTitle = AttributedString(title, attributes: AttributeContainer().font(.monospacedSystemFont(ofSize: 14, weight: .medium)))
+                cfg.attributedTitle = AttributedString(
+                    title,
+                    attributes: AttributeContainer().font(.monospacedSystemFont(ofSize: 14, weight: .medium))
+                )
             }
             let b = UIButton(configuration: cfg, primaryAction: UIAction { _ in action() })
             b.widthAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true

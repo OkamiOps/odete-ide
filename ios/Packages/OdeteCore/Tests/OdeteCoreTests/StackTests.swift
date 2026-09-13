@@ -1,8 +1,8 @@
 import Foundation
-import Testing
 @testable import OdeteCore
+import Testing
 
-@Suite struct StackTests {
+struct StackTests {
     private func pkg(_ deps: [String: String]) -> Data {
         try! JSONSerialization.data(withJSONObject: ["dependencies": deps])
     }

@@ -5,7 +5,9 @@ import OdeteCore
 public struct FileOps: Sendable {
     public let root: URL
 
-    public init(root: URL) { self.root = root }
+    public init(root: URL) {
+        self.root = root
+    }
 
     public func url(_ rel: String) throws -> URL {
         guard rel.isEmpty || PathRules.validRelativePath(rel) else { throw FileError.outsideRoot(rel) }
@@ -31,13 +33,17 @@ public struct FileOps: Sendable {
     }
 
     public func createFile(_ rel: String, contents: String = "") throws {
-        if exists(rel) { throw FileError.alreadyExists(rel) }
+        if exists(rel) {
+            throw FileError.alreadyExists(rel)
+        }
         try write(rel, contents)
     }
 
     public func createDirectory(_ rel: String) throws {
-        if exists(rel) { throw FileError.alreadyExists(rel) }
-        try FileManager.default.createDirectory(at: try url(rel), withIntermediateDirectories: true)
+        if exists(rel) {
+            throw FileError.alreadyExists(rel)
+        }
+        try FileManager.default.createDirectory(at: url(rel), withIntermediateDirectories: true)
     }
 
     /// Renomeia o último componente, mantendo a pasta.
@@ -51,16 +57,20 @@ public struct FileOps: Sendable {
 
     public func move(_ rel: String, to dest: String) throws {
         guard exists(rel) else { throw FileError.notFound(rel) }
-        if exists(dest) { throw FileError.alreadyExists(dest) }
-        if dest.hasPrefix(rel + "/") { throw FileError.outsideRoot(dest) }
+        if exists(dest) {
+            throw FileError.alreadyExists(dest)
+        }
+        if dest.hasPrefix(rel + "/") {
+            throw FileError.outsideRoot(dest)
+        }
         let to = try url(dest)
         try FileManager.default.createDirectory(at: to.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try FileManager.default.moveItem(at: try url(rel), to: to)
+        try FileManager.default.moveItem(at: url(rel), to: to)
     }
 
     public func delete(_ rel: String) throws {
         guard exists(rel) else { throw FileError.notFound(rel) }
-        try FileManager.default.removeItem(at: try url(rel))
+        try FileManager.default.removeItem(at: url(rel))
     }
 
     public func isDirectory(_ rel: String) -> Bool {
@@ -75,7 +85,9 @@ public struct FileOps: Sendable {
         while true {
             let name = n == 1 ? "\(base).\(ext)" : "\(base)-\(n).\(ext)"
             let rel = dir.isEmpty ? name : "\(dir)/\(name)"
-            if !exists(rel) { return rel }
+            if !exists(rel) {
+                return rel
+            }
             n += 1
         }
     }

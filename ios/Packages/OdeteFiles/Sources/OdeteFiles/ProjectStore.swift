@@ -25,10 +25,14 @@ public struct ProjectStore: Sendable {
     public func list() throws -> [Project] {
         let fm = FileManager.default
         try fm.createDirectory(at: root, withIntermediateDirectories: true)
-        let items = try fm.contentsOfDirectory(at: root, includingPropertiesForKeys: [.isDirectoryKey], options: [.skipsHiddenFiles])
+        let items = try fm.contentsOfDirectory(
+            at: root,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        )
         var out: [Project] = []
         for dir in items where (try? dir.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {
-            out.append(try readOrCreateMeta(dir))
+            try out.append(readOrCreateMeta(dir))
         }
         return out.sorted { ($0.lastOpenedAt ?? $0.createdAt) > ($1.lastOpenedAt ?? $1.createdAt) }
     }
@@ -58,11 +62,16 @@ public struct ProjectStore: Sendable {
     public func create(name: String, template: Template = .blank) throws -> Project {
         guard PathRules.validName(name) else { throw FileError.invalidName(name) }
         let dir = root.appending(path: name, directoryHint: .isDirectory)
-        if FileManager.default.fileExists(atPath: dir.path) { throw FileError.alreadyExists(name) }
+        if FileManager.default.fileExists(atPath: dir.path) {
+            throw FileError.alreadyExists(name)
+        }
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         for (path, contents) in template.files(projectName: name) {
             let f = dir.appending(path: path)
-            try FileManager.default.createDirectory(at: f.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try FileManager.default.createDirectory(
+                at: f.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
             try contents.write(to: f, atomically: true, encoding: .utf8)
         }
         let p = Project(name: name)
@@ -74,7 +83,9 @@ public struct ProjectStore: Sendable {
         guard PathRules.validName(newName) else { throw FileError.invalidName(newName) }
         let from = url(for: project)
         let to = root.appending(path: newName, directoryHint: .isDirectory)
-        if FileManager.default.fileExists(atPath: to.path) { throw FileError.alreadyExists(newName) }
+        if FileManager.default.fileExists(atPath: to.path) {
+            throw FileError.alreadyExists(newName)
+        }
         try FileManager.default.moveItem(at: from, to: to)
         var p = project
         p.name = newName

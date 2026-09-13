@@ -38,7 +38,9 @@ public final class StateStore: Sendable {
         let wait = debounce
         let task = Task { [self] in
             try? await Task.sleep(for: wait)
-            if Task.isCancelled { return }
+            if Task.isCancelled {
+                return
+            }
             try? saveNow(snapshot)
         }
         pending.withLock { old in

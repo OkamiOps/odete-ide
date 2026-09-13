@@ -7,7 +7,9 @@ public struct ModePicker: View {
     @Binding var mode: CenterMode
     @Namespace private var ns
 
-    public init(mode: Binding<CenterMode>) { _mode = mode }
+    public init(mode: Binding<CenterMode>) {
+        _mode = mode
+    }
 
     public var body: some View {
         HStack(spacing: 2) {
@@ -18,6 +20,8 @@ public struct ModePicker: View {
                     Text(m.label)
                         .font(OdeteFont.ui(12, weight: mode == m ? .semibold : .regular))
                         .foregroundStyle(mode == m ? theme.bg : theme.fgMuted)
+                        .lineLimit(1)
+                        .fixedSize()
                         .padding(.horizontal, 12)
                         .frame(height: 30)
                         .background {

@@ -19,13 +19,19 @@ public enum FileError: LocalizedError, Equatable {
 enum PathRules {
     static func validName(_ name: String) -> Bool {
         let trimmed = name.trimmingCharacters(in: .whitespaces)
-        if trimmed.isEmpty || trimmed == "." || trimmed == ".." { return false }
-        if trimmed.contains("/") || trimmed.contains("\0") { return false }
+        if trimmed.isEmpty || trimmed == "." || trimmed == ".." {
+            return false
+        }
+        if trimmed.contains("/") || trimmed.contains("\0") {
+            return false
+        }
         return true
     }
 
     static func validRelativePath(_ path: String) -> Bool {
-        if path.isEmpty || path.hasPrefix("/") { return false }
+        if path.isEmpty || path.hasPrefix("/") {
+            return false
+        }
         return !path.split(separator: "/").contains { $0 == ".." || $0.isEmpty }
     }
 }

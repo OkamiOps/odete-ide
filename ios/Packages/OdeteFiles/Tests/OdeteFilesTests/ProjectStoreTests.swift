@@ -1,11 +1,11 @@
 import Foundation
-import Testing
 import OdeteCore
 @testable import OdeteFiles
+import Testing
 
-@Suite struct ProjectStoreTests {
+struct ProjectStoreTests {
     @Test func createListRenameDuplicateDelete() throws {
-        let store = ProjectStore(root: try tempDir())
+        let store = try ProjectStore(root: tempDir())
         #expect(try store.list().isEmpty)
         let a = try store.create(name: "Alpha")
         _ = try store.create(name: "Beta", template: .viteReact)
@@ -27,7 +27,7 @@ import OdeteCore
     }
 
     @Test func rejectsBadNames() throws {
-        let store = ProjectStore(root: try tempDir())
+        let store = try ProjectStore(root: tempDir())
         #expect(throws: FileError.invalidName("a/b")) { try store.create(name: "a/b") }
         #expect(throws: FileError.invalidName("..")) { try store.create(name: "..") }
         _ = try store.create(name: "X")
@@ -35,7 +35,7 @@ import OdeteCore
     }
 
     @Test func touchOrdersByLastOpened() throws {
-        let store = ProjectStore(root: try tempDir())
+        let store = try ProjectStore(root: tempDir())
         let a = try store.create(name: "A")
         _ = try store.create(name: "B")
         _ = try store.touch(a)

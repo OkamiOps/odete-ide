@@ -22,28 +22,65 @@ struct FileTreeView: View {
             ScrollView {
                 LazyVStack(spacing: 0) {
                     ForEach(ws.tree.children ?? []) { node in
-                        FileRow(node: node, depth: 0, renaming: $renaming, deleting: $deleting, newFolderAt: $newFolderAt, draft: $draft)
+                        FileRow(
+                            node: node,
+                            depth: 0,
+                            renaming: $renaming,
+                            deleting: $deleting,
+                            newFolderAt: $newFolderAt,
+                            draft: $draft
+                        )
                     }
                 }
                 .padding(.vertical, 4)
             }
             .dropDestination(for: String.self) { items, _ in
-                for p in items { ws.move(p, into: "") }
+                for p in items {
+                    ws.move(p, into: "")
+                }
                 return true
             }
         }
-        .alert("Renomear", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
+        .alert("Renomear", isPresented: Binding(get: { renaming != nil }, set: {
+            if !$0 {
+                renaming = nil
+            }
+        })) {
             TextField("Nome", text: $draft)
-            Button("Renomear") { if let p = renaming { ws.rename(p, to: draft) }; renaming = nil }
+            Button("Renomear") {
+                if let p = renaming {
+                    ws.rename(p, to: draft)
+                }; renaming = nil
+            }
             Button("Cancelar", role: .cancel) { renaming = nil }
         }
-        .alert("Nova pasta", isPresented: Binding(get: { newFolderAt != nil }, set: { if !$0 { newFolderAt = nil } })) {
+        .alert("Nova pasta", isPresented: Binding(get: { newFolderAt != nil }, set: {
+            if !$0 {
+                newFolderAt = nil
+            }
+        })) {
             TextField("nome", text: $draft)
-            Button("Criar") { if let at = newFolderAt { ws.createFolder(near: at, name: draft) }; newFolderAt = nil }
+            Button("Criar") {
+                if let at = newFolderAt {
+                    ws.createFolder(near: at, name: draft)
+                }; newFolderAt = nil
+            }
             Button("Cancelar", role: .cancel) { newFolderAt = nil }
         }
-        .confirmationDialog("Apagar \"\(deleting ?? "")\"?", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), titleVisibility: .visible) {
-            Button("Apagar", role: .destructive) { if let p = deleting { ws.delete(p) }; deleting = nil }
+        .confirmationDialog(
+            "Apagar \"\(deleting ?? "")\"?",
+            isPresented: Binding(get: { deleting != nil }, set: {
+                if !$0 {
+                    deleting = nil
+                }
+            }),
+            titleVisibility: .visible
+        ) {
+            Button("Apagar", role: .destructive) {
+                if let p = deleting {
+                    ws.delete(p)
+                }; deleting = nil
+            }
             Button("Cancelar", role: .cancel) { deleting = nil }
         }
     }
@@ -60,13 +97,22 @@ struct FileRow: View {
     @Binding var draft: String
     @State private var over = false
 
-    var open: Bool { ws.expanded.contains(node.path) }
-    var selected: Bool { ws.selected == node.path }
+    var open: Bool {
+        ws.expanded.contains(node.path)
+    }
+
+    var selected: Bool {
+        ws.selected == node.path
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             Button {
-                if node.isDirectory { ws.toggle(node.path); ws.selected = node.path } else { ws.openFile(node.path) }
+                if node.isDirectory {
+                    ws.toggle(node.path); ws.selected = node.path
+                } else {
+                    ws.openFile(node.path)
+                }
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: "chevron.right")
@@ -93,13 +139,17 @@ struct FileRow: View {
             }
             .buttonStyle(.plain)
             .draggable(node.path) {
-                HStack(spacing: 6) { FileGlyph(path: node.path, isDirectory: node.isDirectory); Text(node.name).font(OdeteFont.ui(13)) }
-                    .padding(8)
-                    .background(theme.bgElevated, in: RoundedRectangle(cornerRadius: 8))
+                HStack(spacing: 6) {
+                    FileGlyph(path: node.path, isDirectory: node.isDirectory); Text(node.name).font(OdeteFont.ui(13))
+                }
+                .padding(8)
+                .background(theme.bgElevated, in: RoundedRectangle(cornerRadius: 8))
             }
             .dropDestination(for: String.self) { items, _ in
                 guard node.isDirectory else { return false }
-                for p in items { ws.move(p, into: node.path) }
+                for p in items {
+                    ws.move(p, into: node.path)
+                }
                 return true
             } isTargeted: { over = $0 && node.isDirectory }
             .contextMenu {
@@ -117,7 +167,14 @@ struct FileRow: View {
             }
             if node.isDirectory, open {
                 ForEach(node.children ?? []) { child in
-                    FileRow(node: child, depth: depth + 1, renaming: $renaming, deleting: $deleting, newFolderAt: $newFolderAt, draft: $draft)
+                    FileRow(
+                        node: child,
+                        depth: depth + 1,
+                        renaming: $renaming,
+                        deleting: $deleting,
+                        newFolderAt: $newFolderAt,
+                        draft: $draft
+                    )
                 }
             }
         }

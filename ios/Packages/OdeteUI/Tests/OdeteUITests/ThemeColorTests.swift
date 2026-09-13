@@ -1,9 +1,9 @@
 import OdeteCore
+@testable import OdeteUI
 import SwiftUI
 import Testing
-@testable import OdeteUI
 
-@Suite struct ThemeColorTests {
+struct ThemeColorTests {
     @Test func hexParses() {
         #expect(Color(hex: "#ffffff") == Color(.sRGB, red: 1, green: 1, blue: 1, opacity: 1))
         #expect(Color(hex: "000000") == Color(.sRGB, red: 0, green: 0, blue: 0, opacity: 1))

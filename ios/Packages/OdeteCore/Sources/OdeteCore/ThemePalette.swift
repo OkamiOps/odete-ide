@@ -50,35 +50,70 @@ public struct ThemePalette: Hashable, Sendable, Identifiable {
             bg: "#1e1e2e", bgElevated: "#181825", bgSubtle: "#313244",
             fg: "#cdd6f4", fgMuted: "#a6adc8", fgSubtle: "#6c7086",
             border: "#313244", borderStrong: "#45475a", accent: "#cba6f7", accentFg: "#1e1e2e",
-            syntax: SyntaxColors(keyword: "#cba6f7", string: "#a6e3a1", comment: "#6c7086", number: "#fab387", function: "#89b4fa", type: "#f9e2af")
+            syntax: SyntaxColors(
+                keyword: "#cba6f7",
+                string: "#a6e3a1",
+                comment: "#6c7086",
+                number: "#fab387",
+                function: "#89b4fa",
+                type: "#f9e2af"
+            )
         ),
         ThemePalette(
             id: .latte, label: "Latte", blurb: "Catppuccin claro.", dark: false,
             bg: "#eff1f5", bgElevated: "#e6e9ef", bgSubtle: "#dce0e8",
             fg: "#4c4f69", fgMuted: "#6c6f85", fgSubtle: "#9ca0b0",
             border: "#ccd0da", borderStrong: "#bcc0cc", accent: "#8839ef", accentFg: "#eff1f5",
-            syntax: SyntaxColors(keyword: "#8839ef", string: "#40a02b", comment: "#9ca0b0", number: "#fe640b", function: "#1e66f5", type: "#df8e1d")
+            syntax: SyntaxColors(
+                keyword: "#8839ef",
+                string: "#40a02b",
+                comment: "#9ca0b0",
+                number: "#fe640b",
+                function: "#1e66f5",
+                type: "#df8e1d"
+            )
         ),
         ThemePalette(
             id: .darcula, label: "Darcula", blurb: "JetBrains.", dark: true,
             bg: "#2b2b2b", bgElevated: "#3c3f41", bgSubtle: "#313335",
             fg: "#a9b7c6", fgMuted: "#808080", fgSubtle: "#606366",
             border: "#323232", borderStrong: "#4b4f51", accent: "#cc7832", accentFg: "#2b2b2b",
-            syntax: SyntaxColors(keyword: "#cc7832", string: "#6a8759", comment: "#808080", number: "#6897bb", function: "#ffc66d", type: "#bbb529")
+            syntax: SyntaxColors(
+                keyword: "#cc7832",
+                string: "#6a8759",
+                comment: "#808080",
+                number: "#6897bb",
+                function: "#ffc66d",
+                type: "#bbb529"
+            )
         ),
         ThemePalette(
             id: .cursor, label: "Cursor", blurb: "Laranja.", dark: true,
             bg: "#181818", bgElevated: "#1f1f1f", bgSubtle: "#262626",
             fg: "#e4e4e4", fgMuted: "#a1a1a1", fgSubtle: "#737373",
             border: "#2a2a2a", borderStrong: "#3f3f3f", accent: "#f54e00", accentFg: "#ffffff",
-            syntax: SyntaxColors(keyword: "#c792ea", string: "#c3e88d", comment: "#546e7a", number: "#f78c6c", function: "#82aaff", type: "#ffcb6b")
+            syntax: SyntaxColors(
+                keyword: "#c792ea",
+                string: "#c3e88d",
+                comment: "#546e7a",
+                number: "#f78c6c",
+                function: "#82aaff",
+                type: "#ffcb6b"
+            )
         ),
         ThemePalette(
             id: .claude, label: "Claude", blurb: "Terracota.", dark: false,
             bg: "#faf9f5", bgElevated: "#f5f0e8", bgSubtle: "#efe8dc",
             fg: "#3d3929", fgMuted: "#6b6456", fgSubtle: "#9a9284",
             border: "#e6dcc8", borderStrong: "#d4c7ae", accent: "#cc785c", accentFg: "#ffffff",
-            syntax: SyntaxColors(keyword: "#9b4d32", string: "#3b6d11", comment: "#9a9284", number: "#b35900", function: "#325d88", type: "#8a5a00")
+            syntax: SyntaxColors(
+                keyword: "#9b4d32",
+                string: "#3b6d11",
+                comment: "#9a9284",
+                number: "#b35900",
+                function: "#325d88",
+                type: "#8a5a00"
+            )
         ),
         ThemePalette(
             id: .linear, label: "Linear", blurb: "Índigo.", dark: true,

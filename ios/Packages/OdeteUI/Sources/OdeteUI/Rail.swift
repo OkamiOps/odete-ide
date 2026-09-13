@@ -10,7 +10,13 @@ public struct Rail: View {
     public var onSelect: (SidePanel) -> Void
     public var onToggleAgent: () -> Void
 
-    public init(side: SidePanel, sideOpen: Bool, agentVisible: Bool, onSelect: @escaping (SidePanel) -> Void, onToggleAgent: @escaping () -> Void) {
+    public init(
+        side: SidePanel,
+        sideOpen: Bool,
+        agentVisible: Bool,
+        onSelect: @escaping (SidePanel) -> Void,
+        onToggleAgent: @escaping () -> Void
+    ) {
         self.side = side
         self.sideOpen = sideOpen
         self.agentVisible = agentVisible

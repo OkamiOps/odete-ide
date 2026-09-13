@@ -8,10 +8,39 @@ struct WorkspaceView: View {
     @Environment(WorkspaceModel.self) private var ws
     @Environment(AppModel.self) private var app
     @Environment(\.theme) private var theme
+    @Environment(\.horizontalSizeClass) private var sizeClass
 
     var body: some View {
+        Group {
+            if sizeClass == .compact {
+                PhoneShell()
+            } else {
+                padLayout
+            }
+        }
+        .overlay {
+            if ws.paletteOpen {
+                ZStack(alignment: .top) {
+                    Color.black.opacity(0.35).ignoresSafeArea().onTapGesture { ws.paletteOpen = false }
+                    CommandPalette().padding(.top, 60)
+                }
+                .transition(.opacity)
+            }
+        }
+        .animation(.snappy(duration: 0.15), value: ws.paletteOpen)
+        .focusedSceneValue(\.workspaceActions, WorkspaceActions(ws: ws, chrome: chrome, app: app))
+        .alert("Erro", isPresented: Binding(get: { ws.error != nil }, set: {
+            if !$0 {
+                ws.error = nil
+            }
+        })) {
+            Button("OK") { ws.error = nil }
+        } message: { Text(ws.error ?? "") }
+    }
+
+    var padLayout: some View {
         @Bindable var chrome = chrome
-        HStack(spacing: 0) {
+        return HStack(spacing: 0) {
             Rail(
                 side: chrome.snapshot.side,
                 sideOpen: chrome.snapshot.sideOpen,
@@ -23,19 +52,33 @@ struct WorkspaceView: View {
                 SidebarView()
                     .frame(width: chrome.snapshot.sideWidth)
                     .background(theme.bgElevated)
-                Splitter(value: $chrome.snapshot.sideWidth, axis: .horizontal, range: Metrics.minSide ... Metrics.maxSide)
+                Splitter(
+                    value: $chrome.snapshot.sideWidth,
+                    axis: .horizontal,
+                    range: Metrics.minSide ... Metrics.maxSide
+                )
             }
             VStack(spacing: 0) {
                 CenterPane()
                 if chrome.snapshot.termVisible {
-                    Splitter(value: $chrome.snapshot.termHeight, axis: .vertical, range: Metrics.minTerm ... Metrics.maxTerm, direction: -1)
+                    Splitter(
+                        value: $chrome.snapshot.termHeight,
+                        axis: .vertical,
+                        range: Metrics.minTerm ... Metrics.maxTerm,
+                        direction: -1
+                    )
                     TerminalDrawer()
                         .frame(height: chrome.snapshot.termHeight)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             if chrome.snapshot.agentVisible {
-                Splitter(value: $chrome.snapshot.agentWidth, axis: .horizontal, range: Metrics.minAgent ... Metrics.maxAgent, direction: -1)
+                Splitter(
+                    value: $chrome.snapshot.agentWidth,
+                    axis: .horizontal,
+                    range: Metrics.minAgent ... Metrics.maxAgent,
+                    direction: -1
+                )
                 AgentColumn()
                     .frame(width: chrome.snapshot.agentWidth)
             }
@@ -44,20 +87,6 @@ struct WorkspaceView: View {
         .animation(.snappy(duration: 0.2), value: chrome.snapshot.sideOpen)
         .animation(.snappy(duration: 0.2), value: chrome.snapshot.agentVisible)
         .animation(.snappy(duration: 0.2), value: chrome.snapshot.termVisible)
-        .alert("Erro", isPresented: Binding(get: { ws.error != nil }, set: { if !$0 { ws.error = nil } })) {
-            Button("OK") { ws.error = nil }
-        } message: { Text(ws.error ?? "") }
-        .background {
-            // Atalhos de teclado físico.
-            Group {
-                Button("") { ws.save() }.keyboardShortcut("s", modifiers: .command)
-                Button("") { chrome.toggleSide() }.keyboardShortcut("b", modifiers: .command)
-                Button("") { chrome.toggleTerm() }.keyboardShortcut("j", modifiers: .command)
-                Button("") { if let a = ws.active { ws.closeTab(a) } }.keyboardShortcut("w", modifiers: .command)
-                Button("") { chrome.toggleAgent() }.keyboardShortcut("i", modifiers: .command)
-            }
-            .opacity(0)
-        }
     }
 }
 
@@ -67,9 +96,19 @@ struct SidebarView: View {
     var body: some View {
         switch chrome.snapshot.side {
         case .files: FileTreeView()
-        case .search: ShellPanel("Busca", symbol: "magnifyingglass", phase: 1, blurb: "Busca no projeto chega no marco 5.")
-        case .git: ShellPanel("Git", symbol: "arrow.triangle.branch", phase: 2, blurb: "Commits, branches e GitHub com libgit2.")
-        case .problems: ShellPanel("Problemas", symbol: "exclamationmark.circle", phase: 3, blurb: "Diagnósticos do lint e do build.")
+        case .search: SearchPane()
+        case .git: ShellPanel(
+                "Git",
+                symbol: "arrow.triangle.branch",
+                phase: 2,
+                blurb: "Commits, branches e GitHub com libgit2."
+            )
+        case .problems: ShellPanel(
+                "Problemas",
+                symbol: "exclamationmark.circle",
+                phase: 3,
+                blurb: "Diagnósticos do lint e do build."
+            )
         case .settings: SettingsShell()
         }
     }
@@ -101,7 +140,10 @@ struct SettingsShell: View {
                                 .padding(10)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .background(theme.bg, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                                .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(p.id == chrome.snapshot.theme ? theme.accent : theme.border, lineWidth: 1))
+                                .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(
+                                    p.id == chrome.snapshot.theme ? theme.accent : theme.border,
+                                    lineWidth: 1
+                                ))
                             }
                             .buttonStyle(.plain)
                         }
@@ -110,8 +152,13 @@ struct SettingsShell: View {
                     HStack {
                         Text("Tamanho da fonte")
                         Spacer()
-                        Stepper("\(Int(chrome.snapshot.editor.fontSize)) pt", value: $chrome.snapshot.editor.fontSize, in: 10 ... 22, step: 1)
-                            .fixedSize()
+                        Stepper(
+                            "\(Int(chrome.snapshot.editor.fontSize)) pt",
+                            value: $chrome.snapshot.editor.fontSize,
+                            in: 10 ... 22,
+                            step: 1
+                        )
+                        .fixedSize()
                     }
                     Toggle("Salvar automaticamente", isOn: $chrome.snapshot.editor.autoSave)
                     Toggle("Quebrar linhas", isOn: $chrome.snapshot.editor.wrap)
@@ -143,7 +190,12 @@ struct AgentColumn: View {
             PaneHeader("Agente", detail: "Claude · Sonnet") {
                 HeaderButton("plus.bubble", label: "Novo chat") {}
             }
-            ShellPanel("Agente", symbol: "sparkles", phase: 4, blurb: "Claude, Codex e Grok pela sua assinatura, editando o projeto.")
+            ShellPanel(
+                "Agente",
+                symbol: "sparkles",
+                phase: 4,
+                blurb: "Claude, Codex e Grok pela sua assinatura, editando o projeto."
+            )
             HStack(spacing: 8) {
                 Text("Peça algo à Odete…").font(OdeteFont.ui(13)).foregroundStyle(theme.fgSubtle)
                 Spacer()
@@ -171,7 +223,8 @@ struct TerminalDrawer: View {
             }
             VStack(alignment: .leading, spacing: 4) {
                 Text("odete ~/\(ws.project.name) %").font(OdeteFont.mono(12)).foregroundStyle(theme.accent)
-                Text("shell nativo, npm por ESM e Node em JavaScriptCore chegam na Fase 3").font(OdeteFont.mono(12)).foregroundStyle(theme.fgMuted)
+                Text("shell nativo, npm por ESM e Node em JavaScriptCore chegam na Fase 3").font(OdeteFont.mono(12))
+                    .foregroundStyle(theme.fgMuted)
             }
             .padding(12)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)

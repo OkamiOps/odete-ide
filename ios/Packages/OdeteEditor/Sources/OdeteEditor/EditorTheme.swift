@@ -60,15 +60,21 @@ final class EditorTheme: Runestone.Theme, @unchecked Sendable {
     func textColor(for highlightName: String) -> UIColor? {
         var name = highlightName
         while true {
-            if let c = syntax[name] { return c }
+            if let c = syntax[name] {
+                return c
+            }
             guard let dot = name.lastIndex(of: ".") else { return nil }
             name = String(name[..<dot])
         }
     }
 
     func fontTraits(for highlightName: String) -> FontTraits {
-        if highlightName.hasPrefix("text.strong") || highlightName.hasPrefix("text.title") { return .bold }
-        if highlightName.hasPrefix("text.emphasis") || highlightName.hasPrefix("comment") { return .italic }
+        if highlightName.hasPrefix("text.strong") || highlightName.hasPrefix("text.title") {
+            return .bold
+        }
+        if highlightName.hasPrefix("text.emphasis") || highlightName.hasPrefix("comment") {
+            return .italic
+        }
         return []
     }
 }
@@ -76,7 +82,9 @@ final class EditorTheme: Runestone.Theme, @unchecked Sendable {
 extension UIColor {
     convenience init(hex: String) {
         var s = hex
-        if s.hasPrefix("#") { s.removeFirst() }
+        if s.hasPrefix("#") {
+            s.removeFirst()
+        }
         let v = UInt32(s, radix: 16) ?? 0xFF00FF
         self.init(
             red: CGFloat((v >> 16) & 0xFF) / 255,

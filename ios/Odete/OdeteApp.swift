@@ -7,5 +7,6 @@ struct OdeteMain: App {
         WindowGroup {
             RootView()
         }
+        .commands { OdeteCommands() }
     }
 }

@@ -12,6 +12,7 @@ public enum SidePanel: String, Codable, CaseIterable, Sendable {
         case .settings: "Ajustes"
         }
     }
+
     public var symbol: String {
         switch self {
         case .files: "doc.on.doc"
@@ -48,6 +49,7 @@ public enum PhoneTab: String, Codable, CaseIterable, Sendable {
         case .settings: "Ajustes"
         }
     }
+
     public var symbol: String {
         switch self {
         case .files: "doc.on.doc"
@@ -110,11 +112,21 @@ public final class ChromeState {
         self.snapshot = snapshot
     }
 
-    public var palette: ThemePalette { ThemePalette.by(snapshot.theme) }
+    public var palette: ThemePalette {
+        ThemePalette.by(snapshot.theme)
+    }
 
-    public func toggleSide() { snapshot.sideOpen.toggle() }
-    public func toggleAgent() { snapshot.agentVisible.toggle() }
-    public func toggleTerm() { snapshot.termVisible.toggle() }
+    public func toggleSide() {
+        snapshot.sideOpen.toggle()
+    }
+
+    public func toggleAgent() {
+        snapshot.agentVisible.toggle()
+    }
+
+    public func toggleTerm() {
+        snapshot.termVisible.toggle()
+    }
 
     public func select(side: SidePanel) {
         if snapshot.side == side, snapshot.sideOpen {
@@ -133,8 +145,19 @@ public final class ChromeState {
         snapshot.agentVisible = true
     }
 
-    public func tabs(for project: UUID) -> [EditorTab] { snapshot.tabsByProject[project] ?? [] }
-    public func setTabs(_ tabs: [EditorTab], for project: UUID) { snapshot.tabsByProject[project] = tabs }
-    public func activeTab(for project: UUID) -> String? { snapshot.activeTabByProject[project] }
-    public func setActiveTab(_ path: String?, for project: UUID) { snapshot.activeTabByProject[project] = path }
+    public func tabs(for project: UUID) -> [EditorTab] {
+        snapshot.tabsByProject[project] ?? []
+    }
+
+    public func setTabs(_ tabs: [EditorTab], for project: UUID) {
+        snapshot.tabsByProject[project] = tabs
+    }
+
+    public func activeTab(for project: UUID) -> String? {
+        snapshot.activeTabByProject[project]
+    }
+
+    public func setActiveTab(_ path: String?, for project: UUID) {
+        snapshot.activeTabByProject[project] = path
+    }
 }

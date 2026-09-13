@@ -34,7 +34,9 @@ public struct Splitter: View {
         .gesture(
             DragGesture(minimumDistance: 1)
                 .onChanged { g in
-                    if start == nil { start = value }
+                    if start == nil {
+                        start = value
+                    }
                     hot = true
                     let delta = axis == .horizontal ? g.translation.width : g.translation.height
                     value = min(max((start ?? value) + delta * direction, range.lowerBound), range.upperBound)

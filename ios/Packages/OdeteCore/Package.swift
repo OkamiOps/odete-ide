@@ -8,13 +8,11 @@ let package = Package(
         .library(name: "OdeteCore", targets: ["OdeteCore"]),
     ],
     dependencies: [
-
     ],
     targets: [
         .target(
             name: "OdeteCore",
             dependencies: [
-
             ],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),

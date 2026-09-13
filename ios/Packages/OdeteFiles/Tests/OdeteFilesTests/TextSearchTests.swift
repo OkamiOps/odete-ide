@@ -1,8 +1,8 @@
 import Foundation
-import Testing
 @testable import OdeteFiles
+import Testing
 
-@Suite struct TextSearchTests {
+struct TextSearchTests {
     @Test func literalAndRegex() throws {
         let root = try tempDir()
         let ops = FileOps(root: root)

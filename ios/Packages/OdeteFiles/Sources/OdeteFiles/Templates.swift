@@ -4,7 +4,9 @@ import Foundation
 public enum Template: String, CaseIterable, Identifiable, Sendable {
     case blank, viteReact, astro, swiftPlayground
 
-    public var id: String { rawValue }
+    public var id: String {
+        rawValue
+    }
 
     public var label: String {
         switch self {
@@ -48,7 +50,10 @@ public enum Template: String, CaseIterable, Identifiable, Sendable {
 
     static func blank(_ name: String) -> [String: String] {
         [
-            "README.md": readme(name, "| arquivo | o que é |\n| --- | --- |\n| `index.html` | página do preview |\n| `src/style.css` | visual |\n| `src/main.js` | comportamento |"),
+            "README.md": readme(
+                name,
+                "| arquivo | o que é |\n| --- | --- |\n| `index.html` | página do preview |\n| `src/style.css` | visual |\n| `src/main.js` | comportamento |"
+            ),
             "index.html": """
             <!doctype html>
             <html lang="pt-BR">
@@ -142,7 +147,10 @@ public enum Template: String, CaseIterable, Identifiable, Sendable {
     static func swiftPlayground(_ name: String) -> [String: String] {
         let ident = name.replacingOccurrences(of: " ", with: "")
         return [
-            "README.md": readme(name, "Pacote de app para o Swift Playgrounds. Abra `\(ident).swiftpm` no Playgrounds para rodar."),
+            "README.md": readme(
+                name,
+                "Pacote de app para o Swift Playgrounds. Abra `\(ident).swiftpm` no Playgrounds para rodar."
+            ),
             "\(ident).swiftpm/Package.swift": """
             // swift-tools-version: 5.9
             import AppleProductTypes

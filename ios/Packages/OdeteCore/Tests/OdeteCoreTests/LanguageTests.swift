@@ -1,7 +1,7 @@
-import Testing
 @testable import OdeteCore
+import Testing
 
-@Suite struct LanguageTests {
+struct LanguageTests {
     @Test(arguments: [
         ("src/App.tsx", Language.tsx), ("a.ts", .typescript), ("a.js", .javascript), ("a.jsx", .jsx),
         ("index.html", .html), ("style.css", .css), ("package.json", .json), ("README.md", .markdown),

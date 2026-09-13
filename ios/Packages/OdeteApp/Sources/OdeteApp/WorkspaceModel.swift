@@ -19,6 +19,9 @@ public final class WorkspaceModel {
     public var error: String?
     public var stack: Stack = .html
     public var externalChange = false
+    public var reveal: (line: Int, token: Int)?
+    public var paletteOpen = false
+    public var paletteQuery = ""
 
     private let chrome: ChromeState
     private var watcher: DirectoryWatcher?
@@ -30,10 +33,13 @@ public final class WorkspaceModel {
         self.chrome = chrome
         ops = FileOps(root: root)
         tabs = chrome.tabs(for: project.id).filter { ops.exists($0.path) }.map { EditorTab(path: $0.path) }
-        active = chrome.activeTab(for: project.id).flatMap { p in tabs.contains { $0.path == p } ? p : nil } ?? tabs.first?.path
+        active = chrome.activeTab(for: project.id).flatMap { p in tabs.contains { $0.path == p } ? p : nil } ?? tabs
+            .first?.path
         expanded = Set(chrome.snapshot.expandedByProject[project.id] ?? ["src"])
         reload()
-        for t in tabs { load(t.path) }
+        for t in tabs {
+            load(t.path)
+        }
         let w = DirectoryWatcher(url: root) { [weak self] in
             Task { @MainActor in self?.externalReload() }
         }
@@ -43,7 +49,9 @@ public final class WorkspaceModel {
 
     func stop() {
         watcher?.stop()
-        for t in saveTasks.values { t.cancel() }
+        for t in saveTasks.values {
+            t.cancel()
+        }
         saveAll()
     }
 
@@ -63,7 +71,9 @@ public final class WorkspaceModel {
         reload()
         for t in tabs where !t.isDirty {
             if ops.exists(t.path) {
-                if let disk = try? ops.read(t.path), disk != buffers[t.path] { buffers[t.path] = disk }
+                if let disk = try? ops.read(t.path), disk != buffers[t.path] {
+                    buffers[t.path] = disk
+                }
             } else {
                 closeTab(t.path, force: true)
             }
@@ -71,13 +81,19 @@ public final class WorkspaceModel {
     }
 
     public func toggle(_ path: String) {
-        if expanded.contains(path) { expanded.remove(path) } else { expanded.insert(path) }
+        if expanded.contains(path) {
+            expanded.remove(path)
+        } else {
+            expanded.insert(path)
+        }
         chrome.snapshot.expandedByProject[project.id] = Array(expanded)
     }
 
     // MARK: abas
 
-    public var activeTab: EditorTab? { tabs.first { $0.path == active } }
+    public var activeTab: EditorTab? {
+        tabs.first { $0.path == active }
+    }
 
     public func openFile(_ path: String) {
         if !tabs.contains(where: { $0.path == path }) {
@@ -89,25 +105,39 @@ public final class WorkspaceModel {
         persistTabs()
     }
 
+    public func open(_ path: String, line: Int) {
+        openFile(path)
+        reveal = (line, (reveal?.token ?? 0) + 1)
+    }
+
     private func load(_ path: String) {
-        if buffers[path] == nil { buffers[path] = (try? ops.read(path)) ?? "" }
+        if buffers[path] == nil {
+            buffers[path] = (try? ops.read(path)) ?? ""
+        }
     }
 
     public func closeTab(_ path: String, force: Bool = false) {
         guard let i = tabs.firstIndex(where: { $0.path == path }) else { return }
-        if tabs[i].isDirty, !force { save(path) }
+        if tabs[i].isDirty, !force {
+            save(path)
+        }
         tabs.remove(at: i)
         buffers[path] = nil
-        if active == path { active = tabs[min(i, tabs.count - 1)].path.self as String? ?? nil }
-        if tabs.isEmpty { active = nil }
+        if active == path {
+            active = tabs.isEmpty ? nil : tabs[min(i, tabs.count - 1)].path
+        }
         persistTabs()
     }
 
     public func closeOthers(_ path: String) {
-        for t in tabs where t.path != path { closeTab(t.path) }
+        for t in tabs where t.path != path {
+            closeTab(t.path)
+        }
     }
 
-    public func text(for path: String) -> String { buffers[path] ?? "" }
+    public func text(for path: String) -> String {
+        buffers[path] ?? ""
+    }
 
     public func setText(_ text: String, for path: String) {
         guard buffers[path] != text else { return }
@@ -117,7 +147,9 @@ public final class WorkspaceModel {
             saveTasks[path]?.cancel()
             saveTasks[path] = Task { [weak self] in
                 try? await Task.sleep(for: .seconds(1))
-                if Task.isCancelled { return }
+                if Task.isCancelled {
+                    return
+                }
                 self?.save(path)
             }
         }
@@ -139,7 +171,9 @@ public final class WorkspaceModel {
     }
 
     public func saveAll() {
-        for t in tabs where t.isDirty { save(t.path) }
+        for t in tabs where t.isDirty {
+            save(t.path)
+        }
     }
 
     private func persistTabs() {
@@ -151,7 +185,9 @@ public final class WorkspaceModel {
 
     private func dir(of path: String?) -> String {
         guard let path, !path.isEmpty else { return "" }
-        if ops.isDirectory(path) { return path }
+        if ops.isDirectory(path) {
+            return path
+        }
         return path.split(separator: "/").dropLast().joined(separator: "/")
     }
 
@@ -205,7 +241,9 @@ public final class WorkspaceModel {
     public func delete(_ path: String) {
         do {
             try ops.delete(path)
-            for t in tabs where t.path == path || t.path.hasPrefix(path + "/") { closeTab(t.path, force: true) }
+            for t in tabs where t.path == path || t.path.hasPrefix(path + "/") {
+                closeTab(t.path, force: true)
+            }
             reload()
         } catch { self.error = error.localizedDescription }
     }
@@ -217,7 +255,9 @@ public final class WorkspaceModel {
                 let np = new + p.dropFirst(old.count)
                 tabs[i].path = np
                 buffers[np] = buffers.removeValue(forKey: p)
-                if active == p { active = np }
+                if active == p {
+                    active = np
+                }
             }
         }
         persistTabs()

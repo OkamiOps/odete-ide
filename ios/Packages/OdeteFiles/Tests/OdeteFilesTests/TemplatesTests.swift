@@ -1,7 +1,7 @@
-import Testing
 @testable import OdeteFiles
+import Testing
 
-@Suite struct TemplatesTests {
+struct TemplatesTests {
     @Test func everyTemplateHasReadme() {
         for t in Template.allCases {
             let files = t.files(projectName: "Meu App")

@@ -5,7 +5,9 @@ public extension Color {
     /// "#rrggbb" → Color. Inválido vira magenta para ficar visível.
     init(hex: String) {
         var s = hex.trimmingCharacters(in: .whitespaces)
-        if s.hasPrefix("#") { s.removeFirst() }
+        if s.hasPrefix("#") {
+            s.removeFirst()
+        }
         guard s.count == 6, let v = UInt32(s, radix: 16) else {
             self = .pink
             return
@@ -23,37 +25,79 @@ public extension Color {
 /// Tema pronto para SwiftUI, derivado de `ThemePalette`.
 public struct Theme: Sendable, Hashable {
     public let palette: ThemePalette
-    public var id: ThemeId { palette.id }
-    public var dark: Bool { palette.dark }
-    public var bg: Color { Color(hex: palette.bg) }
-    public var bgElevated: Color { Color(hex: palette.bgElevated) }
-    public var bgSubtle: Color { Color(hex: palette.bgSubtle) }
-    public var fg: Color { Color(hex: palette.fg) }
-    public var fgMuted: Color { Color(hex: palette.fgMuted) }
-    public var fgSubtle: Color { Color(hex: palette.fgSubtle) }
-    public var border: Color { Color(hex: palette.border) }
-    public var borderStrong: Color { Color(hex: palette.borderStrong) }
-    public var accent: Color { Color(hex: palette.accent) }
-    public var accentFg: Color { Color(hex: palette.accentFg) }
-    public var danger: Color { Color(hex: palette.danger) }
-    public var ok: Color { Color(hex: palette.ok) }
-    public var colorScheme: ColorScheme { dark ? .dark : .light }
+    public var id: ThemeId {
+        palette.id
+    }
 
-    public init(_ palette: ThemePalette) { self.palette = palette }
-    public init(id: ThemeId) { self.palette = ThemePalette.by(id) }
+    public var dark: Bool {
+        palette.dark
+    }
+
+    public var bg: Color {
+        Color(hex: palette.bg)
+    }
+
+    public var bgElevated: Color {
+        Color(hex: palette.bgElevated)
+    }
+
+    public var bgSubtle: Color {
+        Color(hex: palette.bgSubtle)
+    }
+
+    public var fg: Color {
+        Color(hex: palette.fg)
+    }
+
+    public var fgMuted: Color {
+        Color(hex: palette.fgMuted)
+    }
+
+    public var fgSubtle: Color {
+        Color(hex: palette.fgSubtle)
+    }
+
+    public var border: Color {
+        Color(hex: palette.border)
+    }
+
+    public var borderStrong: Color {
+        Color(hex: palette.borderStrong)
+    }
+
+    public var accent: Color {
+        Color(hex: palette.accent)
+    }
+
+    public var accentFg: Color {
+        Color(hex: palette.accentFg)
+    }
+
+    public var danger: Color {
+        Color(hex: palette.danger)
+    }
+
+    public var ok: Color {
+        Color(hex: palette.ok)
+    }
+
+    public var colorScheme: ColorScheme {
+        dark ? .dark : .light
+    }
+
+    public init(_ palette: ThemePalette) {
+        self.palette = palette
+    }
+
+    public init(id: ThemeId) {
+        palette = ThemePalette.by(id)
+    }
 
     public static let odete = Theme(id: .odete)
 }
 
-private struct ThemeKey: EnvironmentKey {
-    static let defaultValue: Theme = .odete
-}
-
 public extension EnvironmentValues {
-    var theme: Theme {
-        get { self[ThemeKey.self] }
-        set { self[ThemeKey.self] = newValue }
-    }
+    @Entry var theme: Theme = .odete
 }
 
 public extension View {

@@ -9,7 +9,12 @@ public struct EditorTabs: View {
     public var onSelect: (String) -> Void
     public var onClose: (String) -> Void
 
-    public init(tabs: [EditorTab], active: String?, onSelect: @escaping (String) -> Void, onClose: @escaping (String) -> Void) {
+    public init(
+        tabs: [EditorTab],
+        active: String?,
+        onSelect: @escaping (String) -> Void,
+        onClose: @escaping (String) -> Void
+    ) {
         self.tabs = tabs
         self.active = active
         self.onSelect = onSelect
@@ -21,13 +26,20 @@ public struct EditorTabs: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 0) {
                     ForEach(tabs) { tab in
-                        TabItem(tab: tab, on: tab.path == active, onSelect: { onSelect(tab.path) }, onClose: { onClose(tab.path) })
-                            .id(tab.path)
+                        TabItem(
+                            tab: tab,
+                            on: tab.path == active,
+                            onSelect: { onSelect(tab.path) },
+                            onClose: { onClose(tab.path) }
+                        )
+                        .id(tab.path)
                     }
                 }
             }
             .onChange(of: active) { _, new in
-                if let new { withAnimation { proxy.scrollTo(new, anchor: .center) } }
+                if let new {
+                    withAnimation { proxy.scrollTo(new, anchor: .center) }
+                }
             }
         }
         .frame(height: Metrics.tab)
@@ -75,7 +87,11 @@ struct TabItem: View {
             .padding(.trailing, 4)
         }
         .background(on ? theme.bg : .clear)
-        .overlay(alignment: .top) { if on { Rectangle().fill(theme.accent).frame(height: 2) } }
+        .overlay(alignment: .top) {
+            if on {
+                Rectangle().fill(theme.accent).frame(height: 2)
+            }
+        }
         .overlay(alignment: .trailing) { Rectangle().fill(theme.border).frame(width: 1) }
         .accessibilityElement(children: .contain)
         .accessibilityAddTraits(on ? .isSelected : [])

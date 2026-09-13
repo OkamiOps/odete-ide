@@ -11,6 +11,8 @@ public struct CodeEditorView: UIViewRepresentable {
     public var language: Language
     public var palette: ThemePalette
     public var prefs: EditorPrefs
+    /// Linha (1-based) a revelar; muda o `token` para revelar de novo a mesma linha.
+    public var reveal: (line: Int, token: Int)?
     public var onSave: () -> Void
     public var onFind: () -> Void
 
@@ -20,6 +22,7 @@ public struct CodeEditorView: UIViewRepresentable {
         language: Language,
         palette: ThemePalette,
         prefs: EditorPrefs,
+        reveal: (line: Int, token: Int)? = nil,
         onSave: @escaping () -> Void = {},
         onFind: @escaping () -> Void = {}
     ) {
@@ -28,6 +31,7 @@ public struct CodeEditorView: UIViewRepresentable {
         self.language = language
         self.palette = palette
         self.prefs = prefs
+        self.reveal = reveal
         self.onSave = onSave
         self.onFind = onFind
     }
@@ -48,7 +52,14 @@ public struct CodeEditorView: UIViewRepresentable {
         tv.gutterTrailingPadding = 10
         tv.textContainerInset = UIEdgeInsets(top: 8, left: 0, bottom: 200, right: 8)
         tv.lineSelectionDisplayType = .line
-        tv.characterPairs = [Pair("(", ")"), Pair("[", "]"), Pair("{", "}"), Pair("\"", "\""), Pair("'", "'"), Pair("`", "`")]
+        tv.characterPairs = [
+            Pair("(", ")"),
+            Pair("[", "]"),
+            Pair("{", "}"),
+            Pair("\"", "\""),
+            Pair("'", "'"),
+            Pair("`", "`"),
+        ]
         tv.inputAccessoryView = KeyboardBar(textView: tv, onSave: onSave, onFind: onFind)
         apply(to: tv, context: context, fullReset: true)
         return tv
@@ -68,6 +79,13 @@ public struct CodeEditorView: UIViewRepresentable {
         tv.indentStrategy = .space(length: prefs.tabWidth)
         (tv.inputAccessoryView as? KeyboardBar)?.onSave = onSave
         (tv.inputAccessoryView as? KeyboardBar)?.onFind = onFind
+        if let reveal, c.revealToken != reveal.token {
+            c.revealToken = reveal.token
+            DispatchQueue.main.async {
+                _ = tv.goToLine(max(reveal.line - 1, 0), select: .line)
+                tv.becomeFirstResponder()
+            }
+        }
     }
 
     private func apply(to tv: TextView, context: Context, fullReset: Bool) {
@@ -79,13 +97,20 @@ public struct CodeEditorView: UIViewRepresentable {
         let theme = EditorTheme(palette: palette, fontSize: prefs.fontSize)
         tv.backgroundColor = UIColor(hex: palette.bg)
         if let lang = LanguageMode.treeSitter(for: language) {
-            tv.setState(TextViewState(text: text, theme: theme, language: lang, languageProvider: LanguageMode.provider))
+            tv.setState(TextViewState(
+                text: text,
+                theme: theme,
+                language: lang,
+                languageProvider: LanguageMode.provider
+            ))
         } else {
             tv.setState(TextViewState(text: text, theme: theme))
         }
     }
 
-    public func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
+    public func makeCoordinator() -> Coordinator {
+        Coordinator(parent: self)
+    }
 
     @MainActor
     public final class Coordinator: NSObject, @preconcurrency TextViewDelegate {
@@ -94,8 +119,11 @@ public struct CodeEditorView: UIViewRepresentable {
         var palette: ThemePalette?
         var fontSize: Double = 0
         var isEditing = false
+        var revealToken = -1
 
-        init(parent: CodeEditorView) { self.parent = parent }
+        init(parent: CodeEditorView) {
+            self.parent = parent
+        }
 
         public func textViewDidChange(_ textView: TextView) {
             isEditing = true

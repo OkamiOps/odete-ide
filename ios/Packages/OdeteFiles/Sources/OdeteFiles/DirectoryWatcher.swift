@@ -21,7 +21,11 @@ public final class DirectoryWatcher: @unchecked Sendable {
         queue.async { [self] in
             fd = open(url.path, O_EVTONLY)
             if fd >= 0 {
-                let src = DispatchSource.makeFileSystemObjectSource(fileDescriptor: fd, eventMask: [.write, .rename, .delete, .attrib], queue: queue)
+                let src = DispatchSource.makeFileSystemObjectSource(
+                    fileDescriptor: fd,
+                    eventMask: [.write, .rename, .delete, .attrib],
+                    queue: queue
+                )
                 src.setEventHandler { [weak self] in self?.fire() }
                 src.setCancelHandler { [fd] in close(fd) }
                 src.resume()
@@ -64,7 +68,11 @@ public final class DirectoryWatcher: @unchecked Sendable {
     private func signature() -> Int {
         var hasher = Hasher()
         let keys: [URLResourceKey] = [.isDirectoryKey, .contentModificationDateKey]
-        guard let e = FileManager.default.enumerator(at: url, includingPropertiesForKeys: keys, options: [.skipsPackageDescendants]) else { return 0 }
+        guard let e = FileManager.default.enumerator(
+            at: url,
+            includingPropertiesForKeys: keys,
+            options: [.skipsPackageDescendants]
+        ) else { return 0 }
         for case let item as URL in e {
             let name = item.lastPathComponent
             if name == "node_modules" || name == ".git" || name == ".build" {

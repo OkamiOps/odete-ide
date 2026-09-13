@@ -1,8 +1,8 @@
 import Foundation
-import Testing
 @testable import OdeteCore
+import Testing
 
-@Suite struct StateStoreTests {
+struct StateStoreTests {
     private func temp() -> URL {
         FileManager.default.temporaryDirectory.appending(path: "odete-\(UUID().uuidString)/state.json")
     }

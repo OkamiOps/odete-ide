@@ -1,7 +1,7 @@
-import Testing
 @testable import OdeteCore
+import Testing
 
-@Suite struct IgnoreTests {
+struct IgnoreTests {
     @Test func noiseDirectories() {
         #expect(Ignore.isNoisePath("node_modules/react/index.js"))
         #expect(Ignore.isNoisePath("src/node_modules/x"))

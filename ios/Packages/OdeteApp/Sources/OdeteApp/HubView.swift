@@ -22,12 +22,18 @@ struct HubView: View {
                     if app.projects.isEmpty {
                         WelcomeView { creating = true }
                     } else {
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 240, maximum: 320), spacing: 14)], spacing: 14) {
+                        LazyVGrid(
+                            columns: [GridItem(.adaptive(minimum: 240, maximum: 320), spacing: 14)],
+                            spacing: 14
+                        ) {
                             ForEach(app.projects) { p in
                                 ProjectCard(project: p, root: app.store.url(for: p))
                                     .onTapGesture { app.open(p, chrome: chrome) }
                                     .contextMenu {
-                                        Button("Abrir", systemImage: "arrow.up.forward.square") { app.open(p, chrome: chrome) }
+                                        Button("Abrir", systemImage: "arrow.up.forward.square") { app.open(
+                                            p,
+                                            chrome: chrome
+                                        ) }
                                         Button("Renomear", systemImage: "pencil") { newName = p.name; renaming = p }
                                         Button("Duplicar", systemImage: "plus.square.on.square") { app.duplicate(p) }
                                         Divider()
@@ -43,18 +49,42 @@ struct HubView: View {
             }
         }
         .sheet(isPresented: $creating) { NewProjectSheet() }
-        .alert("Renomear projeto", isPresented: Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })) {
+        .alert("Renomear projeto", isPresented: Binding(get: { renaming != nil }, set: {
+            if !$0 {
+                renaming = nil
+            }
+        })) {
             TextField("Nome", text: $newName)
-            Button("Renomear") { if let p = renaming { app.rename(p, to: newName) }; renaming = nil }
+            Button("Renomear") {
+                if let p = renaming {
+                    app.rename(p, to: newName)
+                }; renaming = nil
+            }
             Button("Cancelar", role: .cancel) { renaming = nil }
         }
-        .confirmationDialog("Apagar \"\(deleting?.name ?? "")\"?", isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), titleVisibility: .visible) {
-            Button("Apagar projeto", role: .destructive) { if let p = deleting { app.delete(p) }; deleting = nil }
+        .confirmationDialog(
+            "Apagar \"\(deleting?.name ?? "")\"?",
+            isPresented: Binding(get: { deleting != nil }, set: {
+                if !$0 {
+                    deleting = nil
+                }
+            }),
+            titleVisibility: .visible
+        ) {
+            Button("Apagar projeto", role: .destructive) {
+                if let p = deleting {
+                    app.delete(p)
+                }; deleting = nil
+            }
             Button("Cancelar", role: .cancel) { deleting = nil }
         } message: {
             Text("Os arquivos saem deste iPad. Não dá para desfazer.")
         }
-        .alert("Erro", isPresented: Binding(get: { app.error != nil }, set: { if !$0 { app.error = nil } })) {
+        .alert("Erro", isPresented: Binding(get: { app.error != nil }, set: {
+            if !$0 {
+                app.error = nil
+            }
+        })) {
             Button("OK") { app.error = nil }
         } message: { Text(app.error ?? "") }
     }
@@ -95,10 +125,12 @@ struct WelcomeView: View {
             Text("Bem-vindo à Odete")
                 .font(OdeteFont.ui(26, weight: .semibold))
                 .foregroundStyle(theme.fg)
-            Text("Uma IDE que roda inteira no iPad: arquivos, git, terminal, preview e um agente que edita o projeto. Sem Mac, sem servidor.")
-                .font(OdeteFont.ui(14))
-                .foregroundStyle(theme.fgMuted)
-                .frame(maxWidth: 520, alignment: .leading)
+            Text(
+                "Uma IDE que roda inteira no iPad: arquivos, git, terminal, preview e um agente que edita o projeto. Sem Mac, sem servidor."
+            )
+            .font(OdeteFont.ui(14))
+            .foregroundStyle(theme.fgMuted)
+            .frame(maxWidth: 520, alignment: .leading)
             VStack(alignment: .leading, spacing: 10) {
                 step(1, "Crie um projeto: em branco, Vite + React, Astro ou Swift Playground.")
                 step(2, "Edite na árvore e no editor. Salva sozinho.")
@@ -222,7 +254,9 @@ struct NewProjectSheet: View {
                                     Text(t.blurb).font(.footnote).foregroundStyle(.secondary)
                                 }
                                 Spacer()
-                                if template == t { Image(systemName: "checkmark").foregroundStyle(theme.accent) }
+                                if template == t {
+                                    Image(systemName: "checkmark").foregroundStyle(theme.accent)
+                                }
                             }
                             .contentShape(Rectangle())
                         }

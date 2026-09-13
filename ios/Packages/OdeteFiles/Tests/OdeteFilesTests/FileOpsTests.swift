@@ -1,10 +1,10 @@
 import Foundation
-import Testing
 @testable import OdeteFiles
+import Testing
 
-@Suite struct FileOpsTests {
+struct FileOpsTests {
     @Test func crud() throws {
-        let ops = FileOps(root: try tempDir())
+        let ops = try FileOps(root: tempDir())
         try ops.createFile("a.txt", contents: "olá")
         #expect(try ops.read("a.txt") == "olá")
         #expect(throws: FileError.alreadyExists("a.txt")) { try ops.createFile("a.txt") }
@@ -21,7 +21,7 @@ import Testing
     }
 
     @Test func refusesEscapingRoot() throws {
-        let ops = FileOps(root: try tempDir())
+        let ops = try FileOps(root: tempDir())
         #expect(throws: FileError.outsideRoot("../x")) { try ops.write("../x", "") }
         #expect(throws: FileError.outsideRoot("/etc/passwd")) { try ops.read("/etc/passwd") }
         try ops.createDirectory("d")
@@ -29,7 +29,7 @@ import Testing
     }
 
     @Test func freeNames() throws {
-        let ops = FileOps(root: try tempDir())
+        let ops = try FileOps(root: tempDir())
         #expect(ops.freeName(in: "", base: "sem-titulo", ext: "txt") == "sem-titulo.txt")
         try ops.createFile("sem-titulo.txt")
         #expect(ops.freeName(in: "", base: "sem-titulo", ext: "txt") == "sem-titulo-2.txt")

@@ -29,6 +29,11 @@ public struct RootView: View {
         .odeteTheme(Theme(chrome.palette))
         .onAppear {
             chrome.onChange = { [store] snap in store.scheduleSave(snap) }
+            if app.workspace == nil, let id = chrome.snapshot.lastProjectId,
+               let p = app.projects.first(where: { $0.id == id })
+            {
+                app.open(p, chrome: chrome)
+            }
         }
     }
 }

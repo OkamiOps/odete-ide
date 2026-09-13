@@ -3,15 +3,23 @@ import OdeteCore
 
 public struct SearchHit: Identifiable, Hashable, Sendable {
     public var path: String
-    public var line: Int      // 1-based
-    public var column: Int    // 1-based
-    public var text: String   // linha inteira
-    public var id: String { "\(path):\(line):\(column)" }
+    public var line: Int // 1-based
+    public var column: Int // 1-based
+    public var text: String // linha inteira
+    public var id: String {
+        "\(path):\(line):\(column)"
+    }
 }
 
 public enum TextSearch {
     /// Busca literal (sem distinguir caixa) ou regex em todos os arquivos de texto do projeto.
-    public static func search(root: URL, query: String, regex: Bool = false, caseSensitive: Bool = false, limit: Int = 2000) throws -> [SearchHit] {
+    public static func search(
+        root: URL,
+        query: String,
+        regex: Bool = false,
+        caseSensitive: Bool = false,
+        limit: Int = 2000
+    ) throws -> [SearchHit] {
         guard !query.isEmpty else { return [] }
         let tree = try FileTreeBuilder.build(at: root)
         var hits: [SearchHit] = []
@@ -27,15 +35,27 @@ public enum TextSearch {
                 if let pattern {
                     let p = caseSensitive ? pattern : pattern.ignoresCase()
                     if let m = s.firstMatch(of: p) {
-                        hits.append(SearchHit(path: node.path, line: lineNo, column: s.distance(from: s.startIndex, to: m.range.lowerBound) + 1, text: s))
+                        hits.append(SearchHit(
+                            path: node.path,
+                            line: lineNo,
+                            column: s.distance(from: s.startIndex, to: m.range.lowerBound) + 1,
+                            text: s
+                        ))
                     }
                 } else {
                     let opts: String.CompareOptions = caseSensitive ? [] : [.caseInsensitive]
                     if let r = s.range(of: query, options: opts) {
-                        hits.append(SearchHit(path: node.path, line: lineNo, column: s.distance(from: s.startIndex, to: r.lowerBound) + 1, text: s))
+                        hits.append(SearchHit(
+                            path: node.path,
+                            line: lineNo,
+                            column: s.distance(from: s.startIndex, to: r.lowerBound) + 1,
+                            text: s
+                        ))
                     }
                 }
-                if hits.count >= limit { return hits }
+                if hits.count >= limit {
+                    return hits
+                }
             }
         }
         return hits

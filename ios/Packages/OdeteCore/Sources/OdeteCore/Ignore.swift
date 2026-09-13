@@ -10,7 +10,9 @@ public enum Ignore {
     public static func isNoisePath(_ path: String) -> Bool {
         let parts = path.split(separator: "/").map(String.init)
         guard let last = parts.last else { return false }
-        if noiseFiles.contains(last) { return true }
+        if noiseFiles.contains(last) {
+            return true
+        }
         return parts.contains { noiseDirs.contains($0) }
     }
 }

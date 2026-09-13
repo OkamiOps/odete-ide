@@ -3,6 +3,7 @@ import {
   Archive,
   Check,
   Download,
+  EllipsisVertical,
   Eye,
   GitBranch,
   GitCommit,
@@ -433,6 +434,7 @@ function GitFile({
   const dir = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
   const [blame, setBlame] = useState(false);
   const [openHunks, setOpenHunks] = useState(false);
+  const [more, setMore] = useState(false);
   const headBody = useWorkspace((s) => s.commits.at(-1)?.files[path]);
   const body = useWorkspace((s) => s.files[path]);
   const rows = blame ? w().gitBlame(path).slice(0, 40) : [];
@@ -454,15 +456,42 @@ function GitFile({
           {stats.del ? <em className="is-del">−{stats.del}</em> : null}
         </span>
         <span className="git-ops">
-          <button type="button" title="Diff" onClick={openDiff}>
-            <Eye size={14} />
+          {staged ? (
+            <button type="button" title="Unstage" onClick={() => w().gitUnstage(path)}>
+              <Minus size={16} />
+            </button>
+          ) : (
+            <>
+              <button type="button" title="Stage" onClick={() => w().gitStage(path)}>
+                <Plus size={16} />
+              </button>
+              <button type="button" title="Discard" onClick={() => w().gitDiscard(path)}>
+                <Trash2 size={16} />
+              </button>
+            </>
+          )}
+          <button
+            type="button"
+            title="mais"
+            className={more ? "is-on" : undefined}
+            onClick={() => setMore((v) => !v)}
+          >
+            <EllipsisVertical size={16} />
           </button>
-          <button type="button" title="Hunks" onClick={() => setOpenHunks((v) => !v)}>
+        </span>
+      </div>
+      {more ? (
+        <div className="git-file-more">
+          <button type="button" onClick={openDiff}>
+            <Eye size={14} />
+            diff
+          </button>
+          <button type="button" onClick={() => setOpenHunks((v) => !v)}>
             <Layers size={14} />
+            hunks
           </button>
           <button
             type="button"
-            title="Blame no editor"
             onClick={() => {
               w().openFile(path);
               useChrome.getState().setCenter("code");
@@ -471,23 +500,10 @@ function GitFile({
             }}
           >
             <GitCommit size={14} />
+            blame
           </button>
-          {staged ? (
-            <button type="button" title="Unstage" onClick={() => w().gitUnstage(path)}>
-              <Minus size={14} />
-            </button>
-          ) : (
-            <>
-              <button type="button" title="Stage" onClick={() => w().gitStage(path)}>
-                <Plus size={14} />
-              </button>
-              <button type="button" title="Discard" onClick={() => w().gitDiscard(path)}>
-                <Trash2 size={14} />
-              </button>
-            </>
-          )}
-        </span>
-      </div>
+        </div>
+      ) : null}
       {openHunks ? (
         <div className="git-hunks">
           {hunks.length === 0 ? (

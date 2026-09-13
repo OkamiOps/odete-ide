@@ -731,12 +731,31 @@ input, textarea, select { font: inherit; font-size: 16px; }
   grid-column: 2 / 4;
   grid-row: 2;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: flex-end;
   gap: 2px;
   max-width: 100%;
 }
-.git-ops button { width: 34px; height: 34px; flex: 0 0 34px; display: grid; place-items: center; border: 0; border-radius: 8px; background: transparent; color: var(--color-fg-muted); }
+.git-ops button { width: 36px; height: 36px; flex: 0 0 36px; display: grid; place-items: center; border: 0; border-radius: 8px; background: transparent; color: var(--color-fg-muted); }
+.git-ops button.is-on, .git-ops button:hover { background: var(--color-bg); color: var(--color-fg); }
+.git-file-more {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 8px 8px 38px;
+}
+.git-file-more button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg);
+  color: var(--color-fg-muted);
+  font-size: 12px;
+}
 .git-ops button:hover { background: var(--color-bg); color: var(--color-fg); }
 .git-more { padding: 4px 4px 10px; }
 .git-more-toggle { width: 100%; min-height: 40px; padding: 0 10px; border: 0; background: transparent; color: var(--color-fg); font-size: 12px; font-weight: 600; text-align: left; }

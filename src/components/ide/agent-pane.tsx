@@ -93,17 +93,29 @@ export function AgentPane() {
   const agentMode = useChrome((s) => s.agentMode);
   const permitMode = useChrome((s) => s.permitMode);
   const threadMap = useAgentChats((s) => s.threads);
+  const [chatsReady, setChatsReady] = useState(() => useAgentChats.persist.hasHydrated());
+  const booted = useRef(false);
 
   useEffect(() => {
+    if (useAgentChats.persist.hasHydrated()) {
+      setChatsReady(true);
+      return;
+    }
+    return useAgentChats.persist.onFinishHydration(() => setChatsReady(true));
+  }, []);
+
+  useEffect(() => {
+    if (!chatsReady) return;
+    booted.current = false;
     const t = useAgentChats.getState().load(projectId);
     history.current = t.messages;
     setItems(t.items);
     cancel.current = false;
     setBusy(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId]);
+    booted.current = true;
+  }, [projectId, chatsReady]);
 
-  const saveTimer = useRef<number | null>(null);
+  }, [draft]);
   useEffect(() => {
     const el = inputRef.current;
     if (!el) return;
@@ -111,12 +123,12 @@ export function AgentPane() {
     el.style.height = `${Math.min(180, Math.max(52, el.scrollHeight))}px`;
   }, [draft]);
   useEffect(() => {
-    if (!projectId) return;
-    if (saveTimer.current) window.clearTimeout(saveTimer.current);
-    saveTimer.current = window.setTimeout(() => {
-      useAgentChats.getState().save(projectId, items, history.current);
-    }, 250);
-  }, [items, projectId]);
+    if (!projectId || !chatsReady || !booted.current) return;
+    const flush = () => useAgentChats.getState().save(projectId, items, history.current);
+    flush();
+    window.addEventListener("pagehide", flush);
+    return () => window.removeEventListener("pagehide", flush);
+  }, [items, projectId, chatsReady]);
 
   useEffect(() => {
     draftRef.current = draft;

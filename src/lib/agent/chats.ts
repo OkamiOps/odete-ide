@@ -51,16 +51,41 @@ function blank(projectId: string): ChatThread {
 }
 
 function slimItems(items: ChatItem[]): ChatItem[] {
-  return items.slice(-60).map((it) => {
+  return items.slice(-80).map((it) => {
+    if (it.kind === "user") return { ...it, images: undefined };
+    if (it.kind === "think") return { ...it, text: it.text.slice(-8000), live: false };
+    if (it.kind === "assistant") return { ...it, text: it.text.slice(0, 20000) };
     if (it.kind === "patch") {
-      return {
-        ...it,
-        before: it.before.slice(0, 4000),
-        after: it.after.slice(0, 4000),
-      };
+      return { ...it, before: it.before.slice(0, 4000), after: it.after.slice(0, 4000) };
     }
     return it;
   });
+}
+
+function safeStorage() {
+  return {
+    getItem: (name: string) => {
+      try {
+        return localStorage.getItem(name);
+      } catch {
+        return null;
+      }
+    },
+    setItem: (name: string, value: string) => {
+      try {
+        localStorage.setItem(name, value);
+      } catch {
+        /* quota */
+      }
+    },
+    removeItem: (name: string) => {
+      try {
+        localStorage.removeItem(name);
+      } catch {
+        /* ignore */
+      }
+    },
+  };
 }
 
 export const useAgentChats = create<ChatState>()(
@@ -72,6 +97,14 @@ export const useAgentChats = create<ChatState>()(
         if (!projectId) return blank("");
         const s = get();
         const aid = s.active[projectId];
+        if (aid && s.threads[aid]?.items.length) return s.threads[aid]!;
+        const existing = Object.values(s.threads)
+          .filter((t) => t.projectId === projectId && (t.items.length || t.messages.length))
+          .sort((a, b) => b.updated - a.updated);
+        if (existing[0]) {
+          set({ active: { ...s.active, [projectId]: existing[0].id } });
+          return existing[0];
+        }
         if (aid && s.threads[aid]) return s.threads[aid]!;
         const t = blank(projectId);
         set({
@@ -102,7 +135,7 @@ export const useAgentChats = create<ChatState>()(
       },
       list: (projectId) =>
         Object.values(get().threads)
-          .filter((t) => t.projectId === projectId)
+          .filter((t) => t.projectId === projectId && (t.items.length || t.messages.length || t.id === get().active[projectId]))
           .sort((a, b) => b.updated - a.updated),
       newChat: (projectId) => {
         const cur = get().load(projectId);
@@ -162,7 +195,7 @@ export const useAgentChats = create<ChatState>()(
     {
       name: "colo-chats-v2",
       version: 2,
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => safeStorage()),
       partialize: (s) => ({ threads: s.threads, active: s.active }),
       migrate: (persisted, version) => {
         const p = persisted as { threads?: Record<string, unknown>; active?: Record<string, string> };

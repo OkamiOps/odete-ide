@@ -10,6 +10,8 @@ import { useProjects } from "./projects";
 import { scheduleSync } from "./folder";
 import { useTerms } from "./terms";
 import { lineDiff } from "./diff";
+import { isNoisePath } from "./ignore";
+import { virtualNpmFile, virtualNpmNames } from "./npm-lock";
 
 function cloneFiles(files: FileMap): FileMap {
   return { ...files };
@@ -235,12 +237,13 @@ export const useWorkspace = create<WorkspaceState>()(
         void import("./folder").then((m) => m.removeFromFolder(path, get().projectId));
         return undefined;
       },
-      readFile: (path) => get().files[path],
+      readFile: (path) => get().files[path] ?? virtualNpmFile(path, get().files),
       listDir: (path = "") => {
         const prefix = path.replace(/^\/+|\/+$/g, "");
         const { files } = get();
-        const names = new Set<string>();
+        const names = new Set<string>(virtualNpmNames(prefix, files));
         for (const p of Object.keys(files).sort()) {
+          if (isNoisePath(p) && prefix !== "node_modules" && !prefix.startsWith("node_modules/")) continue;
           if (prefix) {
             if (p === prefix) {
               names.add(p);
@@ -278,6 +281,7 @@ export const useWorkspace = create<WorkspaceState>()(
         const { files } = get();
         const hits: string[] = [];
         for (const [p, content] of Object.entries(files)) {
+          if (isNoisePath(p)) continue;
           if (path && p !== path && !p.startsWith(path.replace(/\/+$/, "") + "/")) {
             continue;
           }
@@ -321,12 +325,17 @@ export const useWorkspace = create<WorkspaceState>()(
         const { files, commits, lastPushedId, staged, branch, origin } = get();
         const head = commits[commits.length - 1];
         const changed = get().changedPaths();
-        const ahead = head && lastPushedId !== head.id;
+        const aheadN = (() => {
+          if (!lastPushedId) return commits.length;
+          const i = commits.findIndex((c) => c.id === lastPushedId);
+          if (i < 0) return commits.length;
+          return Math.max(0, commits.length - 1 - i);
+        })();
         const behind = origin && !commits.some((c) => c.id === origin.id);
         const rel = [
-          ahead ? "ahead of origin" : null,
+          aheadN > 0 ? `ahead of origin by ${aheadN}` : null,
           behind ? "behind origin" : null,
-          !ahead && !behind ? "up to date with origin/main" : null,
+          !aheadN && !behind ? "up to date with origin" : null,
         ]
           .filter(Boolean)
           .join(", ");
@@ -724,10 +733,11 @@ export const useWorkspace = create<WorkspaceState>()(
       changedPaths: () => {
         const { files, commits } = get();
         const head = commits[commits.length - 1];
-        if (!head) return Object.keys(files);
+        if (!head) return Object.keys(files).filter((k) => !isNoisePath(k));
         const keys = new Set([...Object.keys(files), ...Object.keys(head.files)]);
         const changed: string[] = [];
         for (const k of keys) {
+          if (isNoisePath(k)) continue;
           if (files[k] !== head.files[k]) changed.push(k);
         }
         return changed.sort();

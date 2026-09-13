@@ -1,4 +1,5 @@
 import type { FileMap } from "./types";
+import { isNoisePath } from "./ignore";
 
 export function wordAt(text: string, pos: number) {
   const re = /[A-Za-z_$][\w$]*/g;
@@ -17,7 +18,7 @@ export function findDef(name: string, files: FileMap, fromPath: string) {
     new RegExp(`\\b${name}\\s*=\\s*(?:function|\\()`),
     new RegExp(`\\b(?:export\\s+)?(?:async\\s+)?function\\s+${name}\\b`),
   ];
-  const order = [fromPath, ...Object.keys(files).filter((p) => p !== fromPath)];
+  const order = [fromPath, ...Object.keys(files).filter((p) => p !== fromPath && !isNoisePath(p))];
   for (const path of order) {
     const body = files[path] ?? "";
     const lines = body.split("\n");

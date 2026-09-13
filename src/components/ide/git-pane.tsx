@@ -28,6 +28,7 @@ import { useNav } from "@/lib/workspace/nav";
 import { useProjects } from "@/lib/workspace/projects";
 import { useHub } from "@/lib/workspace/hub";
 import { useWorkspace } from "@/lib/workspace/store";
+import { isNoisePath } from "@/lib/workspace/ignore";
 
 export function GitPane() {
   const files = useWorkspace((s) => s.files);
@@ -64,15 +65,20 @@ export function GitPane() {
 
   const head = commits[commits.length - 1];
   const changed = useMemo(() => {
-    if (!head) return Object.keys(files).sort();
+    if (!head) return Object.keys(files).filter((k) => !isNoisePath(k)).sort();
     const keys = new Set([...Object.keys(files), ...Object.keys(head.files)]);
-    return [...keys].filter((k) => files[k] !== head.files[k]).sort();
+    return [...keys].filter((k) => !isNoisePath(k) && files[k] !== head.files[k]).sort();
   }, [files, head]);
 
   const stagedSet = new Set(staged);
   const stagedFiles = changed.filter((p) => stagedSet.has(p));
   const unstaged = changed.filter((p) => !stagedSet.has(p));
-  const ahead = head && lastPushedId !== head.id ? 1 : 0;
+  const ahead = (() => {
+    if (!lastPushedId) return commits.length;
+    const i = commits.findIndex((c) => c.id === lastPushedId);
+    if (i < 0) return commits.length;
+    return Math.max(0, commits.length - 1 - i);
+  })();
   const behind = origin && !commits.some((c) => c.id === origin.id) ? 1 : 0;
   const w = () => useWorkspace.getState();
   const clean = changed.length === 0 && !conflicts.length;

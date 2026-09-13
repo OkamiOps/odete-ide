@@ -8,6 +8,7 @@ import { usePatches } from "@/lib/agent/patches";
 import { useChrome, type CenterId } from "@/lib/workspace/chrome";
 import { useDrag } from "@/lib/workspace/drag";
 import { useWorkspace } from "@/lib/workspace/store";
+import { isNoisePath } from "@/lib/workspace/ignore";
 
 const MODES: { id: CenterId; label: string }[] = [
   { id: "code", label: "Código" },
@@ -31,7 +32,7 @@ export function CenterPane() {
   const openFile = useWorkspace((s) => s.openFile);
   const files = useWorkspace((s) => s.files);
   const parts = openPath.split("/").filter(Boolean);
-  const names = Object.keys(files).sort();
+  const names = Object.keys(files).filter((p) => !isNoisePath(p)).sort();
   const opts = names.map((p) => ({ id: p, label: p }));
   const dragging = useDrag((s) => !!s.path);
   const right =

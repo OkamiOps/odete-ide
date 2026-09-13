@@ -125,21 +125,24 @@ export async function writeTree(dir: FileSystemDirectoryHandle, files: FileMap, 
   const prev = await getWritten(projectId);
   for (const path of prev) {
     if (files[path] !== undefined) continue;
+    if (path.startsWith("node_modules/") || path.includes("/node_modules/")) continue;
     try {
       await dropPath(dir, path);
     } catch {
       /* already gone */
     }
   }
-  const skipNm = paused > 0;
   for (const [path, body] of Object.entries(files)) {
-    if (skipNm && (path.startsWith("node_modules/") || path.includes("/node_modules/"))) continue;
+    if (path.startsWith("node_modules/") || path.includes("/node_modules/")) continue;
     const fh = await ensurePath(dir, path);
     const w = await fh.createWritable();
     await w.write(bytesOf(body));
     await w.close();
   }
-  await putWritten(projectId, Object.keys(files));
+  await putWritten(
+    projectId,
+    Object.keys(files).filter((p) => !p.startsWith("node_modules/") && !p.includes("/node_modules/")),
+  );
 }
 
 export async function removeFromFolder(path: string, projectId?: string) {

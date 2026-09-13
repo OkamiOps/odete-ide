@@ -45,7 +45,12 @@ function Node({
 }) {
   const { dirs, rootFiles } = treeFromFiles(paths);
   const [open, setOpen] = useState<Record<string, boolean>>({});
-  const isOpen = (dir: string) => open[dir] !== false;
+  const isOpen = (dir: string) => {
+    if (dir === "node_modules" || dir === "dist" || dir === ".next" || dir === ".git" || dir === "coverage") {
+      return open[dir] === true;
+    }
+    return open[dir] !== false;
+  };
 
   return (
     <>

@@ -1,8 +1,9 @@
 import { useWorkspace } from "./store";
 import { fileDiff } from "./diff";
-import { npmInstall } from "./npm";
+import { npmInstall, npmRunScript } from "./npm";
 import { remoteFetch, remotePull, remotePush, remoteSync } from "./git-remote";
 import { useChrome } from "./chrome";
+import { isNoisePath } from "./ignore";
 
 function unquote(s: string) {
   if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
@@ -65,7 +66,7 @@ export async function runShellAsync(raw: string): Promise<string> {
           "ls  cat  pwd  cd  mkdir  touch  rm  echo",
           "git status | log | diff | add | restore | commit -m | pull | push | fetch | sync | clone",
           "git branch | checkout | stash | stash pop | blame",
-          "npm i <pkg>   npm run   npx vite   clear",
+          "npm i [pkg] [-D]   npm run [script]   npm ls   npx vite   clear",
         ].join("\n");
         break;
       case "clear":
@@ -141,7 +142,9 @@ export async function runShellAsync(raw: string): Promise<string> {
           const target = args[1] ? resolve(w.cwd, args[1]) : "";
           const paths = target
             ? [target]
-            : Object.keys({ ...w.files, ...(head ?? {}) }).filter((k) => w.files[k] !== head?.[k]);
+            : Object.keys({ ...w.files, ...(head ?? {}) }).filter(
+                (k) => !isNoisePath(k) && w.files[k] !== head?.[k],
+              );
           if (!paths.length) out = "working tree clean";
           else {
             out = paths
@@ -231,20 +234,48 @@ export async function runShellAsync(raw: string): Promise<string> {
         }
         break;
       }
+      case "wc": {
+        const p = resolve(w.cwd, args[0]);
+        const body = w.readFile(p);
+        if (body === undefined) {
+          err = true;
+          out = `wc: ${p}: não existe`;
+        } else {
+          const lines = body.split("\n").length;
+          const words = body.trim() ? body.trim().split(/\s+/).length : 0;
+          out = `${lines} ${words} ${body.length} ${p}`;
+        }
+        break;
+      }
       case "npm": {
         if (args[0] === "i" || args[0] === "install") {
           out = await npmInstall(args.slice(1), (m) => w.termPrint("out", m));
+        } else if (args[0] === "ls") {
+          const { parseLock } = await import("./npm-lock");
+          const lock = parseLock(w.readFile("package-lock.colo.json"));
+          const keys = Object.keys(lock);
+          out = keys.length ? keys.map((k) => `${k}@${lock[k]}`).join("\n") : "(lock vazio — npm i)";
         } else if (args[0] === "run" || args[0] === "start" || args[0] === "dev") {
-          useChrome.getState().setCenter("preview");
-          out = `sem runtime Node neste iPad.\nabri o Preview (index.html + importmap / esm.sh).\nscripts do package.json não rodam aqui.`;
-        } else out = "npm — use: npm i [pkg]  |  npm run";
+          const name = args[0] === "run" ? args[1] : args[0];
+          const r = npmRunScript(name);
+          if (r.openPreview) {
+            useChrome.getState().setCenter("preview");
+            useChrome.getState().setMobile("preview");
+          }
+          out = r.out;
+        } else out = "npm — use: npm i [pkg]  |  npm run [script]  |  npm ls";
         break;
       }
       case "npx":
-      case "vite":
-        useChrome.getState().setCenter("preview");
-        out = "sem runtime Node — abri o Preview com index.html. vite/npx não executam binário.";
+      case "vite": {
+        const r = npmRunScript("dev");
+        if (r.openPreview) {
+          useChrome.getState().setCenter("preview");
+          useChrome.getState().setMobile("preview");
+        }
+        out = r.out;
         break;
+      }
       case "reset":
         w.resetWorkspace();
         out = "workspace restaurado";

@@ -549,7 +549,7 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
           <div className="agent-empty">
             <p className="agent-empty-kicker">{def.vendor}</p>
             <h3>{def.label} pronto</h3>
-            <p>Edita arquivo, git e npm neste iPad. Vite no preview. Sem outra máquina.</p>
+            <p>npm i no lock + esm.sh. npm run dev abre o Preview com JSX/TS. Next/Nest precisam de Node.</p>
             <div className="agent-starts">
               {STARTERS.map((s) => (
                 <button key={s.label} type="button" onClick={() => void send(s.prompt)}>

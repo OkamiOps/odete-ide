@@ -88,8 +88,8 @@ export function TerminalPane() {
     if (!t) return;
     useTerms.getState().pushHist(t);
     setHistI(-1);
-    void runShellAsync(t).then(() => {
-      if (/^(npm run |npm start|npx vite|vite)/.test(t)) {
+    void runShellAsync(t).then((out) => {
+      if (out && !out.startsWith("ERROR") && /^(npm run |npm start|npx vite|vite|npm dev)/.test(t) && !/\b(build|test|lint)\b/.test(t)) {
         useChrome.getState().setCenter("preview");
       }
     });

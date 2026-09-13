@@ -1,3 +1,5 @@
+import { isNoisePath } from "@/lib/workspace/ignore";
+
 export type AgentMode = "chat" | "plan" | "build";
 
 export const AGENT_TOOLS = [
@@ -88,7 +90,7 @@ export const AGENT_TOOLS = [
     function: {
       name: "run_shell",
       description:
-        "Terminal do workspace. ls, cat, mkdir, git status/log/commit/push/pull, npm i, npx vite. Chat só lê.",
+        "Terminal do workspace. ls, cat, mkdir, git, npm i, npm run dev (Preview JSX/TS). Chat só lê. Next/Nest/Astro SSR não sobem no iPad.",
       parameters: {
         type: "object",
         properties: { command: { type: "string" } },
@@ -110,9 +112,12 @@ export function toolsForMode(mode: AgentMode): AgentTool[] {
 }
 
 export function formatWorkspace(files: Record<string, string>) {
-  const names = Object.keys(files).sort();
+  const names = Object.keys(files)
+    .filter((p) => !isNoisePath(p))
+    .sort();
   if (!names.length) return "(vazio)";
-  return names.join("\n");
+  if (names.length <= 400) return names.join("\n");
+  return `${names.slice(0, 400).join("\n")}\n… e ${names.length - 400} mais`;
 }
 
 export function modePrompt(mode: AgentMode) {

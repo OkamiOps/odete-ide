@@ -1,45 +1,38 @@
 import { useWorkspace } from "./store";
-import { untarGz } from "./zip";
-import { BIN_PREFIX } from "@/lib/github/api";
 import { pauseSync, resumeSync } from "./folder";
+import { isToolPkg, parseLock } from "./npm-lock";
 
-type NpmInfo = { name: string; version: string; main?: string };
+export type NpmInfo = {
+  name: string;
+  version: string;
+  main?: string;
+  module?: string;
+  dependencies?: Record<string, string>;
+  peerDependencies?: Record<string, string>;
+  optionalDependencies?: Record<string, string>;
+};
+
+export type StackKind = "spa" | "ssr" | "api";
+export type Stack = { id: string; kind: StackKind; label: string };
+
+export { isToolPkg, parseLock, lockOfFiles, esmImports, virtualNpmFile, virtualNpmNames } from "./npm-lock";
+
+const MAX_PACKAGES = 1200;
+const CONCURRENCY = 8;
 
 function encName(name: string) {
   return name.startsWith("@") ? name.replace("/", "%2F") : encodeURIComponent(name);
 }
 
-async function lookup(name: string, want?: string): Promise<NpmInfo> {
-  const q = want ? `&ver=${encodeURIComponent(want)}` : "";
-  const local = await fetch(`/api/npm?name=${encName(name)}${q}`);
-  if (local.ok) {
-    const j = (await local.json()) as NpmInfo & { error?: string };
-    if (j.name && j.version) return j;
-  }
-  const spec = want && /^\d/.test(want.replace(/^[vV]/, "")) ? `@${want.replace(/^[vV]/, "")}` : "";
-  const r = await fetch(`https://cdn.jsdelivr.net/npm/${name}${spec}/package.json`);
-  if (!r.ok) throw new Error(`${name}: ${r.status}`);
-  const pkg = (await r.json()) as { name?: string; version?: string; main?: string };
-  if (!pkg.version) throw new Error(`${name}: sem versão`);
-  return { name: pkg.name || name, version: pkg.version, main: pkg.main };
-}
-
-function parsePkg(raw?: string) {
+export function parsePkg(raw?: string) {
   try {
     return JSON.parse(raw || "{}") as {
       name?: string;
       dependencies?: Record<string, string>;
       devDependencies?: Record<string, string>;
+      peerDependencies?: Record<string, string>;
+      scripts?: Record<string, string>;
     };
-  } catch {
-    return {};
-  }
-}
-
-function parseLock(raw?: string) {
-  try {
-    const j = JSON.parse(raw || "{}") as { lock?: Record<string, string> };
-    return j.lock ?? {};
   } catch {
     return {};
   }
@@ -54,65 +47,54 @@ function specName(s: string) {
   return i > 0 ? { name: s.slice(0, i), ver: s.slice(i + 1) } : { name: s, ver: "" };
 }
 
-function injectImportMap(html: string, lock: Record<string, string>) {
-  let prev: Record<string, string> = {};
-  const hit = html.match(/<script type=["']importmap["']>([\s\S]*?)<\/script>/);
-  if (hit) {
-    try {
-      prev = ((JSON.parse(hit[1]!) as { imports?: Record<string, string> }).imports ?? {});
-    } catch {
-      prev = {};
-    }
+export function detectStack(pkg: {
+  dependencies?: Record<string, string>;
+  devDependencies?: Record<string, string>;
+}): Stack {
+  const all = { ...pkg.dependencies, ...pkg.devDependencies };
+  if (all.next) return { id: "next", kind: "ssr", label: "Next.js" };
+  if (all.astro) return { id: "astro", kind: "ssr", label: "Astro" };
+  if (all["@remix-run/react"] || all["@remix-run/node"] || all.remix) return { id: "remix", kind: "ssr", label: "Remix" };
+  if (all["@nestjs/core"]) return { id: "nest", kind: "api", label: "Nest" };
+  if (all["@tanstack/react-start"] || all["@tanstack/start"]) {
+    return { id: "tanstack-start", kind: "ssr", label: "TanStack Start" };
   }
-  const imports: Record<string, string> = { ...prev };
-  for (const [name, ver] of Object.entries(lock)) {
-    imports[name] = `https://esm.sh/${name}@${ver}`;
-    imports[`${name}/`] = `https://esm.sh/${name}@${ver}/`;
-  }
-  const block = `<script type="importmap">${JSON.stringify({ imports }, null, 2)}</script>`;
-  if (hit) return html.replace(/<script type=["']importmap["']>[\s\S]*?<\/script>/, block);
-  if (/<head[^>]*>/i.test(html)) return html.replace(/<head[^>]*>/i, (h) => `${h}\n${block}`);
-  return `${block}\n${html}`;
+  if (all.vite || all["@vitejs/plugin-react"]) return { id: "vite", kind: "spa", label: "Vite" };
+  if (all["react-scripts"]) return { id: "cra", kind: "spa", label: "CRA" };
+  if (all.react) return { id: "react", kind: "spa", label: "React" };
+  return { id: "html", kind: "spa", label: "HTML" };
 }
 
-function isTextBytes(bytes: Uint8Array) {
-  const n = Math.min(bytes.length, 800);
-  for (let i = 0; i < n; i++) if (bytes[i] === 0) return false;
-  return true;
-}
-
-async function unpackPackage(info: NpmInfo, onNote?: (s: string) => void) {
-  const w = useWorkspace.getState();
-  const native: string[] = [];
-  let files = 0;
-  const res = await fetch(`/api/npm?name=${encName(info.name)}&ver=${encodeURIComponent(info.version)}&pack=1`);
-  if (!res.ok) throw new Error(`tarball ${info.name}: ${res.status}`);
-  const tar = await untarGz(await res.arrayBuffer());
-  for (const [full, bytes] of Object.entries(tar)) {
-    const rel = full.replace(/^package\//, "");
-    if (!rel || rel.endsWith("/") || rel.includes("/node_modules/")) continue;
-    if (rel.endsWith(".node") || /\.(exe|dylib|so)$/i.test(rel)) {
-      native.push(rel);
-      continue;
-    }
-    if (bytes.length > 1_200_000) continue;
-    const dest = `node_modules/${info.name}/${rel}`;
-    if (isTextBytes(bytes)) {
-      w.writeFile(dest, new TextDecoder("utf-8", { fatal: false }).decode(bytes));
-    } else {
-      let bin = "";
-      bytes.forEach((b) => {
-        bin += String.fromCharCode(b);
-      });
-      w.writeFile(dest, `${BIN_PREFIX}application/octet-stream;${btoa(bin)}`);
-    }
-    files += 1;
+export function stackHint(stack: Stack) {
+  if (stack.kind === "spa") {
+    return `${stack.label}: npm run dev abre o Preview (JSX/TS no Colo, pacotes via esm.sh). Sem binário Node.`;
   }
-  onNote?.(`${info.name}@${info.version}  ${files} arquivos`);
-  return native;
+  if (stack.id === "nest") {
+    return `Nest é API Node — não sobe neste iPad. npm i grava o lock; o Preview não emula o servidor.`;
+  }
+  return `${stack.label} precisa de Node/SSR. Colo instala o lock e tenta o client se houver index.html. O servidor (${stack.label} dev) não roda aqui.`;
 }
 
-const MAX_PACKAGES = 250;
+async function lookup(name: string, want?: string): Promise<NpmInfo> {
+  const q = want ? `&ver=${encodeURIComponent(want)}` : "";
+  const local = await fetch(`/api/npm?name=${encName(name)}${q}`);
+  if (local.ok) {
+    const j = (await local.json()) as NpmInfo & { error?: string };
+    if (j.name && j.version) return j;
+  }
+  const spec = want && /^\d/.test(want.replace(/^[vV^~>=<]+/, "")) ? `@${want.replace(/^[vV^~>=<]+/, "")}` : "";
+  const r = await fetch(`https://cdn.jsdelivr.net/npm/${name}${spec}/package.json`);
+  if (!r.ok) throw new Error(`${name}: ${r.status}`);
+  const pkg = (await r.json()) as NpmInfo;
+  if (!pkg.version) throw new Error(`${name}: sem versão`);
+  return {
+    name: pkg.name || name,
+    version: pkg.version,
+    main: pkg.main,
+    dependencies: pkg.dependencies,
+    peerDependencies: pkg.peerDependencies,
+  };
+}
 
 export async function npmInstall(args: string[], onNote?: (s: string) => void): Promise<string> {
   const w = useWorkspace.getState();
@@ -120,57 +102,155 @@ export async function npmInstall(args: string[], onNote?: (s: string) => void): 
   try {
     const pkg = parsePkg(w.readFile("package.json"));
     pkg.dependencies = pkg.dependencies ?? {};
-    const requested = args.filter((a) => a && !a.startsWith("-"));
-    const names = requested.length
-      ? requested.map(specName)
-      : Object.keys({ ...pkg.dependencies, ...pkg.devDependencies }).map((name) => ({
-          name,
-          ver: (pkg.dependencies?.[name] || pkg.devDependencies?.[name] || "").replace(/^[\^~>=<]+/, ""),
+    pkg.devDependencies = pkg.devDependencies ?? {};
+    const flags = args.filter((a) => a.startsWith("-"));
+    const saveDev = flags.includes("-D") || flags.includes("--save-dev");
+    const production = flags.includes("--production") || flags.includes("--omit=dev");
+    const unknown = flags.filter(
+      (a) => !["-D", "--save-dev", "--production", "--omit=dev", "-P", "--save"].includes(a),
+    );
+    const requested = args.filter((a) => a && !a.startsWith("-")).map(specName);
+    const fromFile = [
+      ...Object.entries(pkg.dependencies ?? {}).map(([name, ver]) => ({
+        name,
+        ver: ver.replace(/^[\^~>=<]+/, ""),
+        kind: "runtime" as const,
+      })),
+      ...(production
+        ? []
+        : Object.entries(pkg.devDependencies ?? {}).map(([name, ver]) => ({
+            name,
+            ver: ver.replace(/^[\^~>=<]+/, ""),
+            kind: "tool" as const,
+          }))),
+    ];
+    type Job = { name: string; want: string; recurse: boolean; top: boolean };
+    const seed: Job[] = requested.length
+      ? requested.map((n) => ({
+          name: n.name,
+          want: n.ver,
+          recurse: !isToolPkg(n.name),
+          top: true,
+        }))
+      : fromFile.map((n) => ({
+          name: n.name,
+          want: n.ver,
+          recurse: n.kind === "runtime" && !isToolPkg(n.name),
+          top: true,
         }));
-    if (!names.length) return "package.json sem dependências. use: npm i lodash";
-    const lock: Record<string, string> = { ...parseLock(w.readFile("package-lock.colo.json")) };
-    const lines: string[] = [];
-    const native: string[] = [];
-    const failed: string[] = [];
+    if (!seed.length) return "package.json sem dependências. use: npm i react";
 
-    async function collect(name: string, want: string, top: boolean) {
-      if (!name || lock[name] || Object.keys(lock).length >= MAX_PACKAGES) return;
-      onNote?.(`baixando ${name}…`);
+    const prev = parseLock(w.readFile("package-lock.colo.json"));
+    const lock: Record<string, string> = { ...prev };
+    const lines: string[] = [];
+    const failed: string[] = [];
+    const seen = new Set<string>();
+    const queue: Job[] = [];
+    function enqueue(job: Job) {
+      if (!job.name || seen.has(job.name)) return;
+      seen.add(job.name);
+      queue.push(job);
+    }
+    for (const j of seed) enqueue(j);
+
+    async function process(job: Job) {
+      if (Object.keys(lock).length >= MAX_PACKAGES) return;
+      onNote?.(`resolvendo ${job.name}…`);
       let info: NpmInfo;
       try {
-        info = await lookup(name, want);
+        info = await lookup(job.name, job.want);
       } catch (e) {
-        failed.push(`${name}: ${e instanceof Error ? e.message : "falhou"}`);
+        failed.push(`${job.name}: ${e instanceof Error ? e.message : "falhou"}`);
         return;
       }
       lock[info.name] = info.version;
-      if (top) {
-        pkg.dependencies = pkg.dependencies ?? {};
-        pkg.dependencies[info.name] = `^${info.version}`;
+      if (job.top && requested.length) {
+        const bucket = saveDev ? pkg.devDependencies! : pkg.dependencies!;
+        bucket[info.name] = `^${info.version}`;
       }
-      const n = await unpackPackage(info, onNote);
-      native.push(...n.map((f) => `${info.name}/${f}`));
-      lines.push(`+ ${info.name}@${info.version}`);
-      const nested = parsePkg(useWorkspace.getState().readFile(`node_modules/${info.name}/package.json`));
-      for (const dep of Object.keys(nested.dependencies ?? {})) {
-        await collect(dep, "", false);
+      lines.push(`${job.recurse ? "+" : "tool"} ${info.name}@${info.version}`);
+      if (!job.recurse) return;
+      for (const [dep, range] of Object.entries(info.dependencies ?? {})) {
+        enqueue({ name: dep, want: range, recurse: !isToolPkg(dep), top: false });
+      }
+      for (const [dep, range] of Object.entries(info.peerDependencies ?? {})) {
+        enqueue({ name: dep, want: range, recurse: !isToolPkg(dep), top: false });
       }
     }
 
-    for (const n of names) await collect(n.name, n.ver, true);
+    const inflightMax = CONCURRENCY;
+    await new Promise<void>((resolve, reject) => {
+      let inflight = 0;
+      const next = () => {
+        if (!queue.length && inflight === 0) return resolve();
+        while (inflight < inflightMax && queue.length) {
+          if (Object.keys(lock).length >= MAX_PACKAGES) {
+            if (inflight === 0) return resolve();
+            break;
+          }
+          const job = queue.shift()!;
+          inflight += 1;
+          process(job).then(
+            () => {
+              inflight -= 1;
+              next();
+            },
+            (e) => reject(e),
+          );
+        }
+      };
+      next();
+    });
+
     if (!pkg.name) pkg.name = w.projectName || "colo-app";
     const ws = useWorkspace.getState();
     ws.writeFile("package.json", JSON.stringify(pkg, null, 2) + "\n");
     ws.writeFile("package-lock.colo.json", JSON.stringify({ lock, at: Date.now() }, null, 2) + "\n");
-    const html = ws.readFile("index.html");
-    if (html) ws.writeFile("index.html", injectImportMap(html, lock));
-    const extra = native.length
-      ? `\nbinários nativos ignorados (não rodam no iPad):\n${native.slice(0, 8).join("\n")}`
-      : "";
+    const stack = detectStack(pkg);
+    const extra = unknown.length ? `\nflag ignorada: ${unknown.join(" ")}` : "";
     const miss = failed.length ? `\nfalhou:\n${failed.slice(0, 12).join("\n")}` : "";
-    const cap = Object.keys(lock).length >= MAX_PACKAGES ? `\nparou em ${MAX_PACKAGES} pacotes (quota do iPad)` : "";
-    return `added ${lines.length} packages · lock ${Object.keys(lock).length}\n${lines.join("\n")}\npreview usa esm.sh + node_modules${extra}${miss}${cap}`;
+    const cap = Object.keys(lock).length >= MAX_PACKAGES ? `\nparou em ${MAX_PACKAGES} pacotes` : "";
+    return `added ${lines.length} · lock ${Object.keys(lock).length}  (${stack.label})\n${lines.slice(0, 40).join("\n")}${lines.length > 40 ? `\n… +${lines.length - 40}` : ""}\n${stackHint(stack)}\nnode_modules não entra no editor (quota). Preview usa esm.sh + JSX/TS do Colo.${extra}${miss}${cap}`;
   } finally {
     resumeSync(useWorkspace.getState().files, useWorkspace.getState().projectId);
   }
+}
+
+export function npmRunScript(name: string | undefined): { out: string; openPreview: boolean } {
+  const w = useWorkspace.getState();
+  const pkg = parsePkg(w.readFile("package.json"));
+  const scripts = pkg.scripts ?? {};
+  if (!name) {
+    const keys = Object.keys(scripts);
+    return {
+      out: keys.length ? keys.map((k) => `${k}\n  ${scripts[k]}`).join("\n") : "sem scripts em package.json",
+      openPreview: false,
+    };
+  }
+  const cmd = scripts[name];
+  const stack = detectStack(pkg);
+  const isDev =
+    /^(dev|start|preview|serve)$/.test(name) || /\b(vite|astro|next|remix|nuxt)\b/.test(cmd || name);
+  const isBuild =
+    /^(build|test|lint|typecheck|tsc|format)$/.test(name) ||
+    /\b(tsc|eslint|vitest|jest|playwright)\b/.test(cmd || "");
+  if (!cmd && name !== "dev" && name !== "start") {
+    return {
+      out: `npm run ${name}: script não existe\n${Object.keys(scripts).join("  ") || "(nenhum)"}`,
+      openPreview: false,
+    };
+  }
+  if (isBuild) {
+    return {
+      out: `npm run ${name} — ${cmd || name}\neste iPad não executa ${name} (sem Node/CLI).\nuse o Preview pra ver o app, ou rode ${name} num Mac.`,
+      openPreview: false,
+    };
+  }
+  if (stack.kind !== "spa" && isDev) {
+    return { out: `npm run ${name} — ${cmd || name}\n${stackHint(stack)}`, openPreview: true };
+  }
+  return {
+    out: `npm run ${name} — ${cmd || "preview"}\n${stackHint(stack)}\nabri o Preview.`,
+    openPreview: true,
+  };
 }

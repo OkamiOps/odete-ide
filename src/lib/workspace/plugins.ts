@@ -1,6 +1,7 @@
 import { extOf } from "@/lib/utils";
 import type { FileMap } from "./types";
 import { lintSyntaxFile } from "./lint";
+import { isNoisePath } from "./ignore";
 
 export type PluginId =
   | "linter"
@@ -248,6 +249,7 @@ export function collectDiags(
 ): Diag[] {
   const out: Diag[] = [];
   for (const [path, text] of Object.entries(files)) {
+    if (isNoisePath(path)) continue;
     if (opts.linter) out.push(...lintFile(path, text));
     if (opts.todos) out.push(...findTodos(path, text));
   }

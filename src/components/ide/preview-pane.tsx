@@ -4,10 +4,20 @@ import { markdownPage, isMdPath } from "@/lib/workspace/markdown";
 import { buildPreviewHtml } from "@/lib/workspace/preview";
 import { buildSwiftPlayground, isSwiftPath } from "@/lib/workspace/swift-play";
 import { useWorkspace } from "@/lib/workspace/store";
+import { isNoisePath } from "@/lib/workspace/ignore";
 
 type Frame = "full" | "ipad" | "phone";
 
 type Log = { id: number; level: string; text: string };
+
+function sourceKey(files: Record<string, string>) {
+  const parts: string[] = [];
+  for (const k of Object.keys(files).sort()) {
+    if (isNoisePath(k)) continue;
+    parts.push(`${k}:${files[k]!.length}`);
+  }
+  return parts.join("|");
+}
 
 export function PreviewPane() {
   const files = useWorkspace((s) => s.files);
@@ -17,6 +27,12 @@ export function PreviewPane() {
   const [frame, setFrame] = useState<Frame>("full");
   const [tick, setTick] = useState(0);
   const [logs, setLogs] = useState<Log[]>([]);
+  const key = useMemo(() => sourceKey(files), [files]);
+  const [readyKey, setReadyKey] = useState(key);
+  useEffect(() => {
+    const t = window.setTimeout(() => setReadyKey(key), 280);
+    return () => window.clearTimeout(t);
+  }, [key]);
   const srcDoc = useMemo(
     () =>
       md
@@ -24,7 +40,8 @@ export function PreviewPane() {
         : swift
           ? buildSwiftPlayground(files[openPath] ?? "")
           : buildPreviewHtml(files),
-    [files, openPath, swift, md, tick],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [readyKey, openPath, swift, md, tick],
   );
 
   useEffect(() => {

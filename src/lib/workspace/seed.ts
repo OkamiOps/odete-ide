@@ -311,9 +311,10 @@ struct ContentView: View {
 `,
   "notes.md": `# Notas
 
-- Preview injeta CSS e JS no iframe. Não precisa de servidor Vite de verdade.
-- \`npm i\` e \`npx vite\` são simulados no sandbox.
-- Git é local: commit, log, status, push (marca origin).
+- Preview transforma JSX/TS e resolve pacotes via esm.sh. Sem binário Node.
+- \`npm i\` grava o lock (sem despejar node_modules no editor). \`npm run dev\` abre o Preview.
+- Next/Remix/Astro/Nest: o servidor não sobe neste iPad.
+- Git é local: commit, log, status, push (HEAD, não o rascunho).
 - O agente usa grok-4.5 no servidor do app e as tools mexem nestes arquivos.
 `,
 };

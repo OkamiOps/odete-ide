@@ -4,6 +4,7 @@ import { useWorkspace } from "@/lib/workspace/store";
 import { usePatches } from "./patches";
 import type { FileMap } from "@/lib/workspace/types";
 import { idbKv } from "@/lib/workspace/idb";
+import { isNoisePath } from "@/lib/workspace/ignore";
 
 type Snap = {
   id: string;
@@ -24,8 +25,9 @@ function slimFiles(files: FileMap): FileMap {
   const out: FileMap = {};
   let n = 0;
   for (const [k, v] of Object.entries(files)) {
-    if (v.length > 120_000) continue;
-    if (n++ > 80) break;
+    if (isNoisePath(k)) continue;
+    if (v.length > 200_000) continue;
+    if (n++ > 220) break;
     out[k] = v;
   }
   return out;
@@ -37,7 +39,7 @@ export const useCheckpoints = create<State>()(
       items: [],
       last: null,
       take: (title = "turno") => {
-        const files = { ...useWorkspace.getState().files };
+        const files = slimFiles(useWorkspace.getState().files);
         const snap: Snap = { id: crypto.randomUUID(), at: Date.now(), title, files };
         set((s) => ({ last: snap, items: [snap, ...s.items].slice(0, 8) }));
       },
@@ -50,13 +52,13 @@ export const useCheckpoints = create<State>()(
         const snap = get().items.find((x) => x.id === id);
         if (!snap) return "checkpoint sumiu";
         const cur = useWorkspace.getState();
+        const merged = { ...cur.files, ...snap.files };
         const first = snap.files[cur.openPath] !== undefined ? cur.openPath : Object.keys(snap.files)[0] ?? cur.openPath;
-        const keep = cur.tabs.filter((p) => snap.files[p] !== undefined);
+        const keep = cur.tabs.filter((p) => merged[p] !== undefined);
         useWorkspace.setState({
-          files: { ...snap.files },
+          files: merged,
           openPath: first,
           tabs: keep.length ? keep : [first],
-          staged: [],
         });
         usePatches.getState().rejectAll();
         set({ last: snap });

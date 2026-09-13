@@ -5,6 +5,8 @@ import SwiftUI
 /// Layout de iPad: rail, sidebar, centro, agente e a gaveta do terminal.
 struct WorkspaceView: View {
     @Environment(ChromeState.self) private var chrome
+    @Environment(WorkspaceModel.self) private var ws
+    @Environment(AppModel.self) private var app
     @Environment(\.theme) private var theme
 
     var body: some View {
@@ -39,10 +41,23 @@ struct WorkspaceView: View {
             }
         }
         .background(theme.bg)
-        .ignoresSafeArea(.keyboard)
         .animation(.snappy(duration: 0.2), value: chrome.snapshot.sideOpen)
         .animation(.snappy(duration: 0.2), value: chrome.snapshot.agentVisible)
         .animation(.snappy(duration: 0.2), value: chrome.snapshot.termVisible)
+        .alert("Erro", isPresented: Binding(get: { ws.error != nil }, set: { if !$0 { ws.error = nil } })) {
+            Button("OK") { ws.error = nil }
+        } message: { Text(ws.error ?? "") }
+        .background {
+            // Atalhos de teclado físico.
+            Group {
+                Button("") { ws.save() }.keyboardShortcut("s", modifiers: .command)
+                Button("") { chrome.toggleSide() }.keyboardShortcut("b", modifiers: .command)
+                Button("") { chrome.toggleTerm() }.keyboardShortcut("j", modifiers: .command)
+                Button("") { if let a = ws.active { ws.closeTab(a) } }.keyboardShortcut("w", modifiers: .command)
+                Button("") { chrome.toggleAgent() }.keyboardShortcut("i", modifiers: .command)
+            }
+            .opacity(0)
+        }
     }
 }
 
@@ -51,47 +66,11 @@ struct SidebarView: View {
 
     var body: some View {
         switch chrome.snapshot.side {
-        case .files: FilesShell()
+        case .files: FileTreeView()
         case .search: ShellPanel("Busca", symbol: "magnifyingglass", phase: 1, blurb: "Busca no projeto chega no marco 5.")
         case .git: ShellPanel("Git", symbol: "arrow.triangle.branch", phase: 2, blurb: "Commits, branches e GitHub com libgit2.")
         case .problems: ShellPanel("Problemas", symbol: "exclamationmark.circle", phase: 3, blurb: "Diagnósticos do lint e do build.")
         case .settings: SettingsShell()
-        }
-    }
-}
-
-struct FilesShell: View {
-    @Environment(\.theme) private var theme
-    private let sample: [(String, Bool, Int)] = [
-        ("src", true, 0), ("App.tsx", false, 1), ("main.tsx", false, 1), ("style.css", false, 1),
-        ("index.html", false, 0), ("package.json", false, 0), ("README.md", false, 0), ("vite.config.ts", false, 0),
-    ]
-
-    var body: some View {
-        VStack(spacing: 0) {
-            PaneHeader("Arquivos", detail: "meu-app") {
-                HeaderButton("doc.badge.plus", label: "Novo arquivo") {}
-                HeaderButton("folder.badge.plus", label: "Nova pasta") {}
-            }
-            ScrollView {
-                LazyVStack(spacing: 0) {
-                    ForEach(Array(sample.enumerated()), id: \.offset) { _, row in
-                        HStack(spacing: 6) {
-                            if row.1 {
-                                Image(systemName: "chevron.down").font(.system(size: 9, weight: .bold)).foregroundStyle(theme.fgSubtle).frame(width: 12)
-                            } else {
-                                Spacer().frame(width: 12)
-                            }
-                            FileGlyph(path: row.0, isDirectory: row.1, expanded: true)
-                            Text(row.0).font(OdeteFont.ui(13)).foregroundStyle(theme.fg)
-                            Spacer()
-                        }
-                        .padding(.leading, 10 + CGFloat(row.2) * 16)
-                        .frame(height: Metrics.row)
-                        .background(row.0 == "App.tsx" ? theme.bgSubtle : .clear)
-                    }
-                }
-            }
         }
     }
 }
@@ -101,16 +80,15 @@ struct SettingsShell: View {
     @Environment(\.theme) private var theme
 
     var body: some View {
+        @Bindable var chrome = chrome
         VStack(spacing: 0) {
             PaneHeader("Ajustes")
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
-                    Text("TEMA").font(OdeteFont.label).tracking(1).foregroundStyle(theme.fgSubtle)
+                    label("Tema")
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 104), spacing: 8)], spacing: 8) {
                         ForEach(ThemePalette.all) { p in
-                            Button {
-                                chrome.snapshot.theme = p.id
-                            } label: {
+                            Button { chrome.snapshot.theme = p.id } label: {
                                 VStack(alignment: .leading, spacing: 6) {
                                     HStack(spacing: 4) {
                                         Circle().fill(Color(hex: p.bg)).frame(width: 12, height: 12)
@@ -128,10 +106,23 @@ struct SettingsShell: View {
                             .buttonStyle(.plain)
                         }
                     }
-                    Text("LAYOUT").font(OdeteFont.label).tracking(1).foregroundStyle(theme.fgSubtle).padding(.top, 6)
-                    Toggle("Agente", isOn: Binding(get: { chrome.snapshot.agentVisible }, set: { chrome.snapshot.agentVisible = $0 }))
-                    Toggle("Terminal", isOn: Binding(get: { chrome.snapshot.termVisible }, set: { chrome.snapshot.termVisible = $0 }))
-                    Button("Restaurar layout") { chrome.resetLayout() }.font(OdeteFont.ui(12))
+                    label("Editor").padding(.top, 6)
+                    HStack {
+                        Text("Tamanho da fonte")
+                        Spacer()
+                        Stepper("\(Int(chrome.snapshot.editor.fontSize)) pt", value: $chrome.snapshot.editor.fontSize, in: 10 ... 22, step: 1)
+                            .fixedSize()
+                    }
+                    Toggle("Salvar automaticamente", isOn: $chrome.snapshot.editor.autoSave)
+                    Toggle("Quebrar linhas", isOn: $chrome.snapshot.editor.wrap)
+                    Toggle("Números de linha", isOn: $chrome.snapshot.editor.lineNumbers)
+                    label("Layout").padding(.top, 6)
+                    Toggle("Agente", isOn: $chrome.snapshot.agentVisible)
+                    Toggle("Terminal", isOn: $chrome.snapshot.termVisible)
+                    Button("Restaurar layout") { chrome.resetLayout() }
+                    label("Em breve").padding(.top, 6)
+                    Text("Agente (Fase 4) · Git (Fase 2) · Segurança e chaves (Fase 4)")
+                        .font(OdeteFont.ui(12)).foregroundStyle(theme.fgMuted)
                 }
                 .font(OdeteFont.ui(13))
                 .foregroundStyle(theme.fg)
@@ -139,100 +130,9 @@ struct SettingsShell: View {
             }
         }
     }
-}
 
-struct CenterPane: View {
-    @Environment(ChromeState.self) private var chrome
-    @Environment(\.theme) private var theme
-    @State private var tabs: [EditorTab] = [EditorTab(path: "src/App.tsx", isDirty: true), EditorTab(path: "index.html"), EditorTab(path: "README.md")]
-    @State private var active: String? = "src/App.tsx"
-
-    var body: some View {
-        @Bindable var chrome = chrome
-        VStack(spacing: 0) {
-            EditorTabs(tabs: tabs, active: active, onSelect: { active = $0 }, onClose: { p in
-                tabs.removeAll { $0.path == p }
-                if active == p { active = tabs.first?.path }
-            })
-            HStack {
-                ModePicker(mode: $chrome.snapshot.center)
-                Spacer()
-                HeaderButton("sidebar.left", label: "Sidebar") { chrome.toggleSide() }
-                HeaderButton("terminal", label: "Terminal") { chrome.toggleTerm() }
-                HeaderButton("sidebar.right", label: "Agente") { chrome.toggleAgent() }
-            }
-            .padding(.horizontal, 10)
-            .frame(height: 46)
-            .overlay(alignment: .bottom) { Rectangle().fill(theme.border).frame(height: 1) }
-            content
-        }
-        .background(theme.bg)
-    }
-
-    @ViewBuilder var content: some View {
-        switch chrome.snapshot.center {
-        case .code: EditorShell(path: active)
-        case .diff: ShellPanel("Diff", symbol: "plus.forwardslash.minus", phase: 2, blurb: "Diferenças contra o último commit.")
-        case .dual: HStack(spacing: 0) { EditorShell(path: active); Rectangle().fill(theme.border).frame(width: 1); EditorShell(path: "index.html") }
-        case .split: HStack(spacing: 0) { EditorShell(path: active); Rectangle().fill(theme.border).frame(width: 1); ShellPanel("Preview", symbol: "play.rectangle", phase: 3, blurb: "O app do usuário rodando no dispositivo.") }
-        case .preview: ShellPanel("Preview", symbol: "play.rectangle", phase: 3, blurb: "O app do usuário rodando no dispositivo.")
-        }
-    }
-}
-
-/// Editor casca com um trecho fixo, só para o marco 1. O Runestone entra no marco 4.
-struct EditorShell: View {
-    @Environment(\.theme) private var theme
-    var path: String?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(path ?? "nenhum arquivo")
-                .font(OdeteFont.mono(11))
-                .foregroundStyle(theme.fgSubtle)
-                .padding(.horizontal, 12)
-                .frame(height: 26)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .overlay(alignment: .bottom) { Rectangle().fill(theme.border).frame(height: 1) }
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    ForEach(Array(sample.enumerated()), id: \.offset) { i, line in
-                        HStack(alignment: .top, spacing: 0) {
-                            Text("\(i + 1)").font(OdeteFont.mono(12)).foregroundStyle(theme.fgSubtle).frame(width: 40, alignment: .trailing).padding(.trailing, 14)
-                            Text(line).font(OdeteFont.mono(13)).foregroundStyle(theme.fg)
-                        }
-                        .frame(height: 20)
-                    }
-                }
-                .padding(.vertical, 8)
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    var sample: [AttributedString] {
-        let p = theme.palette.syntax
-        func t(_ s: String, _ hex: String) -> AttributedString {
-            var a = AttributedString(s)
-            a.foregroundColor = Color(hex: hex)
-            return a
-        }
-        func plain(_ s: String) -> AttributedString { AttributedString(s) }
-        return [
-            t("import", p.keyword) + plain(" { useState } ") + t("from", p.keyword) + plain(" ") + t("\"react\"", p.string) + plain(";"),
-            plain(""),
-            t("export function", p.keyword) + plain(" ") + t("App", p.function) + plain("() {"),
-            plain("  ") + t("const", p.keyword) + plain(" [n, setN] = ") + t("useState", p.function) + plain("(") + t("0", p.number) + plain(");"),
-            plain("  ") + t("return", p.keyword) + plain(" ("),
-            plain("    <") + t("main", p.type) + plain(" className=") + t("\"page\"", p.string) + plain(">"),
-            plain("      <") + t("h1", p.type) + plain(">Odete</") + t("h1", p.type) + plain(">"),
-            plain("      <") + t("button", p.type) + plain(" onClick={() => setN(n + ") + t("1", p.number) + plain(")}>{n} cliques</") + t("button", p.type) + plain(">"),
-            plain("    </") + t("main", p.type) + plain(">"),
-            plain("  );"),
-            plain("}"),
-            plain(""),
-            t("// editor real com Runestone chega no marco 4", p.comment),
-        ]
+    func label(_ s: String) -> some View {
+        Text(s.uppercased()).font(OdeteFont.label).tracking(1).foregroundStyle(theme.fgSubtle)
     }
 }
 
@@ -262,14 +162,15 @@ struct AgentColumn: View {
 
 struct TerminalDrawer: View {
     @Environment(ChromeState.self) private var chrome
+    @Environment(WorkspaceModel.self) private var ws
     @Environment(\.theme) private var theme
     var body: some View {
         VStack(spacing: 0) {
-            PaneHeader("Terminal", detail: "~/meu-app") {
+            PaneHeader("Terminal", detail: "~/\(ws.project.name)") {
                 HeaderButton("xmark", label: "Fechar terminal") { chrome.toggleTerm() }
             }
             VStack(alignment: .leading, spacing: 4) {
-                Text("odete ~/meu-app %").font(OdeteFont.mono(12)).foregroundStyle(theme.accent)
+                Text("odete ~/\(ws.project.name) %").font(OdeteFont.mono(12)).foregroundStyle(theme.accent)
                 Text("shell nativo, npm por ESM e Node em JavaScriptCore chegam na Fase 3").font(OdeteFont.mono(12)).foregroundStyle(theme.fgMuted)
             }
             .padding(12)

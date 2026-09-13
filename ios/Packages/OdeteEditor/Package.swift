@@ -10,6 +10,7 @@ let package = Package(
     dependencies: [
         .package(path: "../OdeteCore"),
         .package(url: "https://github.com/simonbs/Runestone.git", from: "0.5.2"),
+        .package(url: "https://github.com/simonbs/TreeSitterLanguages.git", from: "0.1.10"),
     ],
     targets: [
         .target(
@@ -17,9 +18,18 @@ let package = Package(
             dependencies: [
                 .product(name: "OdeteCore", package: "OdeteCore"),
                 .product(name: "Runestone", package: "Runestone"),
+                .product(name: "TreeSitterHTMLRunestone", package: "TreeSitterLanguages"),
+                .product(name: "TreeSitterCSSRunestone", package: "TreeSitterLanguages"),
+                .product(name: "TreeSitterJavaScriptRunestone", package: "TreeSitterLanguages"),
+                .product(name: "TreeSitterTypeScriptRunestone", package: "TreeSitterLanguages"),
+                .product(name: "TreeSitterTSXRunestone", package: "TreeSitterLanguages"),
+                .product(name: "TreeSitterJSONRunestone", package: "TreeSitterLanguages"),
+                .product(name: "TreeSitterMarkdownRunestone", package: "TreeSitterLanguages"),
+                .product(name: "TreeSitterMarkdownInlineRunestone", package: "TreeSitterLanguages"),
+                .product(name: "TreeSitterSwiftRunestone", package: "TreeSitterLanguages"),
+                .product(name: "TreeSitterYAMLRunestone", package: "TreeSitterLanguages"),
             ],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
-
     ]
 )

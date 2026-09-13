@@ -2,24 +2,33 @@ import OdeteCore
 import OdeteUI
 import SwiftUI
 
-/// Raiz do app: carrega o estado persistido, aplica o tema e mostra o workspace.
+/// Raiz do app: carrega o estado persistido, aplica o tema e decide entre hub e workspace.
 public struct RootView: View {
     @State private var chrome: ChromeState
+    @State private var app = AppModel()
     private let store: StateStore
 
     public init() {
         let store = StateStore()
         self.store = store
-        let state = ChromeState(snapshot: store.load())
-        _chrome = State(initialValue: state)
+        _chrome = State(initialValue: ChromeState(snapshot: store.load()))
     }
 
     public var body: some View {
-        WorkspaceView()
-            .environment(chrome)
-            .odeteTheme(Theme(chrome.palette))
-            .onAppear {
-                chrome.onChange = { [store] snap in store.scheduleSave(snap) }
+        Group {
+            if let ws = app.workspace {
+                WorkspaceView()
+                    .environment(ws)
+                    .id(ws.project.id)
+            } else {
+                HubView()
             }
+        }
+        .environment(chrome)
+        .environment(app)
+        .odeteTheme(Theme(chrome.palette))
+        .onAppear {
+            chrome.onChange = { [store] snap in store.scheduleSave(snap) }
+        }
     }
 }

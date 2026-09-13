@@ -19,12 +19,16 @@ public struct PaneHeader<Trailing: View>: View {
                 .font(OdeteFont.label)
                 .tracking(1)
                 .foregroundStyle(theme.fgSubtle)
+                .lineLimit(1)
+                .fixedSize()
+                .layoutPriority(2)
             if let detail {
                 Text(detail)
                     .font(OdeteFont.ui(11))
                     .foregroundStyle(theme.fgMuted)
                     .lineLimit(1)
                     .truncationMode(.middle)
+                    .layoutPriority(1)
             }
             Spacer(minLength: 4)
             trailing

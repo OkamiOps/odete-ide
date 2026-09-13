@@ -642,12 +642,40 @@ function ago(ts: number) {
   return `${Math.round(s / 86400)} d`;
 }
 
+function openInEditor(path: string) {
+  useWorkspace.getState().openFile(path);
+  useChrome.getState().setCenter("code");
+  useChrome.getState().setMobile("edit");
+}
+
+function resolvePath(raw: string, files: Record<string, string>): string | null {
+  const t = raw.replace(/^["'`]+|["'`]+$/g, "").replace(/^\.\//, "").trim();
+  if (!t || t.length < 3) return null;
+  if (files[t] !== undefined) return t;
+  const keys = Object.keys(files);
+  const lower = t.toLowerCase();
+  const ci = keys.find((k) => k.toLowerCase() === lower);
+  if (ci) return ci;
+  const base = keys.filter((k) => k === t || k.endsWith(`/${t}`));
+  return base.length === 1 ? base[0]! : null;
+}
+
+function FileLink({ path, label }: { path: string; label?: string }) {
+  return (
+    <button type="button" className="file-link" onClick={() => openInEditor(path)}>
+      {label ?? path}
+    </button>
+  );
+}
+
 function Message({ item }: { item: ChatItem }) {
+  const files = useWorkspace((s) => s.files);
   if (item.kind === "tool") {
+    const path = resolvePath(item.detail, files);
     return (
       <div className="agent-tool">
         <b>{item.name}</b>
-        <span className="min-w-0 truncate">{item.detail}</span>
+        {path ? <FileLink path={path} label={item.detail} /> : <span className="min-w-0 truncate">{item.detail}</span>}
       </div>
     );
   }
@@ -677,18 +705,18 @@ function Message({ item }: { item: ChatItem }) {
             ))}
           </div>
         ) : null}
-        <RichText text={item.text} />
+        <RichText text={item.text} files={files} />
       </div>
     );
   }
   return (
     <div className="agent-msg is-bot">
-      <RichText text={item.text} />
+      <RichText text={item.text} files={files} />
     </div>
   );
 }
 
-function RichText({ text }: { text: string }) {
+function RichText({ text, files }: { text: string; files: Record<string, string> }) {
   const chunks = text.split(/(```[\s\S]*?```)/g).filter((c) => c.length);
   return (
     <div className="md">
@@ -712,12 +740,12 @@ function RichText({ text }: { text: string }) {
                     {lines
                       .filter((l) => l.trim())
                       .map((l, k) => (
-                        <li key={k}>{inline(l.replace(/^\s*[-*]\s/, ""))}</li>
+                        <li key={k}>{inline(l.replace(/^\s*[-*]\s/, ""), files)}</li>
                       ))}
                   </ul>
                 );
               }
-              return <p key={j}>{inline(p)}</p>;
+              return <p key={j}>{inline(p, files)}</p>;
             })}
           </div>
         );
@@ -726,14 +754,29 @@ function RichText({ text }: { text: string }) {
   );
 }
 
-function inline(s: string): ReactNode[] {
-  return s.split(/(`[^`]+`|\*\*[^*]+\*\*)/g).map((part, i) => {
+function inline(s: string, files: Record<string, string>): ReactNode[] {
+  const present = Object.keys(files)
+    .filter((p) => {
+      const base = p.split("/").pop() ?? p;
+      return s.includes(p) || (base.length > 3 && s.includes(base));
+    })
+    .sort((a, b) => b.length - a.length);
+  const pathGroup = present.length
+    ? present.map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")
+    : "(?!)";
+  const re = new RegExp(`(\`[^\`]+\`|\\*\\*[^*]+\\*\\*|${pathGroup})`, "g");
+  return s.split(re).filter((part) => part.length).map((part, i) => {
     if (part.startsWith("`") && part.endsWith("`") && part.length > 1) {
-      return <code key={i}>{part.slice(1, -1)}</code>;
+      const inner = part.slice(1, -1);
+      const path = resolvePath(inner, files);
+      if (path) return <FileLink key={i} path={path} label={inner} />;
+      return <code key={i}>{inner}</code>;
     }
     if (part.startsWith("**") && part.endsWith("**") && part.length > 3) {
       return <strong key={i}>{part.slice(2, -2)}</strong>;
     }
+    const path = resolvePath(part, files);
+    if (path) return <FileLink key={i} path={path} label={part} />;
     return <span key={i}>{part}</span>;
   });
 }
@@ -749,7 +792,7 @@ function PatchCard({ item }: { item: Extract<ChatItem, { kind: "patch" }> }) {
   return (
     <div className={`patch-card is-${status}`}>
       <header>
-        <b>{item.path}</b>
+        <FileLink path={item.path} />
         <span>
           +{add} / −{del}
         </span>

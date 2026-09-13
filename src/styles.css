@@ -1567,3 +1567,19 @@ html[data-dragging] { cursor: grabbing; user-select: none; }
 @media (prefers-reduced-motion: reduce) {
   * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
 }
+
+.file-link {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-accent);
+  font: inherit;
+  font-family: var(--font-mono);
+  font-size: 0.95em;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.file-link:hover { color: var(--color-fg); }

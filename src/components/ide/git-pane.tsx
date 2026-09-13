@@ -87,6 +87,29 @@ export function GitPane() {
     setNote(fn());
   }
 
+  async function restoreCommit(id: string) {
+    const r = w().gitRestoreCommit(id);
+    if (!r.startsWith("PENDING_SHA:")) {
+      setNote(r);
+      return;
+    }
+    const sha = r.slice("PENDING_SHA:".length);
+    const remoteName = useWorkspace.getState().remote;
+    if (!remoteName || !token) {
+      setNote("commit antigo sem snapshot — conecta o GitHub pra baixar a árvore");
+      return;
+    }
+    setNote("baixando árvore…");
+    try {
+      const { githubTreeAtSha } = await import("@/lib/github/api");
+      const files = await githubTreeAtSha(remoteName, sha, token);
+      w().importFiles(files, true);
+      setNote(`restaurado ${id}  ${Object.keys(files).length} arquivos`);
+    } catch (e) {
+      setNote(e instanceof Error ? e.message : "não deu pra baixar o commit");
+    }
+  }
+
   async function gitHubOrLocal(kind: "fetch" | "pull" | "push" | "sync") {
     if (!remote || !token) {
       if (kind === "fetch") run(() => w().gitFetch());
@@ -442,7 +465,7 @@ export function GitPane() {
                 title="restaurar"
                 onClick={() => {
                   if (!window.confirm(`restaurar arquivos do commit ${c.id}?`)) return;
-                  run(() => w().gitRestoreCommit(c.id));
+                  void restoreCommit(c.id);
                 }}
               >
                 <RotateCcw size={14} />

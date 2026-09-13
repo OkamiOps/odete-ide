@@ -232,7 +232,8 @@ export function FileTree() {
           onClick={toggleMenu}
           aria-label={projectName || "Odete"}
         >
-          <img className="ex-mark" src="/brand/odete-wordmark.png?v=5" alt="" />
+          <img className="ex-mark ex-mark-dark" src="/brand/odete-wordmark.png?v=6" alt="" />
+          <img className="ex-mark ex-mark-light" src="/brand/odete-wordmark-light.png?v=6" alt="" />
           {projectName && !/^odete$/i.test(projectName) ? <strong>{projectName}</strong> : null}
           <ChevronRight className={menuOpen ? "tree-chevron is-open" : "tree-chevron"} size={16} strokeWidth={1.8} />
         </button>

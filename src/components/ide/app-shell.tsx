@@ -126,10 +126,15 @@ export function IdeApp() {
         e.preventDefault();
         e.stopPropagation();
         const chrome = useChrome.getState();
-        if (chrome.pluginFormat) {
-          const ws = useWorkspace.getState();
-          ws.writeFile(ws.openPath, formatFile(ws.openPath, ws.files[ws.openPath] ?? ""));
+        const ws = useWorkspace.getState();
+        const body = ws.files[ws.openPath] ?? "";
+        const next = chrome.pluginFormat ? formatFile(ws.openPath, body) : body;
+        if (next !== body) ws.writeFile(ws.openPath, next);
+        else {
+          ws.writeFile(ws.openPath, body);
         }
+        ws.rememberNow();
+        window.dispatchEvent(new Event("colo-saved"));
         return;
       }
       if (meta && is("f") && !e.shiftKey) {
@@ -346,6 +351,15 @@ function StatusBar() {
   const toggleSide = useChrome((s) => s.toggleSide);
   const toggleAgent = useChrome((s) => s.toggleAgent);
   const toggleTerm = useChrome((s) => s.toggleTerm);
+  const [flash, setFlash] = useState("");
+  useEffect(() => {
+    const on = () => {
+      setFlash("salvo");
+      window.setTimeout(() => setFlash(""), 1400);
+    };
+    window.addEventListener("colo-saved", on);
+    return () => window.removeEventListener("colo-saved", on);
+  }, []);
   return (
     <footer className="ide-status">
       <button type="button" onClick={() => setSheet("hub")} title="Projeto">
@@ -362,6 +376,7 @@ function StatusBar() {
       </button>
       <span>{n} commit{n === 1 ? "" : "s"}</span>
       <span>{dirty ? "modificado" : "limpo"}</span>
+      {flash ? <span className="is-on">{flash}</span> : null}
       <span className="min-w-0 truncate">{openPath}</span>
       <span className="ml-auto">{theme}</span>
       <button type="button" onClick={() => useChrome.getState().setCheatsheet(true)} title="Atalhos">

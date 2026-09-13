@@ -70,13 +70,60 @@ function bytesOf(content: string) {
   return new TextEncoder().encode(content);
 }
 
+async function getWritten(): Promise<string[]> {
+  try {
+    const db = await openDb();
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, "readonly");
+      const g = tx.objectStore(STORE).get("written");
+      g.onsuccess = () => resolve((g.result as string[] | undefined) ?? []);
+      g.onerror = () => reject(g.error);
+    });
+  } catch {
+    return [];
+  }
+}
+
+async function putWritten(paths: string[]) {
+  try {
+    const db = await openDb();
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(STORE, "readwrite");
+      tx.objectStore(STORE).put(paths, "written");
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch {
+    /* ignore */
+  }
+}
+
+async function dropPath(root: FileSystemDirectoryHandle, path: string) {
+  const parts = path.split("/").filter(Boolean);
+  const file = parts.pop();
+  if (!file) return;
+  let cur = root;
+  for (const p of parts) cur = await cur.getDirectoryHandle(p);
+  await cur.removeEntry(file);
+}
+
 export async function writeTree(dir: FileSystemDirectoryHandle, files: FileMap) {
+  const prev = await getWritten();
+  for (const path of prev) {
+    if (files[path] !== undefined) continue;
+    try {
+      await dropPath(dir, path);
+    } catch {
+      /* already gone */
+    }
+  }
   for (const [path, body] of Object.entries(files)) {
     const fh = await ensurePath(dir, path);
     const w = await fh.createWritable();
     await w.write(bytesOf(body));
     await w.close();
   }
+  await putWritten(Object.keys(files));
 }
 
 export async function removeFromFolder(path: string) {

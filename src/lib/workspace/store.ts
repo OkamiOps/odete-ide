@@ -9,6 +9,7 @@ import { discardHunk, keepOnlyHunk } from "./hunks";
 import { useProjects } from "./projects";
 import { scheduleSync } from "./folder";
 import { useTerms } from "./terms";
+import { lineDiff } from "./diff";
 
 function cloneFiles(files: FileMap): FileMap {
   return { ...files };
@@ -505,34 +506,74 @@ export const useWorkspace = create<WorkspaceState>()(
       },
       gitBlame: (path) => {
         const { commits, files } = get();
-        const lines = (files[path] ?? "").split("\n");
-        const blame: BlameLine[] = lines.map((text, i) => ({
+        const working = (files[path] ?? "").split("\n");
+        let prevText = "";
+        let prevBlame: BlameLine[] = [];
+        for (const c of commits) {
+          const cur = c.files[path];
+          if (cur === undefined && !prevText) continue;
+          const curText = cur ?? "";
+          const curLines = curText.split("\n");
+          const next: BlameLine[] = curLines.map((text, i) => ({
+            line: i + 1,
+            text,
+            id: c.id,
+            message: c.message,
+            at: c.at,
+          }));
+          if (prevBlame.length) {
+            const diff = lineDiff(prevText, curText);
+            let pi = 0;
+            let ni = 0;
+            for (const row of diff) {
+              if (row.kind === "eq") {
+                const keep = prevBlame[pi];
+                if (keep && next[ni]) next[ni] = { ...keep, line: ni + 1, text: row.text };
+                pi += 1;
+                ni += 1;
+              } else if (row.kind === "del") {
+                pi += 1;
+              } else {
+                ni += 1;
+              }
+            }
+          }
+          prevText = curText;
+          prevBlame = next;
+        }
+        const workText = files[path] ?? "";
+        if (!prevBlame.length) {
+          return working.map((text, i) => ({
+            line: i + 1,
+            text,
+            id: "—",
+            message: "uncommitted",
+            at: 0,
+          }));
+        }
+        const out: BlameLine[] = working.map((text, i) => ({
           line: i + 1,
           text,
-          id: commits[0]?.id ?? "—",
-          message: commits[0]?.message ?? "",
-          at: commits[0]?.at ?? 0,
+          id: "—",
+          message: "uncommitted",
+          at: 0,
         }));
-        for (const c of commits) {
-          const ls = c.files[path]?.split("\n");
-          if (!ls) continue;
-          ls.forEach((text, i) => {
-            if (blame[i] && blame[i]!.text === text) {
-              blame[i] = { line: i + 1, text, id: c.id, message: c.message, at: c.at };
-            } else if (blame[i] && blame[i]!.text !== text) {
-              /* keep later */
-            }
-          });
+        const diff = lineDiff(prevText, workText);
+        let pi = 0;
+        let ni = 0;
+        for (const row of diff) {
+          if (row.kind === "eq") {
+            const keep = prevBlame[pi];
+            if (keep && out[ni]) out[ni] = { ...keep, line: ni + 1, text: row.text };
+            pi += 1;
+            ni += 1;
+          } else if (row.kind === "del") {
+            pi += 1;
+          } else {
+            ni += 1;
+          }
         }
-        for (const c of commits) {
-          const ls = c.files[path]?.split("\n") ?? [];
-          lines.forEach((text, i) => {
-            if (ls[i] !== text) {
-              blame[i] = { line: i + 1, text, id: c.id, message: c.message, at: c.at };
-            }
-          });
-        }
-        return blame;
+        return out;
       },
       gitRestoreCommit: (id) => {
         const c = get().commits.find((x) => x.id === id);

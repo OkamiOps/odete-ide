@@ -376,9 +376,16 @@ function CodexAuth() {
   );
 }
 
-export function AgentPicker({ compact, fill }: { compact?: boolean; fill?: boolean }) {
-  const agentId = useChrome((s) => s.agentId);
-  const setAgentId = useChrome((s) => s.setAgentId);
+export function AgentPicker({
+  compact,
+  fill,
+  slot,
+}: {
+  compact?: boolean;
+  fill?: boolean;
+  slot?: "a" | "b";
+}) {
+  const agentId = useChrome((s) => (slot ? s.slotAgent?.[slot] ?? s.agentId : s.agentId));
   return (
     <PickList
       compact={compact}
@@ -387,7 +394,10 @@ export function AgentPicker({ compact, fill }: { compact?: boolean; fill?: boole
       ariaLabel="Providers"
       value={agentId}
       options={AGENTS.map((a) => ({ id: a.id, label: a.label }))}
-      onChange={(id) => setAgentId(id as AgentId)}
+      onChange={(id) => {
+        if (slot) useChrome.getState().setSlotAgent(slot, id as AgentId);
+        else useChrome.getState().setAgentId(id as AgentId);
+      }}
     />
   );
 }

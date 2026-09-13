@@ -39,6 +39,20 @@ const HOOK = `<script>
   });
   window.addEventListener("error", (e) => send("error", [e.message]));
   window.addEventListener("unhandledrejection", (e) => send("error", [String(e.reason)]));
+  try { window.localStorage.getItem("__colo_probe"); }
+  catch (e) {
+    const mem = {};
+    const store = {
+      getItem: (k) => (Object.prototype.hasOwnProperty.call(mem, k) ? mem[k] : null),
+      setItem: (k, v) => { mem[k] = String(v); },
+      removeItem: (k) => { delete mem[k]; },
+      clear: () => { for (const k of Object.keys(mem)) delete mem[k]; },
+      key: (i) => Object.keys(mem)[i] || null,
+      get length() { return Object.keys(mem).length; }
+    };
+    try { Object.defineProperty(window, "localStorage", { value: store }); } catch (err) {}
+    try { Object.defineProperty(window, "sessionStorage", { value: store }); } catch (err) {}
+  }
 })();
 </script>`;
 

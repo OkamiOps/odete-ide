@@ -66,7 +66,7 @@ export function PreviewPane() {
         </div>
       </div>
       <div className="preview-stage">
-        <iframe key={tick} title="Preview do workspace" sandbox="allow-scripts" srcDoc={srcDoc} />
+        <iframe key={tick} title="Preview do workspace" sandbox="allow-scripts allow-forms allow-modals allow-popups allow-downloads" srcDoc={srcDoc} />
       </div>
       <div className="preview-console">
         <header>

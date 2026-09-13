@@ -71,8 +71,8 @@ async function fileToImage(file: File): Promise<AgentImage | null> {
 }
 
 export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
-  const agentId = useChrome((s) => s.agentId);
-  const connected = useChrome(agentConnected);
+  const agentId = useChrome((s) => s.slotAgent?.[slot] ?? s.agentId);
+  const connected = useChrome((s) => agentConnected({ ...s, agentId }));
   const projectId = useWorkspace((s) => s.projectId);
   const files = useWorkspace((s) => s.files);
   const def = agentById(agentId);
@@ -122,8 +122,8 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
     setListening(true);
     rec.start();
   }
-  const agentMode = useChrome((s) => s.agentMode);
-  const permitMode = useChrome((s) => s.permitMode);
+  const agentMode = useChrome((s) => s.slotMode?.[slot] ?? s.agentMode);
+  const permitMode = useChrome((s) => s.slotPermit?.[slot] ?? s.permitMode);
   const threadMap = useAgentChats((s) => s.threads);
   const [chatsReady, setChatsReady] = useState(() => useAgentChats.persist.hasHydrated());
   const booted = useRef(false);
@@ -324,15 +324,15 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
         },
         {
           provider: agentId,
-          model: currentAgentModel(chrome),
+          model: currentAgentModel({ ...chrome, agentId }),
           access: tokens.access,
           accountId: tokens.accountId,
-          mode: chrome.agentMode,
-          permit: chrome.permitMode,
+          mode: agentMode,
+          permit: permitMode,
           effort: (() => {
-            const modelNow = currentAgentModel(chrome);
-            const opts = effortsForModel(chrome.agentId, modelNow);
-            const stored = currentEffort(chrome);
+            const modelNow = currentAgentModel({ ...chrome, agentId });
+            const opts = effortsForModel(agentId, modelNow);
+            const stored = currentEffort({ ...chrome, agentId });
             const pick = opts.includes(stored as EffortId) ? stored : defaultEffort(opts);
             return pick || undefined;
           })(),
@@ -388,8 +388,8 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
   const pendingCount = usePatches((s) => s.items.filter((p) => p.status === "pending").length);
   const quote = useNav((s) => s.quote);
 
-  const model = useChrome(currentAgentModel);
-  const effortStored = useChrome(currentEffort);
+  const model = useChrome((s) => currentAgentModel({ ...s, agentId }));
+  const effortStored = useChrome((s) => currentEffort({ ...s, agentId }));
   const options = effortsForModel(agentId, model);
   const effort = (options.includes(effortStored as EffortId) ? effortStored : defaultEffort(options)) as EffortId | "";
   const usedTok = lastInput || estimateTokens({
@@ -444,7 +444,7 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
           </div>
         </div>
         <div className="agent-hd-grid">
-          <AgentPicker compact fill />
+          <AgentPicker compact fill slot={slot} />
           <PickList
             compact
             fill
@@ -452,7 +452,7 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
             ariaLabel="Modo"
             value={agentMode}
             options={MODE_META.map((m) => ({ id: m.id, label: m.label }))}
-            onChange={(id) => useChrome.getState().setAgentMode(id as AgentMode)}
+            onChange={(id) => useChrome.getState().setSlotMode(slot, id as AgentMode)}
           />
           {connected ? <ModelSelect provider={agentId} compact /> : <div className="pick-ghost">conecte o provider</div>}
           <PickList
@@ -640,7 +640,7 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
                   type="button"
                   className={`is-${p.id}${permitMode === p.id ? " is-on" : ""}`}
                   onClick={() => {
-                    useChrome.getState().setPermitMode(p.id);
+                    useChrome.getState().setSlotPermit(slot, p.id);
                     setPermOpen(false);
                   }}
                 >

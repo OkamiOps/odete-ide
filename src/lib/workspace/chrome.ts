@@ -83,8 +83,13 @@ const ACTIONS = [
   "setPluginSticky",
   "setPluginComment",
   "setPluginUrls",
+  "setSlotAgent",
+  "setSlotMode",
+  "setSlotPermit",
 ] as const;
 export type PaletteKind = "all" | "files" | "cmds";
+
+export type SlotId = "a" | "b";
 
 type ChromeState = {
   welcome: boolean;
@@ -101,6 +106,9 @@ type ChromeState = {
   mobile: MobileTab;
   creating: boolean;
   agentId: AgentId;
+  slotAgent: Record<SlotId, AgentId>;
+  slotMode: Record<SlotId, AgentMode>;
+  slotPermit: Record<SlotId, PermitMode>;
   grokModel: string;
   claudeModel: string;
   codexModel: string;
@@ -151,6 +159,9 @@ type ChromeState = {
   setMobile: (t: MobileTab) => void;
   setCreating: (v: boolean) => void;
   setAgentId: (id: AgentId) => void;
+  setSlotAgent: (slot: SlotId, id: AgentId) => void;
+  setSlotMode: (slot: SlotId, m: AgentMode) => void;
+  setSlotPermit: (slot: SlotId, m: PermitMode) => void;
   setGrokModel: (m: string) => void;
   setClaudeModel: (m: string) => void;
   setCodexModel: (m: string) => void;
@@ -235,6 +246,9 @@ export const useChrome = create<ChromeState>()(
       mobile: "edit",
       creating: false,
       agentId: "grok",
+      slotAgent: { a: "grok", b: "grok" },
+      slotMode: { a: "build", b: "build" },
+      slotPermit: { a: "auto", b: "auto" },
       grokModel: "grok-4-1-fast-reasoning",
       claudeModel: "",
       codexModel: "",
@@ -286,8 +300,8 @@ export const useChrome = create<ChromeState>()(
       setPalette: (palette, kind) =>
         set((s) => ({ palette, paletteKind: kind ?? (palette ? s.paletteKind : "all") })),
       setFindOpen: (findOpen) => set({ findOpen }),
-      setAgentMode: (agentMode) => set({ agentMode }),
-      setPermitMode: (permitMode) => set({ permitMode }),
+      setAgentMode: (agentMode) => set((s) => ({ agentMode, slotMode: { ...s.slotMode, a: agentMode } })),
+      setPermitMode: (permitMode) => set((s) => ({ permitMode, slotPermit: { ...s.slotPermit, a: permitMode } })),
       setEffort: (key, effort) =>
         set((s) => ({ effortByKey: { ...s.effortByKey, [key]: effort } })),
       setMobile: (mobile) => set({ mobile }),
@@ -295,11 +309,36 @@ export const useChrome = create<ChromeState>()(
       setAgentId: (agentId) =>
         set((s) => {
           const fav = s.favModels?.[agentId];
-          if (!fav) return { agentId };
-          if (agentId === "claude") return { agentId, claudeModel: fav };
-          if (agentId === "codex") return { agentId, codexModel: fav };
-          return { agentId, grokModel: fav };
+          const slotAgent = { ...s.slotAgent, a: agentId };
+          if (!fav) return { agentId, slotAgent };
+          if (agentId === "claude") return { agentId, slotAgent, claudeModel: fav };
+          if (agentId === "codex") return { agentId, slotAgent, codexModel: fav };
+          return { agentId, slotAgent, grokModel: fav };
         }),
+      setSlotAgent: (slot, id) =>
+        set((s) => {
+          const slotAgent = { ...s.slotAgent, [slot]: id };
+          const fav = s.favModels?.[id];
+          const models =
+            !fav
+              ? {}
+              : id === "claude"
+                ? { claudeModel: fav }
+                : id === "codex"
+                  ? { codexModel: fav }
+                  : { grokModel: fav };
+          return slot === "a" ? { agentId: id, slotAgent, ...models } : { slotAgent, ...models };
+        }),
+      setSlotMode: (slot, m) =>
+        set((s) => ({
+          slotMode: { ...s.slotMode, [slot]: m },
+          ...(slot === "a" ? { agentMode: m } : {}),
+        })),
+      setSlotPermit: (slot, m) =>
+        set((s) => ({
+          slotPermit: { ...s.slotPermit, [slot]: m },
+          ...(slot === "a" ? { permitMode: m } : {}),
+        })),
       setGrokModel: (grokModel) => set({ grokModel }),
       setClaudeModel: (claudeModel) => set({ claudeModel }),
       setCodexModel: (codexModel) => set({ codexModel }),
@@ -358,6 +397,9 @@ export const useChrome = create<ChromeState>()(
         agent: s.agent,
         term: s.term,
         agentId: s.agentId,
+        slotAgent: s.slotAgent,
+        slotMode: s.slotMode,
+        slotPermit: s.slotPermit,
         grokModel: s.grokModel,
         claudeModel: s.claudeModel,
         codexModel: s.codexModel,
@@ -416,6 +458,15 @@ export const useChrome = create<ChromeState>()(
           claude: prev.claude || (p.claudeModel as string) || "",
           codex: prev.codex || (p.codexModel as string) || "",
         };
+        const sa = (p.slotAgent ?? {}) as Record<string, string>;
+        p.slotAgent = {
+          a: sa.a || (p.agentId as string) || "grok",
+          b: sa.b || "grok",
+        };
+        const sm = (p.slotMode ?? {}) as Record<string, string>;
+        p.slotMode = { a: sm.a || p.agentMode || "build", b: sm.b || "build" };
+        const sp = (p.slotPermit ?? {}) as Record<string, string>;
+        p.slotPermit = { a: sp.a || p.permitMode || "auto", b: sp.b || "auto" };
         return { ...current, ...p } as ChromeState;
       },
     },

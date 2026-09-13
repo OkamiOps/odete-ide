@@ -30,14 +30,21 @@ function parsePkg(raw?: string) {
 }
 
 function injectImportMap(html: string, lock: Record<string, string>) {
-  const imports: Record<string, string> = {};
+  let prev: Record<string, string> = {};
+  const hit = html.match(/<script type=["']importmap["']>([\s\S]*?)<\/script>/);
+  if (hit) {
+    try {
+      prev = ((JSON.parse(hit[1]!) as { imports?: Record<string, string> }).imports ?? {});
+    } catch {
+      prev = {};
+    }
+  }
+  const imports: Record<string, string> = { ...prev };
   for (const [name, ver] of Object.entries(lock)) {
     imports[name] = `https://esm.sh/${name}@${ver}`;
   }
   const block = `<script type="importmap">${JSON.stringify({ imports }, null, 2)}</script>`;
-  if (/type=["']importmap["']/.test(html)) {
-    return html.replace(/<script type=["']importmap["']>[\s\S]*?<\/script>/, block);
-  }
+  if (hit) return html.replace(/<script type=["']importmap["']>[\s\S]*?<\/script>/, block);
   if (/<head[^>]*>/i.test(html)) return html.replace(/<head[^>]*>/i, (h) => `${h}\n${block}`);
   return `${block}\n${html}`;
 }
@@ -79,6 +86,9 @@ async function unpackPackage(info: NpmInfo, onNote?: (s: string) => void) {
   return native;
 }
 
+const MAX_PACKAGES = 40;
+const MAX_DEPTH = 3;
+
 export async function npmInstall(args: string[], onNote?: (s: string) => void): Promise<string> {
   const w = useWorkspace.getState();
   const pkg = parsePkg(w.readFile("package.json"));
@@ -91,15 +101,34 @@ export async function npmInstall(args: string[], onNote?: (s: string) => void): 
   const lock: Record<string, string> = {};
   const lines: string[] = [];
   const native: string[] = [];
-  for (const name of names) {
+  const failed: string[] = [];
+
+  async function collect(name: string, depth: number, top: boolean) {
+    if (!name || lock[name] || Object.keys(lock).length >= MAX_PACKAGES) return;
     onNote?.(`baixando ${name}…`);
-    const info = await lookup(name);
+    let info: NpmInfo;
+    try {
+      info = await lookup(name);
+    } catch (e) {
+      failed.push(`${name}: ${e instanceof Error ? e.message : "falhou"}`);
+      return;
+    }
     lock[info.name] = info.version;
-    pkg.dependencies[info.name] = `^${info.version}`;
+    if (top) {
+      pkg.dependencies = pkg.dependencies ?? {};
+      pkg.dependencies[info.name] = `^${info.version}`;
+    }
     const n = await unpackPackage(info, onNote);
     native.push(...n.map((f) => `${info.name}/${f}`));
-    lines.push(`+ ${info.name}@${info.version}`);
+    lines.push(`${depth ? "  ".repeat(depth) : ""}+ ${info.name}@${info.version}`);
+    if (depth >= MAX_DEPTH) return;
+    const nested = parsePkg(useWorkspace.getState().readFile(`node_modules/${info.name}/package.json`));
+    for (const dep of Object.keys(nested.dependencies ?? {})) {
+      await collect(dep, depth + 1, false);
+    }
   }
+
+  for (const name of names) await collect(name, 0, true);
   if (!pkg.name) pkg.name = w.projectName || "colo-app";
   w.writeFile("package.json", JSON.stringify(pkg, null, 2) + "\n");
   w.writeFile("package-lock.colo.json", JSON.stringify({ lock, at: Date.now() }, null, 2) + "\n");
@@ -108,5 +137,7 @@ export async function npmInstall(args: string[], onNote?: (s: string) => void): 
   const extra = native.length
     ? `\nbinários nativos ignorados (não rodam no iPad):\n${native.slice(0, 8).join("\n")}`
     : "";
-  return `added ${lines.length} packages\n${lines.join("\n")}\npreview usa esm.sh + node_modules${extra}`;
+  const miss = failed.length ? `\nfalhou:\n${failed.slice(0, 8).join("\n")}` : "";
+  const cap = Object.keys(lock).length >= MAX_PACKAGES ? `\nparou em ${MAX_PACKAGES} pacotes` : "";
+  return `added ${Object.keys(lock).length} packages (deps até ${MAX_DEPTH} níveis)\n${lines.join("\n")}\npreview usa esm.sh + node_modules${extra}${miss}${cap}`;
 }

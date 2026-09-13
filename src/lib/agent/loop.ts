@@ -11,6 +11,7 @@ const MAX_ROUNDS = 8;
 export type ChatItem =
   | { id: string; kind: "user"; text: string; images?: string[] }
   | { id: string; kind: "assistant"; text: string }
+  | { id: string; kind: "think"; text: string }
   | { id: string; kind: "tool"; name: string; detail: string }
   | { id: string; kind: "error"; text: string }
   | { id: string; kind: "patch"; patchId: string; path: string; before: string; after: string };
@@ -66,7 +67,13 @@ export async function runAgentLoop(
       break;
     }
     const msg = result.message;
-    messages.push(msg);
+    const thinking = (msg.thinking ?? "").trim();
+    if (thinking) push({ id: crypto.randomUUID(), kind: "think", text: thinking });
+    messages.push({
+      role: "assistant",
+      content: msg.content,
+      tool_calls: msg.tool_calls,
+    });
 
     const calls = msg.tool_calls ?? [];
     if (calls.length === 0) {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AtSign, Check, Eraser, FolderOpen, ImagePlus, LoaderCircle, Paperclip, Plus, Send, Square, Undo2, X } from "lucide-react";
 import { AgentConnect } from "@/components/ide/settings-pane";
 import { ModelSelect } from "@/components/ide/model-select";
@@ -577,6 +577,14 @@ function Message({ item }: { item: ChatItem }) {
   if (item.kind === "patch") {
     return <PatchCard item={item} />;
   }
+  if (item.kind === "think") {
+    return (
+      <details className="agent-think" open>
+        <summary>Pensando</summary>
+        <pre>{item.text}</pre>
+      </details>
+    );
+  }
   if (item.kind === "user") {
     return (
       <div className="agent-msg is-user">
@@ -587,11 +595,65 @@ function Message({ item }: { item: ChatItem }) {
             ))}
           </div>
         ) : null}
-        {item.text}
+        <RichText text={item.text} />
       </div>
     );
   }
-  return <div className="agent-msg">{item.text}</div>;
+  return (
+    <div className="agent-msg is-bot">
+      <RichText text={item.text} />
+    </div>
+  );
+}
+
+function RichText({ text }: { text: string }) {
+  const chunks = text.split(/(```[\s\S]*?```)/g).filter((c) => c.length);
+  return (
+    <div className="md">
+      {chunks.map((chunk, i) => {
+        const fence = /^```(\w*)\n?([\s\S]*?)```$/.exec(chunk);
+        if (fence) {
+          return (
+            <pre key={i} className="md-code">
+              <code>{fence[2]}</code>
+            </pre>
+          );
+        }
+        return (
+          <div key={i} className="md-block">
+            {chunk.split(/\n{2,}/).map((p, j) => {
+              const lines = p.split("\n");
+              const list = lines.filter((l) => l.trim()).every((l) => /^\s*[-*]\s/.test(l));
+              if (list) {
+                return (
+                  <ul key={j}>
+                    {lines
+                      .filter((l) => l.trim())
+                      .map((l, k) => (
+                        <li key={k}>{inline(l.replace(/^\s*[-*]\s/, ""))}</li>
+                      ))}
+                  </ul>
+                );
+              }
+              return <p key={j}>{inline(p)}</p>;
+            })}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function inline(s: string): ReactNode[] {
+  return s.split(/(`[^`]+`|\*\*[^*]+\*\*)/g).map((part, i) => {
+    if (part.startsWith("`") && part.endsWith("`") && part.length > 1) {
+      return <code key={i}>{part.slice(1, -1)}</code>;
+    }
+    if (part.startsWith("**") && part.endsWith("**") && part.length > 3) {
+      return <strong key={i}>{part.slice(2, -2)}</strong>;
+    }
+    return <span key={i}>{part}</span>;
+  });
 }
 
 function PatchCard({ item }: { item: Extract<ChatItem, { kind: "patch" }> }) {

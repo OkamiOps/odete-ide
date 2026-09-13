@@ -7,6 +7,7 @@ export type AgentImage = { mime: string; data: string };
 export type AgentMessage = {
   role: "system" | "user" | "assistant" | "tool";
   content?: string | null;
+  thinking?: string;
   images?: AgentImage[];
   tool_calls?: Array<{
     id: string;
@@ -89,6 +90,35 @@ function withSystem(messages: AgentMessage[], fileList: string, skills = "", mod
   ];
 }
 
+function pickText(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    return content
+      .map((p) => {
+        if (typeof p === "string") return p;
+        if (p && typeof p === "object") {
+          const rec = p as { text?: unknown; content?: unknown };
+          if (typeof rec.text === "string") return rec.text;
+          if (typeof rec.content === "string") return rec.content;
+        }
+        return "";
+      })
+      .filter(Boolean)
+      .join("\n");
+  }
+  return "";
+}
+
+function pickThinking(raw: Record<string, unknown>): string {
+  if (typeof raw.reasoning_content === "string") return raw.reasoning_content.trim();
+  if (typeof raw.reasoning === "string") return raw.reasoning.trim();
+  const r = raw.reasoning;
+  if (r && typeof r === "object" && typeof (r as { content?: unknown }).content === "string") {
+    return ((r as { content: string }).content || "").trim();
+  }
+  return "";
+}
+
 async function openaiCompatible(opts: {
   url: string;
   headers: Record<string, string>;
@@ -117,17 +147,24 @@ async function openaiCompatible(opts: {
     const host = new URL(opts.url).host;
     return { ok: false, error: `${host} ${res.status}${t ? `: ${t.slice(0, 240)}` : ""}` };
   }
-  const body = (await res.json()) as { choices?: Array<{ message?: AgentMessage }> };
+  const body = (await res.json()) as { choices?: Array<{ message?: Record<string, unknown> }> };
   const raw = body.choices?.[0]?.message;
   if (!raw) return { ok: false, error: "resposta vazia do modelo" };
+  const tool_calls = raw.tool_calls as AgentMessage["tool_calls"];
   return {
     ok: true,
-    message: { role: "assistant", content: raw.content ?? "", tool_calls: raw.tool_calls },
+    message: {
+      role: "assistant",
+      content: pickText(raw.content),
+      thinking: pickThinking(raw) || undefined,
+      tool_calls,
+    },
   };
 }
 
 type AnthBlock =
   | { type: "text"; text: string }
+  | { type: "thinking"; thinking: string }
   | { type: "tool_use"; id: string; name: string; input: unknown }
   | { type: "tool_result"; tool_use_id: string; content: string }
   | { type: "image"; source: { type: "base64"; media_type: string; data: string } };
@@ -229,6 +266,11 @@ async function claudeTurn(
     .map((b) => b.text)
     .join("\n")
     .trim();
+  const thinking = blocks
+    .filter((b): b is Extract<AnthBlock, { type: "thinking" }> => b.type === "thinking")
+    .map((b) => b.thinking)
+    .join("\n")
+    .trim();
   const tool_calls = blocks
     .filter((b): b is Extract<AnthBlock, { type: "tool_use" }> => b.type === "tool_use")
     .map((b) => ({
@@ -241,6 +283,7 @@ async function claudeTurn(
     message: {
       role: "assistant",
       content: text,
+      thinking: thinking || undefined,
       tool_calls: tool_calls.length ? tool_calls : undefined,
     },
   };

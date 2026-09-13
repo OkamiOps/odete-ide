@@ -1290,10 +1290,12 @@ input, textarea, select { font: inherit; font-size: 16px; }
 .preview-ops { display: flex; gap: 4px; margin-left: auto; }
 .preview-ops button { width: 32px; height: 32px; display: grid; place-items: center; border: 0; border-radius: 8px; background: transparent; color: var(--color-fg-muted); }
 .preview-ops button.is-on { background: var(--color-bg-subtle); color: var(--color-fg); }
-.preview-stage { flex: 1 1 0; min-height: 0; display: grid; place-items: center; overflow: auto; background: var(--color-bg-subtle); }
-.preview-frame iframe { width: 100%; height: 100%; max-width: 100%; max-height: 100%; border: 0; background: #efece4; color-scheme: light; }
-.preview-frame.is-ipad .preview-stage iframe { width: min(768px, 100%); height: min(1024px, 100%); box-shadow: 0 12px 40px rgb(0 0 0 / .25); }
-.preview-frame.is-phone .preview-stage iframe { width: min(390px, 100%); height: min(844px, 100%); box-shadow: 0 12px 40px rgb(0 0 0 / .25); }
+.preview-stage { flex: 1 1 0; min-height: 0; display: flex; overflow: hidden; background: var(--color-bg-subtle); }
+.preview-frame iframe { flex: 1 1 auto; width: 100%; height: 100%; min-height: 0; border: 0; background: #efece4; color-scheme: light; }
+.preview-frame.is-ipad .preview-stage,
+.preview-frame.is-phone .preview-stage { display: grid; place-items: center; overflow: auto; }
+.preview-frame.is-ipad .preview-stage iframe { flex: none; width: min(768px, 100%); height: min(1024px, 100%); box-shadow: 0 12px 40px rgb(0 0 0 / .25); }
+.preview-frame.is-phone .preview-stage iframe { flex: none; width: min(390px, 100%); height: min(844px, 100%); box-shadow: 0 12px 40px rgb(0 0 0 / .25); }
 .preview-console { flex: 0 0 96px; display: flex; flex-direction: column; border-top: 1px solid var(--color-border); background: var(--color-bg-elevated); }
 .preview-console header { display: flex; justify-content: space-between; align-items: center; padding: 4px 10px 0; font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--color-fg-subtle); }
 .preview-console header button { border: 0; background: transparent; color: var(--color-fg-muted); font-size: 11px; }

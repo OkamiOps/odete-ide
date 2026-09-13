@@ -15,10 +15,10 @@ function escapeClose(tag: "style" | "script", source: string) {
 }
 
 export function rewriteViewportUnits(source: string) {
-  return source.replace(/100d?vh/gi, "100%").replace(/100d?vw/gi, "100%");
+  return source.replace(/100dvh/gi, "100vh").replace(/100dvw/gi, "100vw");
 }
 
-const BASE = `<style>html, body { margin: 0; background: #efece4; color: #161412; color-scheme: light; }</style>`;
+const BASE = `<style>html, body { margin: 0; min-height: 100%; height: 100%; background: #efece4; color: #161412; color-scheme: light; }</style>`;
 
 const HOOK = `<script>
 (function(){
@@ -408,13 +408,21 @@ export function buildPreviewHtml(files: FileMap) {
   });
 
   const linked = new Set([...html.matchAll(/data-colo(?:-path)?="([^"]+)"/g)].map((m) => m[1]));
+  const importedCss = new Set<string>();
+  for (const [path, src] of Object.entries(vfs)) {
+    if (!/\.(js|jsx|ts|tsx|mjs|cjs)$/.test(path) || path.includes("node_modules/")) continue;
+    for (const m of src.matchAll(/import\s+['"]([^'"]+\.css)['"]/g)) {
+      const hit = findFilePath(vfs, m[1]!);
+      if (hit) importedCss.add(hit);
+    }
+  }
   const extraCss = Object.entries(vfs)
     .filter(
       ([k]) =>
         k.endsWith(".css") &&
         !k.includes("node_modules/") &&
         !linked.has(k) &&
-        !linked.has(k.split("/").pop() ?? ""),
+        (importedCss.has(k) || /(?:^|\/)(index|main|app|style|global|globals)\.css$/.test(k)),
     )
     .map(([k, v]) => `<style data-colo-path="${k}">${escapeClose("style", rewriteViewportUnits(v))}</style>`)
     .join("");

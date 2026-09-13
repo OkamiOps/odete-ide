@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Monitor, RotateCw, Smartphone, Tablet } from "lucide-react";
 import { markdownPage, isMdPath } from "@/lib/workspace/markdown";
 import {
@@ -61,6 +61,7 @@ export function PreviewPane() {
   const key = useMemo(() => sourceKey(files), [files]);
   const [readyKey, setReadyKey] = useState(key);
   const [doc, setDoc] = useState("");
+  const [frameId, setFrameId] = useState(0);
 
   useEffect(() => {
     const t = window.setTimeout(() => setReadyKey(key), 280);
@@ -70,61 +71,71 @@ export function PreviewPane() {
   useEffect(() => {
     try {
       if (wcUrl) {
-        appliedRef.current = files;
+        appliedRef.current = filesRef.current;
         setHmrKind("hmr");
         forceReload.current = false;
         return;
       }
+      const filesNow = filesRef.current;
       if (md) {
-        setDoc(markdownPage(files[openPath] ?? ""));
-        appliedRef.current = files;
+        setDoc(markdownPage(filesNow[openPath] ?? ""));
+        setFrameId((n) => n + 1);
+        appliedRef.current = filesNow;
         setHmrKind("");
         forceReload.current = false;
         return;
       }
       if (swift) {
-        setDoc(buildSwiftPlayground(files[openPath] ?? ""));
-        appliedRef.current = files;
+        setDoc(buildSwiftPlayground(filesNow[openPath] ?? ""));
+        setFrameId((n) => n + 1);
+        appliedRef.current = filesNow;
         setHmrKind("");
         forceReload.current = false;
         return;
       }
-      const html = buildPreviewHtml(files);
+      const html = buildPreviewHtml(filesNow);
       const win = iframeRef.current?.contentWindow;
       const first = !Object.keys(appliedRef.current).length;
       const ready = bootedRef.current && !!win;
-      const cls = classifyPreviewChange(appliedRef.current, files);
+      const cls = classifyPreviewChange(appliedRef.current, filesNow);
       if (!forceReload.current && !first && ready && cls.kind === "css" && cls.paths.length) {
         for (const p of cls.paths) {
-          win!.postMessage({ source: "colo-hmr", kind: "css", path: p, content: previewCss(files, p) }, "*");
+          win!.postMessage({ source: "colo-hmr", kind: "css", path: p, content: previewCss(filesNow, p) }, "*");
         }
-        appliedRef.current = files;
+        appliedRef.current = filesNow;
         setHmrKind("hmr");
         return;
       }
       if (!forceReload.current && !first && ready && cls.kind === "js") {
-        const payload = previewHmrJs(files);
+        const payload = previewHmrJs(filesNow);
         if (payload) {
           win!.postMessage({ source: "colo-hmr", kind: "js", ...payload }, "*");
-          appliedRef.current = files;
+          appliedRef.current = filesNow;
           setHmrKind("hmr");
           return;
         }
       }
       setDoc(html);
+      setFrameId((n) => n + 1);
       bootedRef.current = false;
-      if (iframeRef.current && (forceReload.current || first)) iframeRef.current.srcdoc = html;
-      appliedRef.current = files;
+      appliedRef.current = filesNow;
       setHmrKind(first || forceReload.current ? "" : "reload");
       forceReload.current = false;
     } catch (e) {
       const msg = e instanceof Error ? e.message : "preview falhou";
       setDoc(`<!doctype html><pre style="padding:16px;font:14px ui-monospace">${msg}</pre>`);
+      setFrameId((n) => n + 1);
       setHmrKind("reload");
       forceReload.current = false;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [readyKey, openPath, swift, md, tick, wcUrl]);
+
+  useLayoutEffect(() => {
+    if (wcUrl || !doc) return;
+    const el = iframeRef.current;
+    if (!el) return;
+    if (el.srcdoc !== doc) el.srcdoc = doc;
+  }, [doc, frameId, wcUrl]);
 
   useEffect(() => {
     function onMsg(e: MessageEvent) {
@@ -219,8 +230,9 @@ export function PreviewPane() {
             src={wcUrl}
             allow="cross-origin-isolated"
           />
-        ) : (
+        ) : doc ? (
           <iframe
+            key={frameId}
             ref={iframeRef}
             title="Preview do workspace"
             sandbox="allow-scripts allow-forms allow-modals allow-popups allow-downloads"
@@ -229,6 +241,10 @@ export function PreviewPane() {
               bootedRef.current = true;
             }}
           />
+        ) : (
+          <p className="preview-console-empty" style={{ padding: 16 }}>
+            montando preview…
+          </p>
         )}
       </div>
       <div className="preview-console">

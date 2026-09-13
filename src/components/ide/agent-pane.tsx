@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AtSign, Bot, Check, Columns2, FolderOpen, History, ImagePlus, LoaderCircle, Lock, Mic, Paperclip, Pencil, Plus, RotateCcw, Send, Square, SquarePen, Undo2, Unlock, Wrench, X } from "lucide-react";
 import { AgentConnect, AgentPicker } from "@/components/ide/settings-pane";
 import { PickList } from "@/components/ide/pick-list";
@@ -91,6 +91,7 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
   const [shots, setShots] = useState<AgentImage[]>([]);
   const history = useRef<AgentMessage[]>([]);
   const box = useRef<HTMLDivElement>(null);
+  const stickRef = useRef(true);
   const cancel = useRef(false);
   const gen = useRef(0);
   const draftRef = useRef("");
@@ -160,8 +161,27 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
     setItems(t.items);
     cancel.current = false;
     setBusy(false);
+    stickRef.current = true;
     booted.current = true;
   }, [projectId, chatsReady, slot]);
+
+  useLayoutEffect(() => {
+    if (!stickRef.current) return;
+    const el = box.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [items, chatsReady, projectId, slot]);
+
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      if (!stickRef.current) return;
+      el.scrollTop = el.scrollHeight;
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -278,6 +298,7 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
     history.current = t.messages;
     setItems(t.items);
     setHistOpen(false);
+    stickRef.current = true;
   }
 
   function openThread(id: string) {
@@ -291,6 +312,7 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
     history.current = t.messages;
     setItems(t.items);
     setHistOpen(false);
+    stickRef.current = true;
   }
 
   const pendingCaret = useRef<number | null>(null);
@@ -336,6 +358,7 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
         : `explica este trecho:\n\`\`\`\n${quote}\n\`\`\``
       : prompt;
     if (!connected) return;
+    stickRef.current = true;
     if (!body && !pics.length) {
       if (!running.current && queueRef.current.length) {
         const next = queueRef.current[0]!;
@@ -590,7 +613,15 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
         </div>
       ) : null}
 
-      <div ref={box} className="agent-stream">
+      <div
+        ref={box}
+        className="agent-stream"
+        onScroll={() => {
+          const el = box.current;
+          if (!el) return;
+          stickRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 96;
+        }}
+      >
         {histOpen ? (
           <div className="chat-hist">
             {chats.length ? (

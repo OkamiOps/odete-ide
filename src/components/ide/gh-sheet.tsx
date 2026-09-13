@@ -51,24 +51,23 @@ function ActionsBody() {
   }, [remote, token]);
   return (
     <>
-      <Hd title="GitHub Actions" />
+      <Hd title="Actions" />
       <div className="gh-sheet-body">
         {err ? <p className="agent-err">{err}</p> : null}
-        {!token ? <p>conecta o GitHub nos Ajustes</p> : null}
-        {rows.map((r) => (
-          <a key={r.id} className="hit" href={r.url} target="_blank" rel="noreferrer">
-            <b>
-              {r.name}
-              <em className={r.conclusion === "success" ? "is-ok" : r.conclusion === "failure" ? "is-bad" : ""}>
-                {r.conclusion || r.status}
-              </em>
-            </b>
-            <span>
-              {r.branch} · {new Date(r.at).toLocaleString("pt-BR")}
-            </span>
-          </a>
-        ))}
-        {token && !rows.length && !err ? <p>nenhum run ainda</p> : null}
+        {!token ? <p className="gh-empty">Conecta o GitHub nos Ajustes pra ver os runs.</p> : null}
+        {rows.map((r) => {
+          const tone = r.conclusion === "success" ? "ok" : r.conclusion === "failure" ? "bad" : "run";
+          return (
+            <a key={r.id} className="gh-row" href={r.url} target="_blank" rel="noreferrer">
+              <span className={`gh-pill is-${tone}`}>{r.conclusion || r.status}</span>
+              <b>{r.name}</b>
+              <span>
+                {r.branch} · {new Date(r.at).toLocaleString("pt-BR")}
+              </span>
+            </a>
+          );
+        })}
+        {token && !rows.length && !err ? <p className="gh-empty">Nenhum workflow rodou ainda neste repo.</p> : null}
       </div>
     </>
   );
@@ -173,7 +172,7 @@ function CompareBody() {
 function PrsBody() {
   const remote = useWorkspace((s) => s.remote);
   const token = useProjects((s) => s.github?.token);
-  const [rows, setRows] = useState<{ number: number; title: string; url: string }[]>([]);
+  const [rows, setRows] = useState<{ number: number; title: string; url: string; head: string; draft: boolean; user: string; at: string }[]>([]);
   const [err, setErr] = useState("");
   useEffect(() => {
     if (!remote || !token) return;
@@ -186,14 +185,21 @@ function PrsBody() {
       <Hd title="Pull requests" />
       <div className="gh-sheet-body">
         {err ? <p className="agent-err">{err}</p> : null}
-        {!token ? <p>conecta o GitHub nos Ajustes</p> : null}
+        {!token ? <p className="gh-empty">Conecta o GitHub nos Ajustes pra listar as PRs.</p> : null}
         {rows.map((p) => (
-          <button key={p.number} type="button" className="hit" onClick={() => useHub.getState().setPr(p.number)}>
-            <b>PR #{p.number}</b>
-            <span>{p.title}</span>
+          <button key={p.number} type="button" className="gh-row" onClick={() => useHub.getState().setPr(p.number)}>
+            <span className={`gh-pill ${p.draft ? "is-run" : "is-ok"}`}>{p.draft ? "draft" : `#${p.number}`}</span>
+            <b>{p.title}</b>
+            <span>
+              {p.head}
+              {p.user ? ` · ${p.user}` : ""}
+              {p.at ? ` · ${new Date(p.at).toLocaleDateString("pt-BR")}` : ""}
+            </span>
           </button>
         ))}
-        {token && !rows.length && !err ? <p>nenhuma PR aberta</p> : null}
+        {token && !rows.length && !err ? (
+          <p className="gh-empty">Nenhuma PR aberta. Quando abrir uma, ela aparece aqui.</p>
+        ) : null}
       </div>
     </>
   );

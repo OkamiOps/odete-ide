@@ -287,24 +287,24 @@ export function GitPane() {
                 criar
               </button>
             </div>
-            <div className="git-stash-row">
+            <div className="git-compare">
               <PickList
                 value={commits[commits.length - 2]?.id ?? ""}
-                options={commits.map((c) => ({ id: c.id, label: c.message.slice(0, 28) }))}
+                options={commits.map((c) => ({ id: c.id, label: c.message.slice(0, 40) }))}
                 onChange={(id) => useHub.setState({ compareA: id })}
                 fill
                 ariaLabel="commit A"
               />
               <PickList
                 value={commits[commits.length - 1]?.id ?? ""}
-                options={commits.map((c) => ({ id: c.id, label: c.message.slice(0, 28) }))}
+                options={commits.map((c) => ({ id: c.id, label: c.message.slice(0, 40) }))}
                 onChange={(id) => useHub.setState({ compareB: id })}
                 fill
                 ariaLabel="commit B"
               />
               <button
                 type="button"
-                className="chip"
+                className="chip git-compare-go"
                 onClick={() => {
                   const a = useHub.getState().compareA || commits[Math.max(0, commits.length - 2)]?.id;
                   const b = useHub.getState().compareB || commits[commits.length - 1]?.id;

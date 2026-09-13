@@ -140,7 +140,6 @@ export function SettingsPane() {
 
 export function AgentConnect({ embedded = false }: { embedded?: boolean }) {
   const agentId = useChrome((s) => s.agentId);
-  const setAgentId = useChrome((s) => s.setAgentId);
   const body = (
     <>
       {agentId === "grok" ? <GrokInfo /> : null}
@@ -152,17 +151,9 @@ export function AgentConnect({ embedded = false }: { embedded?: boolean }) {
   return (
     <section className="set-card">
       <h2>Agente</h2>
-      <div className="agent-pick">
-        {AGENTS.map((a) => (
-          <button
-            key={a.id}
-            type="button"
-            className={agentId === a.id ? "is-on" : undefined}
-            onClick={() => setAgentId(a.id)}
-          >
-            {a.label}
-          </button>
-        ))}
+      <div className="set-agent-pick">
+        <p className="text-xs text-fg-subtle">Provider</p>
+        <AgentPicker fill />
       </div>
       {body}
     </section>
@@ -394,7 +385,7 @@ export function AgentPicker({ compact, fill }: { compact?: boolean; fill?: boole
     <PickList
       compact={compact}
       fill={fill}
-      ariaLabel="Agente"
+      ariaLabel="Providers"
       value={agentId}
       options={AGENTS.map((a) => ({ id: a.id, label: a.label }))}
       onChange={(id) => setAgentId(id as AgentId)}

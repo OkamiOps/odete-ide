@@ -457,11 +457,26 @@ export async function githubIssues(remote: string, token: string) {
 export async function githubPulls(remote: string, token: string) {
   const spec = parseRepo(remote);
   if (!spec) throw new Error("remote inválido");
-  const list = await gh<{ number: number; title: string; html_url: string; head: { ref: string } }[]>(
-    `https://api.github.com/repos/${spec.owner}/${spec.repo}/pulls?state=open&per_page=20`,
-    token,
-  );
-  return list.map((p) => ({ number: p.number, title: p.title, url: p.html_url, head: p.head.ref }));
+  const list = await gh<
+    {
+      number: number;
+      title: string;
+      html_url: string;
+      draft: boolean;
+      updated_at: string;
+      user: { login: string };
+      head: { ref: string };
+    }[]
+  >(`https://api.github.com/repos/${spec.owner}/${spec.repo}/pulls?state=open&per_page=20`, token);
+  return list.map((p) => ({
+    number: p.number,
+    title: p.title,
+    url: p.html_url,
+    head: p.head.ref,
+    draft: p.draft,
+    user: p.user?.login ?? "",
+    at: p.updated_at,
+  }));
 }
 
 export async function githubCreateRepo(token: string, name: string, owner?: string) {

@@ -1,15 +1,16 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AtSign, Bot, Check, Columns2, FolderOpen, History, ImagePlus, LoaderCircle, Lock, Mic, Paperclip, Pencil, Plus, RotateCcw, Send, Square, SquarePen, Undo2, Unlock, Wrench, X } from "lucide-react";
-import { AgentConnect } from "@/components/ide/settings-pane";
+import { AgentConnect, AgentPicker } from "@/components/ide/settings-pane";
+import { PickList } from "@/components/ide/pick-list";
 import { ModelSelect } from "@/components/ide/model-select";
 import { contextWindow, estimateTokens, fmtTok, useAgentChats } from "@/lib/agent/chats";
 import { emptyUse } from "@/lib/agent/stream-types";
-import { defaultEffort, effortKey, EFFORT_HINT, EFFORT_LABEL, effortsForModel, type EffortId } from "@/lib/agent/effort";
+import { defaultEffort, effortKey, EFFORT_LABEL, effortsForModel, type EffortId } from "@/lib/agent/effort";
 import { runAgentLoop, type ChatItem } from "@/lib/agent/loop";
 import { usePatches } from "@/lib/agent/patches";
 import { useCheckpoints } from "@/lib/agent/checkpoints";
 import { armNotify, pingDone } from "@/lib/workspace/notify";
-import { AGENTS, agentById } from "@/lib/agent/providers";
+import { agentById } from "@/lib/agent/providers";
 import type { AgentImage, AgentMessage } from "@/lib/agent/server";
 import { answerPermit, type PermitMode } from "@/lib/agent/permit";
 import type { AgentMode } from "@/lib/agent/tools";
@@ -28,9 +29,9 @@ const STARTERS = [
 ];
 
 const MODE_META: { id: AgentMode; label: string }[] = [
-  { id: "chat", label: "chat" },
-  { id: "plan", label: "plan" },
-  { id: "build", label: "build" },
+  { id: "chat", label: "Chat" },
+  { id: "plan", label: "Plan" },
+  { id: "build", label: "Build" },
 ];
 
 const PERM_META: { id: PermitMode; label: string; hint: string }[] = [
@@ -394,9 +395,6 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
         <div className="agent-hd-top">
           <span className="label">Agente</span>
           <div className="agent-hd-ops">
-            <button type="button" className="agent-icon" aria-label="novo chat" title="Novo chat" onClick={clear}>
-              <SquarePen size={16} />
-            </button>
             {slot === "a" ? (
               <button
                 type="button"
@@ -429,54 +427,32 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
             >
               <History size={16} />
             </button>
+            <button type="button" className="agent-icon" aria-label="novo chat" title="Novo chat" onClick={clear}>
+              <SquarePen size={16} />
+            </button>
           </div>
         </div>
-        <div className="agent-pick">
-          {AGENTS.map((a) => (
-            <button
-              key={a.id}
-              type="button"
-              className={agentId === a.id ? "is-on" : undefined}
-              onClick={() => useChrome.getState().setAgentId(a.id)}
-            >
-              {a.label}
-            </button>
-          ))}
-        </div>
-        {connected ? <ModelSelect provider={agentId} compact /> : null}
-        {connected && options.length ? (
-          <div
-            className="agent-effort"
-            role="tablist"
-            aria-label="effort"
-            style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }}
-          >
-            {options.map((id) => (
-              <button
-                key={id}
-                type="button"
-                title={EFFORT_HINT[id]}
-                className={effort === id ? "is-on" : undefined}
-                onClick={() => useChrome.getState().setEffort(effortKey(agentId, model), id)}
-              >
-                {EFFORT_LABEL[id]}
-              </button>
-            ))}
-          </div>
-        ) : null}
-        <div className="agent-modes" role="tablist" aria-label="modo do agente">
-          {MODE_META.map((m) => (
-            <button
-              key={m.id}
-              type="button"
-              role="tab"
-              aria-selected={agentMode === m.id}
-              className={agentMode === m.id ? "is-on" : undefined}
-              onClick={() => useChrome.getState().setAgentMode(m.id)}
-            >
-              {m.label}
-            </button>
-          ))}
+        <div className="agent-hd-drops">
+          <AgentPicker compact fill />
+          {connected ? <ModelSelect provider={agentId} compact /> : null}
+          {connected && options.length ? (
+            <PickList
+              compact
+              fill
+              ariaLabel="Effort"
+              value={effort || options[0]!}
+              options={options.map((id) => ({ id, label: EFFORT_LABEL[id] }))}
+              onChange={(id) => useChrome.getState().setEffort(effortKey(agentId, model), id as EffortId)}
+            />
+          ) : null}
+          <PickList
+            compact
+            fill
+            ariaLabel="Modo"
+            value={agentMode}
+            options={MODE_META.map((m) => ({ id: m.id, label: m.label }))}
+            onChange={(id) => useChrome.getState().setAgentMode(id as AgentMode)}
+          />
         </div>
       </div>
       {ckOpen ? (

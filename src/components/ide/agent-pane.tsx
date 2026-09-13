@@ -195,24 +195,41 @@ export function AgentPane() {
     setHistOpen(false);
   }
 
+  function placeCaret(pos: number) {
+    requestAnimationFrame(() => {
+      const el = inputRef.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(pos, pos);
+      caretRef.current = pos;
+      setCaret(pos);
+    });
+  }
+
   function pickFile(path: string) {
     setPicker(false);
     setPlus(false);
-    setDraft((d) => {
-      const hit = mentionAt(d, caretRef.current);
-      if (hit) return d.slice(0, hit.start) + `@${path} ` + d.slice(hit.end);
-      return `${d}${d && !/\s$/.test(d) ? " " : ""}@${path} `;
-    });
+    const d = draft;
+    const hit = mentionAt(d, caretRef.current);
+    const next = hit
+      ? `${d.slice(0, hit.start)}@${path} ${d.slice(hit.end)}`
+      : `${d}${d && !/\s$/.test(d) ? " " : ""}@${path} `;
+    const pos = hit ? hit.start + path.length + 2 : next.length;
+    setDraft(next);
+    placeCaret(pos);
   }
 
   function pickSkill(id: string) {
     setPicker(false);
     setPlus(false);
-    setDraft((d) => {
-      const hit = slashAt(d, caretRef.current);
-      if (hit) return d.slice(0, hit.start) + `/${id} ` + d.slice(hit.end);
-      return `${d}${d && !/\s$/.test(d) ? " " : ""}/${id} `;
-    });
+    const d = draft;
+    const hit = slashAt(d, caretRef.current);
+    const next = hit
+      ? `${d.slice(0, hit.start)}/${id} ${d.slice(hit.end)}`
+      : `${d}${d && !/\s$/.test(d) ? " " : ""}/${id} `;
+    const pos = hit ? hit.start + id.length + 2 : next.length;
+    setDraft(next);
+    placeCaret(pos);
   }
 
   async function send(text: string) {

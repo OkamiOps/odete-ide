@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { AtSign, Check, Eraser, FolderOpen, ImagePlus, LoaderCircle, Paperclip, Plus, Send, Square, Undo2, X } from "lucide-react";
+import { AtSign, Check, FolderOpen, History, ImagePlus, LoaderCircle, Paperclip, Plus, Send, Square, SquarePen, Undo2, X } from "lucide-react";
 import { AgentConnect } from "@/components/ide/settings-pane";
 import { ModelSelect } from "@/components/ide/model-select";
-import { useAgentChats } from "@/lib/agent/chats";
+import { contextWindow, estimateTokens, fmtTok, useAgentChats } from "@/lib/agent/chats";
 import { defaultEffort, effortKey, EFFORT_HINT, EFFORT_LABEL, effortsForModel, type EffortId } from "@/lib/agent/effort";
 import { runAgentLoop, type ChatItem } from "@/lib/agent/loop";
 import { usePatches } from "@/lib/agent/patches";
@@ -57,7 +57,6 @@ export function AgentPane() {
   const connected = useChrome(agentConnected);
   const projectId = useWorkspace((s) => s.projectId);
   const files = useWorkspace((s) => s.files);
-  const openPath = useWorkspace((s) => s.openPath);
   const def = agentById(agentId);
   const [items, setItems] = useState<ChatItem[]>([]);
   const [draft, setDraft] = useState("");
@@ -73,7 +72,9 @@ export function AgentPane() {
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [plus, setPlus] = useState(false);
   const [picker, setPicker] = useState<false | "file" | "skill">(false);
+  const [histOpen, setHistOpen] = useState(false);
   const agentMode = useChrome((s) => s.agentMode);
+  const threadMap = useAgentChats((s) => s.threads);
 
   useEffect(() => {
     const t = useAgentChats.getState().load(projectId);
@@ -138,10 +139,21 @@ export function AgentPane() {
 
   function clear() {
     cancel.current = true;
-    history.current = [];
-    setItems([]);
     setBusy(false);
-    useAgentChats.getState().clear(projectId);
+    const t = useAgentChats.getState().newChat(projectId);
+    history.current = t.messages;
+    setItems(t.items);
+    setHistOpen(false);
+  }
+
+  function openThread(id: string) {
+    const t = useAgentChats.getState().open(projectId, id);
+    if (!t) return;
+    cancel.current = true;
+    setBusy(false);
+    history.current = t.messages;
+    setItems(t.items);
+    setHistOpen(false);
   }
 
   function pickFile(path: string) {
@@ -235,6 +247,13 @@ export function AgentPane() {
     void send(t);
   };
 
+  const chats = useMemo(
+    () =>
+      Object.values(threadMap)
+        .filter((t) => t.projectId === projectId)
+        .sort((a, b) => b.updated - a.updated),
+    [threadMap, projectId],
+  );
   const empty = connected && items.length === 0;
   const pendingCount = usePatches((s) => s.items.filter((p) => p.status === "pending").length);
   const quote = useNav((s) => s.quote);
@@ -243,15 +262,34 @@ export function AgentPane() {
   const effortStored = useChrome(currentEffort);
   const options = effortsForModel(agentId, model);
   const effort = (options.includes(effortStored as EffortId) ? effortStored : defaultEffort(options)) as EffortId | "";
+  const usedTok = estimateTokens({
+    messages: history.current,
+    files,
+    draft,
+    images: shots.length,
+  });
+  const maxTok = contextWindow(agentId, model);
+  const ctxPct = Math.min(100, Math.round((usedTok / Math.max(1, maxTok)) * 100));
 
   return (
     <div className="agent-pane">
       <div className="agent-hd">
         <div className="agent-hd-top">
           <span className="label">Agente</span>
-          <button type="button" className="agent-icon" aria-label="limpar conversa" onClick={clear}>
-            <Eraser size={15} />
-          </button>
+          <div className="agent-hd-ops">
+            <button type="button" className="agent-icon" aria-label="novo chat" title="Novo chat" onClick={clear}>
+              <SquarePen size={16} />
+            </button>
+            <button
+              type="button"
+              className={`agent-icon${histOpen ? " is-on" : ""}`}
+              aria-label="histórico"
+              title="Histórico"
+              onClick={() => setHistOpen((v) => !v)}
+            >
+              <History size={16} />
+            </button>
+          </div>
         </div>
         <div className="agent-pick">
           {AGENTS.map((a) => (
@@ -303,13 +341,41 @@ export function AgentPane() {
       </div>
 
       <div ref={box} className="agent-stream">
-        {!connected ? (
+        {histOpen ? (
+          <div className="chat-hist">
+            {chats.length ? (
+              chats.map((t) => (
+                <div key={t.id} className="chat-hist-row">
+                  <button type="button" className="chat-hist-main" onClick={() => openThread(t.id)}>
+                    <b>{t.title}</b>
+                    <span>{ago(t.updated)} · {t.items.filter((i) => i.kind === "user").length} msgs</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="agent-icon"
+                    aria-label="apagar conversa"
+                    onClick={() => {
+                      const next = useAgentChats.getState().remove(projectId, t.id);
+                      history.current = next.messages;
+                      setItems(next.items);
+                    }}
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ))
+            ) : (
+              <p className="clone-status">nenhuma conversa ainda</p>
+            )}
+          </div>
+        ) : null}
+        {!histOpen && !connected ? (
           <div className="agent-auth">
             <AgentConnect embedded />
           </div>
         ) : null}
 
-        {empty ? (
+        {!histOpen && empty ? (
           <div className="agent-empty">
             <p className="agent-empty-kicker">{def.vendor}</p>
             <h3>{def.label} pronto</h3>
@@ -324,11 +390,13 @@ export function AgentPane() {
           </div>
         ) : null}
 
-        {items.map((item) => (
-          <Message key={item.id} item={item} />
-        ))}
+        {!histOpen
+          ? items.map((item) => (
+              <Message key={item.id} item={item} />
+            ))
+          : null}
 
-        {pendingCount > 1 ? (
+        {!histOpen && pendingCount > 1 ? (
           <div className="patch-bar">
             <button type="button" onClick={() => usePatches.getState().acceptAll()}>
               Aceitar todos ({pendingCount})
@@ -537,6 +605,10 @@ export function AgentPane() {
               >
                 <Plus size={20} />
               </button>
+              <span className={`agent-ctx${ctxPct >= 85 ? " is-hot" : ctxPct >= 60 ? " is-warm" : ""}`} title="contexto estimado">
+                {fmtTok(usedTok)}
+                <em>/{fmtTok(maxTok)}</em>
+              </span>
               {busy ? (
                 <button
                   type="button"
@@ -560,6 +632,14 @@ export function AgentPane() {
       ) : null}
     </div>
   );
+}
+
+function ago(ts: number) {
+  const s = Math.max(1, Math.round((Date.now() - ts) / 1000));
+  if (s < 60) return "agora";
+  if (s < 3600) return `${Math.round(s / 60)} min`;
+  if (s < 86400) return `${Math.round(s / 3600)} h`;
+  return `${Math.round(s / 86400)} d`;
 }
 
 function Message({ item }: { item: ChatItem }) {

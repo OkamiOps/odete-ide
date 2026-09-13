@@ -742,7 +742,9 @@ input, textarea, select { font: inherit; font-size: 16px; }
 .agent-pane { display: flex; flex-direction: column; height: 100%; min-height: 0; }
 .agent-hd { flex-shrink: 0; padding: 8px 10px 10px; border-bottom: 1px solid var(--color-border); display: flex; flex-direction: column; gap: 8px; }
 .agent-hd-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0; }
-.agent-icon { display: grid; place-items: center; width: 32px; height: 32px; border: 0; border-radius: 8px; background: transparent; color: var(--color-fg-muted); }
+.agent-hd-ops { display: flex; gap: 2px; }
+.agent-icon { display: grid; place-items: center; width: 36px; height: 36px; border: 0; border-radius: 10px; background: transparent; color: var(--color-fg-muted); }
+.agent-icon.is-on, .agent-icon:hover { background: var(--color-bg-subtle); color: var(--color-fg); }
 .agent-hd-picks { display: grid; grid-template-columns: 7.5rem minmax(0,1fr); gap: 6px; }
 .agent-hd .agent-pick { margin: 0; }
 .agent-effort {
@@ -889,6 +891,42 @@ input, textarea, select { font: inherit; font-size: 16px; }
 .agent-compose-hint { flex: 1; min-width: 0; font-size: 11px; color: var(--color-fg-subtle); padding: 0 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .agent-icon-btn { width: 40px; height: 40px; display: grid; place-items: center; border: 0; border-radius: 10px; background: transparent; color: var(--color-fg-muted); }
 .agent-icon-btn:hover, .agent-icon-btn.is-on { background: var(--color-bg-subtle); color: var(--color-fg); }
+.agent-ctx {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-fg-subtle);
+  padding: 0 6px;
+}
+.agent-ctx em { font-style: normal; opacity: .7; }
+.agent-ctx.is-warm { color: #e6c349; }
+.agent-ctx.is-hot { color: #e25d5d; }
+.chat-hist { display: flex; flex-direction: column; gap: 6px; }
+.chat-hist-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px;
+  align-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-bg);
+  padding: 4px;
+}
+.chat-hist-main {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-height: 48px;
+  padding: 6px 10px;
+  border: 0;
+  background: transparent;
+  color: var(--color-fg);
+  text-align: left;
+}
+.chat-hist-main b { font-size: 14px; font-weight: 600; }
+.chat-hist-main span { font-size: 11px; color: var(--color-fg-subtle); }
 .plus-menu {
   display: grid;
   grid-template-columns: 1fr 1fr;

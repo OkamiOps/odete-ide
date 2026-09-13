@@ -68,15 +68,15 @@ export function detectStack(pkg: {
 
 export function stackHint(stack: Stack) {
   if (stack.kind === "spa") {
-    return `${stack.label}: npm run dev abre o Preview (JSX/TS no Colo, HMR CSS/JS, pacotes via esm.sh).`;
+    return `${stack.label}: npm run dev sobe o Vite no Node deste iPad. HMR de verdade.`;
   }
   if (stack.id === "nest") {
-    return `Nest no Colo: npm run start executa src/main.ts no Safari (decorators shim) e o Preview chama as rotas. Sem TCP, Prisma nativo ou microservices.`;
+    return `Nest: npm run start sobe o servidor no Node deste iPad. o Preview aponta pra ele.`;
   }
   if (stack.id === "next") {
-    return `Next no Colo: app/page.tsx no Preview + Route Handlers em /api. Sem SSR, sem next build, sem webpack.`;
+    return `Next: npm run dev sobe o Next neste iPad (1º boot é lento). o Preview aponta pro servidor.`;
   }
-  return `${stack.label}: o Colo tenta o client no Preview. fetch('/api') cai nos Route Handlers ou em public/api. Sem Node real neste iPad.`;
+  return `${stack.label}: npm run dev/start usa o Node deste iPad.`;
 }
 
 async function lookup(name: string, want?: string): Promise<NpmInfo> {

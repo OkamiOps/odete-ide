@@ -551,7 +551,7 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
           <div className="agent-empty">
             <p className="agent-empty-kicker">{def.vendor}</p>
             <h3>{def.label} pronto</h3>
-            <p>npm i / pnpm i (workspace e catalog). Preview com HMR e fetch('/api') pra JSON em public/. Next/Nest server precisam de Node — iPad não tem.</p>
+            <p>npm i e npm run dev usam o Node deste iPad. Vite, Next e Nest sobem no Preview. build também corre (é mais lento).</p>
             <div className="agent-starts">
               {STARTERS.map((s) => (
                 <button key={s.label} type="button" onClick={() => void send(s.prompt)}>

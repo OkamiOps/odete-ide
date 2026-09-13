@@ -12,7 +12,23 @@ import { grokPwaPlugin } from "./scripts/grok-pwa-plugin.mjs";
 import { appEnvPlugin } from "./scripts/app-env-plugin.mjs";
 import { isMigrationFile } from "./scripts/migration-plan.mjs";
 
-/** The files `src/lib/db.ts` globs — same directory, same non-recursive scope. */
+const ISO_HEADERS = {
+  "Cross-Origin-Embedder-Policy": "credentialless",
+  "Cross-Origin-Opener-Policy": "same-origin",
+};
+
+function isolationPlugin(): Plugin {
+  return {
+    name: "colo-isolation",
+    configureServer(server) {
+      server.middlewares.use((_req, res, next) => {
+        res.setHeader("Cross-Origin-Embedder-Policy", ISO_HEADERS["Cross-Origin-Embedder-Policy"]);
+        res.setHeader("Cross-Origin-Opener-Policy", ISO_HEADERS["Cross-Origin-Opener-Policy"]);
+        next();
+      });
+    },
+  };
+}
 function hasGlobbedMigrations(root: string): boolean {
   try {
     return readdirSync(join(root, "migrations")).some(isMigrationFile);
@@ -150,14 +166,20 @@ export default defineConfig(({ command, isPreview }) => ({
     host: "0.0.0.0",
     port: 8080,
     strictPort: true,
+    headers: ISO_HEADERS,
   },
   preview: {
     host: "127.0.0.1",
     port: 8081,
     strictPort: true,
+    headers: ISO_HEADERS,
+  },
+  optimizeDeps: {
+    exclude: ["@webcontainer/api"],
   },
   resolve: { tsconfigPaths: true },
   plugins: [
+    isolationPlugin(),
     pgliteBootstrapPlugin(),
     // Before tanstackStart so /auth/popup never falls through to the SPA.
     authPopupPlugin(),

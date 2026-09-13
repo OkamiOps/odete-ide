@@ -1,0 +1,367 @@
+import { create } from "zustand";
+import type { FileSystemTree, WebContainer, WebContainerProcess } from "@webcontainer/api";
+import { unpackBin } from "@/lib/github/api";
+import { isNoisePath } from "./ignore";
+import type { FileMap } from "./types";
+import { useWorkspace } from "./store";
+
+export type NodeStatus = "off" | "booting" | "ready" | "running" | "unsupported";
+
+type NodeState = {
+  status: NodeStatus;
+  previewUrl: string;
+  isolated: boolean;
+  reason: string;
+};
+
+type Host = typeof globalThis & {
+  __coloWc?: WebContainer;
+  __coloWcBoot?: Promise<WebContainer | null>;
+};
+
+const HOST = globalThis as Host;
+
+export const useNodeRuntime = create<NodeState>(() => ({
+  status: "off",
+  previewUrl: "",
+  isolated: false,
+  reason: "",
+}));
+
+let wc: WebContainer | null = HOST.__coloWc ?? null;
+let bootP: Promise<WebContainer | null> | null = HOST.__coloWcBoot ?? null;
+let mountedFor = "";
+let lastFiles: FileMap = {};
+let running: WebContainerProcess | null = null;
+let pulling = false;
+let unsubWs: (() => void) | null = null;
+let unsubReady: (() => void) | null = null;
+
+function isolatedNow() {
+  return typeof window !== "undefined" && !!window.crossOriginIsolated && typeof SharedArrayBuffer !== "undefined";
+}
+
+function parentDir(path: string) {
+  const i = path.lastIndexOf("/");
+  return i <= 0 ? "" : path.slice(0, i);
+}
+
+function fileBytes(contents: string): string | Uint8Array {
+  const bin = unpackBin(contents);
+  if (!bin) return contents;
+  const raw = atob(bin.b64);
+  const out = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+  return out;
+}
+
+export function filesToTree(files: FileMap): FileSystemTree {
+  const root: FileSystemTree = {};
+  for (const [path, contents] of Object.entries(files)) {
+    if (isNoisePath(path) || path.startsWith("__colo")) continue;
+    const parts = path.split("/").filter(Boolean);
+    let node = root;
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i]!;
+      const last = i === parts.length - 1;
+      if (last) {
+        node[part] = { file: { contents: fileBytes(contents) } };
+      } else {
+        const cur = node[part];
+        if (!cur || !("directory" in cur)) node[part] = { directory: {} };
+        node = (node[part] as { directory: FileSystemTree }).directory;
+      }
+    }
+  }
+  return root;
+}
+
+function manager(files: FileMap, prefer?: string) {
+  if (prefer === "pnpm" || files["pnpm-workspace.yaml"] || files["pnpm-lock.yaml"]) {
+    return { bin: "pnpm", install: ["install"] as string[] };
+  }
+  if (prefer === "yarn" || files["yarn.lock"]) return { bin: "yarn", install: [] as string[] };
+  return { bin: "npm", install: ["install"] as string[] };
+}
+
+function cleanChunk(chunk: string) {
+  return String(chunk)
+    .replace(/\u001b\[[0-9;?]*[ -/]*[@-~]/g, "")
+    .replace(/\u001b\][^\u0007]*(\u0007|\u001b\\)/g, "")
+    .replace(/\r/g, "");
+}
+
+async function stream(proc: WebContainerProcess, onLog: (s: string) => void) {
+  const dec = proc.output.pipeTo(
+    new WritableStream({
+      write(chunk) {
+        const text = cleanChunk(chunk);
+        for (const line of text.split("\n")) {
+          const t = line.trimEnd();
+          if (!t || /^[|/\-\\]+$/.test(t.trim())) continue;
+          onLog(t);
+        }
+      },
+    }),
+  );
+  return dec.catch(() => undefined);
+}
+
+async function waitServer(ms: number) {
+  if (!wc) return "";
+  const already = useNodeRuntime.getState().previewUrl;
+  if (already) return already;
+  return new Promise<string>((resolve) => {
+    const t = window.setTimeout(() => {
+      off();
+      resolve(useNodeRuntime.getState().previewUrl);
+    }, ms);
+    const off = wc!.on("server-ready", (_port, url) => {
+      window.clearTimeout(t);
+      off();
+      useNodeRuntime.setState({ previewUrl: url, status: "running" });
+      resolve(url);
+    });
+  });
+}
+
+async function pullManifest(wcInst: WebContainer) {
+  pulling = true;
+  try {
+    const w = useWorkspace.getState();
+    for (const f of ["package.json", "package-lock.json", "pnpm-lock.yaml", "yarn.lock"]) {
+      try {
+        const txt = await wcInst.fs.readFile(f, "utf-8");
+        if (txt && txt !== w.files[f]) w.writeFile(f, txt);
+      } catch {
+        /* missing */
+      }
+    }
+  } finally {
+    pulling = false;
+  }
+}
+
+async function mkdirp(path: string) {
+  if (!wc || !path) return;
+  try {
+    await wc.fs.mkdir(path, { recursive: true });
+  } catch {
+    /* exists */
+  }
+}
+
+async function syncFiles(files: FileMap, projectId: string) {
+  if (!wc || pulling) return;
+  if (mountedFor !== projectId) {
+    await wc.mount(filesToTree(files));
+    mountedFor = projectId;
+    lastFiles = { ...files };
+    return;
+  }
+  const prev = lastFiles;
+  const all = new Set([...Object.keys(prev), ...Object.keys(files)]);
+  for (const path of all) {
+    if (isNoisePath(path) || path.startsWith("__colo")) continue;
+    const next = files[path];
+    const old = prev[path];
+    if (next === old) continue;
+    if (next === undefined) {
+      try {
+        await wc.fs.rm(path, { force: true });
+      } catch {
+        /* gone */
+      }
+      continue;
+    }
+    await mkdirp(parentDir(path));
+    try {
+      await wc.fs.writeFile(path, fileBytes(next));
+    } catch {
+      await mkdirp(parentDir(path));
+      await wc.fs.writeFile(path, fileBytes(next));
+    }
+  }
+  lastFiles = { ...files };
+}
+
+function watchWorkspace() {
+  unsubWs?.();
+  let timer = 0;
+  unsubWs = useWorkspace.subscribe((s, prev) => {
+    if (s.files === prev.files && s.projectId === prev.projectId) return;
+    if (pulling) return;
+    window.clearTimeout(timer);
+    timer = window.setTimeout(() => {
+      void syncFiles(s.files, s.projectId);
+    }, 160);
+  });
+}
+
+export function nodeUnsupportedReason() {
+  if (typeof window === "undefined") return "sem janela";
+  if (!window.crossOriginIsolated) {
+    return "Node precisa do app em tela cheia (instalado). Nesta pré-visualização embutida o Safari não isola a origem.";
+  }
+  if (typeof SharedArrayBuffer === "undefined") return "SharedArrayBuffer indisponível neste Safari";
+  return "";
+}
+
+export async function ensureNode(onLog?: (s: string) => void): Promise<WebContainer | null> {
+  if (typeof window === "undefined") return null;
+  const reason = nodeUnsupportedReason();
+  if (reason) {
+    useNodeRuntime.setState({ status: "unsupported", isolated: false, reason });
+    return null;
+  }
+  if (HOST.__coloWc) {
+    wc = HOST.__coloWc;
+    if (useNodeRuntime.getState().status === "off" || useNodeRuntime.getState().status === "unsupported") {
+      useNodeRuntime.setState({ status: "ready", isolated: true, reason: "" });
+    }
+    return wc;
+  }
+  if (wc) return wc;
+  if (HOST.__coloWcBoot) return HOST.__coloWcBoot;
+  if (bootP) return bootP;
+  useNodeRuntime.setState({ status: "booting", isolated: true, reason: "" });
+  onLog?.("Node: a arrancar no iPad…");
+  bootP = (async () => {
+    try {
+      const { WebContainer } = await import("@webcontainer/api");
+      const inst = await WebContainer.boot({
+        coep: "credentialless",
+        workdirName: "colo",
+        forwardPreviewErrors: "exceptions-only",
+      });
+      wc = inst;
+      HOST.__coloWc = inst;
+      unsubReady?.();
+      unsubReady = inst.on("server-ready", (_port, url) => {
+        useNodeRuntime.setState({ previewUrl: url, status: "running" });
+      });
+      inst.on("error", (err) => {
+        onLog?.(`Node: ${err.message}`);
+      });
+      const w = useWorkspace.getState();
+      await inst.mount(filesToTree(w.files));
+      mountedFor = w.projectId;
+      lastFiles = { ...w.files };
+      watchWorkspace();
+      useNodeRuntime.setState({ status: "ready", isolated: true, reason: "" });
+      onLog?.("Node pronto. npm run dev usa o Node deste iPad.");
+      return inst;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (/single WebContainer/i.test(msg) && HOST.__coloWc) {
+        wc = HOST.__coloWc;
+        useNodeRuntime.setState({ status: "ready", isolated: true, reason: "" });
+        return wc;
+      }
+      useNodeRuntime.setState({ status: "unsupported", isolated: isolatedNow(), reason: msg });
+      onLog?.(`Node falhou: ${msg}`);
+      bootP = null;
+      HOST.__coloWcBoot = undefined;
+      wc = null;
+      return null;
+    }
+  })();
+  HOST.__coloWcBoot = bootP;
+  return bootP;
+}
+
+export async function nodeSpawn(cmd: string, args: string[], onLog: (s: string) => void): Promise<{ used: boolean; code: number; out: string }> {
+  const inst = await ensureNode(onLog);
+  if (!inst) return { used: false, code: 1, out: nodeUnsupportedReason() };
+  await syncFiles(useWorkspace.getState().files, useWorkspace.getState().projectId);
+  const proc = await inst.spawn(cmd, args);
+  await stream(proc, onLog);
+  const code = await proc.exit;
+  await pullManifest(inst);
+  return { used: true, code, out: `${cmd} ${args.join(" ")} → ${code}` };
+}
+
+export async function nodeInstall(args: string[], onLog: (s: string) => void, prefer?: string) {
+  const inst = await ensureNode(onLog);
+  if (!inst) return { used: false, out: "" };
+  await syncFiles(useWorkspace.getState().files, useWorkspace.getState().projectId);
+  const m = manager(useWorkspace.getState().files, prefer);
+  const argv = args.length ? ["i", ...args] : m.install.length ? m.install : ["i"];
+  onLog?.(`${m.bin} ${argv.join(" ")}`);
+  const proc = await inst.spawn(m.bin, argv);
+  await stream(proc, onLog);
+  const code = await proc.exit;
+  await pullManifest(inst);
+  return { used: true, out: code === 0 ? `${m.bin} install ok` : `${m.bin} install saiu ${code}` };
+}
+
+export async function nodeRunScript(name: string, onLog: (s: string) => void, prefer?: string) {
+  const inst = await ensureNode(onLog);
+  if (!inst) return { used: false, openPreview: false, out: "" };
+  await syncFiles(useWorkspace.getState().files, useWorkspace.getState().projectId);
+  let hasMods = false;
+  try {
+    const names = await inst.fs.readdir("node_modules");
+    hasMods = names.length > 0;
+  } catch {
+    hasMods = false;
+  }
+  if (!hasMods) {
+    onLog("sem node_modules — instalando…");
+    await nodeInstall([], onLog, prefer);
+  }
+  const m = manager(useWorkspace.getState().files, prefer);
+  if (running) {
+    try {
+      running.kill();
+    } catch {
+      /* already dead */
+    }
+    running = null;
+  }
+  const proc = await inst.spawn(m.bin, ["run", name]);
+  running = proc;
+  void stream(proc, onLog);
+  void proc.exit.then((code) => {
+    if (running === proc) {
+      running = null;
+      useNodeRuntime.setState((s) => ({
+        status: s.previewUrl ? "running" : "ready",
+      }));
+      onLog(`npm run ${name} saiu ${code}`);
+    }
+  });
+  const long = /^(dev|start|preview|serve)$/.test(name);
+  if (long) {
+    onLog(`npm run ${name} — à espera do servidor…`);
+    const url = await waitServer(90_000);
+    if (url) {
+      return { used: true, openPreview: true, out: `npm run ${name}\npreview no Node deste iPad` };
+    }
+    return {
+      used: true,
+      openPreview: true,
+      out: `npm run ${name} a correr. se o Preview ficar vazio, espera o compile (Next demora no 1º boot).`,
+    };
+  }
+  const code = await proc.exit;
+  running = null;
+  await pullManifest(inst);
+  return { used: true, openPreview: false, out: `npm run ${name} → ${code}` };
+}
+
+export async function nodeExecFile(file: string, argv: string[], onLog: (s: string) => void) {
+  return nodeSpawn("node", [file, ...argv], onLog);
+}
+
+export function stopNodeDev() {
+  if (running) {
+    try {
+      running.kill();
+    } catch {
+      /* ignore */
+    }
+    running = null;
+  }
+  useNodeRuntime.setState({ previewUrl: "", status: wc ? "ready" : "off" });
+}

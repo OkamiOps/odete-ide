@@ -66,7 +66,8 @@ export async function runShellAsync(raw: string): Promise<string> {
           "ls  cat  pwd  cd  mkdir  touch  rm  echo",
           "git status | log | diff | add | restore | commit -m | pull | push | fetch | sync | clone",
           "git branch | checkout | stash | stash pop | blame",
-          "npm i [pkg] [-D]   pnpm i   npm run [script]   npm ls   npx vite   node [arquivo]   clear",
+          "npm i [pkg] [-D]   pnpm i   npm run [script]   npm ls   node [arquivo]   clear",
+          "npm run dev | start | build  → Node neste iPad",
         ].join("\n");
         break;
       case "clear":
@@ -252,7 +253,15 @@ export async function runShellAsync(raw: string): Promise<string> {
         const sub = args[0];
         const rest = args.slice(1);
         if (sub === "i" || sub === "install" || sub === "add") {
-          out = await npmInstall(rest, (m) => w.termPrint("out", m));
+          const { nodeInstall } = await import("./node-runtime");
+          const wc = await nodeInstall(rest, (m) => w.termPrint("out", m), cmd);
+          if (wc.used) out = wc.out;
+          else {
+            const { nodeUnsupportedReason } = await import("./node-runtime");
+            const why = nodeUnsupportedReason();
+            if (why) w.termPrint("out", why);
+            out = await npmInstall(rest, (m) => w.termPrint("out", m));
+          }
         } else if (sub === "ls") {
           const { parseLock } = await import("./npm-lock");
           const lock = parseLock(w.readFile("package-lock.colo.json"));
@@ -260,6 +269,20 @@ export async function runShellAsync(raw: string): Promise<string> {
           out = keys.length ? keys.map((k) => `${k}@${lock[k]}`).join("\n") : "(lock vazio — npm i)";
         } else if (sub === "run" || sub === "start" || sub === "dev") {
           const name = sub === "run" ? args[1] : sub;
+          if (!name) {
+            out = npmRunScript(undefined).out;
+            break;
+          }
+          const { nodeRunScript } = await import("./node-runtime");
+          const wc = await nodeRunScript(name, (m) => w.termPrint("out", m), cmd);
+          if (wc.used) {
+            if (wc.openPreview) {
+              useChrome.getState().setCenter("preview");
+              useChrome.getState().setMobile("preview");
+            }
+            out = wc.out;
+            break;
+          }
           const r = npmRunScript(name);
           if (r.openPreview) {
             useChrome.getState().setCenter("preview");
@@ -277,8 +300,25 @@ export async function runShellAsync(raw: string): Promise<string> {
       case "vite": {
         const tool = cmd === "npx" ? args[0] : "vite";
         if (cmd === "npx" && (tool === "tsx" || tool === "ts-node")) {
+          const { nodeExecFile } = await import("./node-runtime");
+          const wc = await nodeExecFile(resolve(w.cwd, args[1] ?? ""), args.slice(2), (m) => w.termPrint("out", m));
+          if (wc.used) {
+            out = wc.out;
+            err = wc.code !== 0;
+            break;
+          }
           const { runNode } = await import("./runtime");
           out = await runNode(resolve(w.cwd, args[1] ?? ""), args.slice(2), w.files);
+          break;
+        }
+        const { nodeRunScript } = await import("./node-runtime");
+        const wc = await nodeRunScript("dev", (m) => w.termPrint("out", m), cmd);
+        if (wc.used) {
+          if (wc.openPreview) {
+            useChrome.getState().setCenter("preview");
+            useChrome.getState().setMobile("preview");
+          }
+          out = wc.out;
           break;
         }
         if (cmd === "npx" && (tool === "next" || tool === "nest" || tool === "@nestjs/cli")) {
@@ -303,8 +343,16 @@ export async function runShellAsync(raw: string): Promise<string> {
       case "node":
       case "tsx":
       case "ts-node": {
+        const { nodeExecFile } = await import("./node-runtime");
+        const file = resolve(w.cwd, args[0] ?? "index.js");
+        const wc = await nodeExecFile(file, args.slice(1), (m) => w.termPrint("out", m));
+        if (wc.used) {
+          out = wc.out;
+          err = wc.code !== 0;
+          break;
+        }
         const { runNode } = await import("./runtime");
-        out = await runNode(resolve(w.cwd, args[0] ?? "index.js"), args.slice(1), w.files);
+        out = await runNode(file, args.slice(1), w.files);
         break;
       }
       case "reset":

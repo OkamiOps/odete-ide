@@ -9,6 +9,7 @@ import {
   previewHmrJs,
 } from "@/lib/workspace/preview";
 import { dispatchRuntime } from "@/lib/workspace/runtime";
+import { useNodeRuntime } from "@/lib/workspace/node-runtime";
 import { buildSwiftPlayground, isSwiftPath } from "@/lib/workspace/swift-play";
 import { useWorkspace } from "@/lib/workspace/store";
 import { isNoisePath } from "@/lib/workspace/ignore";
@@ -42,6 +43,8 @@ function sourceKey(files: Record<string, string>) {
 export function PreviewPane() {
   const files = useWorkspace((s) => s.files);
   const openPath = useWorkspace((s) => s.openPath);
+  const wcUrl = useNodeRuntime((s) => s.previewUrl);
+  const wcStatus = useNodeRuntime((s) => s.status);
   const swift = isSwiftPath(openPath);
   const md = isMdPath(openPath);
   const [frame, setFrame] = useState<Frame>("full");
@@ -76,6 +79,12 @@ export function PreviewPane() {
         setDoc(buildSwiftPlayground(files[openPath] ?? ""));
         appliedRef.current = files;
         setHmrKind("");
+        forceReload.current = false;
+        return;
+      }
+      if (wcUrl) {
+        appliedRef.current = files;
+        setHmrKind("hmr");
         forceReload.current = false;
         return;
       }
@@ -114,7 +123,7 @@ export function PreviewPane() {
       forceReload.current = false;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [readyKey, openPath, swift, md, tick]);
+  }, [readyKey, openPath, swift, md, tick, wcUrl]);
 
   useEffect(() => {
     function onMsg(e: MessageEvent) {
@@ -163,7 +172,19 @@ export function PreviewPane() {
     <div className={`preview-frame is-${frame}`}>
       <div className="pane-hd">
         <span className="label">Preview</span>
-        <em>{md ? openPath : swift ? openPath : hmrKind === "hmr" ? "HMR" : "index.html"}</em>
+        <em>
+          {md
+            ? openPath
+            : swift
+              ? openPath
+              : wcUrl
+                ? wcStatus === "running"
+                  ? "Node"
+                  : "Node…"
+                : hmrKind === "hmr"
+                  ? "HMR"
+                  : "index.html"}
+        </em>
         <div className="preview-ops">
           <button type="button" className={frame === "full" ? "is-on" : undefined} title="tela cheia" onClick={() => setFrame("full")}>
             <Monitor size={14} />
@@ -188,15 +209,25 @@ export function PreviewPane() {
         </div>
       </div>
       <div className="preview-stage">
-        <iframe
-          ref={iframeRef}
-          title="Preview do workspace"
-          sandbox="allow-scripts allow-forms allow-modals allow-popups allow-downloads"
-          srcDoc={doc}
-          onLoad={() => {
-            bootedRef.current = true;
-          }}
-        />
+        {wcUrl && !md && !swift ? (
+          <iframe
+            key={wcUrl}
+            title="Preview do workspace"
+            sandbox="allow-scripts allow-forms allow-modals allow-popups allow-downloads allow-same-origin"
+            src={wcUrl}
+            allow="cross-origin-isolated"
+          />
+        ) : (
+          <iframe
+            ref={iframeRef}
+            title="Preview do workspace"
+            sandbox="allow-scripts allow-forms allow-modals allow-popups allow-downloads"
+            srcDoc={doc}
+            onLoad={() => {
+              bootedRef.current = true;
+            }}
+          />
+        )}
       </div>
       <div className="preview-console">
         <header>

@@ -1,6 +1,7 @@
 import { executeTool } from "./execute";
 import { agentTurn, type AgentImage, type AgentMessage } from "./server";
 import type { StreamEvt } from "./stream-types";
+import { emptyUse, fillUse, type TokenUse } from "./stream-types";
 import type { AgentId } from "./providers";
 import type { AgentMode } from "./tools";
 import { useWorkspace } from "@/lib/workspace/store";
@@ -61,6 +62,7 @@ async function streamTurn(
     let text = "";
     let tool_calls: AgentMessage["tool_calls"];
     let err = "";
+    let use = emptyUse();
     while (true) {
       if (shouldStop?.()) break;
       const { done, value } = await reader.read();
@@ -86,6 +88,9 @@ async function streamTurn(
         } else if (ev.t === "tools") {
           tool_calls = ev.calls;
           onEvt(ev);
+        } else if (ev.t === "usage") {
+          use = fillUse(use, ev.use);
+          onEvt(ev);
         } else if (ev.t === "error") {
           err = ev.e;
         }
@@ -100,6 +105,7 @@ async function streamTurn(
         thinking: thinking || undefined,
         tool_calls,
       },
+      use,
     };
   } catch {
     return agentTurn({ data: payload });
@@ -107,7 +113,7 @@ async function streamTurn(
 }
 
 type AgentTurnLike =
-  | { ok: true; message: AgentMessage }
+  | { ok: true; message: AgentMessage; use?: TokenUse }
   | { ok: false; error: string };
 
 export async function runAgentLoop(
@@ -117,6 +123,7 @@ export async function runAgentLoop(
   auth: LoopAuth,
   shouldStop?: () => boolean,
   images?: AgentImage[],
+  onUsage?: (use: TokenUse) => void,
 ): Promise<AgentMessage[]> {
   const extra: ChatItem[] = [];
   const upsert = (item: ChatItem) => {
@@ -174,6 +181,9 @@ export async function runAgentLoop(
     if (!result.ok) {
       push({ id: crypto.randomUUID(), kind: "error", text: result.error });
       break;
+    }
+    if (result.use && (result.use.input || result.use.output || result.use.cache)) {
+      onUsage?.(result.use);
     }
     const msg = result.message;
     if (thinkText) upsert({ id: thinkId, kind: "think", text: msg.thinking || thinkText, live: false });

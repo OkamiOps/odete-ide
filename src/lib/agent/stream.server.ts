@@ -2,6 +2,7 @@ import { SYSTEM_PROMPT, modePrompt, toolsForMode, type AgentMode, type AgentTool
 import type { AgentId } from "./providers";
 import type { AgentMessage, AgentTurnResult } from "./server";
 import type { StreamEvt } from "./stream-types";
+import { pickUsage } from "./stream-types";
 
 export type { StreamEvt };
 
@@ -114,6 +115,7 @@ async function streamOpenAI(opts: {
     messages: sanitizeOpenAI(opts.messages),
     temperature: 0.3,
     stream: true,
+    stream_options: { include_usage: true },
     ...opts.extra,
   };
   if (opts.tools.length) {
@@ -141,6 +143,8 @@ async function streamOpenAI(opts: {
     } catch {
       return;
     }
+    const usage = pickUsage(json);
+    if (usage) opts.emit({ t: "usage", use: usage });
     const choices = json.choices as Array<{ delta?: Record<string, unknown> }> | undefined;
     const delta = choices?.[0]?.delta;
     if (!delta) return;
@@ -239,6 +243,8 @@ async function streamClaude(
       return;
     }
     const type = String(json.type || "");
+    const usage = pickUsage(json);
+    if (usage) emit({ t: "usage", use: usage });
     if (type === "content_block_start") {
       const block = json.content_block as { type?: string; id?: string; name?: string } | undefined;
       blockType = block?.type ?? "";

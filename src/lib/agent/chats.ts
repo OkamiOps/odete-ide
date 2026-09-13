@@ -3,6 +3,7 @@ import { createJSONStorage, persist } from "zustand/middleware";
 import { uid } from "@/lib/utils";
 import type { ChatItem } from "./loop";
 import type { AgentMessage } from "./server";
+import { addUse, emptyUse, type TokenUse } from "./stream-types";
 
 export type ChatThread = {
   id: string;
@@ -11,6 +12,8 @@ export type ChatThread = {
   updated: number;
   items: ChatItem[];
   messages: AgentMessage[];
+  usage: TokenUse;
+  lastInput: number;
 };
 
 type ChatState = {
@@ -22,6 +25,7 @@ type ChatState = {
   newChat: (projectId: string) => ChatThread;
   open: (projectId: string, threadId: string) => ChatThread | null;
   remove: (projectId: string, threadId: string) => ChatThread;
+  addUsage: (projectId: string, use: TokenUse) => void;
 };
 
 function titleOf(items: ChatItem[]) {
@@ -41,6 +45,8 @@ function blank(projectId: string): ChatThread {
     updated: Date.now(),
     items: [],
     messages: [],
+    usage: emptyUse(),
+    lastInput: 0,
   };
 }
 
@@ -114,6 +120,25 @@ export const useAgentChats = create<ChatState>()(
         set((s) => ({ active: { ...s.active, [projectId]: threadId } }));
         return t;
       },
+      addUsage: (projectId, use) => {
+        if (!projectId) return;
+        set((s) => {
+          const id = s.active[projectId];
+          if (!id || !s.threads[id]) return s;
+          const prev = s.threads[id]!;
+          return {
+            threads: {
+              ...s.threads,
+              [id]: {
+                ...prev,
+                usage: addUse(prev.usage ?? emptyUse(), use),
+                lastInput: use.input || prev.lastInput,
+                updated: Date.now(),
+              },
+            },
+          };
+        });
+      },
       remove: (projectId, threadId) => {
         const s = get();
         const threads = { ...s.threads };
@@ -155,6 +180,8 @@ export const useAgentChats = create<ChatState>()(
             updated: Date.now(),
             items: rec.items,
             messages: rec.messages ?? [],
+            usage: emptyUse(),
+            lastInput: 0,
           };
           active[pid] = id;
         }

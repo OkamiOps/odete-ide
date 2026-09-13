@@ -950,14 +950,38 @@ input, textarea, select { font: inherit; font-size: 16px; }
 .agent-ctx {
   flex: 1;
   min-width: 0;
+  border: 0;
+  background: transparent;
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--color-fg-subtle);
   padding: 0 6px;
+  text-align: left;
 }
 .agent-ctx em { font-style: normal; opacity: .7; }
+.agent-ctx.is-on { color: var(--color-fg); }
 .agent-ctx.is-warm { color: #e6c349; }
 .agent-ctx.is-hot { color: #e25d5d; }
+.ctx-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 10px;
+  padding: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  background: var(--color-bg-elevated);
+}
+.ctx-menu div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 36px;
+  padding: 0 10px;
+  border-radius: 10px;
+}
+.ctx-menu span { font-size: 13px; color: var(--color-fg-muted); }
+.ctx-menu b { font-family: var(--font-mono); font-size: 13px; font-weight: 600; }
 .chat-hist { display: flex; flex-direction: column; gap: 6px; }
 .chat-hist-row {
   display: grid;

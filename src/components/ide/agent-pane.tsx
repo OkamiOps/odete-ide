@@ -3,6 +3,7 @@ import { AtSign, Bot, Check, FolderOpen, History, ImagePlus, LoaderCircle, Lock,
 import { AgentConnect } from "@/components/ide/settings-pane";
 import { ModelSelect } from "@/components/ide/model-select";
 import { contextWindow, estimateTokens, fmtTok, useAgentChats } from "@/lib/agent/chats";
+import { emptyUse } from "@/lib/agent/stream-types";
 import { defaultEffort, effortKey, EFFORT_HINT, EFFORT_LABEL, effortsForModel, type EffortId } from "@/lib/agent/effort";
 import { runAgentLoop, type ChatItem } from "@/lib/agent/loop";
 import { usePatches } from "@/lib/agent/patches";
@@ -87,6 +88,7 @@ export function AgentPane() {
   const [permOpen, setPermOpen] = useState(false);
   const [picker, setPicker] = useState<false | "file" | "skill">(false);
   const [histOpen, setHistOpen] = useState(false);
+  const [ctxOpen, setCtxOpen] = useState(false);
   const agentMode = useChrome((s) => s.agentMode);
   const permitMode = useChrome((s) => s.permitMode);
   const threadMap = useAgentChats((s) => s.threads);
@@ -244,6 +246,7 @@ export function AgentPane() {
         },
         () => cancel.current,
         pics,
+        (use) => useAgentChats.getState().addUsage(projectId, use),
       );
       if (!cancel.current) history.current = next;
     } catch (e) {
@@ -271,6 +274,9 @@ export function AgentPane() {
         .sort((a, b) => b.updated - a.updated),
     [threadMap, projectId],
   );
+  const activeId = useAgentChats((s) => s.active[projectId]);
+  const usage = (activeId && threadMap[activeId]?.usage) || emptyUse();
+  const lastInput = (activeId && threadMap[activeId]?.lastInput) || 0;
   const empty = connected && items.length === 0;
   const pendingCount = usePatches((s) => s.items.filter((p) => p.status === "pending").length);
   const quote = useNav((s) => s.quote);
@@ -279,7 +285,7 @@ export function AgentPane() {
   const effortStored = useChrome(currentEffort);
   const options = effortsForModel(agentId, model);
   const effort = (options.includes(effortStored as EffortId) ? effortStored : defaultEffort(options)) as EffortId | "";
-  const usedTok = estimateTokens({
+  const usedTok = lastInput || estimateTokens({
     messages: history.current,
     draft,
     images: shots.length,
@@ -476,6 +482,32 @@ export function AgentPane() {
                 <span className="mention-empty">nenhum arquivo</span>
               )}
             </div>
+          ) : ctxOpen ? (
+            <div className="ctx-menu">
+              <div>
+                <span>Janela</span>
+                <b>
+                  {fmtTok(usedTok)}
+                  {maxTok ? ` / ${fmtTok(maxTok)}` : ""}
+                </b>
+              </div>
+              <div>
+                <span>Input</span>
+                <b>{fmtTok(usage.input)}</b>
+              </div>
+              <div>
+                <span>Output</span>
+                <b>{fmtTok(usage.output)}</b>
+              </div>
+              <div>
+                <span>Cache</span>
+                <b>{fmtTok(usage.cache)}</b>
+              </div>
+              <div>
+                <span>Thinking</span>
+                <b>{fmtTok(usage.reasoning)}</b>
+              </div>
+            </div>
           ) : permOpen ? (
             <div className="perm-menu">
               {PERM_META.map((p) => (
@@ -643,6 +675,7 @@ export function AgentPane() {
                 onClick={() => {
                   setPicker(false);
                   setPermOpen(false);
+                  setCtxOpen(false);
                   setPlus((v) => !v);
                 }}
               >
@@ -656,15 +689,26 @@ export function AgentPane() {
                 onClick={() => {
                   setPlus(false);
                   setPicker(false);
+                  setCtxOpen(false);
                   setPermOpen((v) => !v);
                 }}
               >
                 <PermIcon id={permitMode} size={18} />
               </button>
-              <span className={`agent-ctx${ctxPct >= 85 ? " is-hot" : ctxPct >= 60 ? " is-warm" : ""}`} title="contexto da conversa">
+              <button
+                type="button"
+                className={`agent-ctx${ctxOpen ? " is-on" : ""}${ctxPct >= 85 ? " is-hot" : ctxPct >= 60 ? " is-warm" : ""}`}
+                title="detalhes do contexto"
+                onClick={() => {
+                  setPlus(false);
+                  setPermOpen(false);
+                  setPicker(false);
+                  setCtxOpen((v) => !v);
+                }}
+              >
                 {fmtTok(usedTok)}
                 {maxTok ? <em>/{fmtTok(maxTok)}</em> : null}
-              </span>
+              </button>
               {busy ? (
                 <button
                   type="button"

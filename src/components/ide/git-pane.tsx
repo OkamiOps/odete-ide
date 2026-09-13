@@ -80,6 +80,45 @@ export function GitPane() {
     setNote(fn());
   }
 
+  async function gitHubOrLocal(kind: "fetch" | "pull" | "push" | "sync") {
+    if (!remote || !token) {
+      if (kind === "fetch") run(() => w().gitFetch());
+      else if (kind === "pull") run(() => w().gitPull());
+      else if (kind === "push") run(() => w().gitPush());
+      else run(() => w().gitSync());
+      if (!remote) setNote((n) => `${n}\n(sem remote — só local)`);
+      else setNote((n) => `${n}\n(conecta o GitHub pra ir pra rede)`);
+      return;
+    }
+    setBusy(true);
+    try {
+      if (kind === "fetch" || kind === "pull" || kind === "sync") {
+        const r = await githubPullTree(remote, branch, token);
+        if (kind === "fetch") {
+          setNote(`fetch ${Object.keys(r.files).length} arquivos`);
+        } else {
+          setNote(w().mergeRemote(r.files));
+        }
+      }
+      if (kind === "push" || kind === "sync") {
+        const sha = await githubPushTree(
+          remote,
+          branch,
+          w().files,
+          token,
+          msg.trim() || "colo push",
+          setNote,
+        );
+        w().gitPush();
+        setNote((n) => `${n}\nGitHub ${sha}`);
+      }
+    } catch (e) {
+      setNote(e instanceof Error ? e.message : "git falhou");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="git">
       <div className="pane-hd">
@@ -109,19 +148,19 @@ export function GitPane() {
           {remote ? <em title={remote}>{remote.replace(/^https?:\/\//, "").slice(0, 28)}</em> : <em>local</em>}
         </div>
         <div className="git-sync">
-          <button type="button" onClick={() => run(() => w().gitFetch())}>
+          <button type="button" disabled={busy} onClick={() => void gitHubOrLocal("fetch")}>
             <RefreshCw size={16} />
             fetch
           </button>
-          <button type="button" className="is-accent" onClick={() => run(() => w().gitSync())}>
+          <button type="button" className="is-accent" disabled={busy} onClick={() => void gitHubOrLocal("sync")}>
             <RefreshCw size={16} />
             sync
           </button>
-          <button type="button" onClick={() => run(() => w().gitPull())}>
+          <button type="button" disabled={busy} onClick={() => void gitHubOrLocal("pull")}>
             <Download size={16} />
             pull
           </button>
-          <button type="button" onClick={() => run(() => w().gitPush())}>
+          <button type="button" disabled={busy} onClick={() => void gitHubOrLocal("push")}>
             <Upload size={16} />
             push
           </button>

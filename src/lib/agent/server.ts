@@ -237,7 +237,15 @@ async function claudeTurn(
     system,
     messages: toAnthropicMessages(messages),
   };
-  if (effort) bodyJson.output_config = { effort };
+  if (effort) {
+    const e = effort.trim().toLowerCase();
+    const level = !e || e === "none" ? "" : e === "minimal" ? "low" : e === "xhigh" ? "max" : e;
+    if (level) {
+      bodyJson.output_config = { effort: level };
+      bodyJson.max_tokens = level === "low" ? 4000 : level === "medium" ? 9000 : level === "high" ? 14000 : 24000;
+      delete bodyJson.temperature;
+    }
+  }
   if (tools.length) {
     bodyJson.tools = tools.map((t) => ({
       name: t.function.name,

@@ -18,6 +18,22 @@ type TurnBody = {
   effort?: string;
 };
 
+function mapClaudeEffort(effort: string): { budget: number; maxTokens: number; level: "low" | "medium" | "high" | "max" } | null {
+  const e = effort.trim().toLowerCase();
+  if (!e || e === "none") return null;
+  if (e === "minimal" || e === "low") return { budget: 1024, maxTokens: 4000, level: "low" };
+  if (e === "medium") return { budget: 4096, maxTokens: 9000, level: "medium" };
+  if (e === "high") return { budget: 8192, maxTokens: 14000, level: "high" };
+  return { budget: 16000, maxTokens: 24000, level: "max" };
+}
+
+function openaiEffort(effort: string): string | undefined {
+  const e = effort.trim().toLowerCase();
+  if (!e || e === "none") return undefined;
+  if (e === "minimal") return "low";
+  return e;
+}
+
 function withSystem(messages: AgentMessage[], fileList: string, skills = "", mode: AgentMode = "build"): AgentMessage[] {
   const trimmed = messages.slice(-24).filter((m) => m.role !== "system");
   return [
@@ -113,11 +129,11 @@ async function streamOpenAI(opts: {
   const payload: Record<string, unknown> = {
     model: opts.model,
     messages: sanitizeOpenAI(opts.messages),
-    temperature: 0.3,
     stream: true,
     stream_options: { include_usage: true },
     ...opts.extra,
   };
+  if (!payload.reasoning_effort) payload.temperature = 0.3;
   if (opts.tools.length) {
     payload.tools = opts.tools;
     payload.tool_choice = "auto";
@@ -196,15 +212,17 @@ async function streamClaude(
   emit: (e: StreamEvt) => void,
 ): Promise<AgentTurnResult> {
   const system = messages.find((m) => m.role === "system")?.content ?? SYSTEM_PROMPT;
+  const mapped = mapClaudeEffort(effort);
   const bodyJson: Record<string, unknown> = {
     model,
-    max_tokens: effort ? 8000 : 1600,
+    max_tokens: mapped ? mapped.maxTokens : 1600,
     stream: true,
     system,
     messages: toAnth(messages),
   };
-  if (effort) {
-    bodyJson.thinking = { type: "enabled", budget_tokens: 4000 };
+  if (mapped) {
+    bodyJson.thinking = { type: "enabled", budget_tokens: mapped.budget };
+    bodyJson.output_config = { effort: mapped.level };
   } else {
     bodyJson.temperature = 0.3;
   }
@@ -362,8 +380,8 @@ export async function streamProviderTurn(data: TurnBody, emit: (e: StreamEvt) =>
       messages,
       tools,
       extra: {
-        max_tokens: 1600,
-        ...(effort ? { reasoning_effort: effort } : {}),
+        max_tokens: openaiEffort(effort) ? 8000 : 1600,
+        ...(openaiEffort(effort) ? { reasoning_effort: openaiEffort(effort) } : {}),
       },
       emit,
     });
@@ -398,8 +416,8 @@ export async function streamProviderTurn(data: TurnBody, emit: (e: StreamEvt) =>
     messages,
     tools,
     extra: {
-      max_completion_tokens: 1600,
-      ...(effort ? { reasoning_effort: effort } : {}),
+      max_completion_tokens: openaiEffort(effort) ? 8000 : 1600,
+      ...(openaiEffort(effort) ? { reasoning_effort: openaiEffort(effort) } : {}),
     },
     emit,
   });

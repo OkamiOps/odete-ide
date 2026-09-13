@@ -321,10 +321,13 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
           accountId: tokens.accountId,
           mode: chrome.agentMode,
           permit: chrome.permitMode,
-          effort:
-            currentEffort(chrome) ||
-            defaultEffort(effortsForModel(chrome.agentId, currentAgentModel(chrome))) ||
-            undefined,
+          effort: (() => {
+            const modelNow = currentAgentModel(chrome);
+            const opts = effortsForModel(chrome.agentId, modelNow);
+            const stored = currentEffort(chrome);
+            const pick = opts.includes(stored as EffortId) ? stored : defaultEffort(opts);
+            return pick || undefined;
+          })(),
         },
         () => cancel.current,
         pics,

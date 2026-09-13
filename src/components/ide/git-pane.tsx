@@ -365,6 +365,7 @@ export function GitPane() {
                   {c.id === lastPushedId ? <em className="git-origin">origin</em> : null}
                 </span>
               </button>
+              <span className="git-log-ops">
               <button
                 type="button"
                 className="git-ghost"
@@ -381,6 +382,7 @@ export function GitPane() {
               >
                 <RotateCcw size={14} />
               </button>
+              </span>
             </article>
           ))}
         </GitGroup>

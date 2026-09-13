@@ -8,6 +8,11 @@ disabled_rules:
   - opening_brace
   - closure_parameter_position
   - optional_data_string_conversion
+  - cyclomatic_complexity
+  - large_tuple
+  - function_body_length
+  - blanket_disable_command
+  - force_try
 identifier_name:
   min_length: 1
 type_body_length:

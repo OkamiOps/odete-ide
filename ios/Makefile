@@ -13,8 +13,8 @@ build: gen
 	xcodebuild -project Odete.xcodeproj -scheme Odete -destination '$(DEST)' -derivedDataPath $(DERIVED) -quiet build
 
 unit:
-	for p in OdeteCore OdeteFiles OdeteUI; do \
-	  (cd Packages/$$p && xcodebuild test -scheme $$p -destination '$(DEST)' -derivedDataPath ../../$(DERIVED) -quiet 2>&1 | grep -E "error:|Test run|TEST") ; \
+	@for p in OdeteCore OdeteFiles OdeteUI OdeteApp; do \
+	  (cd Packages/$$p && xcodebuild test -scheme $$p -destination '$(DEST)' -derivedDataPath ../../$(DERIVED) 2>&1 | grep -E "error:|✘|Test run with|TEST (SUCCEEDED|FAILED)") ; \
 	done
 
 test: gen

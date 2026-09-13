@@ -1903,3 +1903,89 @@ html[data-dragging] { cursor: grabbing; user-select: none; }
 .git-pr { border-bottom: 1px solid var(--color-border); }
 .git-pr .hit { width: 100%; }
 .git-pr-ops { display: flex; gap: 6px; padding: 0 10px 8px; }
+.git-pr-diff { padding: 0 10px 10px; }
+.git-pr-diff details { margin-top: 6px; }
+.git-pr-diff summary { font-size: 12px; color: var(--color-fg); }
+.git-pr-diff em { font-style: normal; color: var(--color-fg-subtle); }
+.git-pr-diff pre { margin: 6px 0 0; font-size: 11px; white-space: pre-wrap; color: var(--color-fg-muted); }
+.bin-view {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 100%;
+  padding: 20px;
+  overflow: auto;
+}
+.bin-view img { max-width: 100%; max-height: 80%; border-radius: 12px; }
+.bin-view span, .bin-view p { font-size: 12px; color: var(--color-fg-muted); }
+.code-tools {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 3;
+  display: flex;
+  gap: 4px;
+}
+.code-tools button {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-bg) 80%, transparent);
+  color: var(--color-fg-muted);
+}
+.code-tools button.is-on { color: var(--color-fg); background: var(--color-bg-subtle); }
+.code-wrap { position: relative; }
+.outline-list {
+  position: absolute;
+  top: 42px;
+  left: 8px;
+  z-index: 4;
+  width: min(280px, calc(100% - 16px));
+  max-height: 240px;
+  overflow: auto;
+  padding: 6px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-bg-elevated);
+}
+.outline-list button {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 8px;
+  width: 100%;
+  min-height: 36px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-fg);
+  text-align: left;
+  font-size: 13px;
+}
+.outline-list em { font-style: normal; font-size: 10px; color: var(--color-fg-subtle); }
+.outline-list span { font-family: var(--font-mono); font-size: 10px; color: var(--color-fg-subtle); }
+.ck-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 8px 8px;
+}
+.ck-list button {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  text-align: left;
+}
+.ck-list b { font-size: 13px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ck-list span { font-size: 11px; color: var(--color-fg-subtle); flex-shrink: 0; }

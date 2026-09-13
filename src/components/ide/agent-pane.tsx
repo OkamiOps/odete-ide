@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { AtSign, Bot, Check, FolderOpen, History, ImagePlus, LoaderCircle, Lock, Paperclip, Pencil, Plus, RotateCcw, Send, Square, SquarePen, Undo2, Unlock, Wrench, X } from "lucide-react";
+import { AtSign, Bot, Check, FolderOpen, History, ImagePlus, LoaderCircle, Lock, Mic, Paperclip, Pencil, Plus, RotateCcw, Send, Square, SquarePen, Undo2, Unlock, Wrench, X } from "lucide-react";
 import { AgentConnect } from "@/components/ide/settings-pane";
 import { ModelSelect } from "@/components/ide/model-select";
 import { contextWindow, estimateTokens, fmtTok, useAgentChats } from "@/lib/agent/chats";
@@ -8,6 +8,7 @@ import { defaultEffort, effortKey, EFFORT_HINT, EFFORT_LABEL, effortsForModel, t
 import { runAgentLoop, type ChatItem } from "@/lib/agent/loop";
 import { usePatches } from "@/lib/agent/patches";
 import { useCheckpoints } from "@/lib/agent/checkpoints";
+import { armNotify, pingDone } from "@/lib/workspace/notify";
 import { AGENTS, agentById } from "@/lib/agent/providers";
 import type { AgentImage, AgentMessage } from "@/lib/agent/server";
 import { answerPermit, type PermitMode } from "@/lib/agent/permit";
@@ -90,7 +91,30 @@ export function AgentPane() {
   const [picker, setPicker] = useState<false | "file" | "skill">(false);
   const [pickIx, setPickIx] = useState(0);
   const [histOpen, setHistOpen] = useState(false);
+  const [ckOpen, setCkOpen] = useState(false);
   const [ctxOpen, setCtxOpen] = useState(false);
+  const [listening, setListening] = useState(false);
+  const ckItems = useCheckpoints((s) => s.items);
+
+  function startVoice() {
+    const w = window as unknown as {
+      SpeechRecognition?: new () => SpeechRec;
+      webkitSpeechRecognition?: new () => SpeechRec;
+    };
+    const SR = w.SpeechRecognition ?? w.webkitSpeechRecognition;
+    if (!SR) return;
+    const rec = new SR();
+    rec.lang = "pt-BR";
+    rec.interimResults = false;
+    rec.onresult = (e) => {
+      const t = e.results[0]?.[0]?.transcript ?? "";
+      if (t) setDraft((d) => (d ? `${d} ${t}` : t));
+    };
+    rec.onend = () => setListening(false);
+    rec.onerror = () => setListening(false);
+    setListening(true);
+    rec.start();
+  }
   const agentMode = useChrome((s) => s.agentMode);
   const permitMode = useChrome((s) => s.permitMode);
   const threadMap = useAgentChats((s) => s.threads);
@@ -256,7 +280,8 @@ export function AgentPane() {
         : `explica este trecho:\n\`\`\`\n${quote}\n\`\`\``
       : prompt;
     if ((!body && !pics.length) || busy || !connected) return;
-    useCheckpoints.getState().take();
+    useCheckpoints.getState().take(prompt.slice(0, 40) || "turno");
+    armNotify();
     useNav.getState().setQuote("");
     setDraft("");
     setShots([]);
@@ -316,6 +341,7 @@ export function AgentPane() {
       ]);
     } finally {
       setBusy(false);
+      if (!cancel.current) pingDone("Colo", "agente terminou");
     }
   }
   sendFn.current = (t: string) => {
@@ -372,10 +398,13 @@ export function AgentPane() {
             </button>
             <button
               type="button"
-              className="agent-icon"
+              className={`agent-icon${ckOpen ? " is-on" : ""}`}
               aria-label="desfazer turno"
-              title="Desfazer turno do agente"
-              onClick={() => useCheckpoints.getState().undo()}
+              title="Checkpoints"
+              onClick={() => {
+                if (useCheckpoints.getState().items.length > 1) setCkOpen((v) => !v);
+                else useCheckpoints.getState().undo();
+              }}
             >
               <Undo2 size={16} />
             </button>
@@ -438,6 +467,27 @@ export function AgentPane() {
           ))}
         </div>
       </div>
+      {ckOpen ? (
+        <div className="ck-list">
+          {ckItems.length ? (
+            ckItems.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => {
+                  useCheckpoints.getState().restore(s.id);
+                  setCkOpen(false);
+                }}
+              >
+                <b>{s.title}</b>
+                <span>{ago(s.at)}</span>
+              </button>
+            ))
+          ) : (
+            <p>nenhum checkpoint</p>
+          )}
+        </div>
+      ) : null}
 
       <div ref={box} className="agent-stream">
         {histOpen ? (
@@ -787,6 +837,15 @@ export function AgentPane() {
               </button>
               <button
                 type="button"
+                className={`agent-icon-btn${listening ? " is-on" : ""}`}
+                title="Falar"
+                aria-label="Falar"
+                onClick={startVoice}
+              >
+                <Mic size={20} />
+              </button>
+              <button
+                type="button"
                 className={`agent-icon-btn is-${permitMode}${permOpen ? " is-on" : ""}`}
                 title={`Permissão: ${permitMode}`}
                 aria-label="níveis de permissão"
@@ -898,6 +957,15 @@ function CtxPanel({
     </div>
   );
 }
+
+type SpeechRec = {
+  lang: string;
+  interimResults: boolean;
+  onresult: ((e: { results: Array<Array<{ transcript: string }>> }) => void) | null;
+  onend: (() => void) | null;
+  onerror: (() => void) | null;
+  start: () => void;
+};
 
 function mentionAt(text: string, pos: number) {
   const left = text.slice(0, Math.max(0, pos));

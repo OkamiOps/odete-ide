@@ -1,3 +1,16 @@
+import { unpackBin } from "@/lib/github/api";
+
+function fileBytes(content: string) {
+  const bin = unpackBin(content);
+  if (bin) {
+    const raw = atob(bin.b64);
+    const out = new Uint8Array(raw.length);
+    for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+    return out;
+  }
+  return new TextEncoder().encode(content);
+}
+
 function crcTable() {
   const t = new Uint32Array(256);
   for (let i = 0; i < 256; i++) {
@@ -46,7 +59,7 @@ export function zipFiles(files: Record<string, string>): Blob {
   let offset = 0;
   const names = Object.keys(files).sort();
   for (const name of names) {
-    const body = enc.encode(files[name] ?? "");
+    const body = fileBytes(files[name] ?? "");
     const path = enc.encode(name.replace(/^\/+/, ""));
     const crc = crc32(body);
     const local = concat([

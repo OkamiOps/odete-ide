@@ -5,7 +5,9 @@ import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { highlightSelectionMatches, search, SearchQuery, setSearchQuery, findNext, findPrevious, replaceNext, replaceAll } from "@codemirror/search";
 import { startCompletion } from "@codemirror/autocomplete";
 import { tags as t } from "@lezer/highlight";
-import { Check, X } from "lucide-react";
+import { Check, ListTree, Search, X } from "lucide-react";
+import { unpackBin } from "@/lib/github/api";
+import { outlineOf } from "@/lib/workspace/outline";
 import { extOf } from "@/lib/utils";
 import { usePatches } from "@/lib/agent/patches";
 import { chipsFor, coloCompletions } from "@/lib/workspace/complete";
@@ -110,6 +112,9 @@ export function CodeEditor({ path }: { path?: string }) {
   const dark = themeById(themeId).dark;
   const active = path ?? openPath;
   const value = files[active] ?? "";
+  const [outOpen, setOutOpen] = useState(false);
+  const outline = useMemo(() => outlineOf(active, value), [active, value]);
+  const bin = unpackBin(value);
   const viewRef = useRef<EditorView | null>(null);
   const pending = usePatches((s) => s.items.find((p) => p.status === "pending" && p.path === active) ?? null);
   const jumpN = useNav((s) => s.n);
@@ -242,6 +247,24 @@ export function CodeEditor({ path }: { path?: string }) {
     view.focus();
   }, [jumpN, jumpPath, jumpLine, active, cm]);
 
+  if (bin?.mime.startsWith("image/")) {
+    return (
+      <div className="bin-view">
+        <img alt={active} src={`data:${bin.mime};base64,${bin.b64}`} />
+        <span>{active}</span>
+      </div>
+    );
+  }
+  if (bin) {
+    return (
+      <div className="bin-view">
+        <p>
+          arquivo binário · {bin.mime} · {Math.max(1, Math.round((bin.b64.length * 3) / 4 / 1024))} kb
+        </p>
+      </div>
+    );
+  }
+
   if (!cm) {
     return (
       <pre className="h-full overflow-auto p-4 font-mono text-sm leading-relaxed text-fg-muted">
@@ -269,6 +292,34 @@ export function CodeEditor({ path }: { path?: string }) {
   }
   return (
     <div className={mapOn ? `code-wrap has-map is-${minimap}` : "code-wrap"}>
+      <div className="code-tools">
+        <button type="button" title="buscar" onClick={() => useChrome.getState().setFindOpen(!findOpen)}>
+          <Search size={14} />
+        </button>
+        {outline.length ? (
+          <button type="button" title="outline" className={outOpen ? "is-on" : undefined} onClick={() => setOutOpen((v) => !v)}>
+            <ListTree size={14} />
+          </button>
+        ) : null}
+      </div>
+      {outOpen && outline.length ? (
+        <div className="outline-list">
+          {outline.map((o) => (
+            <button
+              key={`${o.line}:${o.name}`}
+              type="button"
+              onClick={() => {
+                useNav.getState().go(active, o.line);
+                setOutOpen(false);
+              }}
+            >
+              <em>{o.kind}</em>
+              {o.name}
+              <span>{o.line}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
       {findOpen && !path ? <FindBar viewRef={viewRef} /> : null}
       <div className="code-stage">
       <Editor

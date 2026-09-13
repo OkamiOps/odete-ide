@@ -1,6 +1,7 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { createJSONStorage, persist } from "zustand/middleware";
 import { SEED_COMMIT_MESSAGE, SEED_FILES } from "./seed";
+import { idbKv } from "./idb";
 import type { BlameLine, BranchSnap, Commit, Conflict, FileMap, StashEntry, TermLine } from "./types";
 import { uid } from "../utils";
 import { rememberEdit } from "./history";
@@ -711,6 +712,7 @@ export const useWorkspace = create<WorkspaceState>()(
     }),
     {
       name: "colo-workspace-v2",
+      storage: createJSONStorage(() => idbKv),
       partialize: (s) => ({
         files: s.files,
         openPath: s.openPath,

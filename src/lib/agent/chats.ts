@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { uid } from "@/lib/utils";
+import { idbKv } from "@/lib/workspace/idb";
 import type { ChatItem } from "./loop";
 import type { AgentMessage } from "./server";
 import { addUse, emptyUse, type TokenUse } from "./stream-types";
@@ -195,7 +196,7 @@ export const useAgentChats = create<ChatState>()(
     {
       name: "colo-chats-v2",
       version: 2,
-      storage: createJSONStorage(() => safeStorage()),
+      storage: createJSONStorage(() => idbKv),
       partialize: (s) => ({ threads: s.threads, active: s.active }),
       migrate: (persisted, version) => {
         const p = persisted as { threads?: Record<string, unknown>; active?: Record<string, string> };

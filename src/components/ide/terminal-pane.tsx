@@ -66,8 +66,15 @@ export function TerminalPane() {
   const scripts = useMemo(() => pkgScripts(files), [files]);
 
   useEffect(() => {
-    end.current?.scrollIntoView({ block: "end" });
-  }, [tab.lines.length, tab.id]);
+    function onMsg(e: MessageEvent) {
+      const d = e.data as { source?: string; level?: string; args?: unknown };
+      if (!d || d.source !== "colo-preview") return;
+      const text = Array.isArray(d.args) ? d.args.join(" ") : String(d.args ?? "");
+      useTerms.getState().print(d.level === "error" || d.level === "warn" ? "err" : "out", `[vite] ${text}`);
+    }
+    window.addEventListener("message", onMsg);
+    return () => window.removeEventListener("message", onMsg);
+  }, []);
 
   useEffect(() => {
     const el = inputRef.current;

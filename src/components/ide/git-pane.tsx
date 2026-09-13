@@ -17,7 +17,7 @@ import {
   Trash2,
   Upload,
 } from "lucide-react";
-import { githubCreateIssue, githubCreatePr, githubFork, githubIssues, githubMergePr, githubPulls, githubPullTree, githubPushTree, githubReviewPr, type CloneResult } from "@/lib/github/api";
+import { githubCreateIssue, githubCreatePr, githubFork, githubIssues, githubMergePr, githubPrFiles, githubPulls, githubPullTree, githubPushTree, githubReviewPr, type CloneResult } from "@/lib/github/api";
 import { PickList } from "@/components/ide/pick-list";
 import { diffStats, fileStatus } from "@/lib/workspace/diff";
 import { hunksOf } from "@/lib/workspace/hunks";
@@ -549,6 +549,8 @@ function GitFile({
 function GithubBox({ remote, branch, token }: { remote: string; branch: string; token: string }) {
   const [issues, setIssues] = useState<{ number: number; title: string; url: string }[]>([]);
   const [prs, setPrs] = useState<{ number: number; title: string; url: string }[]>([]);
+  const [prFiles, setPrFiles] = useState<{ path: string; status: string; add: number; del: number; patch: string }[] | null>(null);
+  const [prOpen, setPrOpen] = useState<number | null>(null);
   const [title, setTitle] = useState("");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
@@ -584,10 +586,26 @@ function GithubBox({ remote, branch, token }: { remote: string; branch: string; 
       </p>
       {prs.slice(0, 8).map((p) => (
         <div key={p.number} className="git-pr">
-          <a className="hit" href={p.url} target="_blank" rel="noreferrer">
+          <button
+            type="button"
+            className="hit"
+            onClick={() => {
+              if (prOpen === p.number) {
+                setPrOpen(null);
+                setPrFiles(null);
+                return;
+              }
+              setPrOpen(p.number);
+              setBusy(true);
+              void githubPrFiles(remote, token, p.number)
+                .then((f) => setPrFiles(f))
+                .catch((e) => setNote(e instanceof Error ? e.message : "diff falhou"))
+                .finally(() => setBusy(false));
+            }}
+          >
             <b>PR #{p.number}</b>
             <span>{p.title}</span>
-          </a>
+          </button>
           <div className="git-pr-ops">
             <button
               type="button"
@@ -624,6 +642,18 @@ function GithubBox({ remote, branch, token }: { remote: string; branch: string; 
               merge
             </button>
           </div>
+          {prOpen === p.number && prFiles ? (
+            <div className="git-pr-diff">
+              {prFiles.slice(0, 20).map((f) => (
+                <details key={f.path}>
+                  <summary>
+                    {f.path} <em>+{f.add} −{f.del}</em>
+                  </summary>
+                  <pre>{f.patch || "(sem patch)"}</pre>
+                </details>
+              ))}
+            </div>
+          ) : null}
         </div>
       ))}
       {issues.slice(0, 5).map((i) => (

@@ -544,6 +544,21 @@ export async function githubReviewPr(
   );
 }
 
+export async function githubPrFiles(remote: string, token: string, number: number) {
+  const spec = parseRepo(remote);
+  if (!spec) throw new Error("remote inválido");
+  const list = await gh<
+    { filename: string; status: string; additions: number; deletions: number; patch?: string }[]
+  >(`https://api.github.com/repos/${spec.owner}/${spec.repo}/pulls/${number}/files?per_page=100`, token);
+  return list.map((f) => ({
+    path: f.filename,
+    status: f.status,
+    add: f.additions,
+    del: f.deletions,
+    patch: f.patch ?? "",
+  }));
+}
+
 export async function githubFork(remote: string, token: string) {
   const spec = parseRepo(remote);
   if (!spec) throw new Error("remote inválido");

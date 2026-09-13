@@ -5,6 +5,7 @@ export type Commit = {
   message: string;
   at: number;
   files: FileMap;
+  sha?: string;
 };
 
 export type TermLine = {

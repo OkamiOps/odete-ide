@@ -2,16 +2,20 @@ import { create } from "zustand";
 
 export type DiskBackend = "native" | "opfs" | "idb" | "memory";
 
-type NativeDisk = {
+export type NativeDisk = {
   readText: (path: string) => Promise<string | null>;
   writeText: (path: string, text: string) => Promise<void>;
   remove: (path: string) => Promise<void>;
   list: (prefix?: string) => Promise<string[]>;
+  pickFolder?: (projectId: string) => Promise<string>;
+  sql?: (q: string, params?: unknown[]) => Promise<{ rows: Record<string, unknown>[] }>;
+  secretGet?: (key: string) => Promise<string | null>;
+  secretSet?: (key: string, value: string) => Promise<void>;
+  secretDelete?: (key: string) => Promise<void>;
 };
 
 type Host = typeof globalThis & {
   coloNative?: NativeDisk;
-  webkit?: { messageHandlers?: { coloDisk?: { postMessage: (m: unknown) => void } } };
 };
 
 export const useDisk = create<{
@@ -24,10 +28,14 @@ export const useDisk = create<{
   lastError: "",
 }));
 
-function native(): NativeDisk | null {
+export function nativeDisk(): NativeDisk | null {
   const g = globalThis as Host;
   if (g.coloNative) return g.coloNative;
   return null;
+}
+
+function native(): NativeDisk | null {
+  return nativeDisk();
 }
 
 let mem = new Map<string, string>();

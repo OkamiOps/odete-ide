@@ -1,4 +1,5 @@
 import { idbKv } from "./idb";
+import { keychainDel, keychainGet, keychainSet, keychainReady } from "./keychain";
 import type { TokenBundle } from "@/lib/agent/oauth";
 import type { GithubUser } from "@/lib/github/api";
 
@@ -39,21 +40,32 @@ export function freeWorkspaceQuota() {
 
 export async function writeSecrets(s: Secrets) {
   const raw = JSON.stringify(s);
+  if (await keychainSet(KEY, raw)) return;
   await idbKv.setItem(KEY, raw);
-  try {
-    localStorage.setItem(KEY, raw);
-  } catch {
-    /* quota — idb já guardou */
-  }
 }
 
 export async function readSecrets(): Promise<Secrets | null> {
+  const fromChain = parse(await keychainGet(KEY));
+  if (fromChain && (fromChain.github || fromChain.claudeAuth || fromChain.openaiAuth)) return fromChain;
   const a = parse(await idbKv.getItem(KEY));
-  if (a && (a.github || a.claudeAuth || a.openaiAuth)) return a;
+  if (a && (a.github || a.claudeAuth || a.openaiAuth)) {
+    if (keychainReady()) await keychainSet(KEY, JSON.stringify(a));
+    return a;
+  }
   try {
     return parse(localStorage.getItem(KEY));
   } catch {
     return a;
+  }
+}
+
+export async function clearSecrets() {
+  await keychainDel(KEY);
+  await idbKv.removeItem(KEY);
+  try {
+    localStorage.removeItem(KEY);
+  } catch {
+    /* */
   }
 }
 

@@ -138,7 +138,7 @@ export function CenterPane() {
                   ariaLabel="arquivo da esquerda"
                 />
               </div>
-              <CodeEditor />
+              <CodeEditor pane="a" />
               {dragging ? <DropHint side="left" label="Solta à esquerda" /> : null}
             </div>
             <div
@@ -158,7 +158,7 @@ export function CenterPane() {
                   ariaLabel="arquivo da direita"
                 />
               </div>
-              <CodeEditor path={right} />
+              <CodeEditor path={right} pane="b" />
               {dragging ? <DropHint side="right" label="Solta à direita" /> : null}
             </div>
           </>

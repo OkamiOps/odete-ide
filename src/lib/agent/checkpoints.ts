@@ -3,7 +3,7 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import { useWorkspace } from "@/lib/workspace/store";
 import { usePatches, type AgentSlot } from "./patches";
 import type { FileMap } from "@/lib/workspace/types";
-import { idbKv } from "@/lib/workspace/idb";
+import { sqlKv } from "@/lib/workspace/sql";
 import { isNoisePath } from "@/lib/workspace/ignore";
 
 type Snap = {
@@ -123,7 +123,7 @@ export const useCheckpoints = create<State>()(
     }),
     {
       name: "colo-ck-v1",
-      storage: createJSONStorage(() => idbKv),
+      storage: createJSONStorage(() => sqlKv),
       partialize: (s) => ({
         items: s.items.slice(0, 12).map((x) => ({
           ...x,

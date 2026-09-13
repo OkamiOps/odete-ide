@@ -235,7 +235,7 @@ function safeStorage() {
 export const useChrome = create<ChromeState>()(
   persist(
     (set) => ({
-      welcome: false,
+      welcome: !hasEnteredWorkspace(),
       side: "files",
       center: "code",
       agent: true,
@@ -460,7 +460,7 @@ export const useChrome = create<ChromeState>()(
       }),
       merge: (persisted, current) => {
         const p = { ...((persisted ?? {}) as Record<string, unknown>) };
-        p.welcome = false;
+        p.welcome = !hasEnteredWorkspace();
         if (p.theme === "verdent") p.theme = "volt";
         if (p.pluginMinimap === true && !p.minimap) p.minimap = "m";
         if (p.pluginMinimap === false && !p.minimap) p.minimap = "off";

@@ -1,5 +1,6 @@
 import { unpackBin } from "@/lib/github/api";
 import type { FileMap } from "./types";
+import { nativeDisk } from "./disk";
 
 const DB = "colo-handles";
 const STORE = "h";
@@ -159,14 +160,22 @@ export async function saveHandle(dir: FileSystemDirectoryHandle, projectId?: str
   await putHandle(dir, projectId || "root");
 }
 
-export async function bindFolder(projectId?: string) {
+export async function bindFolder(projectId?: string): Promise<{ name: string }> {
+  const n = nativeDisk();
+  const pid = projectId || "root";
+  if (n?.pickFolder) {
+    const name = await n.pickFolder(pid);
+    return { name: name || "Documents" };
+  }
   const w = window as Window & {
     showDirectoryPicker?: (opts?: { mode?: string }) => Promise<FileSystemDirectoryHandle>;
   };
-  if (!w.showDirectoryPicker) throw new Error("este browser não abre pasta do Files");
+  if (!w.showDirectoryPicker) {
+    throw new Error("no app nativo a pasta é Documents/Colo. este WebView não tem picker de pasta.");
+  }
   const dir = await w.showDirectoryPicker({ mode: "readwrite" });
-  await putHandle(dir, projectId || "root");
-  return dir;
+  await putHandle(dir, pid);
+  return { name: dir.name };
 }
 
 let timer: number | null = null;

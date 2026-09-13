@@ -88,7 +88,7 @@ function languageFor(path: string, langs: LangMod) {
   return [];
 }
 
-export function CodeEditor({ path }: { path?: string }) {
+export function CodeEditor({ path, pane = "a" }: { path?: string; pane?: "a" | "b" }) {
   const openPath = useWorkspace((s) => s.openPath);
   const files = useWorkspace((s) => s.files);
   const writeFile = useWorkspace((s) => s.writeFile);
@@ -420,7 +420,12 @@ export function CodeEditor({ path }: { path?: string }) {
         }}
         onCreateEditor={(view) => {
           viewRef.current = view;
-          setActiveView(view);
+          const focus = () => {
+            setActiveView(view);
+            useChrome.setState({ editFocus: pane });
+          };
+          view.contentDOM.addEventListener("focusin", focus);
+          if (pane === "a") setActiveView(view);
         }}
         onChange={(next) => {
           if (pending) usePatches.getState().accept(pending.id);

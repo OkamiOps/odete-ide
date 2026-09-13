@@ -7,7 +7,7 @@ import {
   githubPrFiles,
   githubPulls,
 } from "@/lib/github/api";
-import { bindFolder, writeTree } from "@/lib/workspace/folder";
+import { bindFolder } from "@/lib/workspace/folder";
 import { useHub } from "@/lib/workspace/hub";
 import { useProjects } from "@/lib/workspace/projects";
 import { useWorkspace } from "@/lib/workspace/store";
@@ -210,16 +210,18 @@ function FolderBody() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [ok, setOk] = useState("");
-  const picker = typeof window !== "undefined" && "showDirectoryPicker" in window;
+  const picker =
+    typeof window !== "undefined" &&
+    ("showDirectoryPicker" in window || !!(window as Window & { coloNative?: { pickFolder?: unknown } }).coloNative?.pickFolder);
   return (
     <>
       <Hd title="Salvar na pasta" />
       <div className="gh-sheet-body">
-        <p>Tu escolhe a pasta no Files. O Colo só grava depois que tu apontar o lugar.</p>
+        <p>No app nativo a pasta é Documents/Colo (FileManager). Podes apontar outra no Files.</p>
         {name ? <p>pasta atual: <b>{name}</b></p> : <p>nenhuma pasta escolhida ainda</p>}
         {!picker ? (
           <p className="agent-err">
-            este browser não deixa gravar pasta. no iPad abre o Files pelo app (Safari / TestFlight), não pelo preview do desktop.
+            neste WebView não há picker. No app instalado os arquivos já vão pro FileManager.
           </p>
         ) : null}
         <button
@@ -234,8 +236,10 @@ function FolderBody() {
               .then(async (dir) => {
                 useHub.getState().setFolder(dir.name);
                 const s = useWorkspace.getState();
-                await writeTree(dir, s.files, s.projectId);
-                setOk(`gravado em ${dir.name}`);
+                const { getHandle, writeTree } = await import("@/lib/workspace/folder");
+                const handle = await getHandle({ projectId: s.projectId, prompt: true });
+                if (handle) await writeTree(handle, s.files, s.projectId);
+                setOk(`pasta ${dir.name}`);
               })
               .catch((e) => {
                 if (e instanceof DOMException && e.name === "AbortError") return;

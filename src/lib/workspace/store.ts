@@ -134,6 +134,7 @@ export type WorkspaceState = {
     branch?: string;
     message?: string;
     pushed?: boolean;
+    history?: { sha: string; message: string; at: number }[];
   }) => void;
   newProject: (name: string) => void;
   closeProject: () => void;
@@ -634,12 +635,14 @@ export const useWorkspace = create<WorkspaceState>()(
         return out;
       },
       gitRestoreCommit: (id) => {
-        const c = get().commits.find((x) => x.id === id);
+        const c = get().commits.find((x) => x.id === id || x.sha === id || x.sha?.startsWith(id));
         if (!c) return "commit não encontrado";
-        if (!c.files || !Object.keys(c.files).length) return "commit sem snapshot — não dá pra restaurar";
-        set({ files: cloneFiles(c.files), staged: [] });
-        scheduleSync(c.files, get().projectId);
-        return `arquivos restaurados de ${c.id}  ${c.message}`;
+        if (c.files && Object.keys(c.files).length) {
+          set({ files: cloneFiles(c.files), staged: [], stagedBlobs: {} });
+          scheduleSync(c.files, get().projectId);
+          return `arquivos restaurados de ${c.id}  ${c.message}`;
+        }
+        return `PENDING_SHA:${c.sha || c.id}`;
       },
       gitApplyHunk: (path, index, keep) => {
         const { files, commits } = get();
@@ -831,18 +834,28 @@ export const useWorkspace = create<WorkspaceState>()(
         get().rememberNow();
         const files = cloneFiles(p.files);
         const first = Object.keys(files).sort().find((k) => k === "README.md") ?? Object.keys(files).sort()[0] ?? "README.md";
-        const commit: Commit = {
-          id: uid(),
+        const history: Commit[] | null = p.history?.length
+          ? p.history.map((h, i, arr) => ({
+              id: h.sha.slice(0, 8),
+              sha: h.sha,
+              message: h.message,
+              at: h.at,
+              files: i === arr.length - 1 ? cloneFiles(files) : {},
+            }))
+          : null;
+        const commit: Commit = history?.at(-1) ?? {
+          id: uid().slice(0, 8),
           message: p.message || `abrir ${p.name}`,
           at: Date.now(),
           files: cloneFiles(files),
         };
+        if (history) history[history.length - 1] = { ...commit, files: cloneFiles(files), sha: commit.sha ?? history.at(-1)?.sha };
         set({
           files,
           openPath: files[first] !== undefined ? first : Object.keys(files)[0] ?? "README.md",
           tabs: [first],
-          commits: [commit],
-          lastPushedId: p.pushed === false ? null : p.remote ? commit.id : commit.id,
+          commits: history ?? [commit],
+          lastPushedId: p.pushed === false ? null : commit.id,
           origin: { ...commit, files: cloneFiles(files) },
           staged: [],
           stagedBlobs: {},

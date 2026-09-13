@@ -13,7 +13,14 @@ export type GithubRepo = {
   stars: number;
   issues: number;
 };
-export type CloneResult = { name: string; branch: string; remote: string; files: Record<string, string> };
+export type CloneCommit = { sha: string; message: string; at: number };
+export type CloneResult = {
+  name: string;
+  branch: string;
+  remote: string;
+  files: Record<string, string>;
+  commits?: CloneCommit[];
+};
 
 const SKIP_HEAVY =
   /\.(mp4|mp3|wav|ogg|zip|gz|tgz|7z|rar|exe|dmg|iso|lockb|DS_Store)$/i;
@@ -267,11 +274,13 @@ export async function githubClone(
   );
   const branch = wanted || info.default_branch || "main";
   const zipped = await cloneViaZip(owner, slug, branch, token, onProgress);
+  const log = await githubCommitLog(owner, slug, branch, token);
   if (zipped && Object.keys(zipped).length) {
-    onProgress?.(`${Object.keys(zipped).length} arquivos`);
-    return { name: info.name, branch, remote: info.full_name, files: zipped };
+    onProgress?.(`${Object.keys(zipped).length} arquivos · ${log.length || 1} commits`);
+    return { name: info.name, branch, remote: info.full_name, files: zipped, commits: log };
   }
-  return cloneViaTree(owner, slug, branch, info, token, onProgress);
+  const tree = await cloneViaTree(owner, slug, branch, info, token, onProgress);
+  return { ...tree, commits: log.length ? log : tree.commits };
 }
 
 async function cloneViaZip(
@@ -400,6 +409,52 @@ async function cloneViaTree(
   if (!Object.keys(files).length) throw new Error("não deu pra baixar os arquivos");
   onProgress?.(`${Object.keys(files).length} arquivos`);
   return { name: info.name, branch, remote: info.full_name, files };
+}
+
+export async function githubCommitLog(
+  owner: string,
+  repo: string,
+  branch: string,
+  token?: string,
+): Promise<CloneCommit[]> {
+  try {
+    const list = await gh<
+      { sha: string; commit: { message: string; committer?: { date?: string }; author?: { date?: string } } }[]
+    >(
+      `https://api.github.com/repos/${owner}/${repo}/commits?sha=${encodeURIComponent(branch)}&per_page=12`,
+      token,
+    );
+    return list
+      .map((c) => ({
+        sha: c.sha,
+        message: (c.commit.message || "").split("\n")[0] || c.sha.slice(0, 8),
+        at: Date.parse(c.commit.committer?.date || c.commit.author?.date || "") || Date.now(),
+      }))
+      .reverse();
+  } catch {
+    return [];
+  }
+}
+
+export async function githubTreeAtSha(
+  remote: string,
+  sha: string,
+  token?: string,
+  onProgress?: (msg: string) => void,
+): Promise<Record<string, string>> {
+  const spec = parseRepo(remote);
+  if (!spec) throw new Error("remote inválido");
+  const zipped = await cloneViaZip(spec.owner, spec.repo, sha, token, onProgress);
+  if (zipped && Object.keys(zipped).length) return zipped;
+  const r = await cloneViaTree(
+    spec.owner,
+    spec.repo,
+    sha,
+    { name: spec.repo, full_name: `${spec.owner}/${spec.repo}` },
+    token,
+    onProgress,
+  );
+  return r.files;
 }
 
 async function ghWrite<T>(url: string, token: string, method: string, body: unknown): Promise<T> {

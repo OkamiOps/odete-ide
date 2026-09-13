@@ -164,15 +164,34 @@ export async function runShellAsync(raw: string): Promise<string> {
           else w.gitStage(resolve(w.cwd, args[1]));
           out = "ok";
         } else if (sub === "restore") {
-          const p = args.includes("--staged")
-            ? args.filter((a) => a !== "--staged" && a !== "restore")[0]
-            : args[1];
-          if (args.includes("--staged")) {
-            if (!p || p === ".") w.gitUnstageAll();
-            else w.gitUnstage(resolve(w.cwd, p));
-            out = "unstaged";
+          const sha = args.find((a) => /^[0-9a-f]{7,40}$/i.test(a));
+          if (sha && w.commits.some((c) => c.id === sha || c.sha === sha || c.sha?.startsWith(sha))) {
+            const r = w.gitRestoreCommit(sha);
+            if (r.startsWith("PENDING_SHA:")) {
+              const full = r.slice("PENDING_SHA:".length);
+              const { githubTreeAtSha } = await import("@/lib/github/api");
+              const { useProjects } = await import("./projects");
+              const token = useProjects.getState().github?.token;
+              if (!w.remote || !token) {
+                err = true;
+                out = "commit antigo sem snapshot — conecta o GitHub pra baixar a árvore";
+              } else {
+                const files = await githubTreeAtSha(w.remote, full, token, (m) => w.termPrint("out", m));
+                w.importFiles(files, true);
+                out = `restaurado ${sha}  ${Object.keys(files).length} arquivos`;
+              }
+            } else out = r;
           } else {
-            out = !p || p === "." ? w.gitDiscardAll() : w.gitDiscard(resolve(w.cwd, p));
+            const p = args.includes("--staged")
+              ? args.filter((a) => a !== "--staged" && a !== "restore")[0]
+              : args[1];
+            if (args.includes("--staged")) {
+              if (!p || p === ".") w.gitUnstageAll();
+              else w.gitUnstage(resolve(w.cwd, p));
+              out = "unstaged";
+            } else {
+              out = !p || p === "." ? w.gitDiscardAll() : w.gitDiscard(resolve(w.cwd, p));
+            }
           }
         } else if (sub === "reset") {
           out = w.gitUndoCommit();
@@ -222,8 +241,9 @@ export async function runShellAsync(raw: string): Promise<string> {
                 branch: r.branch,
                 message: `clone ${r.remote}`,
                 pushed: true,
+                history: r.commits,
               });
-              out = `ok ${r.remote}  ${Object.keys(r.files).length} arquivos`;
+              out = `ok ${r.remote}  ${Object.keys(r.files).length} arquivos · ${(r.commits?.length ?? 1)} commits`;
             } catch (e) {
               err = true;
               out = e instanceof Error ? e.message : "clone falhou";

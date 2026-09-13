@@ -4,7 +4,7 @@ import { useWorkspace } from "@/lib/workspace/store";
 import { useNav } from "@/lib/workspace/nav";
 import { uid } from "@/lib/utils";
 import { hunksOf, keepOnlyHunk } from "@/lib/workspace/hunks";
-import { idbKv } from "@/lib/workspace/idb";
+import { sqlKv } from "@/lib/workspace/sql";
 
 export type AgentSlot = "a" | "b";
 
@@ -143,7 +143,7 @@ export const usePatches = create<PatchState>()(
     }),
     {
       name: "colo-patches-v1",
-      storage: createJSONStorage(() => idbKv),
+      storage: createJSONStorage(() => sqlKv),
       partialize: (s) => ({
         items: s.items.filter((p) => p.status === "pending" && clipOk(p)).slice(-16),
       }),

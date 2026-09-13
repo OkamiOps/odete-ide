@@ -34,6 +34,7 @@ let bootP: Promise<WebContainer | null> | null = HOST.__coloWcBoot ?? null;
 let mountedFor = HOST.__coloWcMount?.projectId ?? "";
 let lastFiles: FileMap = HOST.__coloWcMount?.lastFiles ?? {};
 let running: WebContainerProcess | null = null;
+let jobs = new Set<WebContainerProcess>();
 let pulling = false;
 let unsubWs: (() => void) | null = null;
 let unsubReady: (() => void) | null = null;
@@ -109,6 +110,12 @@ function cleanChunk(chunk: string) {
     .replace(new RegExp(`${esc}\\[[0-9;?]*[ -/]*[@-~]`, "g"), "")
     .replace(new RegExp(`${esc}\\][^${bel}]* (${bel}|${esc}\\\\)`, "g"), "")
     .replace(/\r/g, "");
+}
+
+function watchJob(proc: WebContainerProcess) {
+  jobs.add(proc);
+  void proc.exit.then(() => jobs.delete(proc));
+  return proc;
 }
 
 async function stream(proc: WebContainerProcess, onLog: (s: string) => void) {
@@ -294,6 +301,7 @@ export async function nodeSpawn(cmd: string, args: string[], onLog: (s: string) 
   if (!inst) return { used: false, code: 1, out: nodeUnsupportedReason() };
   await syncFiles(useWorkspace.getState().files, useWorkspace.getState().projectId);
   const proc = await inst.spawn(cmd, args);
+  watchJob(proc);
   await stream(proc, onLog);
   const code = await proc.exit;
   await pullManifest(inst);
@@ -314,6 +322,7 @@ export async function nodeInstall(args: string[], onLog: (s: string) => void, pr
       : ["i"];
   onLog?.(`${m.bin} ${argv.join(" ")}`);
   const proc = await inst.spawn(m.bin, argv);
+  watchJob(proc);
   await stream(proc, onLog);
   const code = await proc.exit;
   await pullManifest(inst);
@@ -347,6 +356,7 @@ export async function nodeRunScript(name: string, onLog: (s: string) => void, pr
   }
   const proc = await inst.spawn(m.bin, ["run", name]);
   running = proc;
+  watchJob(proc);
   void stream(proc, onLog);
   void proc.exit.then((code) => {
     if (running === proc) {
@@ -382,14 +392,19 @@ export async function nodeExecFile(file: string, argv: string[], onLog: (s: stri
   return nodeSpawn("node", [file, ...argv], onLog);
 }
 
-export function stopNodeDev() {
-  if (running) {
+export function abortNodeJobs() {
+  for (const p of [...jobs]) {
     try {
-      running.kill();
+      p.kill();
     } catch {
-      /* ignore */
+      /* */
     }
-    running = null;
   }
+  jobs.clear();
+  running = null;
   useNodeRuntime.setState({ previewUrl: "", status: wc ? "ready" : "off" });
+}
+
+export function stopNodeDev() {
+  abortNodeJobs();
 }

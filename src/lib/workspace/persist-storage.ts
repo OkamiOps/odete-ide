@@ -1,4 +1,5 @@
-import { idbKv, usePersistHealth } from "./idb";
+import { sqlKv } from "./sql";
+import { usePersistHealth } from "./idb";
 import { initDisk, loadProject, saveProject, useDisk } from "./disk";
 import { isNoisePath } from "./ignore";
 
@@ -18,7 +19,7 @@ export const workspaceStorage = {
     await initDisk();
     let raw: string | null = null;
     try {
-      raw = await idbKv.getItem(name);
+      raw = await sqlKv.getItem(name);
     } catch (e) {
       usePersistHealth.setState({
         ok: false,
@@ -36,7 +37,7 @@ export const workspaceStorage = {
     }
     const pid =
       (typeof parsed.state?.projectId === "string" && parsed.state.projectId) ||
-      (await idbKv.getItem(LAST).catch(() => null)) ||
+      (await sqlKv.getItem(LAST).catch(() => null)) ||
       "seed";
     const diskFiles = await loadProject(pid);
     if (Object.keys(diskFiles).length) {
@@ -67,7 +68,7 @@ export const workspaceStorage = {
     const files = persistFiles((state.files as Record<string, string>) ?? {});
     const diskOk = await saveProject(pid, files);
     try {
-      await idbKv.setItem(LAST, pid);
+      await sqlKv.setItem(LAST, pid);
     } catch {
       /* tiny key */
     }
@@ -80,7 +81,7 @@ export const workspaceStorage = {
       },
     };
     try {
-      await idbKv.setItem(name, JSON.stringify(slim));
+      await sqlKv.setItem(name, JSON.stringify(slim));
     } catch (e) {
       if (!diskOk) {
         usePersistHealth.setState({
@@ -97,6 +98,6 @@ export const workspaceStorage = {
     }
   },
   removeItem: async (name: string) => {
-    await idbKv.removeItem(name);
+    await sqlKv.removeItem(name);
   },
 };

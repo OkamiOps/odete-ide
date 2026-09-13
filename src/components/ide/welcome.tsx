@@ -11,7 +11,7 @@ export function Welcome() {
           Entrar no workspace
         </button>
         <div className="welcome-meta">
-          <span>sandbox local</span>
+          <span>no próprio iPad</span>
           <span>preview ao vivo</span>
           <span>agente no dispositivo</span>
         </div>

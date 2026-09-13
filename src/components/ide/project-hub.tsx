@@ -605,6 +605,7 @@ function CloneForm() {
         branch: r.branch,
         message: `clone ${r.remote}`,
         pushed: true,
+        history: r.commits,
       });
       setSheet(false);
     } catch (e) {

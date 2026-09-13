@@ -24,6 +24,8 @@ import { usePersistHealth } from "@/lib/workspace/idb";
 import { useDisk, diskLabel, initDisk } from "@/lib/workspace/disk";
 import { setSheet, useProjects } from "@/lib/workspace/projects";
 import { formatFile } from "@/lib/workspace/plugins";
+import { Welcome } from "@/components/ide/welcome";
+import { initSql, useSql } from "@/lib/workspace/sql";
 import { useWorkspace } from "@/lib/workspace/store";
 
 function AgentDock() {
@@ -49,6 +51,7 @@ function useWide() {
 }
 
 export function IdeApp() {
+  const welcome = useChrome((s) => s.welcome);
   const mobile = useChrome((s) => s.mobile);
   const agent = useChrome((s) => s.agent);
   const term = useChrome((s) => s.term);
@@ -79,6 +82,7 @@ export function IdeApp() {
       });
     }
     void initDisk();
+    void initSql();
     void Promise.all([wait(useChrome), wait(useProjects), wait(useWorkspace)]).then(() => restoreAuth());
   }, []);
 
@@ -224,6 +228,7 @@ export function IdeApp() {
       <GhSheet />
       <DragGhost />
       <ProjectHub />
+      {welcome ? <Welcome /> : null}
     </div>
   );
 }
@@ -354,6 +359,7 @@ function StatusBar() {
   const toggleSide = useChrome((s) => s.toggleSide);
   const toggleAgent = useChrome((s) => s.toggleAgent);
   const toggleTerm = useChrome((s) => s.toggleTerm);
+  const sqlBackend = useSql((s) => s.backend);
   const persistErr = usePersistHealth((s) => (!s.ok ? s.lastError : ""));
   const diskErr = useDisk((s) => (!s.ok ? s.lastError : ""));
   const backend = useDisk((s) => s.backend);
@@ -389,7 +395,10 @@ function StatusBar() {
           persistência falhou
         </span>
       ) : (
-        <span title={diskLabel(backend)}>{backend === "native" ? "disco nativo" : backend === "opfs" ? "disco" : "idb"}</span>
+        <span title={diskLabel(backend) + " · " + (sqlBackend === "native" ? "sqlite nativo" : sqlBackend === "pglite" ? "sqlite no app" : "mem")}>
+          {backend === "native" ? "disco nativo" : backend === "opfs" ? "disco" : "idb"}
+          {sqlBackend === "native" ? " · sqlite" : sqlBackend === "pglite" ? " · sql" : ""}
+        </span>
       )}
       <span className="min-w-0 truncate">{openPath}</span>
       <span className="ml-auto">{theme}</span>

@@ -921,6 +921,7 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
                     gen.current += 1;
                     answerPermit(false, slot);
                     setBusy(false);
+                    void import("@/lib/workspace/node-runtime").then((m) => m.abortNodeJobs());
                   }}
                 >
                   <Square size={14} fill="currentColor" />

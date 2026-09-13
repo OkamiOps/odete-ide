@@ -160,6 +160,25 @@ export function buildSwiftPlayground(source: string) {
 </head>
 <body>
   <div class="sw-root"><div class="sw-phone">${inner}</div></div>
+<script>
+(function(){
+  var n = 0;
+  document.querySelectorAll(".sw-btn").forEach(function(b){
+    b.addEventListener("click", function(){
+      n += 1;
+      b.dataset.n = String(n);
+      var t = b.getAttribute("data-label") || b.textContent.replace(/\\s*·\\s*\\d+$/, "");
+      b.setAttribute("data-label", t);
+      b.textContent = t + " · " + n;
+    });
+  });
+  document.querySelectorAll(".sw-tog input").forEach(function(i){
+    i.addEventListener("change", function(){
+      i.parentElement.classList.toggle("is-on", i.checked);
+    });
+  });
+})();
+</script>
 </body>
 </html>`;
 }

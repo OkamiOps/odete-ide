@@ -129,26 +129,36 @@ export function AgentPane() {
     return () => window.removeEventListener("colo-send-agent", onSend);
   }, []);
 
+  const [caret, setCaret] = useState(0);
+  const caretRef = useRef(0);
+  const hlRef = useRef<HTMLDivElement>(null);
+
+  function syncCaret(el: HTMLTextAreaElement) {
+    const pos = el.selectionStart ?? 0;
+    caretRef.current = pos;
+    setCaret(pos);
+  }
+
   const atHit = useMemo(() => {
-    const m = draft.match(/@([^\s]*)$/);
-    if (!m) return null;
-    const q = (m[1] ?? "").toLowerCase();
+    const hit = mentionAt(draft, caret);
+    if (!hit) return null;
+    const q = hit.query.toLowerCase();
     return Object.keys(files)
       .filter((p) => {
         const base = p.split("/").pop() ?? p;
         return !q || p.toLowerCase().includes(q) || base.toLowerCase().includes(q);
       })
-      .slice(0, 8);
-  }, [draft, files]);
+      .slice(0, 16);
+  }, [draft, files, caret]);
 
   const slashHit = useMemo(() => {
-    const m = draft.match(/(^|\s)\/([^\s]*)$/);
-    if (!m) return null;
-    const q = (m[2] ?? "").toLowerCase();
+    const hit = slashAt(draft, caret);
+    if (!hit) return null;
+    const q = hit.query.toLowerCase();
     return allSkills(files)
       .filter((s) => !q || s.id.includes(q) || s.name.toLowerCase().includes(q))
-      .slice(0, 8);
-  }, [draft, files]);
+      .slice(0, 16);
+  }, [draft, files, caret]);
 
   const skillMenu = slashHit ?? (picker === "skill" ? allSkills(files).slice(0, 24) : null);
   const fileMenu =
@@ -178,7 +188,8 @@ export function AgentPane() {
     setPicker(false);
     setPlus(false);
     setDraft((d) => {
-      if (/@([^\s]*)$/.test(d)) return d.replace(/@([^\s]*)$/, `@${path} `);
+      const hit = mentionAt(d, caretRef.current);
+      if (hit) return d.slice(0, hit.start) + `@${path} ` + d.slice(hit.end);
       return `${d}${d && !/\s$/.test(d) ? " " : ""}@${path} `;
     });
   }
@@ -187,7 +198,8 @@ export function AgentPane() {
     setPicker(false);
     setPlus(false);
     setDraft((d) => {
-      if (/(^|\s)\/[^\s]*$/.test(d)) return d.replace(/(^|\s)\/[^\s]*$/, `$1/${id} `);
+      const hit = slashAt(d, caretRef.current);
+      if (hit) return d.slice(0, hit.start) + `/${id} ` + d.slice(hit.end);
       return `${d}${d && !/\s$/.test(d) ? " " : ""}/${id} `;
     });
   }
@@ -604,32 +616,46 @@ export function AgentPane() {
               void send(draft);
             }}
           >
-            <textarea
-              ref={inputRef}
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onPaste={(e) => {
-                const fromItems = [...e.clipboardData.items]
-                  .map((it) => it.getAsFile())
-                  .filter((f): f is File => !!f);
-                const files = [...e.clipboardData.files, ...fromItems].filter((f) => f.type.startsWith("image/"));
-                if (!files.length) return;
-                e.preventDefault();
-                void Promise.all(files.map(fileToImage)).then((got) => {
-                  const ok = got.filter((g): g is AgentImage => !!g);
-                  if (ok.length) setShots((xs) => [...xs, ...ok].slice(0, 4));
-                });
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
+            <div className="agent-input-box">
+              <div ref={hlRef} className="agent-input-hl" aria-hidden>
+                <HighlightDraft text={draft} files={files} />
+              </div>
+              <textarea
+                ref={inputRef}
+                value={draft}
+                onChange={(e) => {
+                  setDraft(e.target.value);
+                  syncCaret(e.currentTarget);
+                }}
+                onClick={(e) => syncCaret(e.currentTarget)}
+                onKeyUp={(e) => syncCaret(e.currentTarget)}
+                onSelect={(e) => syncCaret(e.currentTarget)}
+                onScroll={(e) => {
+                  if (hlRef.current) hlRef.current.scrollTop = e.currentTarget.scrollTop;
+                }}
+                onPaste={(e) => {
+                  const fromItems = [...e.clipboardData.items]
+                    .map((it) => it.getAsFile())
+                    .filter((f): f is File => !!f);
+                  const imgs = [...e.clipboardData.files, ...fromItems].filter((f) => f.type.startsWith("image/"));
+                  if (!imgs.length) return;
                   e.preventDefault();
-                  void send(draft);
-                }
-              }}
-              rows={1}
-              placeholder={`Fala com o ${def.label}…`}
-              className="agent-input"
-            />
+                  void Promise.all(imgs.map(fileToImage)).then((got) => {
+                    const ok = got.filter((g): g is AgentImage => !!g);
+                    if (ok.length) setShots((xs) => [...xs, ...ok].slice(0, 4));
+                  });
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    void send(draft);
+                  }
+                }}
+                rows={1}
+                placeholder={`Fala com o ${def.label}…`}
+                className="agent-input"
+              />
+            </div>
             <input
               ref={fileRef}
               type="file"
@@ -741,6 +767,45 @@ function ago(ts: number) {
   if (s < 3600) return `${Math.round(s / 60)} min`;
   if (s < 86400) return `${Math.round(s / 3600)} h`;
   return `${Math.round(s / 86400)} d`;
+}
+
+function mentionAt(text: string, pos: number) {
+  const left = text.slice(0, Math.max(0, pos));
+  const m = /(?:^|[\s(\[\{])@([^\s@]*)$/.exec(left);
+  if (!m) return null;
+  return { start: left.lastIndexOf("@"), query: m[1] ?? "", end: pos };
+}
+
+function slashAt(text: string, pos: number) {
+  const left = text.slice(0, Math.max(0, pos));
+  const m = /(?:^|[\s])\/([^\s]*)$/.exec(left);
+  if (!m) return null;
+  return { start: left.lastIndexOf("/"), query: m[1] ?? "", end: pos };
+}
+
+function HighlightDraft({ text, files }: { text: string; files: Record<string, string> }) {
+  if (!text) return "\u00a0";
+  const nodes: ReactNode[] = [];
+  const re = /@([^\s]+)/g;
+  let last = 0;
+  let i = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text))) {
+    if (m.index > last) nodes.push(text.slice(last, m.index));
+    const path = resolvePath(m[1] ?? "", files);
+    if (path) {
+      nodes.push(
+        <mark key={i++} className="mention-chip">
+          @{m[1]}
+        </mark>,
+      );
+    } else {
+      nodes.push(m[0]);
+    }
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) nodes.push(text.slice(last));
+  return <>{nodes}</>;
 }
 
 function openInEditor(path: string) {

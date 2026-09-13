@@ -740,22 +740,29 @@ input, textarea, select { font: inherit; font-size: 16px; }
 .git-ops button.is-on, .git-ops button:hover { background: var(--color-bg); color: var(--color-fg); }
 .git-file-more {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 0 8px 8px 38px;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 8px 8px 8px;
+  padding: 4px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-bg);
 }
 .git-file-more button {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 6px;
-  min-height: 32px;
-  padding: 0 10px;
-  border: 1px solid var(--color-border);
+  gap: 10px;
+  width: 100%;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 0;
   border-radius: 8px;
-  background: var(--color-bg);
-  color: var(--color-fg-muted);
-  font-size: 12px;
+  background: transparent;
+  color: var(--color-fg);
+  font-size: 13px;
+  text-align: left;
 }
+.git-file-more button:hover { background: var(--color-bg-subtle); }
 .git-ops button:hover { background: var(--color-bg); color: var(--color-fg); }
 .git-more { padding: 4px 4px 10px; }
 .git-more-toggle { width: 100%; min-height: 40px; padding: 0 10px; border: 0; background: transparent; color: var(--color-fg); font-size: 12px; font-weight: 600; text-align: left; }

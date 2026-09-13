@@ -132,6 +132,13 @@ public actor Repository {
 
     // MARK: índice
 
+    /// Índice do repositório; quem chama libera com `git_index_free`.
+    func index() throws -> OpaquePointer {
+        var idx: OpaquePointer?
+        try check(git_repository_index(&idx, repo), "índice")
+        return idx!
+    }
+
     func withIndex<T>(_ body: (OpaquePointer) throws -> T) throws -> T {
         var idx: OpaquePointer?
         try check(git_repository_index(&idx, repo), "índice")

@@ -1066,7 +1066,7 @@ input, textarea, select { font: inherit; font-size: 16px; }
 .agent-shot img { width: 56px; height: 56px; object-fit: cover; border-radius: 8px; }
 .mention-list { display: flex; flex-direction: column; max-height: 180px; overflow: auto; margin: 8px 10px 0; border: 1px solid var(--color-border); border-radius: 10px; background: var(--color-bg); }
 .mention-list button { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 2px; min-height: 44px; padding: 8px 12px; border: 0; background: transparent; color: var(--color-fg); text-align: left; font-size: 12px; }
-.mention-list button:hover { background: var(--color-bg-subtle); }
+.mention-list button:hover, .mention-list button.is-on { background: var(--color-bg-subtle); }
 .mention-list b { font-family: var(--font-mono); font-weight: 600; }
 .mention-list span { font-size: 11px; color: var(--color-fg-subtle); }
 .mention-empty { display: block; padding: 10px 12px; font-size: 12px; color: var(--color-fg-subtle); }

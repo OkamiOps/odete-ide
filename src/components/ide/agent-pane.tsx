@@ -87,6 +87,7 @@ export function AgentPane() {
   const [plus, setPlus] = useState(false);
   const [permOpen, setPermOpen] = useState(false);
   const [picker, setPicker] = useState<false | "file" | "skill">(false);
+  const [pickIx, setPickIx] = useState(0);
   const [histOpen, setHistOpen] = useState(false);
   const [ctxOpen, setCtxOpen] = useState(false);
   const agentMode = useChrome((s) => s.agentMode);
@@ -163,6 +164,16 @@ export function AgentPane() {
   const skillMenu = slashHit ?? (picker === "skill" ? allSkills(files).slice(0, 24) : null);
   const fileMenu =
     atHit ?? (picker === "file" ? Object.keys(files).sort().slice(0, 24) : null);
+  const menuLen = skillMenu?.length || fileMenu?.length || 0;
+  const activeIx = menuLen ? ((pickIx % menuLen) + menuLen) % menuLen : 0;
+
+  useEffect(() => {
+    setPickIx(0);
+  }, [atHit?.join("|"), slashHit?.map((s) => s.id).join("|"), picker]);
+
+  useEffect(() => {
+    document.querySelector(".mention-list button.is-on")?.scrollIntoView({ block: "nearest" });
+  }, [activeIx, menuLen]);
 
   function clear() {
     cancel.current = true;
@@ -458,10 +469,11 @@ export function AgentPane() {
           {skillMenu ? (
             <div className="mention-list">
               {skillMenu.length ? (
-                skillMenu.map((s) => (
+                skillMenu.map((s, i) => (
                   <button
                     key={s.id}
                     type="button"
+                    className={i === activeIx ? "is-on" : undefined}
                     onMouseDown={(e) => {
                       e.preventDefault();
                       pickSkill(s.id);
@@ -478,10 +490,11 @@ export function AgentPane() {
           ) : fileMenu ? (
             <div className="mention-list">
               {fileMenu.length ? (
-                fileMenu.map((p) => (
+                fileMenu.map((p, i) => (
                   <button
                     key={p}
                     type="button"
+                    className={i === activeIx ? "is-on" : undefined}
                     onMouseDown={(e) => {
                       e.preventDefault();
                       pickFile(p);
@@ -646,6 +659,29 @@ export function AgentPane() {
                   });
                 }}
                 onKeyDown={(e) => {
+                  if (menuLen) {
+                    if (e.key === "ArrowDown") {
+                      e.preventDefault();
+                      setPickIx((i) => i + 1);
+                      return;
+                    }
+                    if (e.key === "ArrowUp") {
+                      e.preventDefault();
+                      setPickIx((i) => i - 1);
+                      return;
+                    }
+                    if (e.key === "Tab" || e.key === "Enter") {
+                      e.preventDefault();
+                      if (skillMenu?.length) pickSkill(skillMenu[activeIx]!.id);
+                      else if (fileMenu?.length) pickFile(fileMenu[activeIx]!);
+                      return;
+                    }
+                    if (e.key === "Escape") {
+                      e.preventDefault();
+                      setPicker(false);
+                      return;
+                    }
+                  }
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
                     void send(draft);

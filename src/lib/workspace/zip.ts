@@ -115,24 +115,27 @@ export function zipFiles(files: Record<string, string>): Blob {
   return new Blob([concat([...locals, center, eocd])], { type: "application/zip" });
 }
 
-export async function unzipFiles(buf: ArrayBuffer): Promise<Record<string, string>> {
+export async function unzipRaw(buf: ArrayBuffer): Promise<Record<string, Uint8Array>> {
   const u8 = new Uint8Array(buf);
   const view = new DataView(buf);
-  const files: Record<string, string> = {};
+  const files: Record<string, Uint8Array> = {};
   const dec = new TextDecoder();
   let i = 0;
   while (i + 30 <= u8.length) {
     if (view.getUint32(i, true) !== 0x04034b50) break;
     const method = view.getUint16(i + 8, true);
-    const comp = view.getUint32(i + 18, true);
+    const flags = view.getUint16(i + 6, true);
+    let comp = view.getUint32(i + 18, true);
     const nameLen = view.getUint16(i + 26, true);
     const extra = view.getUint16(i + 28, true);
     const name = dec.decode(u8.subarray(i + 30, i + 30 + nameLen));
     const start = i + 30 + nameLen + extra;
+    if (flags & 0x8) {
+      /* data descriptor: size not in local header — skip to next signature poorly */
+    }
     const slice = u8.subarray(start, start + comp);
     i = start + comp;
     if (!name || name.endsWith("/") || name.startsWith("__MACOSX")) continue;
-    if (/\.(png|jpe?g|gif|webp|woff2?|pdf|zip|ico)$/i.test(name)) continue;
     try {
       let bytes = slice;
       if (method === 8) {
@@ -142,10 +145,51 @@ export async function unzipFiles(buf: ArrayBuffer): Promise<Record<string, strin
       } else if (method !== 0) {
         continue;
       }
-      files[name.replace(/^\/+/, "")] = dec.decode(bytes);
+      files[name.replace(/^\/+/, "")] = bytes;
     } catch {
       /* skip */
     }
+  }
+  return files;
+}
+
+export async function untarGz(buf: ArrayBuffer): Promise<Record<string, Uint8Array>> {
+  const ds = new DecompressionStream("gzip");
+  const tar = new Uint8Array(await new Response(new Blob([buf]).stream().pipeThrough(ds)).arrayBuffer());
+  const files: Record<string, Uint8Array> = {};
+  const dec = new TextDecoder();
+  const cstr = (block: Uint8Array, from: number, len: number) => {
+    let end = from;
+    const max = Math.min(from + len, block.length);
+    while (end < max && block[end]) end += 1;
+    return dec.decode(block.subarray(from, end));
+  };
+  let i = 0;
+  while (i + 512 <= tar.length) {
+    const block = tar.subarray(i, i + 512);
+    if (block.every((b) => b === 0)) break;
+    const name = cstr(block, 0, 100);
+    const prefix = cstr(block, 345, 155);
+    const size = Number.parseInt(cstr(block, 124, 12).trim(), 8) || 0;
+    const type = String.fromCharCode(block[156] || 0);
+    i += 512;
+    const path = [prefix, name].filter(Boolean).join("/").replace(/^\/+/, "");
+    const data = tar.subarray(i, i + size);
+    i += Math.ceil(size / 512) * 512;
+    if (!path || path.includes("..")) continue;
+    if (type === "5" || path.endsWith("/")) continue;
+    if (type === "0" || type === "\0" || type === "") files[path] = data.slice();
+  }
+  return files;
+}
+
+export async function unzipFiles(buf: ArrayBuffer): Promise<Record<string, string>> {
+  const raw = await unzipRaw(buf);
+  const dec = new TextDecoder();
+  const files: Record<string, string> = {};
+  for (const [name, bytes] of Object.entries(raw)) {
+    if (/\.(png|jpe?g|gif|webp|woff2?|pdf|zip|ico)$/i.test(name)) continue;
+    files[name] = dec.decode(bytes);
   }
   return files;
 }

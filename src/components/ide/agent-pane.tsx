@@ -96,6 +96,7 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
   const [ckOpen, setCkOpen] = useState(false);
   const [ctxOpen, setCtxOpen] = useState(false);
   const [listening, setListening] = useState(false);
+  const [voiceErr, setVoiceErr] = useState("");
   const ckItems = useCheckpoints((s) => s.items);
 
   function startVoice() {
@@ -104,7 +105,11 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
       webkitSpeechRecognition?: new () => SpeechRec;
     };
     const SR = w.SpeechRecognition ?? w.webkitSpeechRecognition;
-    if (!SR) return;
+    if (!SR) {
+      setVoiceErr("este iPad/Safari não tem ditado no browser — usa o teclado");
+      return;
+    }
+    setVoiceErr("");
     const rec = new SR();
     rec.lang = "pt-BR";
     rec.interimResults = false;
@@ -716,6 +721,7 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
               ))}
             </div>
           ) : null}
+          {voiceErr ? <p className="agent-voice-err">{voiceErr}</p> : null}
           <form
             className="agent-compose"
             onSubmit={(e) => {
@@ -840,7 +846,7 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
               <button
                 type="button"
                 className={`agent-icon-btn${listening ? " is-on" : ""}`}
-                title="Falar"
+                title={voiceErr || "Falar"}
                 aria-label="Falar"
                 onClick={startVoice}
               >

@@ -17,7 +17,7 @@ import {
   Trash2,
   Upload,
 } from "lucide-react";
-import { githubCreateIssue, githubCreatePr, githubFork, githubIssues, githubMergePr, githubPrFiles, githubPulls, githubPullTree, githubPushTree, githubReviewPr, type CloneResult } from "@/lib/github/api";
+import { githubCreateIssue, githubCreatePr, githubFork, githubIssues, githubMergePr, githubPrFiles, githubPulls, githubPullTree, githubReviewPr, type CloneResult } from "@/lib/github/api";
 import { remoteFetch, remotePull, remotePush, remoteSync } from "@/lib/workspace/git-remote";
 import { PickList } from "@/components/ide/pick-list";
 import { diffStats, fileStatus } from "@/lib/workspace/diff";
@@ -367,11 +367,8 @@ export function GitPane() {
                   disabled={busy}
                   onClick={() => {
                     setBusy(true);
-                    void githubPushTree(remote, branch, w().files, token, msg.trim() || "colo push", setNote)
-                      .then((sha) => {
-                        w().gitPush();
-                        setNote(`GitHub ${sha}`);
-                      })
+                    void remotePush(msg.trim() || "colo push", setNote)
+                      .then((sha) => setNote(sha))
                       .catch((e) => setNote(e instanceof Error ? e.message : "push falhou"))
                       .finally(() => setBusy(false));
                   }}

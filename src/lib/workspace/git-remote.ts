@@ -12,7 +12,15 @@ export async function remotePush(message = "colo push", onNote?: (s: string) => 
   const { remote, token, ok } = gitRemoteReady();
   const w = useWorkspace.getState();
   if (!ok || !remote || !token) return `${w.gitPush()}\n(sem GitHub — só local)`;
-  const sha = await githubPushTree(remote, w.branch || "main", w.files, token, message, onNote);
+  const sha = await githubPushTree(
+    remote,
+    w.branch || "main",
+    w.files,
+    token,
+    message,
+    onNote,
+    Object.keys(w.origin?.files ?? {}).filter((p) => w.files[p] === undefined),
+  );
   w.gitPush();
   return `pushed ${sha}  ${remote}`;
 }

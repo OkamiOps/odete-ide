@@ -1052,6 +1052,7 @@ input, textarea, select { font: inherit; font-size: 16px; }
 .agent-send { margin-left: 0; }
 .agent-compose-hint { flex: 1; min-width: 0; font-size: 11px; color: var(--color-fg-subtle); padding: 0 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .agent-icon-btn { width: 40px; height: 40px; display: grid; place-items: center; border: 0; border-radius: 10px; background: transparent; color: var(--color-fg-muted); }
+.agent-voice-err { margin: 0 10px 6px; font-size: 12px; line-height: 1.35; color: #e25d5d; }
 .agent-icon-btn:hover, .agent-icon-btn.is-on { background: var(--color-bg-subtle); color: var(--color-fg); }
 .agent-ctx {
   flex: 1;

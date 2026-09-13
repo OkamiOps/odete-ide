@@ -1,5 +1,6 @@
 import { extOf } from "@/lib/utils";
 import type { FileMap } from "./types";
+import { lintSyntaxFile } from "./lint";
 
 export type PluginId =
   | "linter"
@@ -189,79 +190,8 @@ function lintCss(path: string, text: string): Diag[] {
 }
 
 export function lintFile(path: string, text: string): Diag[] {
-  const out: Diag[] = [];
+  const out: Diag[] = lintSyntaxFile(path, text);
   const ext = extOf(path);
-  if (ext === "json" || ext === "webmanifest") {
-    try {
-      JSON.parse(text || "null");
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "JSON inválido";
-      const m = /position\s+(\d+)/i.exec(msg);
-      const line = m ? lineOf(text, Number(m[1])) : 1;
-      out.push({ id: `${path}:json`, path, line, message: msg, severity: "error" });
-    }
-  }
-  if (["ts", "tsx"].includes(ext)) {
-    const stripped = text
-      .replace(/^\s*import\s+[\s\S]*?from\s+['"][^'"]+['"]\s*;?/gm, "")
-      .replace(/^\s*import\s+['"][^'"]+['"]\s*;?/gm, "")
-      .replace(/^\s*export\s+\{[\s\S]*?\}\s*;?/gm, "")
-      .replace(/^\s*export\s+(default\s+)?/gm, "")
-      .replace(/\b(interface|type|enum)\s+\w+[^;{]*(\{[\s\S]*?\}|;)/g, "")
-      .replace(/:\s*[\w.<>[\]|&\s,'"]+(?=[=),;{}\n])/g, "")
-      .replace(/\bas\s+const\b/g, "")
-      .replace(/\bas\s+[\w.<>[\]|&]+/g, "");
-    try {
-      // eslint-disable-next-line no-new-func
-      new Function(stripped);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "TS inválido";
-      const m = /:(\d+)/.exec(msg);
-      out.push({
-        id: `${path}:ts`,
-        path,
-        line: m ? Number(m[1]) : 1,
-        message: msg.replace(/^[\w]*Error:\s*/, "").slice(0, 120),
-        severity: "error",
-      });
-    }
-  }
-  if (["js", "jsx", "mjs", "cjs"].includes(ext)) {
-    const stripped = text
-      .replace(/^\s*import\s+[\s\S]*?from\s+['"][^'"]+['"]\s*;?/gm, "")
-      .replace(/^\s*import\s+['"][^'"]+['"]\s*;?/gm, "")
-      .replace(/^\s*export\s+\{[\s\S]*?\}\s*;?/gm, "")
-      .replace(/^\s*export\s+(default\s+)?/gm, "");
-    try {
-      // parse only — Function is not invoked
-      // eslint-disable-next-line no-new-func
-      new Function(stripped);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "JS inválido";
-      const m = /:(\d+)/.exec(msg);
-      out.push({
-        id: `${path}:js`,
-        path,
-        line: m ? Number(m[1]) : 1,
-        message: msg.replace(/^[\w]*Error:\s*/, "").slice(0, 120),
-        severity: "error",
-      });
-    }
-  }
-  if (ext === "css" || ext === "scss") {
-    out.push(...lintCss(path, text));
-    return out;
-  }
-  if (["js", "jsx", "ts", "tsx", "json", "swift"].includes(ext)) {
-    const brace = braceLine(text, "{", "}");
-    if (brace) {
-      out.push({ id: `${path}:brace`, path, line: brace, message: "chaves { } desbalanceadas", severity: "error" });
-    }
-    const paren = braceLine(text, "(", ")");
-    if (paren) {
-      out.push({ id: `${path}:paren`, path, line: paren, message: "parênteses desbalanceados", severity: "warn" });
-    }
-  }
   if (ext === "html") {
     const voidTags = new Set(["br", "img", "input", "meta", "link", "hr", "source", "area", "base", "col", "embed", "wbr"]);
     const stack: { tag: string; line: number }[] = [];
@@ -291,11 +221,6 @@ export function lintFile(path: string, text: string): Diag[] {
     }
     for (const s of stack.slice(-4)) {
       out.push({ id: `${path}:html-o${s.line}`, path, line: s.line, message: `<${s.tag}> sem fechar`, severity: "warn" });
-    }
-  }
-  if (ext === "swift") {
-    if (/\bfunc\s+\w+[^{]*$/.test(text) && !text.includes("{")) {
-      out.push({ id: `${path}:swift-fn`, path, line: 1, message: "func sem corpo", severity: "warn" });
     }
   }
   return out;

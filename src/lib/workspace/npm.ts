@@ -1,4 +1,6 @@
 import { useWorkspace } from "./store";
+import { untarGz } from "./zip";
+import { BIN_PREFIX } from "@/lib/github/api";
 
 type NpmInfo = { name: string; version: string; main?: string };
 
@@ -40,6 +42,43 @@ function injectImportMap(html: string, lock: Record<string, string>) {
   return `${block}\n${html}`;
 }
 
+function isTextBytes(bytes: Uint8Array) {
+  const n = Math.min(bytes.length, 800);
+  for (let i = 0; i < n; i++) if (bytes[i] === 0) return false;
+  return true;
+}
+
+async function unpackPackage(info: NpmInfo, onNote?: (s: string) => void) {
+  const w = useWorkspace.getState();
+  const native: string[] = [];
+  let files = 0;
+  const res = await fetch(`/api/npm?name=${encodeURIComponent(info.name)}&pack=1`);
+  if (!res.ok) throw new Error(`tarball ${info.name}: ${res.status}`);
+  const tar = await untarGz(await res.arrayBuffer());
+  for (const [full, bytes] of Object.entries(tar)) {
+    const rel = full.replace(/^package\//, "");
+    if (!rel || rel.endsWith("/") || rel.includes("/node_modules/")) continue;
+    if (rel.endsWith(".node") || /\.(exe|dylib|so)$/i.test(rel)) {
+      native.push(rel);
+      continue;
+    }
+    if (bytes.length > 800_000) continue;
+    const dest = `node_modules/${info.name}/${rel}`;
+    if (isTextBytes(bytes)) {
+      w.writeFile(dest, new TextDecoder("utf-8", { fatal: false }).decode(bytes));
+    } else {
+      let bin = "";
+      bytes.forEach((b) => {
+        bin += String.fromCharCode(b);
+      });
+      w.writeFile(dest, `${BIN_PREFIX}application/octet-stream;${btoa(bin)}`);
+    }
+    files += 1;
+  }
+  onNote?.(`${info.name}@${info.version}  ${files} arquivos`);
+  return native;
+}
+
 export async function npmInstall(args: string[], onNote?: (s: string) => void): Promise<string> {
   const w = useWorkspace.getState();
   const pkg = parsePkg(w.readFile("package.json"));
@@ -51,15 +90,14 @@ export async function npmInstall(args: string[], onNote?: (s: string) => void): 
   if (!names.length) return "package.json sem dependências. use: npm i lodash";
   const lock: Record<string, string> = {};
   const lines: string[] = [];
+  const native: string[] = [];
   for (const name of names) {
     onNote?.(`baixando ${name}…`);
     const info = await lookup(name);
     lock[info.name] = info.version;
     pkg.dependencies[info.name] = `^${info.version}`;
-    w.writeFile(
-      `node_modules/${info.name}/package.json`,
-      JSON.stringify({ name: info.name, version: info.version, main: info.main || "index.js", type: "module" }, null, 2) + "\n",
-    );
+    const n = await unpackPackage(info, onNote);
+    native.push(...n.map((f) => `${info.name}/${f}`));
     lines.push(`+ ${info.name}@${info.version}`);
   }
   if (!pkg.name) pkg.name = w.projectName || "colo-app";
@@ -67,5 +105,8 @@ export async function npmInstall(args: string[], onNote?: (s: string) => void): 
   w.writeFile("package-lock.colo.json", JSON.stringify({ lock, at: Date.now() }, null, 2) + "\n");
   const html = w.readFile("index.html");
   if (html) w.writeFile("index.html", injectImportMap(html, lock));
-  return `added ${lines.length} packages\n${lines.join("\n")}\npreview usa esm.sh via importmap`;
+  const extra = native.length
+    ? `\nbinários nativos ignorados (não rodam no iPad):\n${native.slice(0, 8).join("\n")}`
+    : "";
+  return `added ${lines.length} packages\n${lines.join("\n")}\npreview usa esm.sh + node_modules${extra}`;
 }

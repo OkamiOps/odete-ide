@@ -19,7 +19,7 @@ const SKIP_HEAVY =
   /\.(mp4|mp3|wav|ogg|zip|gz|tgz|7z|rar|exe|dmg|iso|lockb|DS_Store)$/i;
 const SKIP_DIR = /(^|\/)(node_modules|\.git|dist|build|\.next|coverage|vendor)(\/|$)/;
 const MAX_FILE = 1_200_000;
-const MAX_FILES = 400;
+const MAX_FILES = 4000;
 
 export const BIN_PREFIX = "bin:";
 
@@ -257,6 +257,62 @@ export async function githubClone(
     token,
   );
   const branch = wanted || info.default_branch || "main";
+  const zipped = await cloneViaZip(owner, slug, branch, token, onProgress);
+  if (zipped && Object.keys(zipped).length) {
+    onProgress?.(`${Object.keys(zipped).length} arquivos`);
+    return { name: info.name, branch, remote: info.full_name, files: zipped };
+  }
+  return cloneViaTree(owner, slug, branch, info, token, onProgress);
+}
+
+async function cloneViaZip(
+  owner: string,
+  slug: string,
+  branch: string,
+  token: string | undefined,
+  onProgress?: (msg: string) => void,
+): Promise<Record<string, string> | null> {
+  try {
+    onProgress?.("baixando zip do GitHub…");
+    const url = token
+      ? `https://api.github.com/repos/${owner}/${slug}/zipball/${encodeURIComponent(branch)}`
+      : `https://codeload.github.com/${owner}/${slug}/zip/refs/heads/${encodeURIComponent(branch)}`;
+    const r = await fetch(url, token ? { headers: headers(token) } : undefined);
+    if (!r.ok) return null;
+    const buf = await r.arrayBuffer();
+    if (buf.byteLength > 70_000_000) return null;
+    const { unzipRaw } = await import("@/lib/workspace/zip");
+    const raw = await unzipRaw(buf);
+    const files: Record<string, string> = {};
+    for (const [full, bytes] of Object.entries(raw)) {
+      const parts = full.split("/").filter(Boolean);
+      if (parts.length < 2) continue;
+      const path = parts.slice(1).join("/");
+      if (!path || SKIP_DIR.test(path) || SKIP_HEAVY.test(path)) continue;
+      if (bytes.length > MAX_FILE) continue;
+      if (isTextBytes(bytes)) files[path] = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
+      else {
+        let bin = "";
+        bytes.forEach((b) => {
+          bin += String.fromCharCode(b);
+        });
+        files[path] = packBin(path, btoa(bin));
+      }
+    }
+    return Object.keys(files).length ? files : null;
+  } catch {
+    return null;
+  }
+}
+
+async function cloneViaTree(
+  owner: string,
+  slug: string,
+  branch: string,
+  info: { name: string; full_name: string },
+  token: string | undefined,
+  onProgress?: (msg: string) => void,
+): Promise<CloneResult> {
   onProgress?.(`árvore ${branch}…`);
   const tree = await gh<{ tree: { path: string; type: string; size?: number }[] }>(
     `https://api.github.com/repos/${owner}/${slug}/git/trees/${encodeURIComponent(branch)}?recursive=1`,
@@ -271,6 +327,7 @@ export async function githubClone(
       (t.size ?? 0) < MAX_FILE,
   );
   const picked = blobs.slice(0, MAX_FILES);
+  if (blobs.length > MAX_FILES) onProgress?.(`${blobs.length} blobs — puxando ${MAX_FILES}`);
   if (!picked.length) throw new Error("nenhum arquivo nesse repo");
   const files: Record<string, string> = {};
   let done = 0;
@@ -369,6 +426,7 @@ export async function githubPushTree(
   token: string,
   message: string,
   onProgress?: (msg: string) => void,
+  deleted: string[] = [],
 ) {
   const spec = parseRepo(remote);
   if (!spec) throw new Error("remote inválido");
@@ -408,6 +466,12 @@ export async function githubPushTree(
     tree.push({ path, mode: "100644", type: "blob", sha: blob.sha });
     i += 1;
     if (i % 6 === 0) onProgress?.(`${i} blobs`);
+  }
+  for (const path of deleted) {
+    if (!path || SKIP_DIR.test(path) || SKIP_HEAVY.test(path)) continue;
+    if (!remoteBlobs.has(path)) continue;
+    if (files[path] !== undefined) continue;
+    tree.push({ path, mode: "100644", type: "blob", sha: null });
   }
   if (!tree.length) {
     onProgress?.("nada pra enviar");

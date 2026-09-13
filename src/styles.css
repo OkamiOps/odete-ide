@@ -1244,6 +1244,29 @@ input, textarea, select { font: inherit; font-size: 16px; }
 }
 .pick-menu button { display: block; width: 100%; min-height: 44px; padding: 0 12px; border: 0; background: transparent; color: var(--color-fg); text-align: left; font-size: 14px; }
 .pick-menu button.is-on, .pick-menu button:hover { background: var(--color-bg-subtle); color: var(--color-fg); }
+.pick-opt { display: grid; grid-template-columns: minmax(0,1fr) 36px; align-items: stretch; min-height: 44px; }
+.pick-opt.is-on { background: var(--color-bg-subtle); }
+.pick-opt-main {
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 0;
+  background: transparent;
+  color: var(--color-fg);
+  text-align: left;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pick-fav {
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--color-fg-subtle);
+}
+.pick-fav.is-on { color: #e8b931; }
 .pick-empty { margin: 0; padding: 14px; color: var(--color-fg-muted); font-size: 13px; }
 .pick-ghost {
   display: flex;
@@ -2146,16 +2169,4 @@ html[data-dragging] { cursor: grabbing; user-select: none; }
 .gh-comment b { font-size: 12px; }
 .gh-comment p { margin: 4px 0 0; font-size: 13px; white-space: pre-wrap; }
 
-.fav-row { display: grid; grid-template-columns: minmax(0,1fr) 40px; gap: 6px; align-items: stretch; min-width: 0; }
-.fav-star {
-  display: grid;
-  place-items: center;
-  width: 40px;
-  min-height: 52px;
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
-  background: var(--color-bg-subtle);
-  color: var(--color-fg-muted);
-}
-.fav-star.is-on { color: #e8b931; border-color: color-mix(in srgb, #e8b931 45%, var(--color-border)); }
 .fav-hint { margin: 0; font-size: 11px; color: var(--color-fg-subtle); line-height: 1.35; }

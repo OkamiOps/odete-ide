@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { Star } from "lucide-react";
 import { PickList } from "@/components/ide/pick-list";
 import { listProviderModels, type ModelInfo } from "@/lib/agent/models";
 import { rememberEfforts } from "@/lib/agent/effort";
@@ -73,14 +72,10 @@ export function ModelSelect({ provider, compact }: { provider: AgentId; compact?
 
   const options = (() => {
     const list = [...models];
-    const extra = [value, fav].filter(Boolean);
-    for (const id of extra) {
+    for (const id of [value, fav]) {
       if (id && !list.some((m) => m.id === id)) list.unshift({ id, label: id });
     }
-    return list.map((m) => ({
-      id: m.id,
-      label: m.id === fav ? `★ ${m.label}` : m.label,
-    }));
+    return list.map((m) => ({ id: m.id, label: m.label }));
   })();
 
   function pick(id: string) {
@@ -88,56 +83,27 @@ export function ModelSelect({ provider, compact }: { provider: AgentId; compact?
     if (!fav) setFav(provider, id);
   }
 
-  const star = (
-    <button
-      type="button"
-      className={`fav-star${value && value === fav ? " is-on" : ""}`}
-      disabled={!value}
-      title={value === fav ? "modelo favorito" : "definir como favorito"}
-      aria-label="favorito"
-      onClick={() => {
-        if (value) setFav(provider, value);
-      }}
-    >
-      <Star size={16} strokeWidth={2} fill={value && value === fav ? "currentColor" : "none"} />
-    </button>
+  const list = (
+    <PickList
+      compact={compact}
+      fill
+      label="Modelo"
+      ariaLabel="Modelo"
+      value={value}
+      options={options}
+      onChange={pick}
+      disabled={busy && !options.length}
+      favorite={fav}
+      onFavorite={(id) => setFav(provider, id)}
+    />
   );
 
-  if (compact) {
-    return (
-      <div className="fav-row">
-        <PickList
-          compact
-          fill
-          label="Modelo"
-          ariaLabel="Modelo"
-          value={value}
-          options={options}
-          onChange={pick}
-          disabled={busy && !options.length}
-        />
-        {star}
-      </div>
-    );
-  }
+  if (compact) return list;
 
   return (
     <div className="space-y-2">
-      <div className="fav-row">
-        <PickList
-          ariaLabel="Modelo"
-          fill
-          label="Modelo"
-          value={value}
-          options={options}
-          onChange={pick}
-          disabled={busy && !options.length}
-        />
-        {star}
-      </div>
-      <p className="fav-hint">
-        {fav ? `Favorito: ${fav}. Ao voltar pra este provider, usa esse modelo.` : "Estrela = favorito deste provider."}
-      </p>
+      {list}
+      <p className="fav-hint">Na lista, toca a estrela do modelo que você quer como padrão deste provider.</p>
       <div className="flex gap-2">
         <input
           className="field"

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Star } from "lucide-react";
 
 export function PickList({
   value,
@@ -11,6 +11,8 @@ export function PickList({
   fill,
   ariaLabel,
   label,
+  favorite,
+  onFavorite,
 }: {
   value: string;
   options: { id: string; label: string }[];
@@ -20,6 +22,8 @@ export function PickList({
   fill?: boolean;
   ariaLabel: string;
   label?: string;
+  favorite?: string;
+  onFavorite?: (id: string) => void;
 }) {
   const btn = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLDivElement>(null);
@@ -30,7 +34,7 @@ export function PickList({
   function place() {
     const r = btn.current?.getBoundingClientRect();
     if (!r) return;
-    const width = Math.max(r.width, compact ? 180 : 260);
+    const width = Math.max(r.width, compact ? 220 : 280);
     const left = Math.min(r.left, window.innerWidth - width - 8);
     const spaceBelow = window.innerHeight - r.bottom;
     const up = spaceBelow < 240 && r.top > spaceBelow;
@@ -98,19 +102,28 @@ export function PickList({
             >
               {options.length ? (
                 options.map((o) => (
-                  <button
-                    key={o.id}
-                    type="button"
-                    role="option"
-                    aria-selected={o.id === value}
-                    className={o.id === value ? "is-on" : undefined}
-                    onClick={() => {
-                      onChange(o.id);
-                      setOpen(false);
-                    }}
-                  >
-                    {o.label}
-                  </button>
+                  <div key={o.id} className={`pick-opt${o.id === value ? " is-on" : ""}`} role="option" aria-selected={o.id === value}>
+                    <button
+                      type="button"
+                      className="pick-opt-main"
+                      onClick={() => {
+                        onChange(o.id);
+                        setOpen(false);
+                      }}
+                    >
+                      {o.label}
+                    </button>
+                    {onFavorite ? (
+                      <button
+                        type="button"
+                        className={`pick-fav${o.id === favorite ? " is-on" : ""}`}
+                        aria-label={o.id === favorite ? "favorito" : "marcar favorito"}
+                        onClick={() => onFavorite(o.id)}
+                      >
+                        <Star size={14} strokeWidth={2} fill={o.id === favorite ? "currentColor" : "none"} />
+                      </button>
+                    ) : null}
+                  </div>
                 ))
               ) : (
                 <p className="pick-empty">nada pra escolher</p>

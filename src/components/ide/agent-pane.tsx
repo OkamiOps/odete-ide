@@ -432,26 +432,34 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
             </button>
           </div>
         </div>
-        <div className="agent-hd-drops">
+        <div className="agent-hd-grid">
           <AgentPicker compact fill />
-          {connected ? <ModelSelect provider={agentId} compact /> : null}
-          {connected && options.length ? (
-            <PickList
-              compact
-              fill
-              ariaLabel="Effort"
-              value={effort || options[0]!}
-              options={options.map((id) => ({ id, label: EFFORT_LABEL[id] }))}
-              onChange={(id) => useChrome.getState().setEffort(effortKey(agentId, model), id as EffortId)}
-            />
-          ) : null}
           <PickList
             compact
             fill
+            label="Modo"
             ariaLabel="Modo"
             value={agentMode}
             options={MODE_META.map((m) => ({ id: m.id, label: m.label }))}
             onChange={(id) => useChrome.getState().setAgentMode(id as AgentMode)}
+          />
+          {connected ? <ModelSelect provider={agentId} compact /> : <div className="pick-ghost">conecte o provider</div>}
+          <PickList
+            compact
+            fill
+            label="Effort"
+            ariaLabel="Effort"
+            disabled={!options.length}
+            value={effort || (options[0] ?? "")}
+            options={
+              options.length
+                ? options.map((id) => ({ id, label: EFFORT_LABEL[id] }))
+                : [{ id: "", label: "—" }]
+            }
+            onChange={(id) => {
+              if (!id) return;
+              useChrome.getState().setEffort(effortKey(agentId, model), id as EffortId);
+            }}
           />
         </div>
       </div>

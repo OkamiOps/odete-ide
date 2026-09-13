@@ -151,11 +151,9 @@ export function AgentConnect({ embedded = false }: { embedded?: boolean }) {
   return (
     <section className="set-card">
       <h2>Agente</h2>
-      <div className="set-agent-pick">
-        <p className="text-xs text-fg-subtle">Provider</p>
-        <AgentPicker fill />
-      </div>
-      {body}
+      <p>Escolhe o provider, o modelo e o login da assinatura.</p>
+      <AgentPicker fill />
+      <div className="set-agent-body">{body}</div>
     </section>
   );
 }
@@ -163,7 +161,7 @@ export function AgentConnect({ embedded = false }: { embedded?: boolean }) {
 function GrokInfo() {
   return (
     <div className="space-y-3">
-      <p className="text-xs leading-relaxed text-fg-muted">
+      <p>
         Grok já está ligado neste preview. Sem login extra. Modelos vêm da xAI.
       </p>
       <ModelSelect provider="grok" />
@@ -385,6 +383,7 @@ export function AgentPicker({ compact, fill }: { compact?: boolean; fill?: boole
     <PickList
       compact={compact}
       fill={fill}
+      label="Provider"
       ariaLabel="Providers"
       value={agentId}
       options={AGENTS.map((a) => ({ id: a.id, label: a.label }))}

@@ -10,6 +10,7 @@ export function PickList({
   compact,
   fill,
   ariaLabel,
+  label,
 }: {
   value: string;
   options: { id: string; label: string }[];
@@ -18,20 +19,21 @@ export function PickList({
   compact?: boolean;
   fill?: boolean;
   ariaLabel: string;
+  label?: string;
 }) {
   const btn = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [box, setBox] = useState({ top: 0, left: 0, width: 220, up: false });
-  const current = options.find((o) => o.id === value)?.label ?? "escolher";
+  const current = options.find((o) => o.id === value)?.label ?? options[0]?.label ?? "—";
 
   function place() {
     const r = btn.current?.getBoundingClientRect();
     if (!r) return;
-    const width = Math.max(r.width, compact ? 160 : 240);
+    const width = Math.max(r.width, compact ? 180 : 260);
     const left = Math.min(r.left, window.innerWidth - width - 8);
     const spaceBelow = window.innerHeight - r.bottom;
-    const up = spaceBelow < 220 && r.top > spaceBelow;
+    const up = spaceBelow < 240 && r.top > spaceBelow;
     setBox({
       top: up ? r.top - 8 : r.bottom + 6,
       left: Math.max(8, left),
@@ -66,15 +68,20 @@ export function PickList({
       <button
         ref={btn}
         type="button"
-        className={["pick-btn", compact ? "is-compact" : "", fill ? "is-fill" : ""].filter(Boolean).join(" ")}
+        className={["pick-btn", compact ? "is-compact" : "", fill ? "is-fill" : "", label ? "has-label" : ""]
+          .filter(Boolean)
+          .join(" ")}
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={ariaLabel}
         disabled={disabled}
         onClick={() => setOpen((v) => !v)}
       >
-        <span>{current}</span>
-        <ChevronDown size={18} strokeWidth={2} />
+        {label ? <em>{label}</em> : null}
+        <span className="pick-val">
+          <span>{current}</span>
+          <ChevronDown size={16} strokeWidth={2} />
+        </span>
       </button>
       {open
         ? createPortal(

@@ -46,6 +46,8 @@ export function GitPane() {
   const [suggesting, setSuggesting] = useState(false);
   const msgRef = useRef<HTMLTextAreaElement>(null);
   const token = useProjects((s) => s.github?.token);
+  const compareA = useHub((s) => s.compareA);
+  const compareB = useHub((s) => s.compareB);
   const snaps = useWorkspace((s) => s.branchSnaps);
   const branches = useMemo(
     () => [...new Set([branch, ...Object.keys(snaps ?? {})])].sort(),
@@ -287,16 +289,19 @@ export function GitPane() {
                 criar
               </button>
             </div>
+            {commits.length >= 2 ? (
             <div className="git-compare">
               <PickList
-                value={commits[commits.length - 2]?.id ?? ""}
+                label="Commit A"
+                value={compareA || commits[commits.length - 2]!.id}
                 options={commits.map((c) => ({ id: c.id, label: c.message.slice(0, 40) }))}
                 onChange={(id) => useHub.setState({ compareA: id })}
                 fill
                 ariaLabel="commit A"
               />
               <PickList
-                value={commits[commits.length - 1]?.id ?? ""}
+                label="Commit B"
+                value={compareB || commits[commits.length - 1]!.id}
                 options={commits.map((c) => ({ id: c.id, label: c.message.slice(0, 40) }))}
                 onChange={(id) => useHub.setState({ compareB: id })}
                 fill
@@ -314,6 +319,7 @@ export function GitPane() {
                 comparar
               </button>
             </div>
+            ) : null}
             <div className="git-stash-row">
               <button type="button" className="chip" onClick={() => run(() => w().gitStash())}>
                 <Archive size={14} />

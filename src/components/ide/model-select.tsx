@@ -74,6 +74,7 @@ export function ModelSelect({ provider, compact }: { provider: AgentId; compact?
       <PickList
         compact
         fill
+        label="Modelo"
         ariaLabel="Modelo"
         value={value}
         options={options}
@@ -85,9 +86,10 @@ export function ModelSelect({ provider, compact }: { provider: AgentId; compact?
 
   return (
     <div className="space-y-2">
-      <p className="text-xs text-fg-subtle">Modelo</p>
       <PickList
         ariaLabel="Modelo"
+        fill
+        label="Modelo"
         value={value}
         options={options}
         onChange={setValue}

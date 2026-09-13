@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>FormatVersion</key>
+	<integer>1</integer>
+	<key>Store</key>
+	<dict>
+		<key>OdeteAccountsTests</key>
+		<dict>
+			<key>AccountStoreTests</key>
+			<dict>
+				<key>addRemoveAndLookup</key>
+				<dict>
+					<key>mrnet</key>
+					<real>0.0055110454559326172</real>
+				</dict>
+			</dict>
+			<key>DeviceFlowTests</key>
+			<dict>
+				<key>parsesCode</key>
+				<dict>
+					<key>mrnet</key>
+					<real>0.0024669170379638672</real>
+				</dict>
+				<key>parsesPoll</key>
+				<dict>
+					<key>mrnet</key>
+					<real>0.0033559799194335938</real>
+				</dict>
+			</dict>
+			<key>GitHubAPITests</key>
+			<dict>
+				<key>decodesPullsAndRuns</key>
+				<dict>
+					<key>mrnet</key>
+					<real>0.0047948360443115234</real>
+				</dict>
+			</dict>
+			<key>HostAccountTests</key>
+			<dict>
+				<key>detectKind</key>
+				<dict>
+					<key>mrnet</key>
+					<real>0.00079607963562011719</real>
+				</dict>
+				<key>hostOfRemote</key>
+				<dict>
+					<key>mrnet</key>
+					<real>0.00064897537231445312</real>
+				</dict>
+			</dict>
+		</dict>
+	</dict>
+</dict>
+</plist>

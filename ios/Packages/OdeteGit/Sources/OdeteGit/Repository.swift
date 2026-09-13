@@ -7,7 +7,7 @@ public actor Repository {
     nonisolated(unsafe) let repo: OpaquePointer
     public let workdir: URL
 
-    private init(repo: OpaquePointer, workdir: URL) {
+    init(repo: OpaquePointer, workdir: URL) {
         self.repo = repo
         self.workdir = workdir
     }

@@ -24,7 +24,7 @@ const STARTERS = [
 
 const MODE_META: { id: AgentMode; label: string }[] = [
   { id: "chat", label: "chat" },
-  { id: "plan", label: "code" },
+  { id: "plan", label: "plan" },
   { id: "build", label: "build" },
 ];
 
@@ -579,8 +579,10 @@ function Message({ item }: { item: ChatItem }) {
   }
   if (item.kind === "think") {
     return (
-      <details className="agent-think" open>
-        <summary>Pensando</summary>
+      <details className="agent-think">
+        <summary>
+          {item.live ? "Pensando…" : "Pensando"}
+        </summary>
         <pre>{item.text}</pre>
       </details>
     );

@@ -121,7 +121,7 @@ Sem build step além do Vite. Acessível, contraste ok, sem dependência nova.
         <p id="out" class="out">0 cliques</p>
       </main>
       <footer>
-        <span>colo-demo</span>
+        <span>odete-demo</span>
         <span>sandbox no dispositivo</span>
       </footer>
     </div>

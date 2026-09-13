@@ -13,6 +13,7 @@ import { useTerms } from "./terms";
 import { lineDiff } from "./diff";
 import { isNoisePath } from "./ignore";
 import { virtualNpmFile, virtualNpmNames } from "./npm-lock";
+import { rebrandFiles, rebrandName, rebrandPath } from "./brand";
 
 function cloneFiles(files: FileMap): FileMap {
   return { ...files };
@@ -976,7 +977,11 @@ export const useWorkspace = create<WorkspaceState>()(
         if (!state.stash) state.stash = [];
         if (!state.conflicts) state.conflicts = [];
         if (!state.projectId) state.projectId = "seed";
-        if (!state.projectName || state.projectName === "colo") state.projectName = "odete";
+        if (state.files) state.files = rebrandFiles(state.files);
+        if (state.tabs) state.tabs = state.tabs.map(rebrandPath);
+        if (state.openPath) state.openPath = rebrandPath(state.openPath);
+        if (state.staged) state.staged = state.staged.map(rebrandPath);
+        state.projectName = rebrandName(state.projectName);
         if (state.remote === undefined) state.remote = null;
         state.hydrated = true;
       },

@@ -5,8 +5,8 @@ export function Welcome() {
     <div className="welcome" role="dialog" aria-label="Odete">
       <div className="welcome-glow" aria-hidden />
       <div className="welcome-inner">
-        <img className="welcome-icon" src="/brand/odete-icon.png?v=3" width={180} height={180} alt="" />
-        <img className="welcome-word" src="/brand/odete-wordmark.png?v=3" alt="Odete" />
+        <img className="welcome-icon" src="/brand/odete-icon.png?v=4" width={168} height={168} alt="" />
+        <img className="welcome-word" src="/brand/odete-wordmark.png?v=4" alt="Odete" />
         <p className="welcome-kicker">IDE para iPad e iPhone</p>
         <p className="welcome-line">Ideias se sentem mais em casa aqui.</p>
         <button type="button" className="welcome-go" onClick={enterWorkspace}>

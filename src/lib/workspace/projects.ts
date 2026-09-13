@@ -4,6 +4,7 @@ import { idbKv } from "./idb";
 import { persistAuth } from "./secrets";
 import type { FileMap } from "./types";
 import { githubUser, type GithubUser } from "@/lib/github/api";
+import { rebrandFiles, rebrandName } from "./brand";
 
 export type RecentProject = {
   id: string;
@@ -121,6 +122,17 @@ export const useProjects = create<ProjectsState>()(
       name: "colo-projects-v2",
       partialize: (s) => ({ recents: s.recents, library: s.library, github: s.github }),
       storage: createJSONStorage(() => idbKv),
+      merge: (persisted, current) => {
+        const p = { ...(current as ProjectsState), ...((persisted ?? {}) as Partial<ProjectsState>) };
+        const stamp = (r: RecentProject): RecentProject => ({
+          ...r,
+          name: rebrandName(r.name),
+          snapshot: r.snapshot ? rebrandFiles(r.snapshot) : r.snapshot,
+        });
+        if (p.recents) p.recents = p.recents.map(stamp);
+        if (p.library) p.library = p.library.map(stamp);
+        return p;
+      },
     },
   ),
 );

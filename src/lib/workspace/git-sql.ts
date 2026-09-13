@@ -21,6 +21,8 @@ function parseCommit(row: Record<string, unknown>): Commit | null {
     } catch {
       files = {};
     }
+  } else if (row.files && typeof row.files === "object") {
+    files = row.files as FileMap;
   }
   return {
     id,
@@ -50,12 +52,7 @@ export async function saveGit(projectId: string, commits: Commit[], origin: Comm
       [projectId, c.id, c.sha ?? "", c.message, c.at, keepFiles ? JSON.stringify(c.files) : "{}"],
     );
   }
-  if (originSlim) {
-    await sqlQuery(
-      "INSERT INTO git_commits(project_id, id, sha, message, at, files) VALUES(?, ?, ?, ?, ?, ?)",
-      [projectId, "__origin__", originSlim.sha ?? originSlim.id, originSlim.message, originSlim.at, JSON.stringify(originSlim.files)],
-    );
-  }
+  await kvSet(`git-origin:${projectId}`, originSlim ? JSON.stringify(originSlim) : "");
 }
 
 export async function loadGit(projectId: string): Promise<{ commits: Commit[]; origin: Commit | null }> {
@@ -70,19 +67,23 @@ export async function loadGit(projectId: string): Promise<{ commits: Commit[]; o
       return { commits: [], origin: null };
     }
   }
+  const originRaw = await kvGet(`git-origin:${projectId}`);
+  let origin: Commit | null = null;
+  if (originRaw) {
+    try {
+      origin = parseCommit(JSON.parse(originRaw) as Record<string, unknown>);
+    } catch {
+      origin = null;
+    }
+  }
   const rows = await sqlQuery(
     "SELECT id, sha, message, at, files FROM git_commits WHERE project_id = ? ORDER BY at ASC",
     [projectId],
   );
-  let origin: Commit | null = null;
   const commits: Commit[] = [];
   for (const row of rows) {
     const c = parseCommit(row);
-    if (!c) continue;
-    if (c.id === "__origin__") {
-      origin = c;
-      continue;
-    }
+    if (!c || c.id === "__origin__") continue;
     commits.push(c);
   }
   return { commits, origin };

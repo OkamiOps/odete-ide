@@ -25,6 +25,8 @@ function pickCtx(m: Record<string, unknown>): number | undefined {
   );
   return Number.isFinite(n) && n > 1000 ? Math.round(n) : undefined;
 }
+
+function asList(json: unknown): ModelInfo[] {
   if (!json || typeof json !== "object") return [];
   const rec = json as Record<string, unknown>;
   let raw: unknown = rec.data ?? rec.models ?? rec.items ?? rec.model_slugs;

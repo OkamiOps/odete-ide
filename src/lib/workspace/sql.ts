@@ -29,21 +29,33 @@ function toPg(sql: string) {
   return sql.replace(/\?/g, () => `$${++i}`);
 }
 
+const SCHEMA = `
+CREATE TABLE IF NOT EXISTS kv (k TEXT PRIMARY KEY, v TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS git_commits (
+  project_id TEXT NOT NULL,
+  id TEXT NOT NULL,
+  sha TEXT,
+  message TEXT NOT NULL,
+  at BIGINT NOT NULL,
+  files TEXT,
+  PRIMARY KEY (project_id, id)
+);
+`;
+
 async function bootPglite() {
   const { PGlite } = await import("@electric-sql/pglite");
   const db = new PGlite("idb://colo-sql");
   await db.waitReady;
-  await db.exec(`CREATE TABLE IF NOT EXISTS kv (k TEXT PRIMARY KEY, v TEXT NOT NULL)`);
+  await db.exec(SCHEMA);
   pg = db as typeof pg;
 }
 
 async function bootNative() {
   const n = native();
   if (!n) return;
-  await n.sql(
-    "CREATE TABLE IF NOT EXISTS kv (k TEXT PRIMARY KEY, v TEXT NOT NULL)",
-    [],
-  );
+  for (const stmt of SCHEMA.split(";").map((s) => s.trim()).filter(Boolean)) {
+    await n.sql(stmt, []);
+  }
 }
 
 export async function initSql(): Promise<SqlBackend> {

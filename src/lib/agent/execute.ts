@@ -2,6 +2,7 @@ import { runShellAsync, isReadShell } from "@/lib/workspace/shell";
 import { useWorkspace } from "@/lib/workspace/store";
 import { useTerms } from "@/lib/workspace/terms";
 import { usePatches, type AgentSlot } from "./patches";
+import { isAborted } from "./abort";
 import type { AgentMode } from "./tools";
 
 function clip(s: string, max = 200_000) {
@@ -21,6 +22,7 @@ export async function executeTool(
   } catch {
     return "argumentos JSON inválidos";
   }
+  if (isAborted(slot)) return "parado";
   const w = useWorkspace.getState();
   const str = (k: string) => (typeof args[k] === "string" ? (args[k] as string) : "");
 

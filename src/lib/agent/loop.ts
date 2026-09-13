@@ -9,6 +9,7 @@ import { usePatches } from "./patches";
 import { allSkills, formatSkillsPrompt } from "@/lib/workspace/skills";
 import { formatWorkspace } from "./tools";
 import { projectRules } from "./rules";
+import { abortSignal, isAborted, startAbort } from "./abort";
 import { needsPermit, waitPermit, type PermitMode } from "./permit";
 
 const MAX_ROUNDS = 8;
@@ -44,17 +45,17 @@ async function streamTurn(
     accountId?: string;
     mode?: AgentMode;
     effort?: string;
+    slot?: string;
   },
   onEvt: (e: StreamEvt) => void,
   shouldStop?: () => boolean,
 ): Promise<AgentTurnLike> {
   const ac = new AbortController();
-  let tick: ReturnType<typeof setInterval> | undefined;
-  if (shouldStop) {
-    tick = setInterval(() => {
-      if (shouldStop()) ac.abort();
-    }, 160);
-  }
+  const extra = abortSignal(payload.slot ?? "a");
+  const onAbort = () => ac.abort();
+  extra?.addEventListener("abort", onAbort);
+  if (extra?.aborted) ac.abort();
+  const stopped = () => shouldStop?.() || ac.signal.aborted || isAborted(payload.slot ?? "a");
   try {
     const res = await fetch("/api/agent", {
       method: "POST",
@@ -63,7 +64,7 @@ async function streamTurn(
       signal: ac.signal,
     });
     if (!res.ok || !res.body) {
-      if (shouldStop?.() || ac.signal.aborted) return { ok: false, error: "parado" };
+      if (stopped()) return { ok: false, error: "parado" };
       return agentTurn({ data: payload });
     }
     const reader = res.body.getReader();
@@ -75,7 +76,14 @@ async function streamTurn(
     let err = "";
     let use = emptyUse();
     while (true) {
-      if (shouldStop?.() || ac.signal.aborted) break;
+      if (stopped()) {
+        try {
+          await reader.cancel();
+        } catch {
+          /* */
+        }
+        break;
+      }
       const { done, value } = await reader.read();
       if (done) break;
       buf += dec.decode(value, { stream: true });
@@ -107,7 +115,7 @@ async function streamTurn(
         }
       }
     }
-    if (ac.signal.aborted || shouldStop?.()) return { ok: false, error: "parado" };
+    if (stopped()) return { ok: false, error: "parado" };
     if (err) return { ok: false, error: err };
     return {
       ok: true,
@@ -120,12 +128,12 @@ async function streamTurn(
       use,
     };
   } catch (e) {
-    if (ac.signal.aborted || (e instanceof DOMException && e.name === "AbortError")) {
+    if (ac.signal.aborted || (e instanceof DOMException && e.name === "AbortError") || stopped()) {
       return { ok: false, error: "parado" };
     }
     return agentTurn({ data: payload });
   } finally {
-    if (tick) clearInterval(tick);
+    extra?.removeEventListener("abort", onAbort);
   }
 }
 
@@ -159,10 +167,12 @@ export async function runAgentLoop(
   const mode = auth.mode ?? "build";
   const permit = auth.permit ?? "auto";
   const slot = auth.slot ?? "a";
+  startAbort(slot);
+  const stopped = () => shouldStop?.() || isAborted(slot);
   let hitCap = false;
 
   for (let round = 0; round < MAX_ROUNDS; round++) {
-    if (shouldStop?.()) break;
+    if (stopped()) break;
     const files = useWorkspace.getState().files;
     const fileList = formatWorkspace(files);
     const skills = [formatSkillsPrompt(allSkills(files), userText), projectRules(files)]
@@ -184,6 +194,7 @@ export async function runAgentLoop(
         accountId: auth.accountId,
         mode,
         effort: auth.effort,
+        slot,
       },
       (ev) => {
         if (ev.t === "think") {
@@ -196,9 +207,9 @@ export async function runAgentLoop(
           upsert({ id: textId, kind: "assistant", text: answer });
         }
       },
-      shouldStop,
+      stopped,
     );
-    if (shouldStop?.()) break;
+    if (stopped()) break;
     if (!result.ok) {
       push({ id: crypto.randomUUID(), kind: "error", text: result.error });
       break;
@@ -226,7 +237,7 @@ export async function runAgentLoop(
     }
 
     for (const call of calls) {
-      if (shouldStop?.()) break;
+      if (stopped()) break;
       const name = call.function.name;
       if (mode === "chat" && (name === "write_file" || name === "str_replace")) {
         const detail = "chat não edita. mude pra Plan ou Build.";
@@ -249,7 +260,7 @@ export async function runAgentLoop(
       if (needsPermit(permit, name)) {
         upsert({ id: call.id, kind: "permit", name, detail: hint, status: "pending" });
         const ok = await waitPermit(slot);
-        if (shouldStop?.() || !ok) {
+        if (stopped() || !ok) {
           upsert({ id: call.id, kind: "permit", name, detail: hint, status: "no" });
           messages.push({
             role: "tool",
@@ -291,7 +302,7 @@ export async function runAgentLoop(
     if (round === MAX_ROUNDS - 1) hitCap = true;
   }
 
-  if (hitCap && !shouldStop?.()) {
+  if (hitCap && !stopped()) {
     push({
       id: crypto.randomUUID(),
       kind: "error",

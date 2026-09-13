@@ -20,18 +20,23 @@ const ENTERED_KEY = "colo-entered";
 
 export function hasEnteredWorkspace() {
   try {
-    return localStorage.getItem(ENTERED_KEY) === "1";
+    if (localStorage.getItem(ENTERED_KEY) === "1") return true;
   } catch {
-    return false;
+    /* */
   }
+  return false;
 }
 
-export function enterWorkspace() {
+function markEntered() {
   try {
     localStorage.setItem(ENTERED_KEY, "1");
   } catch {
     /* ignore quota / private mode */
   }
+}
+
+export function enterWorkspace() {
+  markEntered();
   useChrome.setState({ welcome: false });
 }
 
@@ -460,6 +465,7 @@ export const useChrome = create<ChromeState>()(
       }),
       merge: (persisted, current) => {
         const p = { ...((persisted ?? {}) as Record<string, unknown>) };
+        if (persisted && Object.keys(p).length) markEntered();
         p.welcome = !hasEnteredWorkspace();
         if (p.theme === "verdent") p.theme = "volt";
         if (p.pluginMinimap === true && !p.minimap) p.minimap = "m";

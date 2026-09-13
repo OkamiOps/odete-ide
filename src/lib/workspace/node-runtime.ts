@@ -150,6 +150,17 @@ async function waitServer(ms: number) {
   });
 }
 
+async function hydrateFromDisk(projectId: string, files: FileMap): Promise<FileMap> {
+  try {
+    const { loadProject } = await import("./disk");
+    const disk = await loadProject(projectId);
+    if (!Object.keys(disk).length) return files;
+    return { ...files, ...disk };
+  } catch {
+    return files;
+  }
+}
+
 async function pullManifest(wcInst: WebContainer) {
   pulling = true;
   try {
@@ -161,6 +172,13 @@ async function pullManifest(wcInst: WebContainer) {
       } catch {
         /* missing */
       }
+    }
+    try {
+      const { saveProject } = await import("./disk");
+      const snap = useWorkspace.getState();
+      await saveProject(snap.projectId, snap.files);
+    } catch {
+      /* disco opcional */
     }
   } finally {
     pulling = false;
@@ -271,8 +289,9 @@ export async function ensureNode(onLog?: (s: string) => void): Promise<WebContai
         onLog?.(`Node: ${err.message}`);
       });
       const w = useWorkspace.getState();
-      await inst.mount(filesToTree(w.files));
-      rememberMount(w.projectId, w.files);
+      const files = await hydrateFromDisk(w.projectId, w.files);
+      await inst.mount(filesToTree(files));
+      rememberMount(w.projectId, files);
       watchWorkspace();
       useNodeRuntime.setState({ status: "ready", isolated: true, reason: "" });
       onLog?.("Node pronto. npm run dev usa o Node deste iPad.");
@@ -299,7 +318,10 @@ export async function ensureNode(onLog?: (s: string) => void): Promise<WebContai
 export async function nodeSpawn(cmd: string, args: string[], onLog: (s: string) => void): Promise<{ used: boolean; code: number; out: string }> {
   const inst = await ensureNode(onLog);
   if (!inst) return { used: false, code: 1, out: nodeUnsupportedReason() };
-  await syncFiles(useWorkspace.getState().files, useWorkspace.getState().projectId);
+  await syncFiles(
+    await hydrateFromDisk(useWorkspace.getState().projectId, useWorkspace.getState().files),
+    useWorkspace.getState().projectId,
+  );
   const proc = await inst.spawn(cmd, args);
   watchJob(proc);
   await stream(proc, onLog);
@@ -311,7 +333,10 @@ export async function nodeSpawn(cmd: string, args: string[], onLog: (s: string) 
 export async function nodeInstall(args: string[], onLog: (s: string) => void, prefer?: string) {
   const inst = await ensureNode(onLog);
   if (!inst) return { used: false, out: "" };
-  await syncFiles(useWorkspace.getState().files, useWorkspace.getState().projectId);
+  await syncFiles(
+    await hydrateFromDisk(useWorkspace.getState().projectId, useWorkspace.getState().files),
+    useWorkspace.getState().projectId,
+  );
   const m = manager(useWorkspace.getState().files, prefer);
   const argv = args.length
     ? m.bin === "yarn"
@@ -332,7 +357,10 @@ export async function nodeInstall(args: string[], onLog: (s: string) => void, pr
 export async function nodeRunScript(name: string, onLog: (s: string) => void, prefer?: string) {
   const inst = await ensureNode(onLog);
   if (!inst) return { used: false, openPreview: false, out: "" };
-  await syncFiles(useWorkspace.getState().files, useWorkspace.getState().projectId);
+  await syncFiles(
+    await hydrateFromDisk(useWorkspace.getState().projectId, useWorkspace.getState().files),
+    useWorkspace.getState().projectId,
+  );
   let hasMods = false;
   try {
     const names = await inst.fs.readdir("node_modules");

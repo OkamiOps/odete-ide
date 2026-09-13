@@ -2,6 +2,8 @@ import { sqlKv } from "./sql";
 import { usePersistHealth } from "./idb";
 import { initDisk, loadProject, saveProject, useDisk } from "./disk";
 import { isNoisePath } from "./ignore";
+import { loadGit, saveGit } from "./git-sql";
+import type { Commit } from "./types";
 
 function persistFiles(files: Record<string, string>) {
   const out: Record<string, string> = {};
@@ -40,8 +42,16 @@ export const workspaceStorage = {
       (await sqlKv.getItem(LAST).catch(() => null)) ||
       "seed";
     const diskFiles = await loadProject(pid);
-    if (Object.keys(diskFiles).length) {
-      const state = { ...(parsed.state ?? {}), projectId: pid, files: diskFiles };
+    const git = await loadGit(pid).catch(() => ({ commits: [] as Commit[], origin: null as Commit | null }));
+    if (Object.keys(diskFiles).length || git.commits.length) {
+      const prev = (parsed.state ?? {}) as Record<string, unknown>;
+      const state = {
+        ...prev,
+        projectId: pid,
+        files: Object.keys(diskFiles).length ? diskFiles : ((prev.files as Record<string, string>) ?? {}),
+        commits: git.commits.length ? git.commits : prev.commits,
+        origin: git.origin ?? prev.origin,
+      };
       return JSON.stringify({ ...parsed, state });
     }
     if (parsed.state && (parsed.state as { disk?: boolean }).disk) {
@@ -67,17 +77,35 @@ export const workspaceStorage = {
     const pid = typeof state.projectId === "string" ? state.projectId : "seed";
     const files = persistFiles((state.files as Record<string, string>) ?? {});
     const diskOk = await saveProject(pid, files);
+    const commits = (state.commits as Commit[] | undefined) ?? [];
+    const origin = (state.origin as Commit | null | undefined) ?? null;
+    try {
+      await saveGit(pid, commits, origin);
+    } catch {
+      /* git sql opcional — commits ainda vão no índice */
+    }
     try {
       await sqlKv.setItem(LAST, pid);
     } catch {
       /* tiny key */
     }
+    const metaCommits = commits.slice(-12).map((c) => ({
+      id: c.id,
+      sha: c.sha,
+      message: c.message,
+      at: c.at,
+      files: {},
+    }));
     const slim = {
       ...parsed,
       state: {
         ...state,
         files: diskOk ? {} : files,
         disk: diskOk,
+        commits: metaCommits,
+        origin: origin
+          ? { id: origin.id, sha: origin.sha, message: origin.message, at: origin.at, files: {} }
+          : origin,
       },
     };
     try {

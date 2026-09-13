@@ -13,20 +13,35 @@ function extractString(src: string) {
   return m ? m[1]!.replace(/\\n/g, "\n").replace(/\\"/g, '"') : "";
 }
 
+function extractStates(src: string) {
+  const out: Record<string, string> = {};
+  const re = /@State(?:\s*\([^)]*\))?\s+(?:private\s+)?var\s+(\w+)\s*(?::\s*[^=]+)?\s*=\s*([^\n]+)/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(src))) {
+    const name = m[1]!;
+    let raw = m[2]!.trim().replace(/;+$/, "");
+    if (/^true|false$/.test(raw)) out[name] = raw;
+    else if (/^-?\d+(?:\.\d+)?$/.test(raw)) out[name] = raw;
+    else if (raw.startsWith("\"")) out[name] = JSON.stringify(extractString(raw) || "");
+    else out[name] = "0";
+  }
+  return out;
+}
+
+function interp(text: string) {
+  return text.replace(/\\\((\w+)\)/g, (_a, n) => `<span data-bind="${n}">0</span>`);
+}
+
 function extractSystemName(src: string) {
   const m = src.match(/systemName:\s*"([^"]+)"/);
   return m ? m[1]! : "star";
-}
-
-function node(tag: string, cls: string, inner: string) {
-  return `<div class="${cls}">${inner}</div>`.replace("div", tag === "span" ? "span" : "div");
 }
 
 function parseView(src: string): string {
   const trimmed = src.trim();
   if (!trimmed) return "";
 
-  const call = trimmed.match(/^(VStack|HStack|ZStack|List|NavigationStack|ScrollView)\s*(?:\([^)]*\))?\s*\{/);
+  const call = trimmed.match(/^(VStack|HStack|ZStack|List|NavigationStack|ScrollView|Form)\s*(?:\([^)]*\))?\s*\{/);
   if (call) {
     const kind = call[1]!;
     const body = blockBody(trimmed.slice(call[0].length - 1));
@@ -36,7 +51,7 @@ function parseView(src: string): string {
         ? "sw-h"
         : kind === "ZStack"
           ? "sw-z"
-          : kind === "List"
+          : kind === "List" || kind === "Form"
             ? "sw-list"
             : "sw-v";
     const title = kind === "NavigationStack" ? `<header class="sw-nav">Playground</header>` : "";
@@ -44,23 +59,56 @@ function parseView(src: string): string {
   }
 
   if (/^Text\s*\(/.test(trimmed)) {
-    const t = extractString(trimmed) || " ";
-    const big = /\.font\(\s*\.largeTitle/.test(trimmed) || /\.bold\(/.test(trimmed);
+    const t = extractString(trimmed) || trimmed.match(/Text\(\s*\\?\((\w+)\)/)?.[0] || " ";
+    const bind = trimmed.match(/\\\((\w+)\)/);
+    const big = /\.font\(\s*\.largeTitle/.test(trimmed) || /\.bold\(/.test(trimmed) || /\.font\(\s*\.title/.test(trimmed);
     const pad = /\.padding\(/.test(trimmed);
-    return `<p class="sw-text${big ? " is-big" : ""}${pad ? " is-pad" : ""}">${esc(t)}</p>`;
+    const inner = bind ? interp(extractString(trimmed) || `\\(${bind[1]})`) : esc(extractString(trimmed) || " ");
+    return `<p class="sw-text${big ? " is-big" : ""}${pad ? " is-pad" : ""}">${inner || esc(t)}</p>`;
   }
   if (/^Button\s*\(/.test(trimmed)) {
     const t = extractString(trimmed) || "Botão";
-    return `<button type="button" class="sw-btn">${esc(t)}</button>`;
+    const inc = trimmed.match(/(\w+)\s*\+=\s*(\d+)/);
+    const dec = trimmed.match(/(\w+)\s*-=\s*(\d+)/);
+    const tog = trimmed.match(/(\w+)\s*\.toggle\(\)/);
+    const attr = inc
+      ? `data-act="inc" data-var="${inc[1]}" data-by="${inc[2]}"`
+      : dec
+        ? `data-act="dec" data-var="${dec[1]}" data-by="${dec[2]}"`
+        : tog
+          ? `data-act="tog" data-var="${tog[1]}"`
+          : `data-act="inc" data-var="count" data-by="1"`;
+    return `<button type="button" class="sw-btn" ${attr}>${esc(t)}</button>`;
   }
   if (/^Toggle\s*\(/.test(trimmed)) {
     const t = extractString(trimmed) || "Toggle";
-    return `<label class="sw-tog"><input type="checkbox" /> ${esc(t)}</label>`;
+    const bind = trimmed.match(/isOn:\s*\$(\w+)/);
+    return `<label class="sw-tog"><input type="checkbox" data-var="${bind?.[1] || ""}" /> ${esc(t)}</label>`;
   }
   if (/^TextField\s*\(/.test(trimmed)) {
     const t = extractString(trimmed) || "";
-    return `<input class="sw-field" placeholder="${esc(t)}" />`;
+    const bind = trimmed.match(/text:\s*\$(\w+)/);
+    return `<input class="sw-field" placeholder="${esc(t)}" data-var="${bind?.[1] || ""}" />`;
   }
+  if (/^Slider\s*\(/.test(trimmed)) {
+    const bind = trimmed.match(/value:\s*\$(\w+)/);
+    return `<input type="range" class="sw-slider" min="0" max="100" data-var="${bind?.[1] || ""}" />`;
+  }
+  if (/^Stepper\s*\(/.test(trimmed)) {
+    const t = extractString(trimmed) || "";
+    const bind = trimmed.match(/value:\s*\$(\w+)/);
+    return `<div class="sw-step"><button type="button" data-act="dec" data-var="${bind?.[1] || "count"}" data-by="1">−</button><span>${esc(t)}</span><button type="button" data-act="inc" data-var="${bind?.[1] || "count"}" data-by="1">+</button></div>`;
+  }
+  if (/^ProgressView\s*\(/.test(trimmed)) {
+    const bind = trimmed.match(/value:\s*\$?(\w+)/);
+    return `<progress class="sw-prog" max="1" value="0.4" data-var="${bind?.[1] || ""}"></progress>`;
+  }
+  if (/^Label\s*\(/.test(trimmed)) {
+    const t = extractString(trimmed) || "";
+    return `<div class="sw-label">${esc(t)}</div>`;
+  }
+  if (/^Circle\s*\(/.test(trimmed)) return `<div class="sw-circle"></div>`;
+  if (/^Capsule\s*\(/.test(trimmed) || /^RoundedRectangle/.test(trimmed)) return `<div class="sw-cap"></div>`;
   if (/^Image\s*\(/.test(trimmed)) {
     const n = extractSystemName(trimmed);
     return `<div class="sw-img" title="${esc(n)}">􀋃 ${esc(n)}</div>`;
@@ -71,6 +119,10 @@ function parseView(src: string): string {
     const t = extractString(trimmed);
     const body = blockBody(trimmed.slice(trimmed.indexOf("{")));
     return `<section class="sw-sec"><h3>${esc(t)}</h3>${splitTop(body).map(parseView).join("")}</section>`;
+  }
+  if (/^ForEach\s*\(/.test(trimmed)) {
+    const body = blockBody(trimmed.slice(trimmed.indexOf("{")));
+    return `<div class="sw-list">${splitTop(body).map(parseView).join("")}</div>`;
   }
   return "";
 }
@@ -112,7 +164,7 @@ function splitTop(src: string): string[] {
   const tail = buf.trim();
   if (tail && !tail.startsWith("//") && !tail.startsWith(".")) out.push(tail);
   return out.filter((s) =>
-    /^(VStack|HStack|ZStack|List|NavigationStack|ScrollView|Text|Button|Image|Spacer|Divider|Section|Toggle|TextField)\b/.test(s),
+    /^(VStack|HStack|ZStack|List|NavigationStack|ScrollView|Form|Text|Button|Image|Spacer|Divider|Section|Toggle|TextField|Slider|Stepper|ProgressView|Label|Circle|Capsule|RoundedRectangle|ForEach)\b/.test(s),
   );
 }
 
@@ -128,7 +180,8 @@ export function isSwiftPath(path: string) {
 
 export function buildSwiftPlayground(source: string) {
   const body = findBody(source);
-  const inner = splitTop(body).map(parseView).join("") || parseView(body.trim()) || `<p class="sw-empty">Nada pra renderizar. Use Text, VStack, Button…</p>`;
+  const inner = splitTop(body).map(parseView).join("") || parseView(body.trim()) || `<p class="sw-empty">Nada pra renderizar. Use Text, VStack, Button, @State…</p>`;
+  const states = extractStates(source);
   return `<!doctype html>
 <html lang="pt-BR">
 <head>
@@ -138,7 +191,8 @@ export function buildSwiftPlayground(source: string) {
 <style>
   html, body { margin: 0; height: 100%; background: #0c0c0d; color: #f2f2f2; font-family: ui-sans-serif, system-ui, sans-serif; }
   .sw-root { min-height: 100%; padding: 24px 18px 40px; display: flex; justify-content: center; }
-  .sw-phone { width: min(390px, 100%); min-height: 520px; border-radius: 28px; background: #1c1c1e; padding: 18px; box-shadow: 0 20px 50px rgb(0 0 0 / 0.45); }
+  .sw-phone { width: min(390px, 100%); min-height: 520px; border-radius: 28px; background: #1c1c1e; padding: 18px; box-shadow: 0 20px 50px rgb(0 0 0 / 0.45); position: relative; }
+  .sw-banner { font-size: 11px; color: #8e8e93; letter-spacing: .04em; margin: 0 0 12px; }
   .sw-v { display: flex; flex-direction: column; gap: 12px; }
   .sw-h { display: flex; flex-direction: row; align-items: center; gap: 12px; }
   .sw-z { display: grid; }
@@ -149,6 +203,12 @@ export function buildSwiftPlayground(source: string) {
   .sw-btn { min-height: 44px; padding: 0 16px; border: 0; border-radius: 12px; background: #0a84ff; color: #fff; font-size: 16px; }
   .sw-tog { display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: 16px; }
   .sw-field { min-height: 44px; width: 100%; padding: 0 12px; border-radius: 10px; border: 1px solid rgb(255 255 255 / 0.16); background: #2c2c2e; color: #fff; }
+  .sw-slider, .sw-prog { width: 100%; }
+  .sw-step { display: flex; align-items: center; gap: 10px; }
+  .sw-step button { width: 44px; height: 44px; border: 0; border-radius: 10px; background: #2c2c2e; color: #fff; font-size: 20px; }
+  .sw-circle { width: 48px; height: 48px; border-radius: 50%; background: #0a84ff; }
+  .sw-cap { height: 28px; border-radius: 999px; background: #2c2c2e; }
+  .sw-label { font-size: 15px; }
   .sw-text.is-pad { padding: 8px 0; }
   .sw-img { padding: 10px 0; color: #8e8e93; font-size: 13px; }
   .sw-spacer { flex: 1; min-height: 12px; }
@@ -159,24 +219,49 @@ export function buildSwiftPlayground(source: string) {
 </style>
 </head>
 <body>
-  <div class="sw-root"><div class="sw-phone">${inner}</div></div>
+  <div class="sw-root"><div class="sw-phone">
+    <p class="sw-banner">Playground SwiftUI · não é o compilador do Xcode</p>
+    ${inner}
+  </div></div>
 <script>
 (function(){
-  var n = 0;
-  document.querySelectorAll(".sw-btn").forEach(function(b){
-    b.addEventListener("click", function(){
-      n += 1;
-      b.dataset.n = String(n);
-      var t = b.getAttribute("data-label") || b.textContent.replace(/\\s*·\\s*\\d+$/, "");
-      b.setAttribute("data-label", t);
-      b.textContent = t + " · " + n;
+  var st = ${JSON.stringify(states)};
+  function paint(){
+    document.querySelectorAll("[data-bind]").forEach(function(el){
+      var k = el.getAttribute("data-bind");
+      if (k in st) el.textContent = String(st[k]);
+    });
+    document.querySelectorAll("input[data-var], progress[data-var]").forEach(function(el){
+      var k = el.getAttribute("data-var");
+      if (!k || !(k in st)) return;
+      if (el.type === "checkbox") el.checked = !!st[k];
+      else if (el.tagName === "PROGRESS") el.value = Number(st[k]) || 0;
+      else el.value = st[k];
+    });
+  }
+  function act(el){
+    var a = el.getAttribute("data-act");
+    var k = el.getAttribute("data-var");
+    var by = Number(el.getAttribute("data-by") || 1);
+    if (!k) return;
+    if (typeof st[k] === "undefined") st[k] = 0;
+    if (a === "inc") st[k] = Number(st[k]) + by;
+    if (a === "dec") st[k] = Number(st[k]) - by;
+    if (a === "tog") st[k] = !st[k];
+    paint();
+  }
+  document.querySelectorAll("[data-act]").forEach(function(b){
+    b.addEventListener("click", function(){ act(b); });
+  });
+  document.querySelectorAll("input[data-var]").forEach(function(i){
+    i.addEventListener("input", function(){
+      var k = i.getAttribute("data-var");
+      if (!k) return;
+      st[k] = i.type === "checkbox" ? i.checked : (i.type === "range" ? Number(i.value) : i.value);
+      paint();
     });
   });
-  document.querySelectorAll(".sw-tog input").forEach(function(i){
-    i.addEventListener("change", function(){
-      i.parentElement.classList.toggle("is-on", i.checked);
-    });
-  });
+  paint();
 })();
 </script>
 </body>

@@ -13,6 +13,7 @@ import { armNotify, pingDone } from "@/lib/workspace/notify";
 import { agentById } from "@/lib/agent/providers";
 import type { AgentImage, AgentMessage } from "@/lib/agent/server";
 import { answerPermit, type PermitMode } from "@/lib/agent/permit";
+import { abortFetch, fireAbort } from "@/lib/agent/abort";
 import type { AgentMode } from "@/lib/agent/tools";
 import { authForTurn } from "@/lib/agent/session";
 import { agentConnected, currentAgentModel, currentEffort, useChrome } from "@/lib/workspace/chrome";
@@ -154,6 +155,7 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
   useEffect(() => {
     return () => {
       cancel.current = true;
+      abortFetch(slot);
       gen.current += 1;
       answerPermit(false, slot);
     };
@@ -247,6 +249,7 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
 
   function clear() {
     cancel.current = true;
+    abortFetch(slot);
     gen.current += 1;
     answerPermit(false, slot);
     setBusy(false);
@@ -260,6 +263,7 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
     const t = useAgentChats.getState().open(projectId, id, slot);
     if (!t) return;
     cancel.current = true;
+    abortFetch(slot);
     gen.current += 1;
     answerPermit(false, slot);
     setBusy(false);
@@ -918,10 +922,10 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
                   aria-label="parar"
                   onClick={() => {
                     cancel.current = true;
+                    fireAbort(slot);
                     gen.current += 1;
                     answerPermit(false, slot);
                     setBusy(false);
-                    void import("@/lib/workspace/node-runtime").then((m) => m.abortNodeJobs());
                   }}
                 >
                   <Square size={14} fill="currentColor" />

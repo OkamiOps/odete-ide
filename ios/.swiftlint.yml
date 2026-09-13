@@ -5,12 +5,16 @@ excluded:
 disabled_rules:
   - trailing_comma
   - todo
-line_length:
-  warning: 120
-  error: 160
+  - opening_brace
+  - closure_parameter_position
+  - optional_data_string_conversion
 identifier_name:
   min_length: 1
 type_body_length:
   warning: 400
 file_length:
   warning: 600
+line_length:
+  ignores_urls: true
+  ignores_comments: true
+  ignores_interpolated_strings: true

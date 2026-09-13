@@ -8,6 +8,7 @@ struct HubView: View {
     @Environment(AppModel.self) private var app
     @Environment(ChromeState.self) private var chrome
     @Environment(\.theme) private var theme
+    @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var creating = false
     @State private var renaming: Project?
     @State private var deleting: Project?
@@ -94,9 +95,10 @@ struct HubView: View {
             BrandIcon(size: 44)
             VStack(alignment: .leading, spacing: 2) {
                 Wordmark(height: 20)
-                Text("IDE no colo. Seus projetos, neste iPad.")
+                Text(sizeClass == .compact ? "IDE no colo." : "IDE no colo. Seus projetos, neste iPad.")
                     .font(OdeteFont.ui(12))
                     .foregroundStyle(theme.fgMuted)
+                    .lineLimit(1)
             }
             Spacer()
             Menu {
@@ -105,10 +107,14 @@ struct HubView: View {
                 }
             } label: {
                 Label("Tema", systemImage: "paintpalette")
+                    .labelStyle(sizeClass == .compact ? AnyLabelStyle(.iconOnly) : AnyLabelStyle(.titleAndIcon))
             }
             .buttonStyle(.glass)
             Button { creating = true } label: {
                 Label("Novo projeto", systemImage: "plus")
+                    .labelStyle(sizeClass == .compact ? AnyLabelStyle(.iconOnly) : AnyLabelStyle(.titleAndIcon))
+                    .lineLimit(1)
+                    .fixedSize()
             }
             .buttonStyle(.glassProminent)
             .keyboardShortcut("n", modifiers: .command)
@@ -282,5 +288,17 @@ struct NewProjectSheet: View {
         guard !n.isEmpty, let p = app.create(name: n, template: template) else { return }
         dismiss()
         app.open(p, chrome: chrome)
+    }
+}
+
+/// Apaga o tipo do estilo de rótulo para escolher em runtime.
+struct AnyLabelStyle: LabelStyle {
+    private let make: (Configuration) -> AnyView
+    init(_ style: some LabelStyle) {
+        make = { AnyView(style.makeBody(configuration: $0)) }
+    }
+
+    func makeBody(configuration: Configuration) -> some View {
+        make(configuration)
     }
 }

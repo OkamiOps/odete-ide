@@ -1,3 +1,4 @@
+// swiftlint:disable line_length
 import Foundation
 
 /// Modelos de projeto novo. `files` devolve caminho relativo → conteúdo.

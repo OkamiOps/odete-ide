@@ -39,6 +39,8 @@ struct CenterPane: View {
                     Text(t.isDirty ? "não salvo" : "salvo")
                         .font(OdeteFont.mono(10))
                         .foregroundStyle(t.isDirty ? theme.accent : theme.fgSubtle)
+                        .lineLimit(1)
+                        .fixedSize()
                         .padding(.trailing, 6)
                 }
                 HeaderButton("command", label: "Paleta") { ws.paletteOpen = true }

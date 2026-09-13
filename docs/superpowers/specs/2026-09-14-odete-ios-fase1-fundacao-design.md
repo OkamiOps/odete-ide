@@ -137,7 +137,7 @@ mensagem "chega na Fase N", para o fluxo ser navegável por inteiro.
 ## Verificação
 
 - Build: `xcodegen generate` e `xcodebuild -scheme Odete -destination
-  'platform=iOS Simulator,name=iPad Air 11-inch (M3),OS=26.5'`.
+  'platform=iOS Simulator,name=iPad Air 11-inch (M4),OS=26.5'`.
 - Simulador aberto no painel do Claude Code; screenshots a cada marco.
 - Testes unitários (Swift Testing): árvore e ordenação, ignore, operações de
   arquivo, persistência do estado, detecção de linguagem, temas completos.

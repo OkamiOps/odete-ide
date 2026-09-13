@@ -18,7 +18,7 @@
 - Textos da interface em português do Brasil, como a versão web.
 - Toque mínimo 44 pt; itens de lista 40 pt.
 - Cada pacote importa só camadas abaixo.
-- Build/teste sempre no destino `platform=iOS Simulator,name=iPad Air 11-inch (M3),OS=26.5`.
+- Build/teste sempre no destino `platform=iOS Simulator,name=iPad Air 11-inch (M4),OS=26.5`.
 - Commits pequenos em português, com trailer `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`.
 
 ---

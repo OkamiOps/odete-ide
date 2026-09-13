@@ -1,0 +1,88 @@
+name: Odete
+options:
+  bundleIdPrefix: com.okamiops
+  deploymentTarget:
+    iOS: "26.0"
+  xcodeVersion: "26.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    IPHONEOS_DEPLOYMENT_TARGET: "26.0"
+    TARGETED_DEVICE_FAMILY: "1,2"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    CODE_SIGN_STYLE: Automatic
+    CODE_SIGNING_ALLOWED: "NO"
+    DEVELOPMENT_TEAM: ""
+    ENABLE_USER_SCRIPT_SANDBOXING: "YES"
+    SWIFT_UPCOMING_FEATURE_EXISTENTIAL_ANY: "YES"
+packages:
+  OdeteCore:
+    path: Packages/OdeteCore
+  OdeteFiles:
+    path: Packages/OdeteFiles
+  OdeteEditor:
+    path: Packages/OdeteEditor
+  OdeteUI:
+    path: Packages/OdeteUI
+  OdeteApp:
+    path: Packages/OdeteApp
+targets:
+  Odete:
+    type: application
+    platform: iOS
+    sources:
+      - path: Odete
+    info:
+      path: Odete/Info.plist
+      properties:
+        CFBundleDisplayName: Odete
+        CFBundleName: Odete
+        UILaunchScreen: {}
+        UIFileSharingEnabled: true
+        LSSupportsOpeningDocumentsInPlace: true
+        UISupportsDocumentBrowser: false
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: true
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        ITSAppUsesNonExemptEncryption: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.okamiops.odete
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        INFOPLIST_KEY_UIUserInterfaceStyle: Automatic
+    dependencies:
+      - package: OdeteApp
+        product: OdeteApp
+  OdeteUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: Tests/OdeteUITests
+    dependencies:
+      - target: Odete
+schemes:
+  Odete:
+    build:
+      targets:
+        Odete: all
+        OdeteUITests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - OdeteUITests
+      testPlans: []

@@ -5,6 +5,7 @@ import { ProjectMenu } from "@/components/ide/project-hub";
 import { useChrome } from "@/lib/workspace/chrome";
 import { fileDragHandlers, useDrag } from "@/lib/workspace/drag";
 import { useWorkspace } from "@/lib/workspace/store";
+import { OdeteWordmark } from "@/lib/workspace/wordmark";
 
 function treeFromFiles(paths: string[]) {
   const dirs = new Map<string, string[]>();
@@ -232,7 +233,7 @@ export function FileTree() {
           onClick={toggleMenu}
           aria-label={projectName || "Odete"}
         >
-          <img className="ex-mark" src="/brand/odete-wordmark.png?v=8" alt="" />
+          <OdeteWordmark className="ex-mark" alt="" />
           {projectName && !/^odete$/i.test(projectName) ? <strong>{projectName}</strong> : null}
           <ChevronRight className={menuOpen ? "tree-chevron is-open" : "tree-chevron"} size={16} strokeWidth={1.8} />
         </button>

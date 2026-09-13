@@ -22,7 +22,7 @@ import {
   uninstallSkill,
   type MarketItem,
 } from "@/lib/workspace/skill-catalog";
-import { THEMES, SYN_FIELDS, type ThemeId, type SynKey } from "@/lib/workspace/themes";
+import { THEMES, SYN_FIELDS, themeById, type ThemeId, type SynKey } from "@/lib/workspace/themes";
 import { ICON_PACKS } from "@/lib/workspace/icons";
 import { PickList } from "@/components/ide/pick-list";
 
@@ -848,7 +848,9 @@ function SkillsSection() {
 }
 
 export function applyTheme(id: ThemeId, syn?: Record<string, string>) {
-  document.documentElement.setAttribute("data-theme", id);
+  const theme = themeById(id);
+  document.documentElement.setAttribute("data-theme", theme.id);
+  document.documentElement.setAttribute("data-scheme", theme.dark ? "dark" : "light");
   for (const field of SYN_FIELDS) {
     const value = syn?.[field.id];
     if (value) document.documentElement.style.setProperty(`--syn-${field.id}`, value);

@@ -667,10 +667,10 @@ input, textarea, select { font: inherit; font-size: 16px; }
   display: block;
   flex: 0 1 auto;
 }
-html[data-theme="latte"] .ex-mark,
-html[data-theme="claude"] .ex-mark {
-  filter: invert(1) hue-rotate(180deg);
-}
+.odete-wm { display: inline-flex; align-items: center; min-width: 0; }
+.odete-wm-light { display: none; }
+html[data-scheme="light"] .odete-wm-dark { display: none; }
+html[data-scheme="light"] .odete-wm-light { display: block; }
 .ex-proj.is-on, .ex-proj:hover { background: var(--color-bg-subtle); }
 .ex-add { width: 32px; height: 32px; display: grid; place-items: center; border: 0; border-radius: 8px; background: transparent; color: var(--color-fg-muted); }
 .ex-add:hover { background: var(--color-bg-subtle); color: var(--color-fg); }

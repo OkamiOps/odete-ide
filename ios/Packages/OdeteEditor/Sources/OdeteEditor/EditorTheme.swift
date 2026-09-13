@@ -20,8 +20,9 @@ final class EditorTheme: Runestone.Theme, @unchecked Sendable {
     private let syntax: [String: UIColor]
 
     init(palette: ThemePalette, fontSize: CGFloat) {
-        font = .monospacedSystemFont(ofSize: fontSize, weight: .regular)
-        lineNumberFont = .monospacedSystemFont(ofSize: max(fontSize - 1, 10), weight: .regular)
+        font = UIFont(name: "IBMPlexMono", size: fontSize) ?? .monospacedSystemFont(ofSize: fontSize, weight: .regular)
+        lineNumberFont = UIFont(name: "IBMPlexMono", size: max(fontSize - 1, 10))
+            ?? .monospacedSystemFont(ofSize: max(fontSize - 1, 10), weight: .regular)
         textColor = UIColor(hex: palette.fg)
         gutterBackgroundColor = UIColor(hex: palette.bg)
         gutterHairlineColor = UIColor(hex: palette.border)

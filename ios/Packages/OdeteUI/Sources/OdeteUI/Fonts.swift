@@ -1,17 +1,40 @@
 import SwiftUI
 
-/// Tipografia. IBM Plex entra quando as fontes forem empacotadas; até lá, SF.
+/// Tipografia: IBM Plex Sans e Mono (empacotadas no app), com SF como reserva.
 public enum OdeteFont {
+    static func sansName(_ weight: Font.Weight) -> String {
+        switch weight {
+        case .semibold, .bold, .heavy, .black: "IBMPlexSans-SemiBold"
+        case .medium: "IBMPlexSans-Medium"
+        default: "IBMPlexSans"
+        }
+    }
+
+    static func monoName(_ weight: Font.Weight) -> String {
+        switch weight {
+        case .medium, .semibold, .bold, .heavy, .black: "IBMPlexMono-Medium"
+        default: "IBMPlexMono"
+        }
+    }
+
     public static func ui(_ size: CGFloat = 13, weight: Font.Weight = .regular) -> Font {
-        .system(size: size, weight: weight, design: .default)
+        if UIFont(name: sansName(weight), size: size) != nil {
+            return .custom(sansName(weight), size: size)
+        }
+        return .system(size: size, weight: weight, design: .default)
     }
 
     public static func mono(_ size: CGFloat = 13, weight: Font.Weight = .regular) -> Font {
-        .system(size: size, weight: weight, design: .monospaced)
+        if UIFont(name: monoName(weight), size: size) != nil {
+            return .custom(monoName(weight), size: size)
+        }
+        return .system(size: size, weight: weight, design: .monospaced)
     }
 
     /// Rótulo de painel: 11 pt, caixa alta, espaçado.
-    public static let label: Font = .system(size: 11, weight: .medium)
+    public static var label: Font {
+        ui(11, weight: .medium)
+    }
 }
 
 public enum Metrics {

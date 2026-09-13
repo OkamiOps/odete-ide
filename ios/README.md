@@ -42,6 +42,10 @@ Tests/OdeteUITests     XCUITest de fumaça
 Dependências entre pacotes: `OdeteApp → OdeteUI → {OdeteEditor, OdeteFiles} → OdeteCore`.
 Fases futuras entram como `OdeteGit`, `OdeteRuntime`, `OdeteAgent`, `OdeteSwift`.
 
+## Fontes
+
+IBM Plex Sans e Mono em `Odete/Fonts/` (licença OFL em `LICENSE-IBM-Plex.txt`).
+
 ## Onde ficam os dados
 
 - Projetos: `Documents/Projects/<nome>/`, visíveis no app Arquivos (`UIFileSharingEnabled`,
@@ -50,5 +54,4 @@ Fases futuras entram como `OdeteGit`, `OdeteRuntime`, `OdeteAgent`, `OdeteSwift`
 
 ## Pendências conhecidas da Fase 1
 
-- Fontes IBM Plex ainda não empacotadas (usa SF e SF Mono).
 - Painéis Git, Problemas, Agente, Terminal, Preview e Diff são cascas ("chega na Fase N").

@@ -1571,10 +1571,13 @@ input, textarea, select { font: inherit; font-size: 16px; }
   margin: 0 0 22px;
 }
 .welcome-word {
-  width: min(300px, 82vw);
+  width: min(320px, 84vw);
   height: auto;
+  padding: 6px 0;
+  object-fit: contain;
+  object-position: center;
   background: transparent;
-  margin: 0 0 16px;
+  margin: 0 0 14px;
 }
 .welcome-kicker {
   margin: 0 0 14px;

@@ -538,31 +538,7 @@ export function AgentPane() {
               )}
             </div>
           ) : ctxOpen ? (
-            <div className="ctx-menu">
-              <div>
-                <span>Janela</span>
-                <b>
-                  {fmtTok(usedTok)}
-                  {maxTok ? ` / ${fmtTok(maxTok)}` : ""}
-                </b>
-              </div>
-              <div>
-                <span>Input</span>
-                <b>{fmtTok(usage.input)}</b>
-              </div>
-              <div>
-                <span>Output</span>
-                <b>{fmtTok(usage.output)}</b>
-              </div>
-              <div>
-                <span>Cache</span>
-                <b>{fmtTok(usage.cache)}</b>
-              </div>
-              <div>
-                <span>Thinking</span>
-                <b>{fmtTok(usage.reasoning)}</b>
-              </div>
-            </div>
+            <CtxPanel usage={usage} usedTok={usedTok} maxTok={maxTok} />
           ) : permOpen ? (
             <div className="perm-menu">
               {PERM_META.map((p) => (
@@ -835,7 +811,57 @@ function ago(ts: number) {
   return `${Math.round(s / 86400)} d`;
 }
 
-function mentionAt(text: string, pos: number) {
+function CtxPanel({
+  usage,
+  usedTok,
+  maxTok,
+}: {
+  usage: { input: number; output: number; cache: number; reasoning: number };
+  usedTok: number;
+  maxTok: number;
+}) {
+  const cache = usage.cache;
+  const think = usage.reasoning;
+  const input = Math.max(0, usage.input - cache);
+  const output = Math.max(0, usage.output - think);
+  const used = usage.input + usage.output || usedTok;
+  const win = maxTok || used || 1;
+  const free = Math.max(0, win - used);
+  const pct = Math.round((used / win) * 100);
+  const rows = [
+    { id: "input", label: "Input", n: input, color: "#5b9fd6" },
+    { id: "cache", label: "Cache", n: cache, color: "#6bc48a" },
+    { id: "output", label: "Output", n: output, color: "#e89a5e" },
+    { id: "think", label: "Thinking", n: think, color: "#a78bfa" },
+    { id: "free", label: "Livre", n: free, color: "color-mix(in srgb, var(--color-fg) 22%, transparent)" },
+  ];
+  return (
+    <div className="ctx-menu">
+      <div className="ctx-head">
+        <span>Janela de contexto</span>
+        <b>
+          {fmtTok(used)} / {fmtTok(win)} ({pct}%)
+        </b>
+      </div>
+      <div className="ctx-bar" aria-hidden>
+        {rows
+          .filter((r) => r.id !== "free" && r.n > 0)
+          .map((r) => (
+            <i key={r.id} style={{ width: `${Math.max(0.6, (r.n / win) * 100)}%`, background: r.color }} />
+          ))}
+        <i className="is-free" />
+      </div>
+      {rows.map((r) => (
+        <div key={r.id} className="ctx-row">
+          <i className="ctx-dot" style={{ background: r.color }} />
+          <span>{r.label}</span>
+          <b>{fmtTok(r.n)}</b>
+          <em>{win ? `${((r.n / win) * 100).toFixed(1)}%` : "—"}</em>
+        </div>
+      ))}
+    </div>
+  );
+}
   const left = text.slice(0, Math.max(0, pos));
   const m = /(?:^|[\s(\[\{])@([^\s@]*)$/.exec(left);
   if (!m) return null;

@@ -225,8 +225,8 @@ input, textarea, select { font: inherit; font-size: 16px; }
 .agent-col { min-width: 0; min-height: 0; border-left: 1px solid var(--color-border); display: flex; flex-direction: column; background: var(--color-bg-elevated); }
 
 .rail { width: 52px; flex: 0 0 52px; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 0; border-right: 1px solid var(--color-border); background: var(--color-bg-elevated); }
-.rail-mark { width: 32px; height: 32px; display: grid; place-items: center; font-weight: 600; font-size: 13px; color: var(--color-accent); }
-.rail-mark img { width: 22px; height: 22px; border-radius: 6px; display: block; }
+.rail-mark { width: 32px; height: 32px; display: grid; place-items: center; overflow: hidden; border-radius: 8px; }
+.rail-mark img { width: 32px; height: 32px; display: block; object-fit: cover; transform: scale(1.08); }
 .rail-btn { width: 40px; height: 40px; display: grid; place-items: center; border: 0; border-radius: 10px; background: transparent; color: var(--color-fg-muted); }
 .rail-btn.is-on, .rail-btn:hover { background: var(--color-bg-subtle); color: var(--color-fg); }
 .rail-space { flex: 1; }
@@ -1563,11 +1563,12 @@ input, textarea, select { font: inherit; font-size: 16px; }
   width: min(420px, 100%);
 }
 .welcome-icon {
-  width: 156px;
-  height: 156px;
+  width: 180px;
+  height: 180px;
   object-fit: contain;
   background: transparent;
-  margin: 0 0 24px;
+  border-radius: 0;
+  margin: 0 0 20px;
 }
 .welcome-word {
   width: min(300px, 82vw);

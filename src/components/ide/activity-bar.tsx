@@ -20,7 +20,7 @@ export function ActivityBar() {
   return (
     <nav className="rail" aria-label="Atividade">
       <span className="rail-mark" title="Odete">
-        <img src="/brand/odete-icon.png" width={22} height={22} alt="" />
+        <img src="/brand/odete-icon.png?v=3" width={32} height={32} alt="" />
       </span>
       {ITEMS.map((it) => {
         const Icon = it.icon;

@@ -376,9 +376,14 @@ input, textarea, select { font: inherit; font-size: 16px; }
   font-size: 12px;
 }
 .code-stage { grid-column: 1; grid-row: 2; position: relative; min-width: 0; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
-.code-stage > div,
-.code-stage .cm-theme,
-.code-stage .cm-editor { flex: 1 1 0 !important; width: 100% !important; height: 100% !important; min-height: 0 !important; }
+.code-stage > .cm-theme,
+.code-stage > .cm-editor,
+.code-stage > div:not(.code-tools) {
+  flex: 1 1 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+}
 .code-stage .cm-editor { display: flex !important; flex-direction: column; background: var(--color-bg) !important; color: var(--color-fg); }
 
 .cm-editor { font-family: var(--font-mono); font-size: 13px; position: relative; }
@@ -2099,8 +2104,13 @@ html[data-dragging] { cursor: grabbing; user-select: none; }
   z-index: 3;
   display: flex;
   gap: 4px;
+  width: auto !important;
+  height: auto !important;
+  flex: none !important;
+  pointer-events: none;
 }
 .code-tools button {
+  pointer-events: auto;
   width: 32px;
   height: 32px;
   display: grid;

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { AtSign, Check, FolderOpen, History, ImagePlus, LoaderCircle, Paperclip, Plus, Send, Shield, Square, SquarePen, Undo2, X } from "lucide-react";
+import { AtSign, Bot, Check, FolderOpen, History, ImagePlus, LoaderCircle, Lock, Paperclip, Plus, Send, Square, SquarePen, Undo2, Unlock, X } from "lucide-react";
 import { AgentConnect } from "@/components/ide/settings-pane";
 import { ModelSelect } from "@/components/ide/model-select";
 import { contextWindow, estimateTokens, fmtTok, useAgentChats } from "@/lib/agent/chats";
@@ -30,10 +30,16 @@ const MODE_META: { id: AgentMode; label: string }[] = [
 ];
 
 const PERM_META: { id: PermitMode; label: string; hint: string }[] = [
-  { id: "ask", label: "ask", hint: "Pergunta quase tudo antes de agir." },
-  { id: "auto", label: "auto", hint: "Lê sozinho. Pergunta pra escrever e terminal." },
-  { id: "full", label: "full", hint: "Segue sem perguntar." },
+  { id: "ask", label: "Ask", hint: "Pergunta quase tudo antes de agir." },
+  { id: "auto", label: "Auto", hint: "Lê sozinho. Pergunta pra escrever e terminal." },
+  { id: "full", label: "Full", hint: "Segue sem perguntar." },
 ];
+
+function PermIcon({ id, size = 18 }: { id: PermitMode; size?: number }) {
+  if (id === "ask") return <Lock size={size} strokeWidth={2} />;
+  if (id === "full") return <Unlock size={size} strokeWidth={2} />;
+  return <Bot size={size} strokeWidth={2} />;
+}
 
 function expandMentions(text: string) {
   const files = useWorkspace.getState().files;
@@ -472,14 +478,19 @@ export function AgentPane() {
                 <button
                   key={p.id}
                   type="button"
-                  className={permitMode === p.id ? "is-on" : undefined}
+                  className={`is-${p.id}${permitMode === p.id ? " is-on" : ""}`}
                   onClick={() => {
                     useChrome.getState().setPermitMode(p.id);
                     setPermOpen(false);
                   }}
                 >
-                  <b>{p.label}</b>
-                  <span>{p.hint}</span>
+                  <i className="perm-ico">
+                    <PermIcon id={p.id} size={18} />
+                  </i>
+                  <span>
+                    <b>{p.label}</b>
+                    <em>{p.hint}</em>
+                  </span>
                 </button>
               ))}
             </div>
@@ -635,7 +646,7 @@ export function AgentPane() {
               </button>
               <button
                 type="button"
-                className={`agent-icon-btn${permOpen ? " is-on" : ""}`}
+                className={`agent-icon-btn is-${permitMode}${permOpen ? " is-on" : ""}`}
                 title={`Permissão: ${permitMode}`}
                 aria-label="níveis de permissão"
                 onClick={() => {
@@ -644,7 +655,7 @@ export function AgentPane() {
                   setPermOpen((v) => !v);
                 }}
               >
-                <Shield size={18} />
+                <PermIcon id={permitMode} size={18} />
               </button>
               <span className={`agent-ctx${ctxPct >= 85 ? " is-hot" : ctxPct >= 60 ? " is-warm" : ""}`} title="contexto da conversa">
                 {fmtTok(usedTok)}

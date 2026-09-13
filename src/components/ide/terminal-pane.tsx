@@ -4,6 +4,7 @@ import { runShell } from "@/lib/workspace/shell";
 import { quoteSelection } from "@/lib/workspace/nav";
 import { useChrome } from "@/lib/workspace/chrome";
 import { useTerms } from "@/lib/workspace/terms";
+import { pkgScripts } from "@/lib/workspace/pkg-scripts";
 import { useWorkspace } from "@/lib/workspace/store";
 import { cn } from "@/lib/utils";
 
@@ -62,6 +63,7 @@ export function TerminalPane() {
   const end = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const names = useMemo(() => Object.keys(files).sort(), [files]);
+  const scripts = useMemo(() => pkgScripts(files), [files]);
 
   useEffect(() => {
     end.current?.scrollIntoView({ block: "end" });
@@ -80,6 +82,9 @@ export function TerminalPane() {
     useTerms.getState().pushHist(t);
     setHistI(-1);
     runShell(t);
+    if (/^(npm run |npx vite|vite)/.test(t)) {
+      useChrome.getState().setCenter("preview");
+    }
     setCmd("");
   }
 
@@ -141,6 +146,15 @@ export function TerminalPane() {
         ))}
         <div ref={end} />
       </div>
+      {scripts.length ? (
+        <div className="term-scripts">
+          {scripts.map((s) => (
+            <button key={s} type="button" onClick={() => run(`npm run ${s}`)}>
+              {s}
+            </button>
+          ))}
+        </div>
+      ) : null}
       <form
         className="term-compose-wrap"
         onSubmit={(e) => {

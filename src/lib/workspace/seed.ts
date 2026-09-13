@@ -59,6 +59,13 @@ when: html, css, preview, página, index
 index.html é a página do Preview. CSS em src/style.css. JS em src/main.js.
 Sem build step além do Vite. Acessível, contraste ok, sem dependência nova.
 `,
+  "AGENTS.md": `# Colo
+
+- Preview usa index.html + src/.
+- Swift em App.swift: subset SwiftUI (VStack, Text, Button, Toggle).
+- Commits curtos em PT-BR.
+- Não invente dependência nova sem pedido.
+`,
   "package.json": `{
   "name": "colo-demo",
   "private": true,

@@ -368,6 +368,14 @@ export function GitPane() {
               <button
                 type="button"
                 className="git-ghost"
+                title="cherry-pick"
+                onClick={() => run(() => w().gitCherryPick(c.id))}
+              >
+                <Layers size={14} />
+              </button>
+              <button
+                type="button"
+                className="git-ghost"
                 title="restaurar"
                 onClick={() => run(() => w().gitRestoreCommit(c.id))}
               >

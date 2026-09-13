@@ -89,11 +89,12 @@ export type WorkspaceState = {
   gitCheckout: (name: string) => string;
   gitStash: () => string;
   gitStashPop: () => string;
+  gitCherryPick: (id: string) => string;
   gitBlame: (path: string) => BlameLine[];
   gitRestoreCommit: (id: string) => string;
   gitApplyHunk: (path: string, index: number, keep: boolean) => string;
   renameFile: (from: string, to: string) => string | undefined;
-  replaceInFiles: (pattern: string, replacement: string) => { files: number; hits: number };
+  replaceInFiles: (pattern: string, replacement: string, onlyPath?: string) => { files: number; hits: number };
   resolveConflict: (path: string, take: "ours" | "theirs" | "merged", merged?: string) => void;
   mergeRemote: (incoming: FileMap) => string;
   changedPaths: () => string[];
@@ -455,6 +456,24 @@ export const useWorkspace = create<WorkspaceState>()(
         });
         return `aplicado ${top.id}`;
       },
+      gitCherryPick: (id) => {
+        const { commits, files } = get();
+        const i = commits.findIndex((c) => c.id === id);
+        if (i < 0) return "commit não encontrado";
+        const cur = commits[i]!;
+        const prev = i > 0 ? commits[i - 1] : undefined;
+        const next = { ...files };
+        for (const [k, v] of Object.entries(cur.files)) {
+          if (!prev || prev.files[k] !== v) next[k] = v;
+        }
+        if (prev) {
+          for (const k of Object.keys(prev.files)) {
+            if (cur.files[k] === undefined) delete next[k];
+          }
+        }
+        set({ files: next });
+        return `cherry-pick ${id} ${cur.message}`;
+      },
       gitBlame: (path) => {
         const { commits, files } = get();
         const lines = (files[path] ?? "").split("\n");
@@ -519,7 +538,7 @@ export const useWorkspace = create<WorkspaceState>()(
         });
         return undefined;
       },
-      replaceInFiles: (pattern, replacement) => {
+      replaceInFiles: (pattern, replacement, onlyPath) => {
         let re: RegExp;
         try {
           re = new RegExp(pattern, "g");
@@ -530,6 +549,7 @@ export const useWorkspace = create<WorkspaceState>()(
         let fileCount = 0;
         let hits = 0;
         for (const [p, text] of Object.entries(files)) {
+          if (onlyPath && p !== onlyPath) continue;
           const next = text.replace(re, () => {
             hits += 1;
             return replacement;

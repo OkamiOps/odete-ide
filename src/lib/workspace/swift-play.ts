@@ -46,11 +46,20 @@ function parseView(src: string): string {
   if (/^Text\s*\(/.test(trimmed)) {
     const t = extractString(trimmed) || " ";
     const big = /\.font\(\s*\.largeTitle/.test(trimmed) || /\.bold\(/.test(trimmed);
-    return `<p class="sw-text${big ? " is-big" : ""}">${esc(t)}</p>`;
+    const pad = /\.padding\(/.test(trimmed);
+    return `<p class="sw-text${big ? " is-big" : ""}${pad ? " is-pad" : ""}">${esc(t)}</p>`;
   }
   if (/^Button\s*\(/.test(trimmed)) {
     const t = extractString(trimmed) || "Botão";
     return `<button type="button" class="sw-btn">${esc(t)}</button>`;
+  }
+  if (/^Toggle\s*\(/.test(trimmed)) {
+    const t = extractString(trimmed) || "Toggle";
+    return `<label class="sw-tog"><input type="checkbox" /> ${esc(t)}</label>`;
+  }
+  if (/^TextField\s*\(/.test(trimmed)) {
+    const t = extractString(trimmed) || "";
+    return `<input class="sw-field" placeholder="${esc(t)}" />`;
   }
   if (/^Image\s*\(/.test(trimmed)) {
     const n = extractSystemName(trimmed);
@@ -94,13 +103,17 @@ function splitTop(src: string): string[] {
     buf += ch;
     if (depth === 0 && paren === 0 && ch === "\n") {
       const piece = buf.trim();
-      if (piece && !piece.startsWith("//") && !piece.startsWith(".")) out.push(piece);
+      if (piece.startsWith(".")) {
+        if (out.length) out[out.length - 1] = `${out[out.length - 1]} ${piece}`;
+      } else if (piece && !piece.startsWith("//")) out.push(piece);
       buf = "";
     }
   }
   const tail = buf.trim();
   if (tail && !tail.startsWith("//") && !tail.startsWith(".")) out.push(tail);
-  return out.filter((s) => /^(VStack|HStack|ZStack|List|NavigationStack|ScrollView|Text|Button|Image|Spacer|Divider|Section)\b/.test(s));
+  return out.filter((s) =>
+    /^(VStack|HStack|ZStack|List|NavigationStack|ScrollView|Text|Button|Image|Spacer|Divider|Section|Toggle|TextField)\b/.test(s),
+  );
 }
 
 function findBody(src: string) {
@@ -134,6 +147,9 @@ export function buildSwiftPlayground(source: string) {
   .sw-text { margin: 0; font-size: 17px; line-height: 1.35; }
   .sw-text.is-big { font-size: 32px; font-weight: 600; letter-spacing: -0.03em; }
   .sw-btn { min-height: 44px; padding: 0 16px; border: 0; border-radius: 12px; background: #0a84ff; color: #fff; font-size: 16px; }
+  .sw-tog { display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: 16px; }
+  .sw-field { min-height: 44px; width: 100%; padding: 0 12px; border-radius: 10px; border: 1px solid rgb(255 255 255 / 0.16); background: #2c2c2e; color: #fff; }
+  .sw-text.is-pad { padding: 8px 0; }
   .sw-img { padding: 10px 0; color: #8e8e93; font-size: 13px; }
   .sw-spacer { flex: 1; min-height: 12px; }
   .sw-hr { border: 0; border-top: 1px solid rgb(255 255 255 / 0.12); margin: 4px 0; }

@@ -4,6 +4,7 @@ import { DropHint } from "@/components/ide/drag-ghost";
 import { EditorTabs } from "@/components/ide/editor-tabs";
 import { PickList } from "@/components/ide/pick-list";
 import { PreviewPane } from "@/components/ide/preview-pane";
+import { usePatches } from "@/lib/agent/patches";
 import { useChrome, type CenterId } from "@/lib/workspace/chrome";
 import { useDrag } from "@/lib/workspace/drag";
 import { useWorkspace } from "@/lib/workspace/store";
@@ -25,6 +26,7 @@ export function CenterPane() {
   const setEditFocus = useChrome((s) => s.setEditFocus);
   const setAltPath = useChrome((s) => s.setAltPath);
   const openPath = useWorkspace((s) => s.openPath);
+  const pending = usePatches((s) => s.items.filter((p) => p.status === "pending"));
   const openFile = useWorkspace((s) => s.openFile);
   const files = useWorkspace((s) => s.files);
   const parts = openPath.split("/").filter(Boolean);
@@ -47,6 +49,29 @@ export function CenterPane() {
   return (
     <section className="center-pane">
       <EditorTabs />
+      {pending.length ? (
+        <div className="patch-queue">
+          {pending.map((p) => (
+            <div key={p.id} className="patch-queue-item">
+              <button
+                type="button"
+                onClick={() => {
+                  openFile(p.path);
+                  setCenter("diff");
+                }}
+              >
+                {p.path}
+              </button>
+              <button type="button" onClick={() => usePatches.getState().accept(p.id)}>
+                ok
+              </button>
+              <button type="button" onClick={() => usePatches.getState().reject(p.id)}>
+                x
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : null}
       <div className="ed-modes" role="tablist" aria-label="Modo do editor">
         {MODES.map((m) => (
           <button

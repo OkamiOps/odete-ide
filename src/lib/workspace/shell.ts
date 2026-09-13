@@ -219,9 +219,10 @@ export function runShell(raw: string): string {
             "added 12 packages, and audited 13 packages in 1s",
             "sandbox colo — sem binários nativos (sharp, etc. não entram)",
           ].join("\n");
-        } else if (args[0] === "run" && args[1] === "dev") {
-          out = "Local:  iframe preview  (abre a aba Preview)";
-        } else out = "npm — use: npm i  |  npm run dev";
+        } else if (args[0] === "run") {
+          const name = args[1] || "dev";
+          out = `> ${name}\nLocal: iframe Preview  — abre a aba Preview`;
+        } else out = "npm — use: npm i  |  npm run <script>";
         break;
       }
       case "npx":

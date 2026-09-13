@@ -8,6 +8,7 @@ import { useWorkspace } from "@/lib/workspace/store";
 import { usePatches } from "./patches";
 import { allSkills, formatSkillsPrompt } from "@/lib/workspace/skills";
 import { formatWorkspace } from "./tools";
+import { projectRules } from "./rules";
 import { needsPermit, waitPermit, type PermitMode } from "./permit";
 
 const MAX_ROUNDS = 8;
@@ -146,7 +147,9 @@ export async function runAgentLoop(
     if (shouldStop?.()) break;
     const files = useWorkspace.getState().files;
     const fileList = formatWorkspace(files);
-    const skills = formatSkillsPrompt(allSkills(files), userText);
+    const skills = [formatSkillsPrompt(allSkills(files), userText), projectRules(files)]
+      .filter(Boolean)
+      .join("\n\n");
     const thinkId = crypto.randomUUID();
     const textId = crypto.randomUUID();
     let thinkText = "";

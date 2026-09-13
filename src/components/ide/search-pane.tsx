@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useNav } from "@/lib/workspace/nav";
 import { useWorkspace } from "@/lib/workspace/store";
 
 export function SearchPane() {
@@ -52,6 +53,18 @@ export function SearchPane() {
         >
           Substituir tudo
         </button>
+        <button
+          type="button"
+          className="chip"
+          disabled={q.trim().length < 2}
+          onClick={() => {
+            const path = useWorkspace.getState().openPath;
+            const r = replaceInFiles(q.trim(), rep, path);
+            setNote(`${r.hits} em ${path}`);
+          }}
+        >
+          Substituir
+        </button>
         {note ? <p className="search-note">{note}</p> : null}
       </div>
       <div className="min-h-0 flex-1 overflow-auto px-1 pb-3">
@@ -63,7 +76,10 @@ export function SearchPane() {
             key={`${h.path}:${h.line}:${i}`}
             type="button"
             className="hit"
-            onClick={() => openFile(h.path)}
+            onClick={() => {
+              openFile(h.path);
+              if (h.line) useNav.getState().go(h.path, Number(h.line));
+            }}
           >
             <b>
               {h.path}

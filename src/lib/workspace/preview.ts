@@ -76,9 +76,44 @@ export function buildPreviewHtml(files: FileMap) {
     .map(([, v]) => rewriteViewportUnits(v))
     .join("\n");
 
-  const inject = `${BASE}${HOOK}${extraCss ? `<style>${escapeClose("style", extraCss)}</style>` : ""}`;
+  const inject = `${BASE}${HOOK}${extraCss ? `<style>${escapeClose("style", extraCss)}</style>` : ""}${importMap(files)}`;
   if (html.includes("</head>")) html = html.replace("</head>", `${inject}</head>`);
   else html = inject + html;
 
   return html;
+}
+
+function resolveRel(from: string, spec: string) {
+  const clean = spec.replace(/[?#].*$/, "");
+  if (clean.startsWith("/")) return clean.replace(/^\/+/, "");
+  const dir = from.includes("/") ? from.slice(0, from.lastIndexOf("/")) : "";
+  const parts = `${dir}/${clean}`.split("/");
+  const out: string[] = [];
+  for (const p of parts) {
+    if (!p || p === ".") continue;
+    if (p === "..") out.pop();
+    else out.push(p);
+  }
+  return out.join("/");
+}
+
+function importMap(files: FileMap) {
+  const js = Object.keys(files).filter((k) => /\.(m?js|jsx)$/.test(k));
+  if (!js.length) return "";
+  const imports: Record<string, string> = {};
+  for (const p of js) {
+    let code = files[p]!;
+    code = code.replace(/from\s+(['"])(\.[^'"]+)\1/g, (_, q: string, spec: string) => {
+      let rel = resolveRel(p, spec);
+      if (files[rel] === undefined) {
+        const hit = [`${rel}.js`, `${rel}.mjs`, `${rel}/index.js`].find((k) => files[k] !== undefined);
+        if (hit) rel = hit;
+      }
+      return `from ${q}/${rel}${q}`;
+    });
+    const url = `data:text/javascript;charset=utf-8,${encodeURIComponent(code)}`;
+    imports[`/${p}`] = url;
+    imports[p] = url;
+  }
+  return `<script type="importmap">${JSON.stringify({ imports })}</script>`;
 }

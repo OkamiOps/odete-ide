@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { AtSign, Bot, Check, FolderOpen, History, ImagePlus, LoaderCircle, Lock, Paperclip, Plus, Send, Square, SquarePen, Undo2, Unlock, Wrench, X } from "lucide-react";
+import { AtSign, Bot, Check, FolderOpen, History, ImagePlus, LoaderCircle, Lock, Paperclip, Pencil, Plus, RotateCcw, Send, Square, SquarePen, Undo2, Unlock, Wrench, X } from "lucide-react";
 import { AgentConnect } from "@/components/ide/settings-pane";
 import { ModelSelect } from "@/components/ide/model-select";
 import { contextWindow, estimateTokens, fmtTok, useAgentChats } from "@/lib/agent/chats";
@@ -7,6 +7,7 @@ import { emptyUse } from "@/lib/agent/stream-types";
 import { defaultEffort, effortKey, EFFORT_HINT, EFFORT_LABEL, effortsForModel, type EffortId } from "@/lib/agent/effort";
 import { runAgentLoop, type ChatItem } from "@/lib/agent/loop";
 import { usePatches } from "@/lib/agent/patches";
+import { useCheckpoints } from "@/lib/agent/checkpoints";
 import { AGENTS, agentById } from "@/lib/agent/providers";
 import type { AgentImage, AgentMessage } from "@/lib/agent/server";
 import { answerPermit, type PermitMode } from "@/lib/agent/permit";
@@ -255,6 +256,7 @@ export function AgentPane() {
         : `explica este trecho:\n\`\`\`\n${quote}\n\`\`\``
       : prompt;
     if ((!body && !pics.length) || busy || !connected) return;
+    useCheckpoints.getState().take();
     useNav.getState().setQuote("");
     setDraft("");
     setShots([]);
@@ -330,7 +332,20 @@ export function AgentPane() {
   const activeId = useAgentChats((s) => s.active[projectId]);
   const usage = (activeId && threadMap[activeId]?.usage) || emptyUse();
   const lastInput = (activeId && threadMap[activeId]?.lastInput) || 0;
+  const lastUserId = [...items].reverse().find((i) => i.kind === "user")?.id;
   const empty = connected && items.length === 0;
+
+  function dropFromUser(userId: string) {
+    const i = items.findIndex((x) => x.id === userId);
+    if (i < 0) return null;
+    const user = items[i]!;
+    setItems(items.slice(0, i));
+    const h = history.current;
+    let u = h.length - 1;
+    while (u >= 0 && h[u]!.role !== "user") u -= 1;
+    if (u >= 0) history.current = h.slice(0, u);
+    return user.kind === "user" ? user.text : "";
+  }
   const pendingCount = usePatches((s) => s.items.filter((p) => p.status === "pending").length);
   const quote = useNav((s) => s.quote);
 
@@ -354,6 +369,15 @@ export function AgentPane() {
           <div className="agent-hd-ops">
             <button type="button" className="agent-icon" aria-label="novo chat" title="Novo chat" onClick={clear}>
               <SquarePen size={16} />
+            </button>
+            <button
+              type="button"
+              className="agent-icon"
+              aria-label="desfazer turno"
+              title="Desfazer turno do agente"
+              onClick={() => useCheckpoints.getState().undo()}
+            >
+              <Undo2 size={16} />
             </button>
             <button
               type="button"
@@ -470,7 +494,19 @@ export function AgentPane() {
               g.type === "tools" ? (
                 <ToolGroup key={g.items[0]!.id} items={g.items} />
               ) : (
-                <Message key={g.item.id} item={g.item} />
+                <Message
+                  key={g.item.id}
+                  item={g.item}
+                  lastUser={g.item.id === lastUserId}
+                  onEdit={() => {
+                    const t = dropFromUser(g.item.id);
+                    if (t) setDraft(t);
+                  }}
+                  onRetry={() => {
+                    const t = dropFromUser(g.item.id);
+                    if (t) void send(t);
+                  }}
+                />
               ),
             )
           : null}
@@ -977,7 +1013,17 @@ function toolLabel(item: ChatItem) {
   return "tool";
 }
 
-function Message({ item }: { item: ChatItem }) {
+function Message({
+  item,
+  lastUser,
+  onEdit,
+  onRetry,
+}: {
+  item: ChatItem;
+  lastUser?: boolean;
+  onEdit?: () => void;
+  onRetry?: () => void;
+}) {
   const files = useWorkspace((s) => s.files);
   if (item.kind === "tool") {
     const path = resolvePath(item.detail, files);
@@ -1037,6 +1083,16 @@ function Message({ item }: { item: ChatItem }) {
           </div>
         ) : null}
         <RichText text={item.text} files={files} />
+        {lastUser ? (
+          <div className="msg-ops">
+            <button type="button" title="Editar" onClick={onEdit}>
+              <Pencil size={13} />
+            </button>
+            <button type="button" title="Refazer" onClick={onRetry}>
+              <RotateCcw size={13} />
+            </button>
+          </div>
+        ) : null}
       </div>
     );
   }

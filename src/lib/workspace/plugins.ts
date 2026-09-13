@@ -201,6 +201,31 @@ export function lintFile(path: string, text: string): Diag[] {
       out.push({ id: `${path}:json`, path, line, message: msg, severity: "error" });
     }
   }
+  if (["ts", "tsx"].includes(ext)) {
+    const stripped = text
+      .replace(/^\s*import\s+[\s\S]*?from\s+['"][^'"]+['"]\s*;?/gm, "")
+      .replace(/^\s*import\s+['"][^'"]+['"]\s*;?/gm, "")
+      .replace(/^\s*export\s+\{[\s\S]*?\}\s*;?/gm, "")
+      .replace(/^\s*export\s+(default\s+)?/gm, "")
+      .replace(/\b(interface|type|enum)\s+\w+[^;{]*(\{[\s\S]*?\}|;)/g, "")
+      .replace(/:\s*[\w.<>[\]|&\s,'"]+(?=[=),;{}\n])/g, "")
+      .replace(/\bas\s+const\b/g, "")
+      .replace(/\bas\s+[\w.<>[\]|&]+/g, "");
+    try {
+      // eslint-disable-next-line no-new-func
+      new Function(stripped);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "TS inválido";
+      const m = /:(\d+)/.exec(msg);
+      out.push({
+        id: `${path}:ts`,
+        path,
+        line: m ? Number(m[1]) : 1,
+        message: msg.replace(/^[\w]*Error:\s*/, "").slice(0, 120),
+        severity: "error",
+      });
+    }
+  }
   if (["js", "jsx", "mjs", "cjs"].includes(ext)) {
     const stripped = text
       .replace(/^\s*import\s+[\s\S]*?from\s+['"][^'"]+['"]\s*;?/gm, "")

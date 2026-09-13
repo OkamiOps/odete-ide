@@ -275,7 +275,6 @@ export function AgentPane() {
   const effort = (options.includes(effortStored as EffortId) ? effortStored : defaultEffort(options)) as EffortId | "";
   const usedTok = estimateTokens({
     messages: history.current,
-    files,
     draft,
     images: shots.length,
   });
@@ -647,9 +646,9 @@ export function AgentPane() {
               >
                 <Shield size={18} />
               </button>
-              <span className={`agent-ctx${ctxPct >= 85 ? " is-hot" : ctxPct >= 60 ? " is-warm" : ""}`} title="contexto estimado">
+              <span className={`agent-ctx${ctxPct >= 85 ? " is-hot" : ctxPct >= 60 ? " is-warm" : ""}`} title="contexto da conversa">
                 {fmtTok(usedTok)}
-                <em>/{fmtTok(maxTok)}</em>
+                {maxTok ? <em>/{fmtTok(maxTok)}</em> : null}
               </span>
               {busy ? (
                 <button

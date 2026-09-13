@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import type { AgentId } from "./providers";
 import { parseEffortList, type EffortId } from "./effort";
 
-export type ModelInfo = { id: string; label: string; efforts?: EffortId[] };
+export type ModelInfo = { id: string; label: string; efforts?: EffortId[]; ctx?: number };
 
 function push(out: ModelInfo[], seen: Set<string>, id: string, label?: string) {
   const slug = id.trim();
@@ -11,7 +11,20 @@ function push(out: ModelInfo[], seen: Set<string>, id: string, label?: string) {
   out.push({ id: slug, label: (label || slug).trim() });
 }
 
-function asList(json: unknown): ModelInfo[] {
+function pickCtx(m: Record<string, unknown>): number | undefined {
+  const cap = m.capabilities && typeof m.capabilities === "object" ? (m.capabilities as Record<string, unknown>) : {};
+  const n = Number(
+    m.context_window ??
+      m.context_length ??
+      m.max_input_tokens ??
+      m.input_token_limit ??
+      m.context_tokens ??
+      cap.context_window ??
+      cap.context_length ??
+      0,
+  );
+  return Number.isFinite(n) && n > 1000 ? Math.round(n) : undefined;
+}
   if (!json || typeof json !== "object") return [];
   const rec = json as Record<string, unknown>;
   let raw: unknown = rec.data ?? rec.models ?? rec.items ?? rec.model_slugs;
@@ -35,9 +48,13 @@ function asList(json: unknown): ModelInfo[] {
     const id = String(m.slug ?? m.id ?? m.model ?? m.name ?? "").trim();
     const label = String(m.display_name ?? m.displayName ?? m.title ?? m.name ?? id);
     const efforts = parseEffortList(m);
+    const ctx = pickCtx(m);
     if (!id || seen.has(id)) continue;
     seen.add(id);
-    out.push(efforts.length ? { id, label: (label || id).trim(), efforts } : { id, label: (label || id).trim() });
+    const info: ModelInfo = { id, label: (label || id).trim() };
+    if (efforts.length) info.efforts = efforts;
+    if (ctx) info.ctx = ctx;
+    out.push(info);
   }
   return out.sort((a, b) => a.label.localeCompare(b.label, "pt"));
 }

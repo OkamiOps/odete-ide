@@ -164,24 +164,26 @@ export const useAgentChats = create<ChatState>()(
   ),
 );
 
+const ctxCache = new Map<string, number>();
+
+export function rememberCtx(provider: string, model: string, ctx?: number) {
+  if (ctx && ctx > 1000) ctxCache.set(`${provider}:${model}`, ctx);
+}
+
 export function contextWindow(provider: string, model: string) {
-  if (provider === "claude") return 200_000;
-  if (/grok-4/.test(model)) return 256_000;
-  return 128_000;
+  return ctxCache.get(`${provider}:${model}`) ?? 0;
 }
 
 export function estimateTokens(opts: {
   messages: AgentMessage[];
-  files: Record<string, string>;
   draft: string;
   images: number;
 }) {
-  let n = 1800;
-  n += Math.ceil(Object.keys(opts.files).join("\n").length / 4);
+  let n = 0;
   for (const m of opts.messages) {
     n += Math.ceil((m.content ?? "").length / 4);
     for (const c of m.tool_calls ?? []) {
-      n += Math.ceil((c.function.arguments || "").length / 4) + 24;
+      n += Math.ceil((c.function.arguments || "").length / 4);
     }
   }
   n += Math.ceil(opts.draft.length / 4);

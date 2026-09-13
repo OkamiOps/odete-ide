@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type PointerEvent as PE, type RefObject } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as PE, type RefObject } from "react";
 import { EditorView, Decoration, highlightTrailingWhitespace, highlightWhitespace, keymap } from "@codemirror/view";
 import { EditorState, RangeSetBuilder } from "@codemirror/state";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
@@ -11,7 +11,7 @@ import { findDef, wordAt } from "@/lib/workspace/goto-def";
 import { unpackBin } from "@/lib/github/api";
 import { outlineOf } from "@/lib/workspace/outline";
 import { extOf } from "@/lib/utils";
-import { usePatches } from "@/lib/agent/patches";
+import { usePatches, type Patch } from "@/lib/agent/patches";
 import { chipsFor, coloCompletions } from "@/lib/workspace/complete";
 import { linter, lintGutter } from "@codemirror/lint";
 import { lintFile } from "@/lib/workspace/plugins";
@@ -350,26 +350,12 @@ export function CodeEditor({ path, pane = "a" }: { path?: string; pane?: "a" | "
       {findOpen && !path ? <FindBar viewRef={viewRef} /> : null}
       <div className="ed-tools">
         {pending ? (
-          <div className="patch-bar-ed">
-            <span>
-              Agente em <b>{active.split("/").pop()}</b>
-            </span>
-            <button type="button" onClick={() => usePatches.getState().accept(pending.id)}>
-              <Check size={14} /> aceitar
-            </button>
-            <button type="button" onClick={() => usePatches.getState().reject(pending.id)}>
-              <X size={14} /> reverter
-            </button>
-            {hunksOf(pending.orig || pending.before, pending.after).map((h, i) => (
-              <button
-                key={h.id}
-                type="button"
-                onClick={() => useNav.getState().go(active, h.afterStart)}
-              >
-                hunk {i + 1}
-              </button>
-            ))}
-          </div>
+          <PatchBar
+            path={active}
+            pending={pending}
+            onAccept={() => usePatches.getState().accept(pending.id)}
+            onRevert={() => usePatches.getState().reject(pending.id)}
+          />
         ) : null}
         {chips.length ? (
           <div className="snip-bar" role="toolbar" aria-label="snippets">
@@ -521,6 +507,90 @@ export function CodeEditor({ path, pane = "a" }: { path?: string; pane?: "a" | "
           ))}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function PatchBar({
+  path,
+  pending,
+  onAccept,
+  onRevert,
+}: {
+  path: string;
+  pending: Patch;
+  onAccept: () => void;
+  onRevert: () => void;
+}) {
+  const hunks = hunksOf(pending.orig || pending.before, pending.after);
+  const add = hunks.reduce((n, h) => n + h.adds.length, 0);
+  const del = hunks.reduce((n, h) => n + h.dels.length, 0);
+  const name = path.split("/").pop() ?? path;
+  const btn: CSSProperties = {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 6,
+    minHeight: 36,
+    padding: "0 12px",
+    borderRadius: 8,
+    fontSize: 13,
+    fontWeight: 600,
+    lineHeight: 1,
+    cursor: "pointer",
+  };
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 8,
+        padding: "10px 12px",
+        borderBottom: "1px solid var(--color-border)",
+        background: "var(--color-bg-elevated)",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
+        <span style={{ fontSize: 13, color: "var(--color-fg)", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {name}
+        </span>
+        <span style={{ fontSize: 12, color: "var(--color-ok)", fontFamily: "var(--font-mono)" }}>+{add}</span>
+        <span style={{ fontSize: 12, color: "var(--color-danger)", fontFamily: "var(--font-mono)" }}>−{del}</span>
+        <span style={{ fontSize: 12, color: "var(--color-fg-subtle)" }}>
+          {hunks.length} {hunks.length === 1 ? "trecho" : "trechos"}
+        </span>
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+        <button
+          type="button"
+          onClick={onAccept}
+          style={{ ...btn, background: "var(--color-ok)", color: "#052016", border: "0" }}
+        >
+          <Check size={14} /> Aceitar
+        </button>
+        <button
+          type="button"
+          onClick={onRevert}
+          style={{ ...btn, background: "transparent", color: "var(--color-danger)", border: "1px solid var(--color-danger)" }}
+        >
+          <X size={14} /> Reverter
+        </button>
+        {hunks.map((h, i) => (
+          <button
+            key={h.id}
+            type="button"
+            onClick={() => useNav.getState().go(path, h.afterStart)}
+            style={{
+              ...btn,
+              fontWeight: 500,
+              background: "var(--color-bg)",
+              color: "var(--color-fg-muted)",
+              border: "1px solid var(--color-border)",
+            }}
+          >
+            ir ao trecho {i + 1}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

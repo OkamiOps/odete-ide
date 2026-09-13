@@ -120,6 +120,12 @@ export function AgentPane() {
     if (!el) return;
     el.style.height = "0px";
     el.style.height = `${Math.min(180, Math.max(52, el.scrollHeight))}px`;
+    const pos = pendingCaret.current;
+    if (pos == null) return;
+    pendingCaret.current = null;
+    el.focus();
+    el.setSelectionRange(pos, pos);
+    setCaret(pos);
   }, [draft]);
   useEffect(() => {
     if (!projectId || !chatsReady || !booted.current) return;
@@ -206,15 +212,11 @@ export function AgentPane() {
     setHistOpen(false);
   }
 
+  const pendingCaret = useRef<number | null>(null);
+
   function placeCaret(pos: number) {
-    requestAnimationFrame(() => {
-      const el = inputRef.current;
-      if (!el) return;
-      el.focus();
-      el.setSelectionRange(pos, pos);
-      caretRef.current = pos;
-      setCaret(pos);
-    });
+    pendingCaret.current = pos;
+    caretRef.current = pos;
   }
 
   function pickFile(path: string) {

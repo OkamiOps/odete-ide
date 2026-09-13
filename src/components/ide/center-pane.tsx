@@ -26,7 +26,8 @@ export function CenterPane() {
   const setEditFocus = useChrome((s) => s.setEditFocus);
   const setAltPath = useChrome((s) => s.setAltPath);
   const openPath = useWorkspace((s) => s.openPath);
-  const pending = usePatches((s) => s.items.filter((p) => p.status === "pending"));
+  const patchItems = usePatches((s) => s.items);
+  const pending = patchItems.filter((p) => p.status === "pending");
   const openFile = useWorkspace((s) => s.openFile);
   const files = useWorkspace((s) => s.files);
   const parts = openPath.split("/").filter(Boolean);

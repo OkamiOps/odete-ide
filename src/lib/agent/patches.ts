@@ -45,6 +45,20 @@ export const usePatches = create<PatchState>()(
       items: [],
       queue: (path, before, after, slot = "a") => {
         const projectId = useWorkspace.getState().projectId;
+        const cur = get().items;
+        const i = cur.findIndex(
+          (p) =>
+            p.status === "pending" &&
+            p.path === path &&
+            asSlot(p.slot) === slot &&
+            (p.projectId ?? projectId) === projectId,
+        );
+        if (i >= 0) {
+          const prev = cur[i]!;
+          const patch: Patch = { ...prev, after, before: prev.orig || prev.before };
+          set({ items: cur.map((p, j) => (j === i ? patch : p)) });
+          return patch;
+        }
         const patch: Patch = {
           id: uid(),
           path,
@@ -68,7 +82,10 @@ export const usePatches = create<PatchState>()(
         const patch = get().items.find((p) => p.id === id);
         if (!patch || patch.status !== "pending") return;
         if (patch.projectId && patch.projectId !== useWorkspace.getState().projectId) return;
-        useWorkspace.getState().writeFile(patch.path, patch.after);
+        const cur = useWorkspace.getState().files[patch.path];
+        if (cur === undefined || cur === patch.before || cur === (patch.orig || patch.before)) {
+          useWorkspace.getState().writeFile(patch.path, patch.after);
+        }
         useWorkspace.getState().openFile(patch.path);
         const first = hunksOf(patch.before, patch.after)[0];
         useNav.getState().go(patch.path, first?.afterStart ?? 1);

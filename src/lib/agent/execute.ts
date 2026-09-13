@@ -52,6 +52,7 @@ export async function executeTool(
       }
       const patch = usePatches.getState().queue(path, before, after, slot);
       w.writeFile(path, after);
+      w.openFile(path);
       return `PATCH:${patch.id} escrito ${path}`;
     }
     case "write_file": {
@@ -67,6 +68,7 @@ export async function executeTool(
       const before = w.readFile(path) ?? "";
       const patch = usePatches.getState().queue(path, before, content, slot);
       w.writeFile(path, content);
+      w.openFile(path);
       return `PATCH:${patch.id} escrito ${path}`;
     }
     case "list_dir": {

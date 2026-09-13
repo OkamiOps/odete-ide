@@ -120,14 +120,19 @@ export function CodeEditor({ path, pane = "a" }: { path?: string; pane?: "a" | "
   const outline = useMemo(() => outlineOf(active, value), [active, value]);
   const bin = unpackBin(value);
   const viewRef = useRef<EditorView | null>(null);
-  const pending = usePatches((s) => s.items.find((p) => p.status === "pending" && p.path === active) ?? null);
+  const skipCm = useRef(false);
+  const pending = usePatches((s) => {
+    const pid = useWorkspace.getState().projectId;
+    const list = s.items.filter((p) => p.status === "pending" && p.path === active && (!p.projectId || p.projectId === pid));
+    return list.at(-1) ?? null;
+  });
   const jumpN = useNav((s) => s.n);
   const jumpPath = useNav((s) => s.path);
   const jumpLine = useNav((s) => s.line);
   const blameOn = useNav((s) => s.blame);
   const histOn = useNav((s) => s.hist);
   const snaps = useHistory((s) => s.byPath[active] ?? EMPTY_SNAPS);
-  const shown = pending ? pending.after : value;
+  const shown = value;
   const commits = useWorkspace((s) => s.commits);
   const headBody = commits.at(-1)?.files[active] ?? "";
   const blameRows = useMemo(
@@ -225,7 +230,7 @@ export function CodeEditor({ path, pane = "a" }: { path?: string; pane?: "a" | "
 
   const patchDeco = useMemo(() => {
     if (!pending) return [];
-    const lines = addedLines(pending.before, pending.after);
+    const lines = addedLines(pending.orig || pending.before, shown);
     const mark = Decoration.line({ class: "cm-patch-add" });
     return EditorView.decorations.of((view) => {
       const b = new RangeSetBuilder<Decoration>();
@@ -236,7 +241,21 @@ export function CodeEditor({ path, pane = "a" }: { path?: string; pane?: "a" | "
       }
       return b.finish();
     });
-  }, [pending]);
+  }, [pending, shown]);
+
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
+    const cur = view.state.doc.toString();
+    if (cur === shown) return;
+    skipCm.current = true;
+    view.dispatch({
+      changes: { from: 0, to: cur.length, insert: shown },
+    });
+    queueMicrotask(() => {
+      skipCm.current = false;
+    });
+  }, [shown, active]);
 
   useEffect(() => {
     if (!jumpN || jumpPath !== active) return;
@@ -310,42 +329,6 @@ export function CodeEditor({ path, pane = "a" }: { path?: string; pane?: "a" | "
   }
   return (
     <div className={mapOn ? `code-wrap has-map is-${minimap}` : "code-wrap"}>
-      <div className="code-tools">
-        <button type="button" title="buscar" onClick={() => useChrome.getState().setFindOpen(!findOpen)}>
-          <Search size={14} />
-        </button>
-        <button
-          type="button"
-          title="formatar"
-          onClick={() => {
-            const ws = useWorkspace.getState();
-            ws.writeFile(active, formatFile(active, ws.files[active] ?? ""));
-          }}
-        >
-          <Sparkles size={14} />
-        </button>
-        <button
-          type="button"
-          title="ir para definição"
-          onClick={() => {
-            const view = viewRef.current;
-            const pos = view?.state.selection.main.head ?? 0;
-            const name = wordAt(value, pos);
-            const hit = findDef(name, files, active);
-            if (hit) {
-              openFile(hit.path);
-              useNav.getState().go(hit.path, hit.line);
-            }
-          }}
-        >
-          <Undo2 size={14} className="rotate-180" />
-        </button>
-        {outline.length ? (
-          <button type="button" title="outline" className={outOpen ? "is-on" : undefined} onClick={() => setOutOpen((v) => !v)}>
-            <ListTree size={14} />
-          </button>
-        ) : null}
-      </div>
       {outOpen && outline.length ? (
         <div className="outline-list">
           {outline.map((o) => (
@@ -365,85 +348,19 @@ export function CodeEditor({ path, pane = "a" }: { path?: string; pane?: "a" | "
         </div>
       ) : null}
       {findOpen && !path ? <FindBar viewRef={viewRef} /> : null}
-      <div className="code-stage">
-      <Editor
-        key={`${active}:${themeId}:${lineNo}:${fold}:${pending?.id ?? "x"}`}
-        value={shown}
-        height="100%"
-        theme="none"
-        extensions={[
-          chromeTheme,
-          syn,
-          wrap ? EditorView.lineWrapping : [],
-          space ? [highlightWhitespace(), highlightTrailingWhitespace()] : [],
-          indent ? indentGuides() : [],
-          selectMatch ? highlightSelectionMatches() : [],
-          search(),
-          ruler
-            ? EditorView.theme({
-                ".cm-content": {
-                  backgroundImage:
-                    "linear-gradient(to right, transparent 80ch, var(--color-border-strong) 80ch, var(--color-border-strong) calc(80ch + 1px), transparent calc(80ch + 1px))",
-                  backgroundAttachment: "local",
-                },
-              })
-            : [],
-          languageFor(active, langs),
-          EditorState.languageData.of(() => [{ autocomplete: coloCompletions(active) }]),
-          ac.autocompletion
-            ? ac.autocompletion({ activateOnTyping: true, icons: true })
-            : [],
-          keymap.of([
-            {
-              key: "Ctrl-Space",
-              run: startCompletion,
-            },
-          ]),
-          gitOn ? gitGutter(headBody, shown) : [],
-          todoOn ? todoMarks() : [],
-          rainbowOn ? rainbowBrackets() : [],
-          emmetTab(active, emmetOn),
-          stickyOn ? stickyContext() : [],
-          commentOn ? lineComment(active) : [],
-          urlsOn ? urlMarks() : [],
-          linterOn ? [lintGutter(), fileLinter(active), lintLineMarks(active, shown)] : [],
-          patchDeco,
-        ].flat()}
-        basicSetup={{
-          lineNumbers: lineNo,
-          foldGutter: fold,
-          highlightActiveLine: true,
-          syntaxHighlighting: false,
-          bracketMatching: true,
-          closeBrackets: true,
-          autocompletion: true,
-        }}
-        onCreateEditor={(view) => {
-          viewRef.current = view;
-          const focus = () => {
-            setActiveView(view);
-            useChrome.setState({ editFocus: pane });
-          };
-          view.contentDOM.addEventListener("focusin", focus);
-          if (pane === "a") setActiveView(view);
-        }}
-        onChange={(next) => {
-          if (pending) usePatches.getState().accept(pending.id);
-          writeFile(active, next);
-        }}
-      />
-      </div>
       <div className="ed-tools">
         {pending ? (
           <div className="patch-bar-ed">
-            <span>Agente em {active.split("/").pop()}</span>
+            <span>
+              Agente em <b>{active.split("/").pop()}</b>
+            </span>
             <button type="button" onClick={() => usePatches.getState().accept(pending.id)}>
               <Check size={14} /> aceitar
             </button>
             <button type="button" onClick={() => usePatches.getState().reject(pending.id)}>
-              <X size={14} /> rejeitar
+              <X size={14} /> reverter
             </button>
-            {hunksOf(pending.before, pending.after).map((h, i) => (
+            {hunksOf(pending.orig || pending.before, pending.after).map((h, i) => (
               <button
                 key={h.id}
                 type="button"
@@ -492,6 +409,109 @@ export function CodeEditor({ path, pane = "a" }: { path?: string; pane?: "a" | "
             ))}
           </div>
         ) : null}
+      </div>
+      <div className="code-stage">
+        <div className="code-tools">
+          <button type="button" title="buscar" onClick={() => useChrome.getState().setFindOpen(!findOpen)}>
+            <Search size={14} />
+          </button>
+          <button
+            type="button"
+            title="formatar"
+            onClick={() => {
+              const ws = useWorkspace.getState();
+              ws.writeFile(active, formatFile(active, ws.files[active] ?? ""));
+            }}
+          >
+            <Sparkles size={14} />
+          </button>
+          <button
+            type="button"
+            title="ir para definição"
+            onClick={() => {
+              const view = viewRef.current;
+              const pos = view?.state.selection.main.head ?? 0;
+              const name = wordAt(value, pos);
+              const hit = findDef(name, files, active);
+              if (hit) {
+                openFile(hit.path);
+                useNav.getState().go(hit.path, hit.line);
+              }
+            }}
+          >
+            <Undo2 size={14} className="rotate-180" />
+          </button>
+          {outline.length ? (
+            <button type="button" title="outline" className={outOpen ? "is-on" : undefined} onClick={() => setOutOpen((v) => !v)}>
+              <ListTree size={14} />
+            </button>
+          ) : null}
+        </div>
+        <Editor
+          key={`${active}:${themeId}:${lineNo}:${fold}`}
+          value={shown}
+          height="100%"
+          theme="none"
+          extensions={[
+            chromeTheme,
+            syn,
+            wrap ? EditorView.lineWrapping : [],
+            space ? [highlightWhitespace(), highlightTrailingWhitespace()] : [],
+            indent ? indentGuides() : [],
+            selectMatch ? highlightSelectionMatches() : [],
+            search(),
+            ruler
+              ? EditorView.theme({
+                  ".cm-content": {
+                    backgroundImage:
+                      "linear-gradient(to right, transparent 80ch, var(--color-border-strong) 80ch, var(--color-border-strong) calc(80ch + 1px), transparent calc(80ch + 1px))",
+                    backgroundAttachment: "local",
+                  },
+                })
+              : [],
+            languageFor(active, langs),
+            EditorState.languageData.of(() => [{ autocomplete: coloCompletions(active) }]),
+            ac.autocompletion ? ac.autocompletion({ activateOnTyping: true, icons: true }) : [],
+            keymap.of([
+              {
+                key: "Ctrl-Space",
+                run: startCompletion,
+              },
+            ]),
+            gitOn ? gitGutter(headBody, shown) : [],
+            todoOn ? todoMarks() : [],
+            rainbowOn ? rainbowBrackets() : [],
+            emmetTab(active, emmetOn),
+            stickyOn ? stickyContext() : [],
+            commentOn ? lineComment(active) : [],
+            urlsOn ? urlMarks() : [],
+            linterOn ? [lintGutter(), fileLinter(active), lintLineMarks(active, shown)] : [],
+            patchDeco,
+          ].flat()}
+          basicSetup={{
+            lineNumbers: lineNo,
+            foldGutter: fold,
+            highlightActiveLine: true,
+            syntaxHighlighting: false,
+            bracketMatching: true,
+            closeBrackets: true,
+            autocompletion: true,
+          }}
+          onCreateEditor={(view) => {
+            viewRef.current = view;
+            const focus = () => {
+              setActiveView(view);
+              useChrome.setState({ editFocus: pane });
+            };
+            view.contentDOM.addEventListener("focusin", focus);
+            if (pane === "a") setActiveView(view);
+          }}
+          onChange={(next) => {
+            if (skipCm.current) return;
+            if (pending && next !== pending.after) usePatches.getState().accept(pending.id);
+            writeFile(active, next);
+          }}
+        />
       </div>
       {mapOn ? <MiniMap text={shown} path={active} linter={linterOn} viewRef={viewRef} size={minimap} /> : null}
       {uniqueColors.length ? (

@@ -859,48 +859,85 @@ function RichText({ text, files }: { text: string; files: Record<string, string>
         }
         return (
           <div key={i} className="md-block">
-            {chunk.split(/\n{2,}/).map((p, j) => {
-              const lines = p.split("\n");
-              const filled = lines.filter((l) => l.trim());
-              if (/^#{1,3}\s/.test(p.trim())) {
-                return <h4 key={j}>{inline(p.replace(/^#{1,3}\s/, ""), files)}</h4>;
-              }
-              const ul = filled.length > 0 && filled.every((l) => /^\s*[-*]\s/.test(l));
-              if (ul) {
-                return (
-                  <ul key={j}>
-                    {filled.map((l, k) => (
-                      <li key={k}>{inline(l.replace(/^\s*[-*]\s/, ""), files)}</li>
-                    ))}
-                  </ul>
-                );
-              }
-              const ol = filled.length > 0 && filled.every((l) => /^\s*\d+[.)]\s/.test(l));
-              if (ol) {
-                return (
-                  <ol key={j}>
-                    {filled.map((l, k) => (
-                      <li key={k}>{inline(l.replace(/^\s*\d+[.)]\s/, ""), files)}</li>
-                    ))}
-                  </ol>
-                );
-              }
-              return (
-                <p key={j}>
-                  {lines.map((l, k) => (
-                    <span key={k}>
-                      {k ? <br /> : null}
-                      {inline(l, files)}
-                    </span>
-                  ))}
-                </p>
-              );
-            })}
+            {renderBlocks(chunk, files)}
           </div>
         );
       })}
     </div>
   );
+}
+
+function renderBlocks(chunk: string, files: Record<string, string>): ReactNode[] {
+  const lines = chunk.replace(/\r/g, "").split("\n");
+  const nodes: ReactNode[] = [];
+  let i = 0;
+  let k = 0;
+  while (i < lines.length) {
+    const line = lines[i] ?? "";
+    if (!line.trim()) {
+      i += 1;
+      continue;
+    }
+    if (/^#{1,3}\s/.test(line)) {
+      nodes.push(
+        <h4 key={k++}>{inline(line.replace(/^#{1,3}\s+/, ""), files)}</h4>,
+      );
+      i += 1;
+      continue;
+    }
+    if (/^\s*[-*]\s/.test(line)) {
+      const items: string[] = [];
+      while (i < lines.length && /^\s*[-*]\s/.test(lines[i] ?? "")) {
+        items.push((lines[i] ?? "").replace(/^\s*[-*]\s+/, ""));
+        i += 1;
+      }
+      nodes.push(
+        <ul key={k++}>
+          {items.map((t, j) => (
+            <li key={j}>{inline(t, files)}</li>
+          ))}
+        </ul>,
+      );
+      continue;
+    }
+    if (/^\s*\d+[.)]\s/.test(line)) {
+      const items: string[] = [];
+      while (i < lines.length && /^\s*\d+[.)]\s/.test(lines[i] ?? "")) {
+        items.push((lines[i] ?? "").replace(/^\s*\d+[.)]\s+/, ""));
+        i += 1;
+      }
+      nodes.push(
+        <ol key={k++}>
+          {items.map((t, j) => (
+            <li key={j}>{inline(t, files)}</li>
+          ))}
+        </ol>,
+      );
+      continue;
+    }
+    const para: string[] = [];
+    while (
+      i < lines.length &&
+      (lines[i] ?? "").trim() &&
+      !/^#{1,3}\s/.test(lines[i] ?? "") &&
+      !/^\s*[-*]\s/.test(lines[i] ?? "") &&
+      !/^\s*\d+[.)]\s/.test(lines[i] ?? "")
+    ) {
+      para.push(lines[i] ?? "");
+      i += 1;
+    }
+    nodes.push(
+      <p key={k++}>
+        {para.map((t, j) => (
+          <span key={j}>
+            {j ? <br /> : null}
+            {inline(t, files)}
+          </span>
+        ))}
+      </p>,
+    );
+  }
+  return nodes;
 }
 
 function inline(s: string, files: Record<string, string>): ReactNode[] {

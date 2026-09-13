@@ -821,10 +821,51 @@ input, textarea, select { font: inherit; font-size: 16px; }
   white-space: pre-wrap;
   font-family: var(--font-sans);
 }
-.md { display: flex; flex-direction: column; gap: 8px; }
+.md { display: flex; flex-direction: column; gap: 10px; }
+.md-block { display: flex; flex-direction: column; gap: 10px; }
 .md-block p { margin: 0; }
-.md-block h4 { margin: 0; font-size: 14px; font-weight: 650; }
-.md-block ul, .md-block ol { margin: 0; padding: 0 0 0 18px; display: flex; flex-direction: column; gap: 4px; }
+.md-block h4 {
+  margin: 2px 0 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--color-fg-subtle);
+}
+.md-block ul, .md-block ol {
+  margin: 0;
+  padding: 0 0 0 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  list-style: none;
+}
+.md-block li {
+  position: relative;
+  padding-left: 16px;
+  line-height: 1.45;
+}
+.md-block ul li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.55em;
+  width: 6px;
+  height: 6px;
+  border-radius: 99px;
+  background: var(--color-accent);
+}
+.md-block ol { counter-reset: md; }
+.md-block ol li { counter-increment: md; padding-left: 22px; }
+.md-block ol li::before {
+  content: counter(md);
+  position: absolute;
+  left: 0;
+  top: 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-accent);
+}
 .md-block code, .md p code {
   font-family: var(--font-mono);
   font-size: 12.5px;

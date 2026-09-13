@@ -61,17 +61,6 @@ function asList(json: unknown): ModelInfo[] {
   return out.sort((a, b) => a.label.localeCompare(b.label, "pt"));
 }
 
-function slugsFromMarkdown(md: string): ModelInfo[] {
-  const seen = new Set<string>();
-  const out: ModelInfo[] = [];
-  const re = /`(gpt-[\w.-]+)`/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(md))) {
-    push(out, seen, m[1]!);
-  }
-  return out.sort((a, b) => a.label.localeCompare(b.label, "pt"));
-}
-
 async function getJson(url: string, headers: Record<string, string>) {
   const res = await fetch(url, { headers });
   const text = await res.text();
@@ -92,24 +81,6 @@ async function codexClientVersion() {
   } catch {
     return "0.145.0";
   }
-}
-
-async function chatgptCatalog(): Promise<ModelInfo[]> {
-  const urls = [
-    "https://developers.openai.com/codex/models.md",
-    "https://learn.chatgpt.com/docs/models.md",
-  ];
-  for (const url of urls) {
-    try {
-      const r = await fetch(url, { headers: { Accept: "text/markdown, text/plain, */*" } });
-      if (!r.ok) continue;
-      const list = slugsFromMarkdown(await r.text());
-      if (list.length) return list;
-    } catch {
-      /* next */
-    }
-  }
-  return [];
 }
 
 export const listProviderModels = createServerFn({ method: "POST" })
@@ -147,6 +118,7 @@ export const listProviderModels = createServerFn({ method: "POST" })
         originator: "codex_cli_rs",
         version,
         "OpenAI-Beta": "responses=v1",
+        Accept: "application/json",
       };
       if (data.accountId) {
         headers["ChatGPT-Account-ID"] = data.accountId;
@@ -156,27 +128,28 @@ export const listProviderModels = createServerFn({ method: "POST" })
         `https://chatgpt.com/backend-api/codex/models?client_version=${encodeURIComponent(version)}`,
         "https://chatgpt.com/backend-api/codex/models",
         "https://chatgpt.com/backend-api/models",
+        "https://api.openai.com/v1/models",
       ];
+      let last = 0;
       for (const url of urls) {
-        const r = await getJson(url, headers);
+        const h = url.includes("api.openai.com")
+          ? { Authorization: `Bearer ${access}`, Accept: "application/json" }
+          : headers;
+        const r = await getJson(url, h);
+        last = r.ok ? 200 : r.status;
         if (!r.ok) continue;
         const models = asList(r.json);
         if (models.length) return { ok: true as const, models };
       }
-    }
-
-    const catalog = await chatgptCatalog();
-    if (catalog.length) {
       return {
-        ok: true as const,
-        models: catalog,
+        ok: false as const,
+        error: `ChatGPT não devolveu modelos (HTTP ${last}). Reconecta o Codex.`,
+        models: [],
       };
     }
     return {
       ok: false as const,
-      error: access
-        ? "não deu pra listar modelos do ChatGPT"
-        : "conecte o ChatGPT para listar os modelos da conta",
+      error: "conecte o ChatGPT para listar os modelos da conta",
       models: [],
     };
   });

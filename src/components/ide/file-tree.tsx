@@ -226,8 +226,14 @@ export function FileTree() {
   return (
     <div className="flex h-full min-h-0 flex-col" ref={wrap}>
       <div className="ex-hd">
-        <button type="button" className={menuOpen ? "ex-proj is-on" : "ex-proj"} onClick={toggleMenu}>
-          <strong>{projectName || "projeto"}</strong>
+        <button
+          type="button"
+          className={menuOpen ? "ex-proj is-on" : "ex-proj"}
+          onClick={toggleMenu}
+          aria-label={projectName || "Odete"}
+        >
+          <img className="ex-mark" src="/brand/odete-wordmark.png?v=5" alt="" />
+          {projectName && !/^odete$/i.test(projectName) ? <strong>{projectName}</strong> : null}
           <ChevronRight className={menuOpen ? "tree-chevron is-open" : "tree-chevron"} size={16} strokeWidth={1.8} />
         </button>
         <button

@@ -3,6 +3,11 @@ import Foundation
 @testable import OdeteGit
 import Testing
 
+func ab(_ r: Repository) async throws -> [Int] {
+    guard let v = try await r.aheadBehind() else { return [] }
+    return [v.ahead, v.behind]
+}
+
 struct RemotesTests {
     func bare() throws -> URL {
         let url = FileManager.default.temporaryDirectory.appending(
@@ -26,7 +31,7 @@ struct RemotesTests {
         #expect(try await a.remotes().map(\.url) == [remote.absoluteString])
         try await a.push()
         #expect(try await a.currentBranch()?.upstream == "origin/main")
-        #expect(try await a.aheadBehind() == (0, 0))
+        #expect(try await ab(a) == [0, 0])
 
         let dirB = FileManager.default.temporaryDirectory.appending(path: "odete-clone-\(UUID().uuidString)")
         let b = try await Repository.clone(remote.absoluteString, to: dirB) { _ in }
@@ -36,17 +41,17 @@ struct RemotesTests {
         try write(urlA, "b.txt", "b\n")
         try await a.stageAll()
         try await a.commit(message: "dois", author: me)
-        #expect(try await a.aheadBehind() == (1, 0))
+        #expect(try await ab(a) == [1, 0])
         try await a.push()
 
         try await b.fetch()
-        #expect(try await b.aheadBehind() == (0, 1))
+        #expect(try await ab(b) == [0, 1])
         let r = try await b.pull(author: me)
         if case .fastForward = r {} else {
             Issue.record("esperava ff, veio \(r)")
         }
         #expect(try await b.log().count == 2)
-        #expect(try await b.aheadBehind() == (0, 0))
+        #expect(try await ab(b) == [0, 0])
     }
 
     @Test func githubSlug() {

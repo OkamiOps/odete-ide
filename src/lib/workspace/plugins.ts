@@ -338,6 +338,26 @@ export function formatFile(path: string, text: string) {
       return text;
     }
   }
+  if (["js", "jsx", "ts", "tsx", "css", "scss", "html"].includes(ext)) {
+    return indentBraces(text);
+  }
   const lines = text.replace(/\t/g, "  ").replace(/[ \t]+$/gm, "");
   return lines.endsWith("\n") ? lines : `${lines}\n`;
+}
+
+function indentBraces(text: string) {
+  const tab = "  ";
+  let depth = 0;
+  const out: string[] = [];
+  for (const raw of text.replace(/\t/g, "  ").split("\n")) {
+    const trimmed = raw.trim();
+    const startsClose = /^[}\])]/.test(trimmed);
+    if (startsClose) depth = Math.max(0, depth - 1);
+    out.push(trimmed ? tab.repeat(depth) + trimmed : "");
+    const open = (trimmed.match(/[{\[(]/g) || []).length;
+    const close = (trimmed.match(/[}\])]/g) || []).length;
+    depth = Math.max(0, depth + open - close);
+  }
+  const next = out.join("\n").replace(/[ \t]+$/gm, "");
+  return next.endsWith("\n") ? next : `${next}\n`;
 }

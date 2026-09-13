@@ -559,6 +559,53 @@ export async function githubPrFiles(remote: string, token: string, number: numbe
   }));
 }
 
+export async function githubActions(remote: string, token: string) {
+  const spec = parseRepo(remote);
+  if (!spec) throw new Error("remote inválido");
+  const data = await gh<{
+    workflow_runs: {
+      id: number;
+      name: string;
+      status: string;
+      conclusion: string | null;
+      html_url: string;
+      head_branch: string;
+      display_title: string;
+      updated_at: string;
+    }[];
+  }>(`https://api.github.com/repos/${spec.owner}/${spec.repo}/actions/runs?per_page=15`, token);
+  return data.workflow_runs.map((r) => ({
+    id: r.id,
+    name: r.name || r.display_title,
+    status: r.status,
+    conclusion: r.conclusion,
+    url: r.html_url,
+    branch: r.head_branch,
+    at: r.updated_at,
+  }));
+}
+
+export async function githubPrComments(remote: string, token: string, number: number) {
+  const spec = parseRepo(remote);
+  if (!spec) throw new Error("remote inválido");
+  const list = await gh<{ user: { login: string }; body: string; created_at: string; path?: string }[]>(
+    `https://api.github.com/repos/${spec.owner}/${spec.repo}/issues/${number}/comments?per_page=40`,
+    token,
+  );
+  return list.map((c) => ({ user: c.user.login, body: c.body, at: c.created_at, path: c.path ?? "" }));
+}
+
+export async function githubCommentPr(remote: string, token: string, number: number, body: string) {
+  const spec = parseRepo(remote);
+  if (!spec) throw new Error("remote inválido");
+  return ghWrite<{ html_url: string }>(
+    `https://api.github.com/repos/${spec.owner}/${spec.repo}/issues/${number}/comments`,
+    token,
+    "POST",
+    { body },
+  );
+}
+
 export async function githubFork(remote: string, token: string) {
   const spec = parseRepo(remote);
   if (!spec) throw new Error("remote inválido");

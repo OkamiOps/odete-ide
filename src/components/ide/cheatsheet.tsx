@@ -19,6 +19,8 @@ const GROUPS: { title: string; rows: { keys: string; do: string }[] }[] = [
       { keys: "⌘ F", do: "Buscar no arquivo" },
       { keys: "⌘ S", do: "Salvar · formatar se ligado" },
       { keys: "Shift Alt F", do: "Formatar arquivo" },
+      { keys: "F12", do: "Ir para definição" },
+      { keys: "Tab", do: "Snippet rafce / clg / Emmet" },
       { keys: "⌘ /", do: "Esta folha" },
     ],
   },

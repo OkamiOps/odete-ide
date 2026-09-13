@@ -5,7 +5,9 @@ import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { highlightSelectionMatches, search, SearchQuery, setSearchQuery, findNext, findPrevious, replaceNext, replaceAll } from "@codemirror/search";
 import { startCompletion } from "@codemirror/autocomplete";
 import { tags as t } from "@lezer/highlight";
-import { Check, ListTree, Search, X } from "lucide-react";
+import { Check, ListTree, Search, Sparkles, Undo2, X } from "lucide-react";
+import { formatFile } from "@/lib/workspace/plugins";
+import { findDef, wordAt } from "@/lib/workspace/goto-def";
 import { unpackBin } from "@/lib/github/api";
 import { outlineOf } from "@/lib/workspace/outline";
 import { extOf } from "@/lib/utils";
@@ -90,6 +92,7 @@ export function CodeEditor({ path }: { path?: string }) {
   const openPath = useWorkspace((s) => s.openPath);
   const files = useWorkspace((s) => s.files);
   const writeFile = useWorkspace((s) => s.writeFile);
+  const openFile = useWorkspace((s) => s.openFile);
   const wrap = useChrome((s) => s.pluginWrap);
   const space = useChrome((s) => s.pluginSpace);
   const indent = useChrome((s) => s.pluginIndent);
@@ -247,6 +250,20 @@ export function CodeEditor({ path }: { path?: string }) {
     view.focus();
   }, [jumpN, jumpPath, jumpLine, active, cm]);
 
+  useEffect(() => {
+    function onDef() {
+      const view = viewRef.current;
+      const pos = view?.state.selection.main.head ?? 0;
+      const name = wordAt(value, pos);
+      const hit = findDef(name, files, active);
+      if (!hit) return;
+      openFile(hit.path);
+      useNav.getState().go(hit.path, hit.line);
+    }
+    window.addEventListener("colo-goto-def", onDef);
+    return () => window.removeEventListener("colo-goto-def", onDef);
+  }, [value, files, active, openFile]);
+
   if (bin?.mime.startsWith("image/")) {
     return (
       <div className="bin-view">
@@ -295,6 +312,32 @@ export function CodeEditor({ path }: { path?: string }) {
       <div className="code-tools">
         <button type="button" title="buscar" onClick={() => useChrome.getState().setFindOpen(!findOpen)}>
           <Search size={14} />
+        </button>
+        <button
+          type="button"
+          title="formatar"
+          onClick={() => {
+            const ws = useWorkspace.getState();
+            ws.writeFile(active, formatFile(active, ws.files[active] ?? ""));
+          }}
+        >
+          <Sparkles size={14} />
+        </button>
+        <button
+          type="button"
+          title="ir para definição"
+          onClick={() => {
+            const view = viewRef.current;
+            const pos = view?.state.selection.main.head ?? 0;
+            const name = wordAt(value, pos);
+            const hit = findDef(name, files, active);
+            if (hit) {
+              openFile(hit.path);
+              useNav.getState().go(hit.path, hit.line);
+            }
+          }}
+        >
+          <Undo2 size={14} className="rotate-180" />
         </button>
         {outline.length ? (
           <button type="button" title="outline" className={outOpen ? "is-on" : undefined} onClick={() => setOutOpen((v) => !v)}>
@@ -358,7 +401,7 @@ export function CodeEditor({ path }: { path?: string }) {
           gitOn ? gitGutter(headBody, shown) : [],
           todoOn ? todoMarks() : [],
           rainbowOn ? rainbowBrackets() : [],
-          emmetOn ? emmetTab() : [],
+          emmetOn ? emmetTab(active) : [],
           stickyOn ? stickyContext() : [],
           commentOn ? lineComment(active) : [],
           urlsOn ? urlMarks() : [],

@@ -156,7 +156,9 @@ export function expandEmmet(abbr: string): string | null {
   return inner;
 }
 
-export function emmetTab(): Extension {
+import { snippetBody } from "./complete";
+
+export function emmetTab(path = ""): Extension {
   return Prec.high(
     keymap.of([
       {
@@ -168,9 +170,10 @@ export function emmetTab(): Extension {
           const before = line.text.slice(0, sel.head - line.from);
           const m = /([^\s]+)$/.exec(before);
           if (!m) return false;
-          const expanded = expandEmmet(m[1]!);
+          const token = m[1]!;
+          const expanded = snippetBody(path, token) || expandEmmet(token);
           if (!expanded) return false;
-          const from = sel.head - m[1]!.length;
+          const from = sel.head - token.length;
           view.dispatch({
             changes: { from, to: sel.head, insert: expanded },
             selection: { anchor: from + expanded.length },

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { AtSign, Bot, Check, FolderOpen, History, ImagePlus, LoaderCircle, Lock, Mic, Paperclip, Pencil, Plus, RotateCcw, Send, Square, SquarePen, Undo2, Unlock, Wrench, X } from "lucide-react";
+import { AtSign, Bot, Check, Columns2, FolderOpen, History, ImagePlus, LoaderCircle, Lock, Mic, Paperclip, Pencil, Plus, RotateCcw, Send, Square, SquarePen, Undo2, Unlock, Wrench, X } from "lucide-react";
 import { AgentConnect } from "@/components/ide/settings-pane";
 import { ModelSelect } from "@/components/ide/model-select";
 import { contextWindow, estimateTokens, fmtTok, useAgentChats } from "@/lib/agent/chats";
@@ -15,6 +15,7 @@ import { answerPermit, type PermitMode } from "@/lib/agent/permit";
 import type { AgentMode } from "@/lib/agent/tools";
 import { authForTurn } from "@/lib/agent/session";
 import { agentConnected, currentAgentModel, currentEffort, useChrome } from "@/lib/workspace/chrome";
+import { useHub } from "@/lib/workspace/hub";
 import { useNav } from "@/lib/workspace/nav";
 import { allSkills } from "@/lib/workspace/skills";
 import { hunksOf } from "@/lib/workspace/hunks";
@@ -68,7 +69,7 @@ async function fileToImage(file: File): Promise<AgentImage | null> {
   return { mime: "image/jpeg", data };
 }
 
-export function AgentPane() {
+export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
   const agentId = useChrome((s) => s.agentId);
   const connected = useChrome(agentConnected);
   const projectId = useWorkspace((s) => s.projectId);
@@ -132,13 +133,13 @@ export function AgentPane() {
   useEffect(() => {
     if (!chatsReady) return;
     booted.current = false;
-    const t = useAgentChats.getState().load(projectId);
+    const t = useAgentChats.getState().load(projectId, slot);
     history.current = t.messages;
     setItems(t.items);
     cancel.current = false;
     setBusy(false);
     booted.current = true;
-  }, [projectId, chatsReady]);
+  }, [projectId, chatsReady, slot]);
 
   useEffect(() => {
     const el = inputRef.current;
@@ -154,7 +155,7 @@ export function AgentPane() {
   }, [draft]);
   useEffect(() => {
     if (!projectId || !chatsReady || !booted.current) return;
-    const flush = () => useAgentChats.getState().save(projectId, items, history.current);
+    const flush = () => useAgentChats.getState().save(projectId, items, history.current, slot);
     flush();
     window.addEventListener("pagehide", flush);
     return () => window.removeEventListener("pagehide", flush);
@@ -221,14 +222,14 @@ export function AgentPane() {
     cancel.current = true;
     answerPermit(false);
     setBusy(false);
-    const t = useAgentChats.getState().newChat(projectId);
+    const t = useAgentChats.getState().newChat(projectId, slot);
     history.current = t.messages;
     setItems(t.items);
     setHistOpen(false);
   }
 
   function openThread(id: string) {
-    const t = useAgentChats.getState().open(projectId, id);
+    const t = useAgentChats.getState().open(projectId, id, slot);
     if (!t) return;
     cancel.current = true;
     setBusy(false);
@@ -355,7 +356,7 @@ export function AgentPane() {
         .sort((a, b) => b.updated - a.updated),
     [threadMap, projectId],
   );
-  const activeId = useAgentChats((s) => s.active[projectId]);
+  const activeId = useAgentChats((s) => s.active[slot === "b" ? `${projectId}#b` : projectId]);
   const usage = (activeId && threadMap[activeId]?.usage) || emptyUse();
   const lastInput = (activeId && threadMap[activeId]?.lastInput) || 0;
   const lastUserId = [...items].reverse().find((i) => i.kind === "user")?.id;
@@ -396,6 +397,17 @@ export function AgentPane() {
             <button type="button" className="agent-icon" aria-label="novo chat" title="Novo chat" onClick={clear}>
               <SquarePen size={16} />
             </button>
+            {slot === "a" ? (
+              <button
+                type="button"
+                className="agent-icon"
+                aria-label="dois chats"
+                title="Dois chats"
+                onClick={() => useHub.getState().toggleSplit()}
+              >
+                <Columns2 size={16} />
+              </button>
+            ) : null}
             <button
               type="button"
               className={`agent-icon${ckOpen ? " is-on" : ""}`}

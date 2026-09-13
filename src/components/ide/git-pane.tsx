@@ -25,7 +25,7 @@ import { suggestCommit } from "@/lib/workspace/commit-ai";
 import { useChrome } from "@/lib/workspace/chrome";
 import { useNav } from "@/lib/workspace/nav";
 import { useProjects } from "@/lib/workspace/projects";
-import { useWorkspace } from "@/lib/workspace/store";
+import { useHub } from "@/lib/workspace/hub";
 
 export function GitPane() {
   const files = useWorkspace((s) => s.files);
@@ -284,6 +284,33 @@ export function GitPane() {
                 }}
               >
                 criar
+              </button>
+            </div>
+            <div className="git-stash-row">
+              <PickList
+                value={commits[commits.length - 2]?.id ?? ""}
+                options={commits.map((c) => ({ id: c.id, label: c.message.slice(0, 28) }))}
+                onChange={(id) => useHub.setState({ compareA: id })}
+                fill
+                ariaLabel="commit A"
+              />
+              <PickList
+                value={commits[commits.length - 1]?.id ?? ""}
+                options={commits.map((c) => ({ id: c.id, label: c.message.slice(0, 28) }))}
+                onChange={(id) => useHub.setState({ compareB: id })}
+                fill
+                ariaLabel="commit B"
+              />
+              <button
+                type="button"
+                className="chip"
+                onClick={() => {
+                  const a = useHub.getState().compareA || commits[Math.max(0, commits.length - 2)]?.id;
+                  const b = useHub.getState().compareB || commits[commits.length - 1]?.id;
+                  if (a && b) useHub.getState().setCompare(a, b);
+                }}
+              >
+                comparar
               </button>
             </div>
             <div className="git-stash-row">
@@ -578,6 +605,9 @@ function GithubBox({ remote, branch, token }: { remote: string; branch: string; 
         <button type="button" onClick={load} disabled={busy}>
           {busy ? "…" : "atualizar"}
         </button>
+        <button type="button" onClick={() => useHub.getState().setView("actions")}>
+          Actions
+        </button>
       </header>
       <p className="git-remote">
         <a href={`https://github.com/${remote}`} target="_blank" rel="noreferrer">
@@ -610,19 +640,9 @@ function GithubBox({ remote, branch, token }: { remote: string; branch: string; 
             <button
               type="button"
               className="chip"
-              disabled={busy}
-              onClick={() => {
-                setBusy(true);
-                void githubReviewPr(remote, token, p.number, "APPROVE", title.trim() || "ok pelo Colo")
-                  .then(() => {
-                    setNote(`review #${p.number}`);
-                    load();
-                  })
-                  .catch((e) => setNote(e instanceof Error ? e.message : "review falhou"))
-                  .finally(() => setBusy(false));
-              }}
+              onClick={() => useHub.getState().setPr(p.number)}
             >
-              review
+              comentários
             </button>
             <button
               type="button"

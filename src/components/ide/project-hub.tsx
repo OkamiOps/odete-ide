@@ -4,7 +4,8 @@ import { githubClone, githubCreateRepo, githubOrgs, githubRepos, type GithubOrg,
 import { PickList } from "@/components/ide/pick-list";
 import { setSheet, useProjectUi, useProjects, type ProjectSheet } from "@/lib/workspace/projects";
 import { useWorkspace } from "@/lib/workspace/store";
-import { downloadZip, importZipFile, saveBlob, safeName, type SaveOffer } from "@/lib/workspace/zip";
+import { bindFolder, writeTree } from "@/lib/workspace/folder";
+import { useHub } from "@/lib/workspace/hub";
 
 export function ProjectHub() {
   const sheet = useProjectUi((s) => s.sheet);
@@ -60,6 +61,22 @@ export function ProjectMenu({ onPick }: { onPick?: () => void }) {
       <button type="button" onClick={() => go("clone")}>Clonar do GitHub</button>
       <button type="button" onClick={() => go("github")}>
         {github ? `GitHub · ${github.user.login}` : "Conectar GitHub"}
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          void bindFolder()
+            .then(async (dir) => {
+              useHub.getState().setFolder(dir.name);
+              await writeTree(dir, useWorkspace.getState().files);
+            })
+            .catch((e) => {
+              if (e instanceof DOMException && e.name === "AbortError") return;
+              console.warn(e);
+            });
+        }}
+      >
+        Salvar na pasta do iPad
       </button>
       <button
         type="button"

@@ -20,11 +20,11 @@ export type ChatThread = {
 type ChatState = {
   threads: Record<string, ChatThread>;
   active: Record<string, string>;
-  load: (projectId: string) => ChatThread;
-  save: (projectId: string, items: ChatItem[], messages: AgentMessage[]) => void;
+  load: (projectId: string, slot?: "a" | "b") => ChatThread;
+  save: (projectId: string, items: ChatItem[], messages: AgentMessage[], slot?: "a" | "b") => void;
   list: (projectId: string) => ChatThread[];
-  newChat: (projectId: string) => ChatThread;
-  open: (projectId: string, threadId: string) => ChatThread | null;
+  newChat: (projectId: string, slot?: "a" | "b") => ChatThread;
+  open: (projectId: string, threadId: string, slot?: "a" | "b") => ChatThread | null;
   remove: (projectId: string, threadId: string) => ChatThread;
   addUsage: (projectId: string, use: TokenUse) => void;
 };
@@ -36,6 +36,10 @@ function titleOf(items: ChatItem[]) {
     return t.length > 48 ? `${t.slice(0, 48)}…` : t;
   }
   return "Nova conversa";
+}
+
+function keyOf(projectId: string, slot: "a" | "b" = "a") {
+  return slot === "b" ? `${projectId}#b` : projectId;
 }
 
 function blank(projectId: string): ChatThread {
@@ -94,30 +98,31 @@ export const useAgentChats = create<ChatState>()(
     (set, get) => ({
       threads: {},
       active: {},
-      load: (projectId) => {
+      load: (projectId, slot = "a") => {
         if (!projectId) return blank("");
         const s = get();
-        const aid = s.active[projectId];
+        const k = keyOf(projectId, slot);
+        const aid = s.active[k];
         if (aid && s.threads[aid]?.items.length) return s.threads[aid]!;
         const existing = Object.values(s.threads)
           .filter((t) => t.projectId === projectId && (t.items.length || t.messages.length))
           .sort((a, b) => b.updated - a.updated);
-        if (existing[0]) {
-          set({ active: { ...s.active, [projectId]: existing[0].id } });
+        if (slot === "a" && existing[0]) {
+          set({ active: { ...s.active, [k]: existing[0].id } });
           return existing[0];
         }
         if (aid && s.threads[aid]) return s.threads[aid]!;
         const t = blank(projectId);
         set({
           threads: { ...s.threads, [t.id]: t },
-          active: { ...s.active, [projectId]: t.id },
+          active: { ...s.active, [k]: t.id },
         });
         return t;
       },
-      save: (projectId, items, messages) => {
+      save: (projectId, items, messages, slot = "a") => {
         if (!projectId) return;
         set((s) => {
-          const id = s.active[projectId];
+          const id = s.active[keyOf(projectId, slot)];
           if (!id || !s.threads[id]) return s;
           const prev = s.threads[id]!;
           return {
@@ -138,20 +143,21 @@ export const useAgentChats = create<ChatState>()(
         Object.values(get().threads)
           .filter((t) => t.projectId === projectId && (t.items.length || t.messages.length || t.id === get().active[projectId]))
           .sort((a, b) => b.updated - a.updated),
-      newChat: (projectId) => {
-        const cur = get().load(projectId);
+      newChat: (projectId, slot = "a") => {
+        const cur = get().load(projectId, slot);
         if (!cur.items.length && !cur.messages.length) return cur;
         const t = blank(projectId);
+        const k = keyOf(projectId, slot);
         set((s) => ({
           threads: { ...s.threads, [t.id]: t },
-          active: { ...s.active, [projectId]: t.id },
+          active: { ...s.active, [k]: t.id },
         }));
         return t;
       },
-      open: (projectId, threadId) => {
+      open: (projectId, threadId, slot = "a") => {
         const t = get().threads[threadId];
         if (!t || t.projectId !== projectId) return null;
-        set((s) => ({ active: { ...s.active, [projectId]: threadId } }));
+        set((s) => ({ active: { ...s.active, [keyOf(projectId, slot)]: threadId } }));
         return t;
       },
       addUsage: (projectId, use) => {

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Monitor, RotateCw, Smartphone, Tablet } from "lucide-react";
+import { markdownPage, isMdPath } from "@/lib/workspace/markdown";
 import { buildPreviewHtml } from "@/lib/workspace/preview";
 import { buildSwiftPlayground, isSwiftPath } from "@/lib/workspace/swift-play";
 import { useWorkspace } from "@/lib/workspace/store";
@@ -12,12 +13,18 @@ export function PreviewPane() {
   const files = useWorkspace((s) => s.files);
   const openPath = useWorkspace((s) => s.openPath);
   const swift = isSwiftPath(openPath);
+  const md = isMdPath(openPath);
   const [frame, setFrame] = useState<Frame>("full");
   const [tick, setTick] = useState(0);
   const [logs, setLogs] = useState<Log[]>([]);
   const srcDoc = useMemo(
-    () => (swift ? buildSwiftPlayground(files[openPath] ?? "") : buildPreviewHtml(files)),
-    [files, openPath, swift, tick],
+    () =>
+      md
+        ? markdownPage(files[openPath] ?? "")
+        : swift
+          ? buildSwiftPlayground(files[openPath] ?? "")
+          : buildPreviewHtml(files),
+    [files, openPath, swift, md, tick],
   );
 
   useEffect(() => {
@@ -35,7 +42,7 @@ export function PreviewPane() {
     <div className={`preview-frame is-${frame}`}>
       <div className="pane-hd">
         <span className="label">Preview</span>
-        <em>{swift ? openPath : "index.html"}</em>
+        <em>{md ? openPath : swift ? openPath : "index.html"}</em>
         <div className="preview-ops">
           <button type="button" className={frame === "full" ? "is-on" : undefined} title="tela cheia" onClick={() => setFrame("full")}>
             <Monitor size={14} />

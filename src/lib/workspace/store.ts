@@ -7,7 +7,7 @@ import { uid } from "../utils";
 import { rememberEdit } from "./history";
 import { discardHunk, keepOnlyHunk } from "./hunks";
 import { useProjects } from "./projects";
-import { useTerms } from "./terms";
+import { scheduleSync } from "./folder";
 
 function cloneFiles(files: FileMap): FileMap {
   return { ...files };
@@ -191,6 +191,7 @@ export const useWorkspace = create<WorkspaceState>()(
               : s.tabs,
         }));
         rememberEdit(clean, content);
+        scheduleSync({ ...get().files, [clean]: content });
         return undefined;
       },
       createFile: (path) => {

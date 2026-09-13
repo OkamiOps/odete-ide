@@ -47,7 +47,11 @@ function forPath(path: string): Completion[] {
   }
   if (["js", "jsx", "ts", "tsx"].includes(ext)) {
     return [
-      snip("log", "console.log(${})", "log", "function"),
+      snip("rafce", "export default function ${Name}() {\n  return (\n    <div>\n      ${}\n    </div>\n  );\n}", "react fn", "function"),
+      snip("rfc", "export function ${Name}() {\n  return (\n    <div>${}</div>\n  );\n}", "react", "function"),
+      snip("useState", "const [${state}, set${State}] = useState(${})", "useState", "function"),
+      snip("useEffect", "useEffect(() => {\n  ${}\n}, [${}]);", "useEffect", "function"),
+      snip("clg", "console.log(${})", "log", "function"),
       snip("fn", "function ${name}() {\n  ${}\n}", "function", "function"),
       snip("afn", "const ${name} = () => {\n  ${}\n}", "arrow", "function"),
       snip("imp", 'import { ${} } from "${}"', "import", "keyword"),
@@ -97,6 +101,7 @@ export function chipsFor(path: string): SnipChip[] {
   }
   if (["js", "jsx", "ts", "tsx"].includes(ext)) {
     return [
+      { id: "rafce", label: "rafce", insert: "export default function Name() {\n  return (\n    <div>\n      \n    </div>\n  );\n}" },
       { id: "log", label: "log", insert: "console.log()" },
       { id: "fn", label: "fn", insert: "function name() {\n  \n}" },
       { id: "afn", label: "=>", insert: "const name = () => {\n  \n}" },
@@ -105,6 +110,23 @@ export function chipsFor(path: string): SnipChip[] {
   return [
     { id: "todo", label: "TODO", insert: "// TODO: " },
   ];
+}
+
+export function snippetBody(path: string, token: string) {
+  const map: Record<string, string> = {
+    rafce: "export default function Name() {\n  return (\n    <div>\n      \n    </div>\n  );\n}",
+    rfc: "export function Name() {\n  return (\n    <div></div>\n  );\n}",
+    useState: "const [state, setState] = useState()",
+    useEffect: "useEffect(() => {\n  \n}, [])",
+    clg: "console.log()",
+    log: "console.log()",
+    fn: "function name() {\n  \n}",
+    afn: "const name = () => {\n  \n}",
+    todo: "// TODO: ",
+  };
+  if (map[token]) return map[token];
+  const chip = chipsFor(path).find((c) => c.id === token || c.label === token);
+  return chip?.insert ?? null;
 }
 
 export function coloCompletions(path: string) {

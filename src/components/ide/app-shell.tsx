@@ -5,6 +5,8 @@ import { AgentPane } from "@/components/ide/agent-pane";
 import { CenterPane } from "@/components/ide/center-pane";
 import { CommandPalette } from "@/components/ide/command-palette";
 import { Cheatsheet } from "@/components/ide/cheatsheet";
+import { GhSheet } from "@/components/ide/gh-sheet";
+import { useHub } from "@/lib/workspace/hub";
 import { DragGhost } from "@/components/ide/drag-ghost";
 import { KbBar } from "@/components/ide/kb-bar";
 import { ProjectHub } from "@/components/ide/project-hub";
@@ -20,6 +22,17 @@ import { useChrome, type MobileTab } from "@/lib/workspace/chrome";
 import { setSheet } from "@/lib/workspace/projects";
 import { formatFile } from "@/lib/workspace/plugins";
 import { useWorkspace } from "@/lib/workspace/store";
+
+function AgentDock() {
+  const split = useHub((s) => s.agentSplit);
+  if (!split) return <AgentPane slot="a" />;
+  return (
+    <div className="agent-dock is-split">
+      <AgentPane slot="a" />
+      <AgentPane slot="b" />
+    </div>
+  );
+}
 
 function useWide() {
   const [wide, setWide] = useState(true);
@@ -150,6 +163,11 @@ export function IdeApp() {
         useChrome.getState().setCheatsheet(!useChrome.getState().cheatsheet);
         return;
       }
+      if (e.key === "F12") {
+        e.preventDefault();
+        window.dispatchEvent(new CustomEvent("colo-goto-def"));
+        return;
+      }
       if (e.key === "Escape") {
         setPalette(false);
         setSheet(false);
@@ -177,6 +195,7 @@ export function IdeApp() {
       {wide ? <StatusBar /> : <Dock />}
       <CommandPalette />
       <Cheatsheet />
+      <GhSheet />
       <DragGhost />
       <ProjectHub />
     </div>
@@ -239,7 +258,7 @@ function DesktopColumns({ agent, term }: { agent: boolean; term: boolean }) {
             />
             <div className="agent-col" style={{ width: agentW, flex: `0 0 ${agentW}px` }}>
               <PaneError name="Agente">
-                <AgentPane />
+                <AgentDock />
               </PaneError>
             </div>
           </>
@@ -274,7 +293,7 @@ function PhonePanes() {
         <CenterPane />
       </div>
       <div className="phone-agent">
-        <AgentPane />
+        <AgentDock />
       </div>
       <div className="phone-term">
         <TerminalPane />

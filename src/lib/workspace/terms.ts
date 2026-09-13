@@ -16,7 +16,7 @@ function boot(name: string, n: number): TermTab {
     id: uid(),
     name: n <= 1 ? "Term 1" : `Term ${n}`,
     lines: [
-      { id: uid(), kind: "ok", text: `colo  ${name}` },
+      { id: uid(), kind: "ok", text: `odete  ${name}` },
       { id: uid(), kind: "out", text: "↑ histórico · Tab completa · help" },
     ],
     hist: [],

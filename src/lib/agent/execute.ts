@@ -46,7 +46,7 @@ export async function executeTool(
       if (hits > 1) return `trecho aparece ${hits} vezes — seja mais específico`;
       const after = before.replace(old, neu);
       if (mode === "plan") {
-        if (path !== ".colo/plan.md") return "plan só escreve .colo/plan.md — mude pra Build pra editar o resto";
+        if (path !== ".odete/plan.md" && path !== ".colo/plan.md") return "plan só escreve .odete/plan.md — mude pra Build pra editar o resto";
         w.writeFile(path, after);
         return `escrito ${path}`;
       }
@@ -61,7 +61,7 @@ export async function executeTool(
       const content = str("content");
       if (!path) return "caminho inválido";
       if (mode === "plan") {
-        if (path !== ".colo/plan.md") return "plan só escreve .colo/plan.md — mude pra Build pra editar o resto";
+        if (path !== ".odete/plan.md" && path !== ".colo/plan.md") return "plan só escreve .odete/plan.md — mude pra Build pra editar o resto";
         w.writeFile(path, content);
         return `escrito ${path}`;
       }
@@ -95,13 +95,13 @@ export async function executeTool(
         return "chat só lê o terminal. use Plan (escrever plano) ou Build (executar).";
       }
       if (mode === "plan" && !isReadShell(command) && !/^(mkdir|touch)\b/.test(command.trim())) {
-        return "plan não roda npm/git que muda remoto. mkdir/touch em .colo/ e leitura ok. Build pra o resto.";
+        return "plan não roda npm/git que muda remoto. mkdir/touch em .odete/ e leitura ok. Build pra o resto.";
       }
       if (mode === "plan" && /^(mkdir|touch)\b/.test(command.trim())) {
         const dest = command.trim().split(/\s+/)[1] ?? "";
         const clean = dest.replace(/^\/+/, "");
-        if (clean && !clean.startsWith(".colo/") && clean !== ".colo") {
-          return "plan só cria coisas em .colo/";
+        if (clean && !clean.startsWith(".odete/") && clean !== ".odete" && !clean.startsWith(".colo/") && clean !== ".colo") {
+          return "plan só cria coisas em .odete/";
         }
       }
       return clip(await runShellAsync(command, slot));

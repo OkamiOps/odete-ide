@@ -145,7 +145,7 @@ export type WorkspaceState = {
 };
 
 const bootLines: TermLine[] = [
-  { id: "boot", kind: "ok", text: "colo  workspace local" },
+  { id: "boot", kind: "ok", text: "odete  workspace local" },
   { id: "boot2", kind: "out", text: "digite help · npm i · git status" },
 ];
 
@@ -174,7 +174,7 @@ function freshState() {
     branch: "main",
     cwd: "",
     projectId: "seed",
-    projectName: "colo",
+    projectName: "odete",
     remote: null as string | null,
     branchSnaps: {} as Record<string, BranchSnap>,
     stash: [] as StashEntry[],
@@ -976,7 +976,7 @@ export const useWorkspace = create<WorkspaceState>()(
         if (!state.stash) state.stash = [];
         if (!state.conflicts) state.conflicts = [];
         if (!state.projectId) state.projectId = "seed";
-        if (!state.projectName) state.projectName = "colo";
+        if (!state.projectName || state.projectName === "colo") state.projectName = "odete";
         if (state.remote === undefined) state.remote = null;
         state.hydrated = true;
       },

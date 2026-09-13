@@ -37,7 +37,7 @@ export const AGENT_TOOLS = [
     function: {
       name: "write_file",
       description:
-        "Cria arquivo ou reescreve INTEIRO. No modo plan, grave o plano em .colo/plan.md.",
+        "Cria arquivo ou reescreve INTEIRO. No modo plan, grave o plano em .odete/plan.md.",
       parameters: {
         type: "object",
         properties: {
@@ -90,7 +90,7 @@ export const AGENT_TOOLS = [
     function: {
       name: "run_shell",
       description:
-        "Terminal do workspace. ls, cat, mkdir, git, npm i / pnpm i, npm run dev/start/build, node arquivo.js. Quando o app está isolado (tela cheia) o Node é de verdade — Vite, Next, Nest, Astro, Remix sobem no Preview. Sem isolamento, cai no Preview JSX/TS da Odete. Chat só lê. Plan: mkdir/touch só em .colo/.",
+        "Terminal do workspace. ls, cat, mkdir, git, npm i / pnpm i, npm run dev/start/build, node arquivo.js. Quando o app está isolado (tela cheia) o Node é de verdade — Vite, Next, Nest, Astro, Remix sobem no Preview. Sem isolamento, cai no Preview JSX/TS da Odete. Chat só lê. Plan: mkdir/touch só em .odete/.",
       parameters: {
         type: "object",
         properties: { command: { type: "string" } },
@@ -128,12 +128,12 @@ Pode LER o terminal (read_terminal ou run_shell com ls/cat/git status).
 Não edite arquivos. Não rode npm i, git push, rm, mkdir.`;
   }
   if (mode === "plan") {
-    return `Modo PLAN: investigue e GRAVE o plano em \`.colo/plan.md\` (crie a pasta se precisar).
+    return `Modo PLAN: investigue e GRAVE o plano em \`.odete/plan.md\` (crie a pasta se precisar).
 ${read}
-Só escreve \`.colo/plan.md\`. mkdir/touch só dentro de \`.colo/\`.
+Só escreve \`.odete/plan.md\`. mkdir/touch só dentro de \`.odete/\`.
 Não rode git push / npm i / rm em massa. Shell de leitura ok.
 
-O arquivo \`.colo/plan.md\` deve ter:
+O arquivo \`.odete/plan.md\` deve ter:
 
 ## Objetivo
 uma linha

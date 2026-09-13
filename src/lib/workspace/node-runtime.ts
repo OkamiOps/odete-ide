@@ -302,7 +302,7 @@ export async function ensureNode(onLog?: (s: string) => void): Promise<WebContai
       const { WebContainer } = await import("@webcontainer/api");
       const inst = await WebContainer.boot({
         coep: "credentialless",
-        workdirName: "colo",
+        workdirName: "odete",
         forwardPreviewErrors: "exceptions-only",
       });
       wc = inst;

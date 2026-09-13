@@ -89,7 +89,7 @@ export function parseSkill(path: string, text: string): Skill | null {
 export function skillsFromFiles(files: FileMap): Skill[] {
   const out: Skill[] = [];
   for (const [path, text] of Object.entries(files)) {
-    if (!/(^|\/)\.colo\/skills\/.+\.md$/i.test(path) && !/(^|\/)SKILL\.md$/i.test(path)) continue;
+    if (!/(^|\/)\.(odete|colo)\/skills\/.+\.md$/i.test(path) && !/(^|\/)SKILL\.md$/i.test(path)) continue;
     const s = parseSkill(path, text);
     if (s) out.push(s);
   }

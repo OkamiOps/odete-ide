@@ -217,7 +217,7 @@ async function runShellInner(raw: string): Promise<string> {
             err = true;
             out = r;
           }
-        } else if (sub === "push") out = await remotePush(args.includes("-m") ? args[args.indexOf("-m") + 1] : "colo push", (m) => w.termPrint("out", m));
+        } else if (sub === "push") out = await remotePush(args.includes("-m") ? args[args.indexOf("-m") + 1] : "odete push", (m) => w.termPrint("out", m));
         else if (sub === "pull") out = await remotePull();
         else if (sub === "fetch") out = await remoteFetch();
         else if (sub === "sync") out = await remoteSync();

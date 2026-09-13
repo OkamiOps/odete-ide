@@ -18,6 +18,7 @@
   --color-ok: #7dce9a;
 }
 
+html[data-theme="odete"],
 html[data-theme="colo"] {
   --color-bg: #08080a;
   --color-bg-elevated: #101014;
@@ -1562,16 +1563,17 @@ input, textarea, select { font: inherit; font-size: 16px; }
   width: min(420px, 100%);
 }
 .welcome-icon {
-  width: 148px;
-  height: 148px;
-  object-fit: cover;
-  border-radius: 34px;
-  margin: 0 0 28px;
+  width: 156px;
+  height: 156px;
+  object-fit: contain;
+  background: transparent;
+  margin: 0 0 24px;
 }
 .welcome-word {
-  width: min(280px, 78vw);
+  width: min(300px, 82vw);
   height: auto;
-  margin: 0 0 14px;
+  background: transparent;
+  margin: 0 0 16px;
 }
 .welcome-kicker {
   margin: 0 0 14px;

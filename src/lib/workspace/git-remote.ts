@@ -8,7 +8,7 @@ export function gitRemoteReady() {
   return { remote, token, ok: Boolean(remote && token) };
 }
 
-export async function remotePush(message = "colo push", onNote?: (s: string) => void) {
+export async function remotePush(message = "odete push", onNote?: (s: string) => void) {
   const { remote, token, ok } = gitRemoteReady();
   const w = useWorkspace.getState();
   if (!ok || !remote || !token) return `${w.gitPush()}\n(sem GitHub — só local)`;
@@ -44,7 +44,7 @@ export async function remoteFetch() {
   return useWorkspace.getState().gitApplyFetch(r.files);
 }
 
-export async function remoteSync(message = "colo sync") {
+export async function remoteSync(message = "odete sync") {
   const pull = await remotePull();
   if (pull.startsWith("error")) return pull;
   const push = await remotePush(message);

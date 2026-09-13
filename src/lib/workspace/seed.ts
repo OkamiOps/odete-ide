@@ -22,7 +22,7 @@ que edita este workspace — no próprio iPad.
 3. Abra Preview (ou Split)
 4. \`git commit\` no terminal ou pelo agente
 `,
-  ".colo/skills/commit.md": `---
+  ".odete/skills/commit.md": `---
 name: Commit
 description: Mensagens curtas no padrão convencional, em PT-BR.
 when: commit, git, mensagem, changelog
@@ -32,7 +32,7 @@ Mensagens: tipo(escopo): o que mudou
 Tipos: feat, fix, chore, docs, refactor, style, test.
 Uma linha, sem ponto final, verbo no infinitivo. Ex: feat(editor): destacar seleção pelo tema.
 `,
-  ".colo/skills/swiftui.md": `---
+  ".odete/skills/swiftui.md": `---
 name: SwiftUI
 description: Estilo SwiftUI simples para o playground do iPad.
 when: swift, swiftui, view, vstack, playground
@@ -41,7 +41,7 @@ when: swift, swiftui, view, vstack, playground
 Swift neste workspace é um subset: VStack, HStack, Text, Button, padding.
 Prefira views pequenas, nomes claros, sem Combine/async. Preview usa o interpretador da Odete.
 `,
-  ".colo/skills/review.md": `---
+  ".odete/skills/review.md": `---
 name: Review
 description: Revisão curta: risco, bug, o que está ok.
 when: review, revisa, revisão, olha esse
@@ -50,7 +50,7 @@ when: review, revisa, revisão, olha esse
 Revise em 3 blocos: (1) o que está ok, (2) bugs/risco, (3) patch sugerido.
 Não reescreva arquivo inteiro se um hunk resolve. Cite path:linha.
 `,
-  ".colo/skills/html.md": `---
+  ".odete/skills/html.md": `---
 name: HTML
 description: index.html e CSS do preview, sem framework.
 when: html, css, preview, página, index

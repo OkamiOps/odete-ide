@@ -670,7 +670,7 @@ export async function githubCreateRepo(token: string, name: string, owner?: stri
     .toLowerCase()
     .replace(/[^a-z0-9._-]+/g, "-")
     .replace(/^-+|-+$/g, "")
-    .slice(0, 80) || "colo-app";
+    .slice(0, 80) || "odete-app";
   const url = owner
     ? `https://api.github.com/orgs/${encodeURIComponent(owner)}/repos`
     : "https://api.github.com/user/repos";

@@ -1,4 +1,5 @@
 export type ThemeId =
+  | "odete"
   | "colo"
   | "catppuccin"
   | "latte"
@@ -20,7 +21,7 @@ export type ThemeDef = {
 
 export const THEMES: ThemeDef[] = [
   {
-    id: "colo",
+    id: "odete",
     label: "Odete",
     blurb: "Noite da marca.",
     dark: true,
@@ -92,7 +93,8 @@ export const THEMES: ThemeDef[] = [
 ];
 
 export function themeById(id: string) {
-  return THEMES.find((t) => t.id === id) ?? THEMES[0]!;
+  const key = id === "colo" ? "odete" : id;
+  return THEMES.find((t) => t.id === key) ?? THEMES[0]!;
 }
 
 export const SYN_FIELDS = [

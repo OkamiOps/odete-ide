@@ -3,8 +3,10 @@ import type { FileMap } from "@/lib/workspace/types";
 const RULE_FILES = [
   "AGENTS.md",
   "CLAUDE.md",
+  ".odete.md",
   ".colo.md",
   ".cursorrules",
+  ".odete/rules.md",
   ".colo/rules.md",
 ];
 

@@ -46,7 +46,7 @@ function slimSnapshot(files: FileMap): FileMap {
     out[path] = text;
     used += n;
   }
-  if (cut) out[".colo/truncated"] = "snapshot cortado — arquivos grandes ficaram de fora dos Recentes.\n";
+  if (cut) out[".odete/truncated"] = "snapshot cortado — arquivos grandes ficaram de fora dos Recentes.\n";
   return out;
 }
 

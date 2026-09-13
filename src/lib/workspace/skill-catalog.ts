@@ -136,13 +136,13 @@ export function catalogById(id: string) {
 }
 
 export function skillPath(id: string) {
-  return `.colo/skills/${id.replace(/[^a-z0-9-]/gi, "-").toLowerCase()}.md`;
+  return `.odete/skills/${id.replace(/[^a-z0-9-]/gi, "-").toLowerCase()}.md`;
 }
 
 export function installedIds(files: Record<string, string>) {
   const ids = new Set<string>();
   for (const path of Object.keys(files)) {
-    const m = path.match(/(?:^|\/)\.colo\/skills\/([^/]+)\.md$/i);
+    const m = path.match(/(?:^|\/)\.(?:odete|colo)\/skills\/([^/]+)\.md$/i);
     if (m) ids.add(m[1]!.toLowerCase());
   }
   return ids;

@@ -902,5 +902,5 @@ async function exportJson() {
     [JSON.stringify({ name: s.projectName, remote: s.remote, files: s.files }, null, 2)],
     { type: "application/octet-stream" },
   );
-  return saveBlob(blob, safeName(s.projectName || "colo", "json"));
+  return saveBlob(blob, safeName(s.projectName || "odete", "json"));
 }

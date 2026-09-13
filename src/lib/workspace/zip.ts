@@ -205,7 +205,7 @@ function isAbort(e: unknown) {
 }
 
 export function safeName(name: string, ext: string) {
-  const base = (name || "colo").replace(/[\\/:*?"<>|]+/g, "-").trim() || "colo";
+  const base = (name || "odete").replace(/[\\/:*?"<>|]+/g, "-").trim() || "odete";
   return base.toLowerCase().endsWith(`.${ext}`) ? base : `${base}.${ext}`;
 }
 

@@ -124,8 +124,8 @@ export function GitPane() {
     try {
       if (kind === "fetch") setNote(await remoteFetch());
       else if (kind === "pull") setNote(await remotePull());
-      else if (kind === "push") setNote(await remotePush(msg.trim() || "colo push", setNote));
-      else setNote(await remoteSync(msg.trim() || "colo sync"));
+      else if (kind === "push") setNote(await remotePush(msg.trim() || "odete push", setNote));
+      else setNote(await remoteSync(msg.trim() || "odete sync"));
     } catch (e) {
       setNote(e instanceof Error ? e.message : "git falhou");
     } finally {
@@ -396,7 +396,7 @@ export function GitPane() {
                   disabled={busy}
                   onClick={() => {
                     setBusy(true);
-                    void remotePush(msg.trim() || "colo push", setNote)
+                    void remotePush(msg.trim() || "odete push", setNote)
                       .then((sha) => setNote(sha))
                       .catch((e) => setNote(e instanceof Error ? e.message : "push falhou"))
                       .finally(() => setBusy(false));

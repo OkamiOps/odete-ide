@@ -266,7 +266,7 @@ export const useChrome = create<ChromeState>()(
       favModels: { grok: "grok-4-1-fast-reasoning", claude: "", codex: "" },
       claudeAuth: null,
       openaiAuth: null,
-      theme: "colo",
+      theme: "odete",
       synCustom: {},
       iconPack: "catppuccin",
       pluginLinter: true,
@@ -473,6 +473,7 @@ export const useChrome = create<ChromeState>()(
         if (persisted && Object.keys(p).length) markEntered();
         p.welcome = !hasEnteredWorkspace();
         if (p.theme === "verdent") p.theme = "volt";
+        if (p.theme === "colo") p.theme = "odete";
         if (p.pluginMinimap === true && !p.minimap) p.minimap = "m";
         if (p.pluginMinimap === false && !p.minimap) p.minimap = "off";
         delete p.pluginMinimap;

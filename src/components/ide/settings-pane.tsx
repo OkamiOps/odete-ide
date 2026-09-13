@@ -835,7 +835,7 @@ function SkillsSection() {
           size="sm"
           variant="outline"
           onClick={() => {
-            const path = ".colo/skills/custom.md";
+            const path = ".odete/skills/custom.md";
             if (!files[path]) writeFile(path, SKILL_TEMPLATE);
             openFile(path);
           }}

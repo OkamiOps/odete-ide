@@ -729,6 +729,7 @@ export const useWorkspace = create<WorkspaceState>()(
           conflicts: [],
           terminal: [{ id: uid(), kind: "ok", text: `projeto ${p.name}` }],
         });
+        scheduleSync(files);
       },
       newProject: (name) => {
         const title = name.trim() || "sem título";

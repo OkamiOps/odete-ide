@@ -224,9 +224,9 @@ input, textarea, select { font: inherit; font-size: 16px; }
 .term-slot { min-height: 0; border-top: 1px solid var(--color-border); background: var(--color-bg-elevated); display: flex; flex-direction: column; overflow: hidden; }
 .agent-col { min-width: 0; min-height: 0; border-left: 1px solid var(--color-border); display: flex; flex-direction: column; background: var(--color-bg-elevated); }
 
-.rail { width: 52px; flex: 0 0 52px; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 0; border-right: 1px solid var(--color-border); background: var(--color-bg-elevated); }
-.rail-mark { width: 32px; height: 32px; display: grid; place-items: center; overflow: hidden; border-radius: 8px; }
-.rail-mark img { width: 32px; height: 32px; display: block; object-fit: cover; }
+.rail { width: 52px; flex: 0 0 52px; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 0 0 8px; border-right: 1px solid var(--color-border); background: var(--color-bg-elevated); }
+.rail-mark { width: 52px; height: 57px; display: grid; place-items: center; overflow: hidden; border-radius: 0; border-bottom: 1px solid var(--color-border); margin-bottom: 6px; flex: 0 0 57px; }
+.rail-mark img { width: 28px; height: 28px; display: block; object-fit: cover; border-radius: 7px; }
 .rail-btn { width: 40px; height: 40px; display: grid; place-items: center; border: 0; border-radius: 10px; background: transparent; color: var(--color-fg-muted); }
 .rail-btn.is-on, .rail-btn:hover { background: var(--color-bg-subtle); color: var(--color-fg); }
 .rail-space { flex: 1; }
@@ -667,10 +667,6 @@ input, textarea, select { font: inherit; font-size: 16px; }
   display: block;
   flex: 0 1 auto;
 }
-.odete-wm { display: inline-flex; align-items: center; min-width: 0; }
-.odete-wm-light { display: none; }
-html[data-scheme="light"] .odete-wm-dark { display: none; }
-html[data-scheme="light"] .odete-wm-light { display: block; }
 .ex-proj.is-on, .ex-proj:hover { background: var(--color-bg-subtle); }
 .ex-add { width: 32px; height: 32px; display: grid; place-items: center; border: 0; border-radius: 8px; background: transparent; color: var(--color-fg-muted); }
 .ex-add:hover { background: var(--color-bg-subtle); color: var(--color-fg); }

@@ -401,7 +401,7 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
   const ctxPct = Math.min(100, Math.round((usedTok / Math.max(1, maxTok)) * 100));
 
   return (
-    <div className="agent-pane">
+    <div className="agent-pane" data-agent-slot={slot}>
       <div className="agent-hd">
         <div className="agent-hd-top">
           <span className="label">Agente</span>

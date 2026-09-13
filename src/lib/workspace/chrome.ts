@@ -9,6 +9,7 @@ import type { ThemeId } from "./themes";
 import type { SynColors } from "./themes";
 import type { IconPackId } from "./icons";
 import type { PermitMode } from "@/lib/agent/permit";
+import type { AgentMode } from "@/lib/agent/tools";
 
 export type SideId = "files" | "search" | "git" | "settings" | "problems";
 export type CenterId = "code" | "preview" | "split" | "diff" | "dual";
@@ -304,7 +305,7 @@ export const useChrome = create<ChromeState>()(
       setCodexModel: (codexModel) => set({ codexModel }),
       setFavModel: (id, m) =>
         set((s) => ({
-          favModels: { grok: "", claude: "", codex: "", ...s.favModels, [id]: m },
+          favModels: { ...s.favModels, [id]: m },
           ...(id === "claude" ? { claudeModel: m } : id === "codex" ? { codexModel: m } : { grokModel: m }),
         })),
       setClaudeAuth: (claudeAuth) => {

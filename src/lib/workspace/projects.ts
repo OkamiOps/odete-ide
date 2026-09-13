@@ -31,17 +31,22 @@ type ProjectsState = {
 };
 
 const MAX_RECENTS = 8;
-const MAX_SNAP = 180_000;
+const MAX_SNAP = 2_000_000;
 
 function slimSnapshot(files: FileMap): FileMap {
   const out: FileMap = {};
   let used = 0;
+  let cut = false;
   for (const [path, text] of Object.entries(files)) {
     const n = text.length;
-    if (used + n > MAX_SNAP) break;
+    if (used + n > MAX_SNAP) {
+      cut = true;
+      continue;
+    }
     out[path] = text;
     used += n;
   }
+  if (cut) out[".colo/truncated"] = "snapshot cortado — arquivos grandes ficaram de fora dos Recentes.\n";
   return out;
 }
 

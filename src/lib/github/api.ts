@@ -62,8 +62,11 @@ export function unpackBin(s: string): { mime: string; b64: string } | null {
 
 export function parseRepo(input: string) {
   const raw = input.trim().replace(/\.git$/, "");
-  const tree = raw.match(/github\.com[/:]([^/]+)\/([^/#?]+)(?:\/(?:tree|blob)\/([^/]+))?/i);
-  if (tree) return { owner: tree[1]!, repo: tree[2]!, branch: tree[3] || "" };
+  const tree = raw.match(/github\.com[/:]([^/]+)\/([^/#?]+)(?:\/(?:tree|blob)\/([^?#]+))?/i);
+  if (tree) {
+    const branch = (tree[3] || "").replace(/\/$/, "").replace(/^blob\/|tree\//, "");
+    return { owner: tree[1]!, repo: tree[2]!.replace(/\.git$/, ""), branch };
+  }
   const short = raw.match(/^([\w.-]+)\/([\w.-]+)$/);
   if (short) return { owner: short[1]!, repo: short[2]!, branch: "" };
   return null;
@@ -284,12 +287,15 @@ async function cloneViaZip(
     const { unzipRaw } = await import("@/lib/workspace/zip");
     const raw = await unzipRaw(buf);
     const files: Record<string, string> = {};
+    const keys = Object.keys(raw);
+    if (keys.length > MAX_FILES) onProgress?.(`${keys.length} arquivos — puxando ${MAX_FILES}`);
     for (const [full, bytes] of Object.entries(raw)) {
       const parts = full.split("/").filter(Boolean);
       if (parts.length < 2) continue;
       const path = parts.slice(1).join("/");
       if (!path || SKIP_DIR.test(path) || SKIP_HEAVY.test(path)) continue;
       if (bytes.length > MAX_FILE) continue;
+      if (Object.keys(files).length >= MAX_FILES) break;
       if (isTextBytes(bytes)) files[path] = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
       else {
         let bin = "";
@@ -503,7 +509,7 @@ export async function githubPullTree(remote: string, branch: string, token?: str
   const spec = parseRepo(remote);
   if (!spec) throw new Error("remote inválido");
   const ref = branch || spec.branch || "main";
-  return githubClone(`https://github.com/${spec.owner}/${spec.repo}/tree/${encodeURIComponent(ref)}`, token);
+  return githubClone(`https://github.com/${spec.owner}/${spec.repo}/tree/${ref}`, token);
 }
 
 export async function githubIssues(remote: string, token: string) {

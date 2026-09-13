@@ -149,9 +149,10 @@ export function IdeApp() {
       if (meta && (e.key === "Enter" || code === "Enter")) {
         e.preventDefault();
         e.stopPropagation();
-        useChrome.getState().toggleAgent();
         useChrome.setState({ agent: true, mobile: "agent" });
-        window.dispatchEvent(new CustomEvent("colo-send-agent", { detail: { slot: "a" } }));
+        const focused = document.querySelector<HTMLElement>("[data-agent-slot]:focus-within");
+        const slot = focused?.getAttribute("data-agent-slot") || "a";
+        window.dispatchEvent(new CustomEvent("colo-send-agent", { detail: { slot } }));
         return;
       }
       if (e.shiftKey && e.altKey && is("f")) {

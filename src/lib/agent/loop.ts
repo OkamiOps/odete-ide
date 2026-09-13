@@ -47,11 +47,19 @@ async function streamTurn(
   onEvt: (e: StreamEvt) => void,
   shouldStop?: () => boolean,
 ): Promise<AgentTurnLike> {
+  const ac = new AbortController();
+  let tick: ReturnType<typeof setInterval> | undefined;
+  if (shouldStop) {
+    tick = setInterval(() => {
+      if (shouldStop()) ac.abort();
+    }, 160);
+  }
   try {
     const res = await fetch("/api/agent", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
+      signal: ac.signal,
     });
     if (!res.ok || !res.body) {
       return agentTurn({ data: payload });
@@ -65,7 +73,7 @@ async function streamTurn(
     let err = "";
     let use = emptyUse();
     while (true) {
-      if (shouldStop?.()) break;
+      if (shouldStop?.() || ac.signal.aborted) break;
       const { done, value } = await reader.read();
       if (done) break;
       buf += dec.decode(value, { stream: true });
@@ -97,6 +105,7 @@ async function streamTurn(
         }
       }
     }
+    if (ac.signal.aborted || shouldStop?.()) return { ok: false, error: "parado" };
     if (err) return { ok: false, error: err };
     return {
       ok: true,
@@ -108,8 +117,13 @@ async function streamTurn(
       },
       use,
     };
-  } catch {
+  } catch (e) {
+    if (ac.signal.aborted || (e instanceof DOMException && e.name === "AbortError")) {
+      return { ok: false, error: "parado" };
+    }
     return agentTurn({ data: payload });
+  } finally {
+    if (tick) clearInterval(tick);
   }
 }
 
@@ -142,6 +156,7 @@ export async function runAgentLoop(
   const messages: AgentMessage[] = [...history, userMsg];
   const mode = auth.mode ?? "build";
   const permit = auth.permit ?? "auto";
+  let hitCap = false;
 
   for (let round = 0; round < MAX_ROUNDS; round++) {
     if (shouldStop?.()) break;
@@ -270,6 +285,15 @@ export async function runAgentLoop(
         content: detail,
       });
     }
+    if (round === MAX_ROUNDS - 1) hitCap = true;
+  }
+
+  if (hitCap && !shouldStop?.()) {
+    push({
+      id: crypto.randomUUID(),
+      kind: "error",
+      text: `parei em ${MAX_ROUNDS} rodadas de ferramenta — manda de novo pra continuar`,
+    });
   }
 
   return messages;

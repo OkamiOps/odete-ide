@@ -216,14 +216,23 @@ export async function saveBlob(blob: Blob, filename: string): Promise<SaveOffer>
     share?: (d: ShareData) => Promise<void>;
     canShare?: (d: ShareData) => boolean;
   };
+  let shared = false;
   try {
     if (nav.share && nav.canShare?.({ files: [file] })) {
       await nav.share({ files: [file], title: filename });
+      shared = true;
     }
   } catch (e) {
-    if (!isAbort(e)) {
-      /* fallback: o link visível */
-    }
+    if (isAbort(e)) return { href, name: filename };
+  }
+  if (!shared) {
+    const a = document.createElement("a");
+    a.href = href;
+    a.download = filename;
+    a.rel = "noopener";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
   }
   return { href, name: filename };
 }

@@ -106,14 +106,6 @@ export const useAgentChats = create<ChatState>()(
         const s = get();
         const k = keyOf(projectId, slot);
         const aid = s.active[k];
-        if (aid && s.threads[aid]?.items.length) return s.threads[aid]!;
-        const existing = Object.values(s.threads)
-          .filter((t) => t.projectId === projectId && (t.items.length || t.messages.length))
-          .sort((a, b) => b.updated - a.updated);
-        if (slot === "a" && existing[0]) {
-          set({ active: { ...s.active, [k]: existing[0].id } });
-          return existing[0];
-        }
         if (aid && s.threads[aid]) return s.threads[aid]!;
         const t = blank(projectId);
         set({

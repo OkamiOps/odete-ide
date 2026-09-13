@@ -38,7 +38,7 @@ export async function remoteFetch() {
   const w = useWorkspace.getState();
   if (!ok || !remote || !token) return `${w.gitFetch()}\n(sem GitHub — só local)`;
   const r = await githubPullTree(remote, w.branch || "main", token);
-  return `fetch ${Object.keys(r.files).length} arquivos  ${remote}`;
+  return useWorkspace.getState().gitApplyFetch(r.files);
 }
 
 export async function remoteSync(message = "colo sync") {

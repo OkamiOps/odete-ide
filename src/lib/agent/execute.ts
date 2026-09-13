@@ -39,6 +39,7 @@ export async function executeTool(name: string, rawArgs: string, mode: AgentMode
       if (hits > 1) return `trecho aparece ${hits} vezes — seja mais específico`;
       const after = before.replace(old, neu);
       if (mode === "plan") {
+        if (path !== ".colo/plan.md") return "plan só escreve .colo/plan.md — mude pra Build pra editar o resto";
         w.writeFile(path, after);
         return `escrito ${path}`;
       }
@@ -51,6 +52,7 @@ export async function executeTool(name: string, rawArgs: string, mode: AgentMode
       const content = str("content");
       if (!path) return "caminho inválido";
       if (mode === "plan") {
+        if (path !== ".colo/plan.md") return "plan só escreve .colo/plan.md — mude pra Build pra editar o resto";
         w.writeFile(path, content);
         return `escrito ${path}`;
       }

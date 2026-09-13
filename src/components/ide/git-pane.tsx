@@ -184,9 +184,9 @@ export function GitPane() {
           <button
             type="button"
             className="git-primary"
-            disabled={!msg.trim() || clean}
+            disabled={!msg.trim() || !stagedFiles.length}
             onClick={() => {
-              const r = w().commit(msg, stagedFiles.length === 0);
+              const r = w().commit(msg, false);
               setNote(r);
               if (r.startsWith("[")) setMsg("");
             }}
@@ -197,19 +197,19 @@ export function GitPane() {
           <button
             type="button"
             className="git-ghost"
-            disabled={!msg.trim() || clean}
+            disabled={!msg.trim() || !stagedFiles.length || busy}
             onClick={() => {
-              const r = w().commit(msg, stagedFiles.length === 0);
+              const r = w().commit(msg, false);
               if (r.startsWith("[")) {
                 setMsg("");
-                setNote(`${r}\n${w().gitPush()}`);
+                void gitHubOrLocal("push");
               } else setNote(r);
             }}
           >
             Push
           </button>
         </div>
-        {note ? <p className="git-note">{note.split("\n")[0]}</p> : null}
+        {note ? <p className="git-note">{note}</p> : null}
       </div>
 
       {conflicts.length ? (
@@ -412,8 +412,8 @@ export function GitPane() {
               <button
                 type="button"
                 className="git-log-main"
-                onClick={() => run(() => w().gitRestoreCommit(c.id))}
-                title="restaurar arquivos deste commit"
+                onClick={() => useHub.getState().setCompare(c.id, head?.id ?? c.id)}
+                title="comparar com HEAD"
               >
                 <b>{c.message}</b>
                 <span>
@@ -434,7 +434,10 @@ export function GitPane() {
                 type="button"
                 className="git-ghost"
                 title="restaurar"
-                onClick={() => run(() => w().gitRestoreCommit(c.id))}
+                onClick={() => {
+                  if (!window.confirm(`restaurar arquivos do commit ${c.id}?`)) return;
+                  run(() => w().gitRestoreCommit(c.id));
+                }}
               >
                 <RotateCcw size={14} />
               </button>
@@ -675,9 +678,24 @@ function GithubBox({ remote, branch, token }: { remote: string; branch: string; 
             </button>
             <button
               type="button"
+              className="chip"
+              disabled={busy}
+              onClick={() => {
+                setBusy(true);
+                void githubReviewPr(remote, token, p.number, "APPROVE", "ok pelo Colo")
+                  .then(() => setNote(`review #${p.number} aprovada`))
+                  .catch((e) => setNote(e instanceof Error ? e.message : "review falhou"))
+                  .finally(() => setBusy(false));
+              }}
+            >
+              aprovar
+            </button>
+            <button
+              type="button"
               className="chip is-on"
               disabled={busy}
               onClick={() => {
+                if (!window.confirm(`merge squash PR #${p.number}?`)) return;
                 setBusy(true);
                 void githubMergePr(remote, token, p.number, "squash")
                   .then((r) => {

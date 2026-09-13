@@ -24,8 +24,9 @@ function slimFiles(files: FileMap): FileMap {
   const out: FileMap = {};
   let n = 0;
   for (const [k, v] of Object.entries(files)) {
-    if (n++ > 120) break;
-    out[k] = v.length > 80_000 ? `${v.slice(0, 80_000)}\n…` : v;
+    if (v.length > 120_000) continue;
+    if (n++ > 80) break;
+    out[k] = v;
   }
   return out;
 }
@@ -48,7 +49,15 @@ export const useCheckpoints = create<State>()(
       restore: (id) => {
         const snap = get().items.find((x) => x.id === id);
         if (!snap) return "checkpoint sumiu";
-        useWorkspace.setState({ files: { ...snap.files } });
+        const cur = useWorkspace.getState();
+        const first = snap.files[cur.openPath] !== undefined ? cur.openPath : Object.keys(snap.files)[0] ?? cur.openPath;
+        const keep = cur.tabs.filter((p) => snap.files[p] !== undefined);
+        useWorkspace.setState({
+          files: { ...snap.files },
+          openPath: first,
+          tabs: keep.length ? keep : [first],
+          staged: [],
+        });
         usePatches.getState().rejectAll();
         set({ last: snap });
         return `voltou: ${snap.title}`;

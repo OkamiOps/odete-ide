@@ -37,7 +37,7 @@ export const useHub = create<Hub>()(
     {
       name: "colo-hub-v1",
       storage: createJSONStorage(() => idbKv),
-      partialize: (s) => ({ agentSplit: s.agentSplit }),
+      partialize: (s) => ({ agentSplit: s.agentSplit, folder: s.folder }),
     },
   ),
 );

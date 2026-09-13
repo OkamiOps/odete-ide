@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { Archive, Copy, FileJson, Files, FolderOpen, GitBranch, Github, Lock, Star, Tablet, Trash2, X } from "lucide-react";
 import { githubClone, githubCreateRepo, githubOrgs, githubRepos, type GithubOrg, type GithubRepo } from "@/lib/github/api";
 import { PickList } from "@/components/ide/pick-list";
+import { downloadZip, importZipFile, saveBlob, safeName, type SaveOffer } from "@/lib/workspace/zip";
 import { setSheet, useProjectUi, useProjects, type ProjectSheet } from "@/lib/workspace/projects";
 import { useWorkspace } from "@/lib/workspace/store";
 import { useHub } from "@/lib/workspace/hub";
@@ -61,13 +62,13 @@ export function ProjectMenu({ onPick }: { onPick?: () => void }) {
       <button type="button" onClick={() => go("github")}>
         {github ? `GitHub · ${github.user.login}` : "Conectar GitHub"}
       </button>
-      <button type="button" onClick={() => { onPick?.(); useHub.getState().setView("folder"); }}>
+      <button type="button" onClick={() => { onPick?.(); setSheet(false); useHub.getState().setView("folder"); }}>
         Salvar na pasta do iPad
       </button>
-      <button type="button" onClick={() => { onPick?.(); useHub.getState().setView("prs"); }}>
+      <button type="button" onClick={() => { onPick?.(); setSheet(false); useHub.getState().setView("prs"); }}>
         Pull requests
       </button>
-      <button type="button" onClick={() => { onPick?.(); useHub.getState().setView("actions"); }}>
+      <button type="button" onClick={() => { onPick?.(); setSheet(false); useHub.getState().setView("actions"); }}>
         GitHub Actions
       </button>
       <button
@@ -449,7 +450,7 @@ function OpenForm() {
 
   async function fromDirectoryApi() {
     setErr("");
-    const picker = (window as Window & { showDirectoryPicker?: () => Promise<FileSystemDirectoryHandle> })
+    const picker = (window as Window & { showDirectoryPicker?: (opts?: { mode?: string }) => Promise<FileSystemDirectoryHandle> })
       .showDirectoryPicker;
     if (!picker) {
       dirRef.current?.click();

@@ -62,10 +62,6 @@ export async function persistAuth() {
   const { useProjects } = await import("./projects");
   const c = useChrome.getState();
   const p = useProjects.getState();
-  if (!c.claudeAuth && !c.openaiAuth && !p.github) {
-    const existing = await readSecrets();
-    if (existing && (existing.github || existing.claudeAuth || existing.openaiAuth)) return;
-  }
   await writeSecrets({
     github: p.github,
     claudeAuth: c.claudeAuth,

@@ -175,7 +175,7 @@ export async function runShellAsync(raw: string): Promise<string> {
         } else if (sub === "commit") {
           const mi = args.findIndex((a) => a === "-m");
           const msg = mi >= 0 ? args.slice(mi + 1).join(" ") : "";
-          const r = w.commit(msg);
+          const r = w.commit(msg, args.includes("-a") || args.includes("-A"));
           if (r.startsWith("[")) out = r;
           else {
             err = true;
@@ -235,14 +235,14 @@ export async function runShellAsync(raw: string): Promise<string> {
           out = await npmInstall(args.slice(1), (m) => w.termPrint("out", m));
         } else if (args[0] === "run" || args[0] === "start" || args[0] === "dev") {
           useChrome.getState().setCenter("preview");
-          out = `> ${args[1] || args[0]}\nPreview aberto (index.html + importmap)`;
+          out = `sem runtime Node neste iPad.\nabri o Preview (index.html + importmap / esm.sh).\nscripts do package.json não rodam aqui.`;
         } else out = "npm — use: npm i [pkg]  |  npm run";
         break;
       }
       case "npx":
       case "vite":
         useChrome.getState().setCenter("preview");
-        out = "preview aberto — index.html no iframe";
+        out = "sem runtime Node — abri o Preview com index.html. vite/npx não executam binário.";
         break;
       case "reset":
         w.resetWorkspace();

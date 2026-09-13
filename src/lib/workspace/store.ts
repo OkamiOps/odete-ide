@@ -100,6 +100,7 @@ export type WorkspaceState = {
   replaceInFiles: (pattern: string, replacement: string, onlyPath?: string) => { files: number; hits: number };
   resolveConflict: (path: string, take: "ours" | "theirs" | "merged", merged?: string) => void;
   mergeRemote: (incoming: FileMap) => string;
+  gitApplyFetch: (incoming: FileMap) => string;
   changedPaths: () => string[];
   fileDirty: (path: string) => boolean;
   termPrint: (kind: TermLine["kind"], text: string) => void;
@@ -184,13 +185,14 @@ export const useWorkspace = create<WorkspaceState>()(
       writeFile: (path, content) => {
         const clean = sanitizePath(path);
         if (!clean) return "caminho inválido";
+        const quiet = clean.startsWith("node_modules/") || clean.includes("/node_modules/");
         set((s) => ({
           files: { ...s.files, [clean]: content },
-          openPath: s.files[clean] === undefined ? clean : s.openPath,
+          openPath: quiet || s.files[clean] !== undefined ? s.openPath : clean,
           tabs:
-            s.files[clean] === undefined && !s.tabs.includes(clean)
-              ? [...s.tabs, clean]
-              : s.tabs,
+            quiet || s.files[clean] !== undefined || s.tabs.includes(clean)
+              ? s.tabs
+              : [...s.tabs, clean],
         }));
         rememberEdit(clean, content);
         scheduleSync({ ...get().files, [clean]: content });
@@ -214,6 +216,8 @@ export const useWorkspace = create<WorkspaceState>()(
           tabs: nextTabs.length ? nextTabs : [fallback],
           openPath: openPath === path ? fallback : openPath,
         });
+        scheduleSync(next);
+        void import("./folder").then((m) => m.removeFromFolder(path));
         return undefined;
       },
       readFile: (path) => get().files[path],
@@ -237,14 +241,16 @@ export const useWorkspace = create<WorkspaceState>()(
         return [...names];
       },
       mkdir: (path) => {
-        const p = path.replace(/^\/+|\/+$/g, "");
+        const p = sanitizePath(path).replace(/\/+$/g, "");
         if (!p) return "mkdir: caminho?";
         const keep = `${p}/.gitkeep`;
         const { files } = get();
-        if (files[keep] !== undefined) return `ok ${p}/`;
-        const hasKids = Object.keys(files).some((k) => k === p || k.startsWith(p + "/"));
-        if (hasKids) return `ok ${p}/`;
-        set({ files: { ...files, [keep]: "" } });
+        if (files[keep] !== undefined || Object.keys(files).some((k) => k === p || k.startsWith(p + "/"))) {
+          return `ok ${p}/`;
+        }
+        const next = { ...files, [keep]: "" };
+        set({ files: next });
+        scheduleSync(next);
         return `criado ${p}/`;
       },
       grep: (pattern, path) => {
@@ -276,11 +282,8 @@ export const useWorkspace = create<WorkspaceState>()(
         const head = commits[commits.length - 1];
         const headFiles = head?.files ?? {};
         const changed = get().changedPaths();
-        const pick =
-          all || staged.length === 0
-            ? changed
-            : staged.filter((p) => changed.includes(p));
-        if (!pick.length) return "nada para commitar";
+        const pick = all ? changed : staged.filter((p) => changed.includes(p));
+        if (!pick.length) return all ? "nada para commitar" : "nada staged — usa Stage ou git commit -a";
         const next = cloneFiles(headFiles);
         for (const p of pick) {
           if (files[p] === undefined) delete next[p];
@@ -340,13 +343,13 @@ export const useWorkspace = create<WorkspaceState>()(
           lastPushedId: head.id,
           origin: { ...head, files: cloneFiles(head.files) },
         });
-        return `To origin/main\n   ${head.id}  ${head.message}\n * [pushed] main -> origin/main`;
+        return `gravado localmente ${head.id} · ${head.message}\n(não foi pro GitHub)`;
       },
       gitFetch: () => {
         const { origin, commits } = get();
         const behind = origin && !commits.some((c) => c.id === origin.id);
-        if (behind) return `From colo-local\n * branch main -> FETCH_HEAD\n   origin/main está à frente`;
-        return "From colo-local\n * branch            main       -> FETCH_HEAD\n   já atualizado";
+        if (behind) return `origin está à frente (fetch)\nconecta o GitHub pra puxar a rede`;
+        return "fetch local — sem GitHub, origin não muda";
       },
       gitPull: () => {
         const { origin, commits, files } = get();
@@ -398,14 +401,18 @@ export const useWorkspace = create<WorkspaceState>()(
         return "working tree restaurada para HEAD";
       },
       gitUndoCommit: () => {
-        const { commits } = get();
+        const { commits, lastPushedId } = get();
         if (commits.length < 2) return "não há commit para desfazer";
         const dropped = commits[commits.length - 1]!;
+        const prev = commits[commits.length - 2]!;
+        const keys = new Set([...Object.keys(dropped.files), ...Object.keys(prev.files)]);
+        const staged = [...keys].filter((k) => dropped.files[k] !== prev.files[k]);
         set({
           commits: commits.slice(0, -1),
-          staged: Object.keys(dropped.files),
+          staged,
+          lastPushedId: lastPushedId === dropped.id ? prev.id : lastPushedId,
         });
-        return `HEAD agora em ${commits[commits.length - 2]!.id} (soft)`;
+        return `HEAD agora em ${prev.id} (soft)`;
       },
       gitBranchList: () => {
         const { branch, branchSnaps } = get();
@@ -427,6 +434,7 @@ export const useWorkspace = create<WorkspaceState>()(
         const s = get();
         if (!n) return "informe o branch";
         if (n === s.branch) return `já em ${n}`;
+        if (get().isDirty()) return "error: commit ou stash antes de trocar de branch";
         const snaps = { ...s.branchSnaps, [s.branch]: snapBranch(s) };
         const dest = snaps[n];
         if (!dest) return `branch desconhecida: ${n}`;
@@ -464,8 +472,9 @@ export const useWorkspace = create<WorkspaceState>()(
         const s = get();
         const top = s.stash[0];
         if (!top) return "stash vazio";
+        if (get().isDirty()) return "error: commit ou descarte antes do stash pop";
         set({
-          files: { ...s.files, ...top.files },
+          files: cloneFiles(top.files),
           staged: top.staged,
           stash: s.stash.slice(1),
         });
@@ -486,7 +495,12 @@ export const useWorkspace = create<WorkspaceState>()(
             if (cur.files[k] === undefined) delete next[k];
           }
         }
-        set({ files: next, staged: Object.keys(next).filter((k) => next[k] !== files[k] || files[k] === undefined) });
+        set({
+          files: next,
+          staged: [...new Set([...Object.keys(next), ...Object.keys(files)])].filter(
+            (k) => next[k] !== files[k],
+          ),
+        });
         return get().commit(`cherry-pick ${id}: ${cur.message}`);
       },
       gitBlame: (path) => {
@@ -551,6 +565,8 @@ export const useWorkspace = create<WorkspaceState>()(
           openPath: openPath === src ? dest : openPath,
           staged: staged.map((t) => (t === src ? dest : t)),
         });
+        scheduleSync(next);
+        void import("./folder").then((m) => m.removeFromFolder(src));
         return undefined;
       },
       replaceInFiles: (pattern, replacement, onlyPath) => {
@@ -588,11 +604,19 @@ export const useWorkspace = create<WorkspaceState>()(
       mergeRemote: (incoming) => {
         const s = get();
         const head = s.commits[s.commits.length - 1];
+        const origin = s.origin;
         const conflicts: Conflict[] = [];
         const files = { ...s.files };
+        if (origin) {
+          for (const path of Object.keys(origin.files)) {
+            if (incoming[path] === undefined && (files[path] === undefined || files[path] === origin.files[path])) {
+              delete files[path];
+            }
+          }
+        }
         for (const [path, theirs] of Object.entries(incoming)) {
           const ours = files[path];
-          const base = head?.files[path];
+          const base = origin?.files[path] ?? head?.files[path];
           if (ours === undefined || ours === theirs || ours === base) {
             files[path] = theirs;
             continue;
@@ -604,23 +628,36 @@ export const useWorkspace = create<WorkspaceState>()(
             files[path] = theirs;
           }
         }
+        const clean = !head || filesEqual(s.files, head.files);
+        const ff = clean && origin && filesEqual(s.files, origin.files) && !conflicts.length;
         const commit: Commit = {
           id: uid().slice(0, 8),
-          message: conflicts.length ? "merge origin (com conflitos)" : "merge origin",
+          message: conflicts.length ? "merge origin (com conflitos)" : ff ? "pull origin" : "merge origin",
           at: Date.now(),
           files: cloneFiles(files),
         };
         set({
           files,
           commits: [...s.commits, commit],
-          lastPushedId: commit.id,
-          origin: { ...commit, files: cloneFiles(files) },
+          origin: { id: commit.id, message: "origin", at: commit.at, files: cloneFiles(incoming) },
+          lastPushedId: ff ? commit.id : s.lastPushedId,
           conflicts,
           staged: [],
         });
+        scheduleSync(files);
         return conflicts.length
           ? `merge com ${conflicts.length} conflito(s)`
-          : `merge ok · ${Object.keys(incoming).length} arquivos`;
+          : `pull ok · ${Object.keys(incoming).length} arquivos`;
+      },
+      gitApplyFetch: (incoming) => {
+        const origin: Commit = {
+          id: `fetch-${uid().slice(0, 6)}`,
+          message: "origin",
+          at: Date.now(),
+          files: cloneFiles(incoming),
+        };
+        set({ origin });
+        return `fetch origin  ${Object.keys(incoming).length} arquivos`;
       },
       changedPaths: () => {
         const { files, commits } = get();
@@ -679,7 +716,7 @@ export const useWorkspace = create<WorkspaceState>()(
           openPath: files[first] !== undefined ? first : Object.keys(files)[0] ?? "README.md",
           tabs: [first],
           commits: [commit],
-          lastPushedId: commit.id,
+          lastPushedId: p.remote ? null : commit.id,
           origin: { ...commit, files: cloneFiles(files) },
           staged: [],
           branch: p.branch || "main",
@@ -687,6 +724,9 @@ export const useWorkspace = create<WorkspaceState>()(
           projectId: p.id,
           projectName: p.name,
           remote: p.remote ?? null,
+          branchSnaps: {},
+          stash: [],
+          conflicts: [],
           terminal: [{ id: uid(), kind: "ok", text: `projeto ${p.name}` }],
         });
       },
@@ -712,6 +752,7 @@ export const useWorkspace = create<WorkspaceState>()(
           openPath: files[get().openPath] !== undefined ? get().openPath : first,
           tabs: replace ? [first] : get().tabs,
         });
+        scheduleSync(files);
       },
       resetWorkspace: () =>
         set({
@@ -730,8 +771,10 @@ export const useWorkspace = create<WorkspaceState>()(
       partialize: (s) => ({
         files: s.files,
         openPath: s.openPath,
-        tabs: s.tabs,
-        commits: s.commits,
+        tabs: s.tabs.filter((t) => !t.startsWith("node_modules/")),
+        commits: s.commits.slice(-8).map((c, i, arr) =>
+          i < arr.length - 3 ? { ...c, files: {} } : c,
+        ),
         lastPushedId: s.lastPushedId,
         origin: s.origin,
         branch: s.branch,
@@ -739,8 +782,13 @@ export const useWorkspace = create<WorkspaceState>()(
         projectId: s.projectId,
         projectName: s.projectName,
         remote: s.remote,
-        branchSnaps: s.branchSnaps,
-        stash: s.stash,
+        branchSnaps: Object.fromEntries(
+          Object.entries(s.branchSnaps).slice(0, 6).map(([k, v]) => [
+            k,
+            { ...v, commits: v.commits.slice(-4).map((c) => ({ ...c, files: {} })), files: v.files },
+          ]),
+        ),
+        stash: s.stash.slice(0, 4),
         conflicts: s.conflicts,
         staged: s.staged,
       }),

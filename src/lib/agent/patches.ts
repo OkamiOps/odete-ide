@@ -11,6 +11,7 @@ export type Patch = {
   path: string;
   before: string;
   after: string;
+  orig: string;
   status: "pending" | "accepted" | "rejected" | "undone";
 };
 
@@ -26,8 +27,8 @@ type PatchState = {
   get: (id: string) => Patch | undefined;
 };
 
-function clip(s: string, n = 24_000) {
-  return s.length > n ? s.slice(0, n) + "\n…" : s;
+function clipOk(p: Patch) {
+  return p.before.length + p.after.length < 80_000;
 }
 
 export const usePatches = create<PatchState>()(
@@ -35,7 +36,7 @@ export const usePatches = create<PatchState>()(
     (set, get) => ({
       items: [],
       queue: (path, before, after) => {
-        const patch: Patch = { id: uid(), path, before, after, status: "pending" };
+        const patch: Patch = { id: uid(), path, before, after, orig: before, status: "pending" };
         set((s) => ({ items: [...s.items.filter((p) => p.status === "pending"), patch].slice(-20) }));
         return patch;
       },
@@ -73,7 +74,7 @@ export const usePatches = create<PatchState>()(
       undo: (id) => {
         const patch = get().items.find((p) => p.id === id);
         if (!patch) return;
-        useWorkspace.getState().writeFile(patch.path, patch.before);
+        useWorkspace.getState().writeFile(patch.path, patch.orig || patch.before);
         set((s) => ({
           items: s.items.map((p) => (p.id === id ? { ...p, status: "undone" } : p)),
         }));
@@ -97,10 +98,7 @@ export const usePatches = create<PatchState>()(
       name: "colo-patches-v1",
       storage: createJSONStorage(() => idbKv),
       partialize: (s) => ({
-        items: s.items
-          .filter((p) => p.status === "pending")
-          .slice(-12)
-          .map((p) => ({ ...p, before: clip(p.before), after: clip(p.after) })),
+        items: s.items.filter((p) => p.status === "pending" && clipOk(p)).slice(-12),
       }),
     },
   ),

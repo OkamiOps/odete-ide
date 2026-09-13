@@ -25,7 +25,7 @@ async function putHandle(dir: FileSystemDirectoryHandle) {
   });
 }
 
-export async function getHandle(): Promise<FileSystemDirectoryHandle | null> {
+export async function getHandle(opts?: { prompt?: boolean }): Promise<FileSystemDirectoryHandle | null> {
   try {
     const db = await openDb();
     const dir = await new Promise<FileSystemDirectoryHandle | undefined>((resolve, reject) => {
@@ -35,9 +35,14 @@ export async function getHandle(): Promise<FileSystemDirectoryHandle | null> {
       g.onerror = () => reject(g.error);
     });
     if (!dir) return null;
-    const q = await dir.queryPermission({ mode: "readwrite" });
+    const fs = dir as FileSystemDirectoryHandle & {
+      queryPermission: (o: { mode: string }) => Promise<PermissionState>;
+      requestPermission: (o: { mode: string }) => Promise<PermissionState>;
+    };
+    const q = await fs.queryPermission({ mode: "readwrite" });
     if (q === "granted") return dir;
-    const req = await dir.requestPermission({ mode: "readwrite" });
+    if (!opts?.prompt) return null;
+    const req = await fs.requestPermission({ mode: "readwrite" });
     return req === "granted" ? dir : null;
   } catch {
     return null;
@@ -71,6 +76,21 @@ export async function writeTree(dir: FileSystemDirectoryHandle, files: FileMap) 
     const w = await fh.createWritable();
     await w.write(bytesOf(body));
     await w.close();
+  }
+}
+
+export async function removeFromFolder(path: string) {
+  const dir = await getHandle();
+  if (!dir) return;
+  try {
+    const parts = path.split("/").filter(Boolean);
+    const file = parts.pop();
+    if (!file) return;
+    let cur = dir;
+    for (const p of parts) cur = await cur.getDirectoryHandle(p);
+    await cur.removeEntry(file);
+  } catch {
+    /* ignore */
   }
 }
 

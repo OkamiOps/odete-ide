@@ -115,7 +115,6 @@ export function AgentPane() {
     booted.current = true;
   }, [projectId, chatsReady]);
 
-  }, [draft]);
   useEffect(() => {
     const el = inputRef.current;
     if (!el) return;

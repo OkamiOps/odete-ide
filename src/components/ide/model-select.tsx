@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Star } from "lucide-react";
 import { PickList } from "@/components/ide/pick-list";
 import { listProviderModels, type ModelInfo } from "@/lib/agent/models";
 import { rememberEfforts } from "@/lib/agent/effort";
@@ -19,9 +20,11 @@ export function ModelSelect({ provider, compact }: { provider: AgentId; compact?
   const grokModel = useChrome((s) => s.grokModel);
   const claudeModel = useChrome((s) => s.claudeModel);
   const codexModel = useChrome((s) => s.codexModel);
+  const fav = useChrome((s) => s.favModels?.[provider] ?? "");
   const setGrok = useChrome((s) => s.setGrokModel);
   const setClaude = useChrome((s) => s.setClaudeModel);
   const setCodex = useChrome((s) => s.setCodexModel);
+  const setFav = useChrome((s) => s.setFavModel);
   const claudeAuth = useChrome((s) => s.claudeAuth);
   const openaiAuth = useChrome((s) => s.openaiAuth);
   const [models, setModels] = useState<ModelInfo[]>([]);
@@ -47,14 +50,15 @@ export function ModelSelect({ provider, compact }: { provider: AgentId; compact?
         if (m.efforts?.length) rememberEfforts(provider, m.id, m.efforts);
         if (m.ctx) rememberCtx(provider, m.id, m.ctx);
       }
-      if (!r.ok) {
-        setErr(r.error);
-        setModels(list);
-      } else {
-        setModels(list);
-        if (list.length && !list.some((m) => m.id === value)) {
-          setValue(list[0]!.id);
-        }
+      setModels(list);
+      if (!r.ok) setErr(r.error);
+      const cur = useChrome.getState();
+      const current =
+        provider === "claude" ? cur.claudeModel : provider === "codex" ? cur.codexModel : cur.grokModel;
+      const favorite = cur.favModels?.[provider] ?? "";
+      if (!current) {
+        const next = (favorite && list.some((m) => m.id === favorite) ? favorite : "") || list[0]?.id || favorite;
+        if (next) setValue(next);
       }
     } catch (e) {
       setErr(e instanceof Error ? e.message : "falha ao listar modelos");
@@ -67,34 +71,73 @@ export function ModelSelect({ provider, compact }: { provider: AgentId; compact?
     void load();
   }, [provider, claudeAuth?.access, openaiAuth?.access]);
 
-  const options = models;
+  const options = (() => {
+    const list = [...models];
+    const extra = [value, fav].filter(Boolean);
+    for (const id of extra) {
+      if (id && !list.some((m) => m.id === id)) list.unshift({ id, label: id });
+    }
+    return list.map((m) => ({
+      id: m.id,
+      label: m.id === fav ? `★ ${m.label}` : m.label,
+    }));
+  })();
+
+  function pick(id: string) {
+    setValue(id);
+    if (!fav) setFav(provider, id);
+  }
+
+  const star = (
+    <button
+      type="button"
+      className={`fav-star${value && value === fav ? " is-on" : ""}`}
+      disabled={!value}
+      title={value === fav ? "modelo favorito" : "definir como favorito"}
+      aria-label="favorito"
+      onClick={() => {
+        if (value) setFav(provider, value);
+      }}
+    >
+      <Star size={16} strokeWidth={2} fill={value && value === fav ? "currentColor" : "none"} />
+    </button>
+  );
 
   if (compact) {
     return (
-      <PickList
-        compact
-        fill
-        label="Modelo"
-        ariaLabel="Modelo"
-        value={value}
-        options={options}
-        onChange={setValue}
-        disabled={busy && !options.length}
-      />
+      <div className="fav-row">
+        <PickList
+          compact
+          fill
+          label="Modelo"
+          ariaLabel="Modelo"
+          value={value}
+          options={options}
+          onChange={pick}
+          disabled={busy && !options.length}
+        />
+        {star}
+      </div>
     );
   }
 
   return (
     <div className="space-y-2">
-      <PickList
-        ariaLabel="Modelo"
-        fill
-        label="Modelo"
-        value={value}
-        options={options}
-        onChange={setValue}
-        disabled={busy && !options.length}
-      />
+      <div className="fav-row">
+        <PickList
+          ariaLabel="Modelo"
+          fill
+          label="Modelo"
+          value={value}
+          options={options}
+          onChange={pick}
+          disabled={busy && !options.length}
+        />
+        {star}
+      </div>
+      <p className="fav-hint">
+        {fav ? `Favorito: ${fav}. Ao voltar pra este provider, usa esse modelo.` : "Estrela = favorito deste provider."}
+      </p>
       <div className="flex gap-2">
         <input
           className="field"
@@ -103,7 +146,7 @@ export function ModelSelect({ provider, compact }: { provider: AgentId; compact?
           onChange={(e) => setCustom(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && custom.trim()) {
-              setValue(custom.trim());
+              pick(custom.trim());
               setCustom("");
             }
           }}
@@ -116,7 +159,7 @@ export function ModelSelect({ provider, compact }: { provider: AgentId; compact?
           className="chip shrink-0"
           onClick={() => {
             if (custom.trim()) {
-              setValue(custom.trim());
+              pick(custom.trim());
               setCustom("");
             } else void load();
           }}

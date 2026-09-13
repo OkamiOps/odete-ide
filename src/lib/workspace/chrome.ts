@@ -103,6 +103,7 @@ type ChromeState = {
   grokModel: string;
   claudeModel: string;
   codexModel: string;
+  favModels: Record<AgentId, string>;
   claudeAuth: TokenBundle | null;
   openaiAuth: TokenBundle | null;
   theme: ThemeId;
@@ -152,6 +153,7 @@ type ChromeState = {
   setGrokModel: (m: string) => void;
   setClaudeModel: (m: string) => void;
   setCodexModel: (m: string) => void;
+  setFavModel: (id: AgentId, m: string) => void;
   setClaudeAuth: (t: TokenBundle | null) => void;
   setOpenaiAuth: (t: TokenBundle | null) => void;
   setTheme: (t: ThemeId) => void;
@@ -235,6 +237,7 @@ export const useChrome = create<ChromeState>()(
       grokModel: "grok-4-1-fast-reasoning",
       claudeModel: "",
       codexModel: "",
+      favModels: { grok: "grok-4-1-fast-reasoning", claude: "", codex: "" },
       claudeAuth: null,
       openaiAuth: null,
       theme: "colo",
@@ -288,10 +291,22 @@ export const useChrome = create<ChromeState>()(
         set((s) => ({ effortByKey: { ...s.effortByKey, [key]: effort } })),
       setMobile: (mobile) => set({ mobile }),
       setCreating: (creating) => set({ creating }),
-      setAgentId: (agentId) => set({ agentId }),
+      setAgentId: (agentId) =>
+        set((s) => {
+          const fav = s.favModels?.[agentId];
+          if (!fav) return { agentId };
+          if (agentId === "claude") return { agentId, claudeModel: fav };
+          if (agentId === "codex") return { agentId, codexModel: fav };
+          return { agentId, grokModel: fav };
+        }),
       setGrokModel: (grokModel) => set({ grokModel }),
       setClaudeModel: (claudeModel) => set({ claudeModel }),
       setCodexModel: (codexModel) => set({ codexModel }),
+      setFavModel: (id, m) =>
+        set((s) => ({
+          favModels: { grok: "", claude: "", codex: "", ...s.favModels, [id]: m },
+          ...(id === "claude" ? { claudeModel: m } : id === "codex" ? { codexModel: m } : { grokModel: m }),
+        })),
       setClaudeAuth: (claudeAuth) => {
         set({ claudeAuth });
         void persistAuth();
@@ -345,6 +360,7 @@ export const useChrome = create<ChromeState>()(
         grokModel: s.grokModel,
         claudeModel: s.claudeModel,
         codexModel: s.codexModel,
+        favModels: s.favModels,
         claudeAuth: s.claudeAuth,
         openaiAuth: s.openaiAuth,
         theme: s.theme,
@@ -390,6 +406,12 @@ export const useChrome = create<ChromeState>()(
         if (typeof p.agentW !== "number" || p.agentW < 200) delete p.agentW;
         if (typeof p.termH !== "number" || p.termH < 120) delete p.termH;
         for (const key of ACTIONS) delete p[key];
+        const prev = (p.favModels ?? {}) as Record<string, string>;
+        p.favModels = {
+          grok: prev.grok || (p.grokModel as string) || "grok-4-1-fast-reasoning",
+          claude: prev.claude || (p.claudeModel as string) || "",
+          codex: prev.codex || (p.codexModel as string) || "",
+        };
         return { ...current, ...p } as ChromeState;
       },
     },

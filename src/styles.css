@@ -2145,3 +2145,17 @@ html[data-dragging] { cursor: grabbing; user-select: none; }
 .gh-comment { padding: 8px 10px; border: 1px solid var(--color-border); border-radius: 10px; background: var(--color-bg); }
 .gh-comment b { font-size: 12px; }
 .gh-comment p { margin: 4px 0 0; font-size: 13px; white-space: pre-wrap; }
+
+.fav-row { display: grid; grid-template-columns: minmax(0,1fr) 40px; gap: 6px; align-items: stretch; min-width: 0; }
+.fav-star {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  min-height: 52px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-bg-subtle);
+  color: var(--color-fg-muted);
+}
+.fav-star.is-on { color: #e8b931; border-color: color-mix(in srgb, #e8b931 45%, var(--color-border)); }
+.fav-hint { margin: 0; font-size: 11px; color: var(--color-fg-subtle); line-height: 1.35; }

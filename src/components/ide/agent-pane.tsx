@@ -862,6 +862,8 @@ function CtxPanel({
     </div>
   );
 }
+
+function mentionAt(text: string, pos: number) {
   const left = text.slice(0, Math.max(0, pos));
   const m = /(?:^|[\s(\[\{])@([^\s@]*)$/.exec(left);
   if (!m) return null;

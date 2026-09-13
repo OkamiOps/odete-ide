@@ -1850,3 +1850,6 @@ html[data-dragging] { cursor: grabbing; user-select: none; }
   font-size: 12px;
   flex-shrink: 0;
 }
+.git-pr { border-bottom: 1px solid var(--color-border); }
+.git-pr .hit { width: 100%; }
+.git-pr-ops { display: flex; gap: 6px; padding: 0 10px 8px; }

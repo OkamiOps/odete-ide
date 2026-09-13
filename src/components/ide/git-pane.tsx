@@ -16,7 +16,7 @@ import {
   Trash2,
   Upload,
 } from "lucide-react";
-import { githubCreateIssue, githubCreatePr, githubIssues, githubPulls, githubPullTree, githubPushTree, type CloneResult } from "@/lib/github/api";
+import { githubCreateIssue, githubCreatePr, githubFork, githubIssues, githubMergePr, githubPulls, githubPullTree, githubPushTree, githubReviewPr, type CloneResult } from "@/lib/github/api";
 import { PickList } from "@/components/ide/pick-list";
 import { diffStats, fileStatus } from "@/lib/workspace/diff";
 import { hunksOf } from "@/lib/workspace/hunks";
@@ -564,11 +564,49 @@ function GithubBox({ remote, branch, token }: { remote: string; branch: string; 
           abrir no GitHub
         </a>
       </p>
-      {prs.slice(0, 5).map((p) => (
-        <a key={p.number} className="hit" href={p.url} target="_blank" rel="noreferrer">
-          <b>PR #{p.number}</b>
-          <span>{p.title}</span>
-        </a>
+      {prs.slice(0, 8).map((p) => (
+        <div key={p.number} className="git-pr">
+          <a className="hit" href={p.url} target="_blank" rel="noreferrer">
+            <b>PR #{p.number}</b>
+            <span>{p.title}</span>
+          </a>
+          <div className="git-pr-ops">
+            <button
+              type="button"
+              className="chip"
+              disabled={busy}
+              onClick={() => {
+                setBusy(true);
+                void githubReviewPr(remote, token, p.number, "APPROVE", title.trim() || "ok pelo Colo")
+                  .then(() => {
+                    setNote(`review #${p.number}`);
+                    load();
+                  })
+                  .catch((e) => setNote(e instanceof Error ? e.message : "review falhou"))
+                  .finally(() => setBusy(false));
+              }}
+            >
+              review
+            </button>
+            <button
+              type="button"
+              className="chip is-on"
+              disabled={busy}
+              onClick={() => {
+                setBusy(true);
+                void githubMergePr(remote, token, p.number, "squash")
+                  .then((r) => {
+                    setNote(r.merged ? `merge #${p.number}` : r.message);
+                    load();
+                  })
+                  .catch((e) => setNote(e instanceof Error ? e.message : "merge falhou"))
+                  .finally(() => setBusy(false));
+              }}
+            >
+              merge
+            </button>
+          </div>
+        </div>
       ))}
       {issues.slice(0, 5).map((i) => (
         <a key={i.number} className="hit" href={i.url} target="_blank" rel="noreferrer">
@@ -613,6 +651,20 @@ function GithubBox({ remote, branch, token }: { remote: string; branch: string; 
           }}
         >
           PR
+        </button>
+        <button
+          type="button"
+          className="chip"
+          disabled={busy}
+          onClick={() => {
+            setBusy(true);
+            void githubFork(remote, token)
+              .then((r) => setNote(`fork ${r.full_name}`))
+              .catch((e) => setNote(e instanceof Error ? e.message : "fork falhou"))
+              .finally(() => setBusy(false));
+          }}
+        >
+          fork
         </button>
       </div>
       {note ? <p className="git-note">{note}</p> : null}

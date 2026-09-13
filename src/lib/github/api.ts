@@ -15,9 +15,50 @@ export type GithubRepo = {
 };
 export type CloneResult = { name: string; branch: string; remote: string; files: Record<string, string> };
 
-const SKIP =
-  /\.(png|jpe?g|gif|webp|ico|bmp|woff2?|ttf|eot|otf|mp4|mp3|wav|ogg|zip|gz|tgz|wasm|pdf|exe|dmg|lockb|bin|DS_Store)$/i;
+const SKIP_HEAVY =
+  /\.(mp4|mp3|wav|ogg|zip|gz|tgz|7z|rar|exe|dmg|iso|lockb|DS_Store)$/i;
 const SKIP_DIR = /(^|\/)(node_modules|\.git|dist|build|\.next|coverage|vendor)(\/|$)/;
+const MAX_FILE = 1_200_000;
+const MAX_FILES = 400;
+
+export const BIN_PREFIX = "bin:";
+
+export function isBinFile(s: string) {
+  return s.startsWith(BIN_PREFIX);
+}
+
+function mimeOf(path: string) {
+  const ext = (path.split(".").pop() ?? "").toLowerCase();
+  const map: Record<string, string> = {
+    png: "image/png",
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    gif: "image/gif",
+    webp: "image/webp",
+    ico: "image/x-icon",
+    bmp: "image/bmp",
+    woff: "font/woff",
+    woff2: "font/woff2",
+    ttf: "font/ttf",
+    otf: "font/otf",
+    pdf: "application/pdf",
+    wasm: "application/wasm",
+    bin: "application/octet-stream",
+  };
+  return map[ext] || "application/octet-stream";
+}
+
+function packBin(path: string, b64: string) {
+  return `${BIN_PREFIX}${mimeOf(path)};${b64}`;
+}
+
+export function unpackBin(s: string): { mime: string; b64: string } | null {
+  if (!isBinFile(s)) return null;
+  const rest = s.slice(BIN_PREFIX.length);
+  const i = rest.indexOf(";");
+  if (i < 0) return { mime: "application/octet-stream", b64: rest };
+  return { mime: rest.slice(0, i), b64: rest.slice(i + 1) };
+}
 
 export function parseRepo(input: string) {
   const raw = input.trim().replace(/\.git$/, "");
@@ -53,6 +94,34 @@ async function gh<T>(url: string, token?: string): Promise<T> {
   return JSON.parse(text) as T;
 }
 
+async function ghPages<T>(url: string, token?: string): Promise<T[]> {
+  const out: T[] = [];
+  let next: string | null = url;
+  let n = 0;
+  while (next && n < 12) {
+    const r = await fetch(next, { headers: headers(token) });
+    const text = await r.text();
+    if (!r.ok) {
+      let msg = `GitHub ${r.status}`;
+      try {
+        const j = JSON.parse(text) as { message?: string };
+        if (j.message) msg = j.message;
+      } catch {
+        if (text) msg = text.slice(0, 180);
+      }
+      throw new Error(msg);
+    }
+    const chunk = JSON.parse(text) as T[];
+    out.push(...chunk);
+    const link = r.headers.get("link") || "";
+    const m = /<([^>]+)>;\s*rel="next"/.exec(link);
+    next = m?.[1] ?? null;
+    n += 1;
+    if (chunk.length < 100) break;
+  }
+  return out;
+}
+
 function decodeB64(content: string) {
   const bin = atob(content.replace(/\n/g, ""));
   const bytes = new Uint8Array(bin.length);
@@ -74,24 +143,23 @@ export async function githubOrgs(token: string): Promise<GithubOrg[]> {
 }
 
 export async function githubRepos(token: string, owner?: string): Promise<GithubRepo[]> {
+  type Raw = {
+    full_name: string;
+    description: string | null;
+    updated_at: string;
+    pushed_at: string | null;
+    private: boolean;
+    fork: boolean;
+    archived: boolean;
+    default_branch: string;
+    language: string | null;
+    stargazers_count: number;
+    open_issues_count: number;
+  };
   const url = owner
     ? `https://api.github.com/orgs/${encodeURIComponent(owner)}/repos?sort=updated&per_page=100&type=all`
-    : "https://api.github.com/user/repos?sort=updated&per_page=100&affiliation=owner";
-  const list = await gh<
-    {
-      full_name: string;
-      description: string | null;
-      updated_at: string;
-      pushed_at: string | null;
-      private: boolean;
-      fork: boolean;
-      archived: boolean;
-      default_branch: string;
-      language: string | null;
-      stargazers_count: number;
-      open_issues_count: number;
-    }[]
-  >(url, token);
+    : "https://api.github.com/user/repos?sort=updated&per_page=100&affiliation=owner,collaborator,organization_member";
+  const list = await ghPages<Raw>(url, token);
   return list.map((r) => ({
     full: r.full_name,
     desc: r.description || "",
@@ -105,6 +173,74 @@ export async function githubRepos(token: string, owner?: string): Promise<Github
     stars: r.stargazers_count || 0,
     issues: r.open_issues_count || 0,
   }));
+}
+
+function bytesFromB64(content: string) {
+  const bin = atob(content.replace(/\n/g, ""));
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
+function isTextBytes(bytes: Uint8Array) {
+  const n = Math.min(bytes.length, 800);
+  for (let i = 0; i < n; i++) if (bytes[i] === 0) return false;
+  return true;
+}
+
+function parseLfsPointer(text: string) {
+  if (!text.startsWith("version https://git-lfs.github.com/spec/v1")) return null;
+  const oid = /oid sha256:([a-f0-9]{64})/.exec(text)?.[1];
+  const size = Number(/size (\d+)/.exec(text)?.[1] || 0);
+  if (!oid || !size) return null;
+  return { oid, size };
+}
+
+async function lfsDownload(owner: string, repo: string, token: string, oid: string, size: number) {
+  const r = await fetch(`https://github.com/${owner}/${repo}.git/info/lfs/objects/batch`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/vnd.git-lfs+json",
+      "Content-Type": "application/vnd.git-lfs+json",
+    },
+    body: JSON.stringify({ operation: "download", transfers: ["basic"], objects: [{ oid, size }] }),
+  });
+  if (!r.ok) throw new Error(`LFS ${r.status}`);
+  const j = (await r.json()) as {
+    objects?: Array<{ actions?: { download?: { href?: string; header?: Record<string, string> } } }>;
+  };
+  const dl = j.objects?.[0]?.actions?.download;
+  if (!dl?.href) throw new Error("LFS sem download");
+  const got = await fetch(dl.href, { headers: dl.header || {} });
+  if (!got.ok) throw new Error(`LFS blob ${got.status}`);
+  const buf = new Uint8Array(await got.arrayBuffer());
+  let bin = "";
+  buf.forEach((b) => {
+    bin += String.fromCharCode(b);
+  });
+  return btoa(bin);
+}
+
+function fileToBytes(content: string) {
+  const bin = unpackBin(content);
+  if (bin) return bytesFromB64(bin.b64);
+  return new TextEncoder().encode(content);
+}
+
+function fileToB64(content: string) {
+  const bin = unpackBin(content);
+  if (bin) return bin.b64;
+  return b64(content);
+}
+
+async function gitBlobSha(bytes: Uint8Array) {
+  const header = new TextEncoder().encode(`blob ${bytes.length}\0`);
+  const buf = new Uint8Array(header.length + bytes.length);
+  buf.set(header);
+  buf.set(bytes, header.length);
+  const hash = await crypto.subtle.digest("SHA-1", buf);
+  return [...new Uint8Array(hash)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 export async function githubClone(
@@ -130,12 +266,12 @@ export async function githubClone(
     (t) =>
       t.type === "blob" &&
       t.path &&
-      !SKIP.test(t.path) &&
+      !SKIP_HEAVY.test(t.path) &&
       !SKIP_DIR.test(t.path) &&
-      (t.size ?? 0) < 120_000,
+      (t.size ?? 0) < MAX_FILE,
   );
-  const picked = blobs.slice(0, 100);
-  if (!picked.length) throw new Error("nenhum arquivo de texto nesse repo");
+  const picked = blobs.slice(0, MAX_FILES);
+  if (!picked.length) throw new Error("nenhum arquivo nesse repo");
   const files: Record<string, string> = {};
   let done = 0;
   const queue = [...picked];
@@ -144,20 +280,48 @@ export async function githubClone(
       const item = queue.shift()!;
       const path = item.path;
       try {
+        let b64content = "";
         if (token) {
           const body = await gh<{ encoding?: string; content?: string }>(
             `https://api.github.com/repos/${owner}/${slug}/contents/${encodeURIComponent(path).replaceAll("%2F", "/")}?ref=${encodeURIComponent(branch)}`,
             token,
           );
-          if (body.encoding === "base64" && body.content) files[path] = decodeB64(body.content);
+          if (body.encoding === "base64" && body.content) b64content = body.content.replace(/\n/g, "");
         } else {
           const raw = await fetch(
             `https://raw.githubusercontent.com/${owner}/${slug}/${encodeURIComponent(branch)}/${path}`,
           );
-          if (raw.ok) files[path] = await raw.text();
+          if (!raw.ok) continue;
+          const buf = new Uint8Array(await raw.arrayBuffer());
+          let bin = "";
+          buf.forEach((b) => {
+            bin += String.fromCharCode(b);
+          });
+          b64content = btoa(bin);
+        }
+        if (!b64content) continue;
+        const bytes = bytesFromB64(b64content);
+        if (isTextBytes(bytes)) {
+          const text = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
+          const lfs = token ? parseLfsPointer(text) : null;
+          if (lfs && lfs.size < MAX_FILE) {
+            try {
+              const raw = await lfsDownload(owner, slug, token!, lfs.oid, lfs.size);
+              const lb = bytesFromB64(raw);
+              files[path] = isTextBytes(lb)
+                ? new TextDecoder("utf-8", { fatal: false }).decode(lb)
+                : packBin(path, raw);
+            } catch {
+              files[path] = text;
+            }
+          } else {
+            files[path] = text;
+          }
+        } else {
+          files[path] = packBin(path, b64content);
         }
       } catch {
-        /* skip file */
+        /* skip */
       }
       done += 1;
       if (done % 8 === 0) onProgress?.(`${done}/${picked.length} arquivos`);
@@ -215,28 +379,48 @@ export async function githubPushTree(
     token,
   );
   const parent = ref.object.sha;
-  const entries = Object.entries(files).slice(0, 80);
-  const tree: { path: string; mode: "100644"; type: "blob"; sha: string }[] = [];
+  const commit = await gh<{ tree: { sha: string } }>(
+    `https://api.github.com/repos/${owner}/${repo}/git/commits/${parent}`,
+    token,
+  );
+  const baseTree = commit.tree.sha;
+  const remoteTree = await gh<{ tree: { path: string; type: string; sha: string; mode: string }[] }>(
+    `https://api.github.com/repos/${owner}/${repo}/git/trees/${baseTree}?recursive=1`,
+    token,
+  );
+  const remoteBlobs = new Map(
+    remoteTree.tree.filter((t) => t.type === "blob").map((t) => [t.path, t.sha]),
+  );
+
+  const tree: Array<{ path: string; mode: "100644"; type: "blob"; sha: string | null }> = [];
+  const entries = Object.entries(files).filter(([p]) => !SKIP_DIR.test(p) && !SKIP_HEAVY.test(p));
   let i = 0;
   for (const [path, content] of entries) {
+    const bytes = fileToBytes(content);
+    const sha = await gitBlobSha(bytes);
+    if (remoteBlobs.get(path) === sha) continue;
     const blob = await ghWrite<{ sha: string }>(
       `https://api.github.com/repos/${owner}/${repo}/git/blobs`,
       token,
       "POST",
-      { content: b64(content), encoding: "base64" },
+      { content: fileToB64(content), encoding: "base64" },
     );
     tree.push({ path, mode: "100644", type: "blob", sha: blob.sha });
     i += 1;
-    if (i % 6 === 0) onProgress?.(`${i}/${entries.length} blobs`);
+    if (i % 6 === 0) onProgress?.(`${i} blobs`);
+  }
+  if (!tree.length) {
+    onProgress?.("nada pra enviar");
+    return parent.slice(0, 8);
   }
   onProgress?.("árvore…");
   const made = await ghWrite<{ sha: string }>(
     `https://api.github.com/repos/${owner}/${repo}/git/trees`,
     token,
     "POST",
-    { tree },
+    { base_tree: baseTree, tree },
   );
-  const commit = await ghWrite<{ sha: string }>(
+  const madeCommit = await ghWrite<{ sha: string }>(
     `https://api.github.com/repos/${owner}/${repo}/git/commits`,
     token,
     "POST",
@@ -246,9 +430,9 @@ export async function githubPushTree(
     `https://api.github.com/repos/${owner}/${repo}/git/refs/heads/${encodeURIComponent(branch)}`,
     token,
     "PATCH",
-    { sha: commit.sha },
+    { sha: madeCommit.sha },
   );
-  return commit.sha.slice(0, 8);
+  return madeCommit.sha.slice(0, 8);
 }
 
 export async function githubPullTree(remote: string, branch: string, token?: string) {
@@ -324,5 +508,49 @@ export async function githubCreatePr(
     token,
     "POST",
     { title, body, head, base },
+  );
+}
+
+export async function githubMergePr(
+  remote: string,
+  token: string,
+  number: number,
+  method: "merge" | "squash" | "rebase" = "squash",
+) {
+  const spec = parseRepo(remote);
+  if (!spec) throw new Error("remote inválido");
+  return ghWrite<{ merged: boolean; sha: string; message: string }>(
+    `https://api.github.com/repos/${spec.owner}/${spec.repo}/pulls/${number}/merge`,
+    token,
+    "PUT",
+    { merge_method: method },
+  );
+}
+
+export async function githubReviewPr(
+  remote: string,
+  token: string,
+  number: number,
+  event: "APPROVE" | "REQUEST_CHANGES" | "COMMENT" = "APPROVE",
+  body = "ok pelo Colo",
+) {
+  const spec = parseRepo(remote);
+  if (!spec) throw new Error("remote inválido");
+  return ghWrite<{ id: number; html_url: string }>(
+    `https://api.github.com/repos/${spec.owner}/${spec.repo}/pulls/${number}/reviews`,
+    token,
+    "POST",
+    { event, body },
+  );
+}
+
+export async function githubFork(remote: string, token: string) {
+  const spec = parseRepo(remote);
+  if (!spec) throw new Error("remote inválido");
+  return ghWrite<{ full_name: string; html_url: string; default_branch: string }>(
+    `https://api.github.com/repos/${spec.owner}/${spec.repo}/forks`,
+    token,
+    "POST",
+    {},
   );
 }

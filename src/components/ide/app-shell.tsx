@@ -20,6 +20,8 @@ import { applyTheme } from "@/components/ide/settings-pane";
 import { Splitter, clamp } from "@/components/ide/splitter";
 import { useChrome, type MobileTab } from "@/lib/workspace/chrome";
 import { freeWorkspaceQuota, restoreAuth } from "@/lib/workspace/secrets";
+import { usePersistHealth } from "@/lib/workspace/idb";
+import { useDisk, diskLabel, initDisk } from "@/lib/workspace/disk";
 import { setSheet, useProjects } from "@/lib/workspace/projects";
 import { formatFile } from "@/lib/workspace/plugins";
 import { useWorkspace } from "@/lib/workspace/store";
@@ -76,7 +78,8 @@ export function IdeApp() {
         });
       });
     }
-    void Promise.all([wait(useChrome), wait(useProjects)]).then(() => restoreAuth());
+    void initDisk();
+    void Promise.all([wait(useChrome), wait(useProjects), wait(useWorkspace)]).then(() => restoreAuth());
   }, []);
 
   useEffect(() => {
@@ -133,7 +136,8 @@ export function IdeApp() {
           ws.writeFile(ws.openPath, body);
         }
         ws.rememberNow();
-        window.dispatchEvent(new Event("colo-saved"));
+        const persistOk = usePersistHealth.getState().ok && useDisk.getState().ok && !usePersistHealth.getState().freeze;
+        window.dispatchEvent(new CustomEvent("colo-saved", { detail: { ok: persistOk } }));
         return;
       }
       if (meta && is("f") && !e.shiftKey) {
@@ -350,10 +354,14 @@ function StatusBar() {
   const toggleSide = useChrome((s) => s.toggleSide);
   const toggleAgent = useChrome((s) => s.toggleAgent);
   const toggleTerm = useChrome((s) => s.toggleTerm);
+  const persistErr = usePersistHealth((s) => (!s.ok ? s.lastError : ""));
+  const diskErr = useDisk((s) => (!s.ok ? s.lastError : ""));
+  const backend = useDisk((s) => s.backend);
   const [flash, setFlash] = useState("");
   useEffect(() => {
-    const on = () => {
-      setFlash("salvo");
+    const on = (e: Event) => {
+      const ok = (e as CustomEvent<{ ok?: boolean }>).detail?.ok !== false;
+      setFlash(ok ? "salvo" : "não persistiu");
       window.setTimeout(() => setFlash(""), 1400);
     };
     window.addEventListener("colo-saved", on);
@@ -376,6 +384,13 @@ function StatusBar() {
       <span>{n} commit{n === 1 ? "" : "s"}</span>
       <span>{dirty ? "modificado" : "limpo"}</span>
       {flash ? <span className="is-on">{flash}</span> : null}
+      {persistErr || diskErr ? (
+        <span className="is-on" title={persistErr || diskErr}>
+          persistência falhou
+        </span>
+      ) : (
+        <span title={diskLabel(backend)}>{backend === "native" ? "disco nativo" : backend === "opfs" ? "disco" : "idb"}</span>
+      )}
       <span className="min-w-0 truncate">{openPath}</span>
       <span className="ml-auto">{theme}</span>
       <button type="button" onClick={() => useChrome.getState().setCheatsheet(true)} title="Atalhos">

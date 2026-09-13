@@ -49,6 +49,7 @@ export function PreviewPane() {
   const md = isMdPath(openPath);
   const [frame, setFrame] = useState<Frame>("full");
   const [tick, setTick] = useState(0);
+  const [wcGen, setWcGen] = useState(0);
   const [logs, setLogs] = useState<Log[]>([]);
   const [hmrKind, setHmrKind] = useState<"hmr" | "reload" | "">("");
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -68,6 +69,12 @@ export function PreviewPane() {
 
   useEffect(() => {
     try {
+      if (wcUrl) {
+        appliedRef.current = files;
+        setHmrKind("hmr");
+        forceReload.current = false;
+        return;
+      }
       if (md) {
         setDoc(markdownPage(files[openPath] ?? ""));
         appliedRef.current = files;
@@ -79,12 +86,6 @@ export function PreviewPane() {
         setDoc(buildSwiftPlayground(files[openPath] ?? ""));
         appliedRef.current = files;
         setHmrKind("");
-        forceReload.current = false;
-        return;
-      }
-      if (wcUrl) {
-        appliedRef.current = files;
-        setHmrKind("hmr");
         forceReload.current = false;
         return;
       }
@@ -173,14 +174,14 @@ export function PreviewPane() {
       <div className="pane-hd">
         <span className="label">Preview</span>
         <em>
-          {md
-            ? openPath
-            : swift
+          {wcUrl
+            ? wcStatus === "running"
+              ? "Node"
+              : "Node…"
+            : md
               ? openPath
-              : wcUrl
-                ? wcStatus === "running"
-                  ? "Node"
-                  : "Node…"
+              : swift
+                ? openPath
                 : hmrKind === "hmr"
                   ? "HMR"
                   : "index.html"}
@@ -201,6 +202,7 @@ export function PreviewPane() {
             onClick={() => {
               setLogs([]);
               forceReload.current = true;
+              if (wcUrl) setWcGen((n) => n + 1);
               setTick((n) => n + 1);
             }}
           >
@@ -209,9 +211,9 @@ export function PreviewPane() {
         </div>
       </div>
       <div className="preview-stage">
-        {wcUrl && !md && !swift ? (
+        {wcUrl ? (
           <iframe
-            key={wcUrl}
+            key={`${wcUrl}:${wcGen}`}
             title="Preview do workspace"
             sandbox="allow-scripts allow-forms allow-modals allow-popups allow-downloads allow-same-origin"
             src={wcUrl}

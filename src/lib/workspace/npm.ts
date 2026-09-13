@@ -67,11 +67,18 @@ export function detectStack(pkg: {
 }
 
 export function stackHint(stack: Stack) {
+  const isolated = typeof window !== "undefined" && !!window.crossOriginIsolated;
+  if (!isolated) {
+    if (stack.kind === "spa") {
+      return `${stack.label}: origem não isolada — Preview com esm.sh (não é o Vite). No app em tela cheia, npm run dev sobe o Node.`;
+    }
+    return `${stack.label}: precisa do app em tela cheia com origem isolada pra subir o servidor. Aqui o Colo só emula o client.`;
+  }
   if (stack.kind === "spa") {
     return `${stack.label}: npm run dev sobe o Vite no Node deste iPad. HMR de verdade.`;
   }
   if (stack.id === "nest") {
-    return `Nest: npm run start sobe o servidor no Node deste iPad. o Preview aponta pra ele.`;
+    return `Nest: npm run start / start:dev sobe o servidor no Node deste iPad. o Preview aponta pra ele.`;
   }
   if (stack.id === "next") {
     return `Next: npm run dev sobe o Next neste iPad (1º boot é lento). o Preview aponta pro servidor.`;
@@ -278,7 +285,7 @@ export function npmRunScript(name: string | undefined): { out: string; openPrevi
   }
   if (isBuild) {
     return {
-      out: `npm run ${name} — ${cmd || name}\neste iPad não executa ${name} (tsc/eslint/next build). Preview e \`node arquivo.js\` usam o runtime do Colo.`,
+      out: `npm run ${name} — ${cmd || name}\nsem Node isolado o Colo não corre ${name} (tsc/eslint/next build). no app em tela cheia, npm run ${name} usa o Node.`,
       openPreview: false,
     };
   }

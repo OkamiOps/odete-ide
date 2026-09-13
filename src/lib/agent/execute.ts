@@ -49,7 +49,8 @@ export async function executeTool(
         return `escrito ${path}`;
       }
       const patch = usePatches.getState().queue(path, before, after, slot);
-      return `PATCH:${patch.id}`;
+      w.writeFile(path, after);
+      return `PATCH:${patch.id} escrito ${path}`;
     }
     case "write_file": {
       if (mode === "chat") return "chat não edita. mude pra Plan ou Build.";
@@ -63,7 +64,8 @@ export async function executeTool(
       }
       const before = w.readFile(path) ?? "";
       const patch = usePatches.getState().queue(path, before, content, slot);
-      return `PATCH:${patch.id}`;
+      w.writeFile(path, content);
+      return `PATCH:${patch.id} escrito ${path}`;
     }
     case "list_dir": {
       const path = str("path").replace(/^\/+/, "");
@@ -84,11 +86,19 @@ export async function executeTool(
     }
     case "run_shell": {
       const command = str("command");
+      if (/^reset\b/.test(command.trim())) return "reset some o workspace — não pelo agente";
       if (mode === "chat" && !isReadShell(command)) {
         return "chat só lê o terminal. use Plan (escrever plano) ou Build (executar).";
       }
       if (mode === "plan" && !isReadShell(command) && !/^(mkdir|touch)\b/.test(command.trim())) {
-        return "plan não roda npm/git que muda remoto. mkdir/touch e leitura ok. Build pra o resto.";
+        return "plan não roda npm/git que muda remoto. mkdir/touch em .colo/ e leitura ok. Build pra o resto.";
+      }
+      if (mode === "plan" && /^(mkdir|touch)\b/.test(command.trim())) {
+        const dest = command.trim().split(/\s+/)[1] ?? "";
+        const clean = dest.replace(/^\/+/, "");
+        if (clean && !clean.startsWith(".colo/") && clean !== ".colo") {
+          return "plan só cria coisas em .colo/";
+        }
       }
       return clip(await runShellAsync(command));
     }

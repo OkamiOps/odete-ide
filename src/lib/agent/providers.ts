@@ -14,7 +14,7 @@ export const AGENTS: AgentDef[] = [
     id: "grok",
     label: "Grok",
     vendor: "xAI",
-    blurb: "Já incluso neste preview. Modelos vêm da xAI.",
+    blurb: "Já incluso neste app. Modelos vêm da xAI.",
     defaultModel: "grok-4-1-fast-reasoning",
     auth: "builtin",
   },

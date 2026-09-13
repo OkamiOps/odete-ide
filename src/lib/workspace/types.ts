@@ -18,12 +18,14 @@ export type StashEntry = {
   message: string;
   files: FileMap;
   staged: string[];
+  stagedBlobs?: FileMap;
 };
 
 export type BranchSnap = {
   files: FileMap;
   commits: Commit[];
   staged: string[];
+  stagedBlobs?: FileMap;
   lastPushedId: string | null;
   origin: Commit | null;
 };

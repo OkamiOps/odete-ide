@@ -169,7 +169,7 @@ function GrokInfo() {
   return (
     <div className="space-y-3">
       <p>
-        Grok já está ligado neste preview. Sem login extra. Modelos vêm da xAI.
+        Grok já está ligado neste app. Sem login extra. Modelos vêm da xAI.
       </p>
       <ModelSelect provider="grok" />
     </div>
@@ -258,7 +258,7 @@ function ClaudeAuth() {
           )}
           {url ? (
             <p className="text-xs text-fg-muted">
-              Autorize no Safari. A página devolve um código no formato{" "}
+              Autorize no navegador do sistema. A página devolve um código no formato{" "}
               <span className="font-mono">code#state</span>. Cole abaixo.
             </p>
           ) : null}

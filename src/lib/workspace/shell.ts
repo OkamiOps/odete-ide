@@ -67,7 +67,7 @@ export async function runShellAsync(raw: string): Promise<string> {
           "git status | log | diff | add | restore | commit -m | pull | push | fetch | sync | clone",
           "git branch | checkout | stash | stash pop | blame",
           "npm i [pkg] [-D]   pnpm i   npm run [script]   npm ls   node [arquivo]   clear",
-          "npm run dev | start | build  → Node neste iPad",
+          "npm run dev | start | start:dev | build  → Node neste iPad (tela cheia / origem isolada)",
         ].join("\n");
         break;
       case "clear":
@@ -263,6 +263,13 @@ export async function runShellAsync(raw: string): Promise<string> {
             out = await npmInstall(rest, (m) => w.termPrint("out", m));
           }
         } else if (sub === "ls") {
+          const { nodeSpawn } = await import("./node-runtime");
+          const wcLs = await nodeSpawn(cmd === "pnpm" ? "pnpm" : "npm", ["ls", "--depth=0"], (m) => w.termPrint("out", m));
+          if (wcLs.used) {
+            out = wcLs.out;
+            err = wcLs.code !== 0;
+            break;
+          }
           const { parseLock } = await import("./npm-lock");
           const lock = parseLock(w.readFile("package-lock.colo.json"));
           const keys = Object.keys(lock);

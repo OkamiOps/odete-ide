@@ -3,7 +3,7 @@ import type { TokenBundle } from "@/lib/agent/oauth";
 import type { GithubUser } from "@/lib/github/api";
 
 const KEY = "colo-secrets-v1";
-const DEAD = ["colo-workspace-v2", "colo-workspace-v1", "colo-workspace"];
+const DEAD = ["colo-workspace-v1", "colo-workspace"];
 
 export type Secrets = {
   github: { token: string; user: GithubUser } | null;

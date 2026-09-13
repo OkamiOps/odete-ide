@@ -90,7 +90,7 @@ export const AGENT_TOOLS = [
     function: {
       name: "run_shell",
       description:
-        "Terminal do workspace. ls, cat, mkdir, git, npm i / pnpm i (workspace e catalog), npm run dev (Preview JSX/TS com HMR). Chat só lê. Next/Nest/Astro SSR não sobem no iPad (sem Node).",
+        "Terminal do workspace. ls, cat, mkdir, git, npm i / pnpm i, npm run dev/start/build, node arquivo.js. Quando o app está isolado (tela cheia) o Node é de verdade — Vite, Next, Nest, Astro, Remix sobem no Preview. Sem isolamento, cai no Preview JSX/TS do Colo. Chat só lê. Plan: mkdir/touch só em .colo/.",
       parameters: {
         type: "object",
         properties: { command: { type: "string" } },
@@ -130,8 +130,8 @@ Não edite arquivos. Não rode npm i, git push, rm, mkdir.`;
   if (mode === "plan") {
     return `Modo PLAN: investigue e GRAVE o plano em \`.colo/plan.md\` (crie a pasta se precisar).
 ${read}
-Pode criar/editar arquivos do plano (\`.colo/plan.md\`, docs, sketches).
-Não rode git push / npm i / rm em massa. Shell de leitura e mkdir ok.
+Só escreve \`.colo/plan.md\`. mkdir/touch só dentro de \`.colo/\`.
+Não rode git push / npm i / rm em massa. Shell de leitura ok.
 
 O arquivo \`.colo/plan.md\` deve ter:
 

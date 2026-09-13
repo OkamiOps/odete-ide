@@ -311,9 +311,8 @@ struct ContentView: View {
 `,
   "notes.md": `# Notas
 
-- Preview transforma JSX/TS e resolve pacotes via esm.sh. Sem binário Node.
-- \`npm i\` grava o lock (sem despejar node_modules no editor). \`npm run dev\` abre o Preview.
-- Next/Remix/Astro/Nest: o servidor não sobe neste iPad.
+- \`npm i\` e \`npm run dev\` usam o Node deste iPad quando o app está em tela cheia (origem isolada).
+- Sem isolamento (prévia embutida) o Preview usa esm.sh + JSX/TS do Colo.
 - Git é local: commit, log, status, push (HEAD, não o rascunho).
 - O agente usa grok-4.5 no servidor do app e as tools mexem nestes arquivos.
 `,

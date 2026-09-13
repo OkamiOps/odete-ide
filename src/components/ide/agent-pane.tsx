@@ -99,7 +99,7 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
   const [listening, setListening] = useState(false);
   const [voiceErr, setVoiceErr] = useState("");
   const ckAll = useCheckpoints((s) => s.items);
-  const ckItems = ckAll.filter((x) => (x.slot ?? "a") === slot);
+  const ckItems = ckAll.filter((x) => (x.slot ?? "a") === slot && (!x.projectId || x.projectId === projectId));
 
   function startVoice() {
     const w = window as unknown as {
@@ -108,7 +108,7 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
     };
     const SR = w.SpeechRecognition ?? w.webkitSpeechRecognition;
     if (!SR) {
-      setVoiceErr("este iPad/Safari não tem ditado no browser — usa o teclado");
+      setVoiceErr("este WebView não tem ditado — usa o teclado");
       return;
     }
     setVoiceErr("");
@@ -150,6 +150,14 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
     setBusy(false);
     booted.current = true;
   }, [projectId, chatsReady, slot]);
+
+  useEffect(() => {
+    return () => {
+      cancel.current = true;
+      gen.current += 1;
+      answerPermit(false, slot);
+    };
+  }, [slot]);
 
   useEffect(() => {
     const el = inputRef.current;
@@ -356,7 +364,7 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
         pics,
         (use) => useAgentChats.getState().addUsage(projectId, use, slot),
       );
-      if (!cancel.current) history.current = next;
+      if (gen.current === my && !cancel.current) history.current = next;
     } catch (e) {
       if (cancel.current || gen.current !== my) return;
       setItems((prev) => [
@@ -401,7 +409,9 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
     return user.kind === "user" ? user.text : "";
   }
   const patchItems = usePatches((s) => s.items);
-  const pendingCount = patchItems.filter((p) => p.status === "pending" && (p.slot ?? "a") === slot).length;
+  const pendingCount = patchItems.filter(
+    (p) => p.status === "pending" && (p.slot ?? "a") === slot && (!p.projectId || p.projectId === projectId),
+  ).length;
   const quote = useNav((s) => s.quote);
 
   const model = useChrome((s) => currentAgentModel({ ...s, agentId }, slot));
@@ -551,7 +561,11 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
           <div className="agent-empty">
             <p className="agent-empty-kicker">{def.vendor}</p>
             <h3>{def.label} pronto</h3>
-            <p>npm i e npm run dev usam o Node deste iPad. Vite, Next e Nest sobem no Preview. build também corre (é mais lento).</p>
+            <p>
+              {typeof window !== "undefined" && window.crossOriginIsolated
+                ? "npm i e npm run dev usam o Node deste iPad. Vite, Next e Nest sobem no Preview. build também corre (é mais lento)."
+                : "Nesta prévia o Node real não sobe (origem não isolada). No app em tela cheia, npm run dev usa o Node deste iPad."}
+            </p>
             <div className="agent-starts">
               {STARTERS.map((s) => (
                 <button key={s.label} type="button" onClick={() => void send(s.prompt)}>

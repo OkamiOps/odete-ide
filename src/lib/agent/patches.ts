@@ -16,6 +16,7 @@ export type Patch = {
   orig: string;
   status: "pending" | "accepted" | "rejected" | "undone";
   slot: AgentSlot;
+  projectId?: string;
 };
 
 type PatchState = {
@@ -43,18 +44,30 @@ export const usePatches = create<PatchState>()(
     (set, get) => ({
       items: [],
       queue: (path, before, after, slot = "a") => {
-        const patch: Patch = { id: uid(), path, before, after, orig: before, status: "pending", slot };
+        const projectId = useWorkspace.getState().projectId;
+        const patch: Patch = {
+          id: uid(),
+          path,
+          before,
+          after,
+          orig: before,
+          status: "pending",
+          slot,
+          projectId,
+        };
         set((s) => {
+          const done = s.items.filter((p) => p.status !== "pending").slice(-24);
           const pending = s.items.filter((p) => p.status === "pending");
-          const mine = pending.filter((p) => asSlot(p.slot) === slot);
-          const others = pending.filter((p) => asSlot(p.slot) !== slot);
-          return { items: [...others, ...mine, patch].slice(-24) };
+          const mine = pending.filter((p) => asSlot(p.slot) === slot && (p.projectId ?? projectId) === projectId);
+          const others = pending.filter((p) => !(asSlot(p.slot) === slot && (p.projectId ?? projectId) === projectId));
+          return { items: [...done, ...others, ...mine.slice(-11), patch] };
         });
         return patch;
       },
       accept: (id) => {
         const patch = get().items.find((p) => p.id === id);
         if (!patch || patch.status !== "pending") return;
+        if (patch.projectId && patch.projectId !== useWorkspace.getState().projectId) return;
         useWorkspace.getState().writeFile(patch.path, patch.after);
         useWorkspace.getState().openFile(patch.path);
         const first = hunksOf(patch.before, patch.after)[0];
@@ -77,37 +90,54 @@ export const usePatches = create<PatchState>()(
         const left = hunksOf(next, patch.after);
         set((s) => ({
           items: s.items.map((p) =>
-            p.id === id
-              ? { ...p, before: next, status: left.length ? "pending" : "accepted" }
-              : p,
+            p.id === id ? { ...p, before: next, status: left.length ? "pending" : "accepted" } : p,
           ),
         }));
       },
       undo: (id) => {
         const patch = get().items.find((p) => p.id === id);
         if (!patch) return;
+        if (patch.projectId && patch.projectId !== useWorkspace.getState().projectId) return;
         useWorkspace.getState().writeFile(patch.path, patch.orig || patch.before);
         set((s) => ({
           items: s.items.map((p) => (p.id === id ? { ...p, status: "undone" } : p)),
         }));
       },
       reject: (id) => {
+        const patch = get().items.find((p) => p.id === id);
+        if (patch && patch.status === "pending") {
+          if (!patch.projectId || patch.projectId === useWorkspace.getState().projectId) {
+            const cur = useWorkspace.getState().files[patch.path];
+            if (cur === patch.after || cur === undefined) {
+              useWorkspace.getState().writeFile(patch.path, patch.orig || patch.before);
+            }
+          }
+        }
         set((s) => ({
           items: s.items.map((p) => (p.id === id ? { ...p, status: "rejected" } : p)),
         }));
       },
       acceptAll: (slot) => {
+        const pid = useWorkspace.getState().projectId;
         const pending = get().items.filter(
-          (x) => x.status === "pending" && (!slot || asSlot(x.slot) === slot),
+          (x) =>
+            x.status === "pending" &&
+            (!slot || asSlot(x.slot) === slot) &&
+            (!x.projectId || x.projectId === pid),
         );
         for (const p of pending) get().accept(p.id);
       },
       rejectAll: (slot) => {
-        set((s) => ({
-          items: s.items.map((p) =>
-            p.status === "pending" && (!slot || asSlot(p.slot) === slot) ? { ...p, status: "rejected" } : p,
-          ),
-        }));
+        const pid = useWorkspace.getState().projectId;
+        const pending = get()
+          .items.filter(
+            (x) =>
+              x.status === "pending" &&
+              (!slot || asSlot(x.slot) === slot) &&
+              (!x.projectId || x.projectId === pid),
+          )
+          .reverse();
+        for (const p of pending) get().reject(p.id);
       },
       get: (id) => get().items.find((p) => p.id === id),
     }),

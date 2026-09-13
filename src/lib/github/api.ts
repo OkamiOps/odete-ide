@@ -444,23 +444,32 @@ export async function githubPushTree(
   if (!spec) throw new Error("remote inválido");
   const { owner, repo } = spec;
   onProgress?.("lendo HEAD…");
-  const ref = await gh<{ object: { sha: string } }>(
-    `https://api.github.com/repos/${owner}/${repo}/git/ref/heads/${encRef(branch)}`,
-    token,
-  );
-  const parent = ref.object.sha;
-  const commit = await gh<{ tree: { sha: string } }>(
-    `https://api.github.com/repos/${owner}/${repo}/git/commits/${parent}`,
-    token,
-  );
-  const baseTree = commit.tree.sha;
-  const remoteTree = await gh<{ tree: { path: string; type: string; sha: string; mode: string }[] }>(
-    `https://api.github.com/repos/${owner}/${repo}/git/trees/${baseTree}?recursive=1`,
-    token,
-  );
-  const remoteBlobs = new Map(
-    remoteTree.tree.filter((t) => t.type === "blob").map((t) => [t.path, t.sha]),
-  );
+  let parent: string | null = null;
+  let baseTree: string | null = null;
+  const remoteBlobs = new Map<string, string>();
+  try {
+    const ref = await gh<{ object: { sha: string } }>(
+      `https://api.github.com/repos/${owner}/${repo}/git/ref/heads/${encRef(branch)}`,
+      token,
+    );
+    parent = ref.object.sha;
+    const commit = await gh<{ tree: { sha: string } }>(
+      `https://api.github.com/repos/${owner}/${repo}/git/commits/${parent}`,
+      token,
+    );
+    baseTree = commit.tree.sha;
+    const remoteTree = await gh<{ tree: { path: string; type: string; sha: string; mode: string }[] }>(
+      `https://api.github.com/repos/${owner}/${repo}/git/trees/${baseTree}?recursive=1`,
+      token,
+    );
+    for (const t of remoteTree.tree) {
+      if (t.type === "blob") remoteBlobs.set(t.path, t.sha);
+    }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!/404|Not Found|does not exist|Git Repository is empty/i.test(msg)) throw e;
+    onProgress?.("repo/branch novo — primeiro commit");
+  }
 
   const tree: Array<{ path: string; mode: "100644"; type: "blob"; sha: string | null }> = [];
   const entries = Object.entries(files).filter(([p]) => !SKIP_DIR.test(p) && !SKIP_HEAVY.test(p));
@@ -485,29 +494,37 @@ export async function githubPushTree(
     if (files[path] !== undefined) continue;
     tree.push({ path, mode: "100644", type: "blob", sha: null });
   }
-  if (!tree.length) {
+  if (!tree.length && parent) {
     onProgress?.("nada pra enviar");
     return parent.slice(0, 8);
+  }
+  if (!tree.length && !parent) {
+    throw new Error("nada pra enviar — workspace vazio");
   }
   onProgress?.("árvore…");
   const made = await ghWrite<{ sha: string }>(
     `https://api.github.com/repos/${owner}/${repo}/git/trees`,
     token,
     "POST",
-    { base_tree: baseTree, tree },
+    baseTree ? { base_tree: baseTree, tree } : { tree },
   );
   const madeCommit = await ghWrite<{ sha: string }>(
     `https://api.github.com/repos/${owner}/${repo}/git/commits`,
     token,
     "POST",
-    { message, tree: made.sha, parents: [parent] },
+    parent ? { message, tree: made.sha, parents: [parent] } : { message, tree: made.sha, parents: [] },
   );
-  await ghWrite(
-    `https://api.github.com/repos/${owner}/${repo}/git/refs/heads/${encRef(branch)}`,
-    token,
-    "PATCH",
-    { sha: madeCommit.sha },
-  );
+  const refUrl = `https://api.github.com/repos/${owner}/${repo}/git/refs/heads/${encRef(branch)}`;
+  try {
+    await ghWrite(refUrl, token, "PATCH", { sha: madeCommit.sha });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!/404|Not Found|does not exist/i.test(msg)) throw e;
+    await ghWrite(`https://api.github.com/repos/${owner}/${repo}/git/refs`, token, "POST", {
+      ref: `refs/heads/${branch}`,
+      sha: madeCommit.sha,
+    });
+  }
   return madeCommit.sha.slice(0, 8);
 }
 

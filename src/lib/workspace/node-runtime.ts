@@ -17,6 +17,7 @@ type NodeState = {
 type Host = typeof globalThis & {
   __coloWc?: WebContainer;
   __coloWcBoot?: Promise<WebContainer | null>;
+  __coloWcMount?: { projectId: string; lastFiles: FileMap };
 };
 
 const HOST = globalThis as Host;
@@ -30,8 +31,8 @@ export const useNodeRuntime = create<NodeState>(() => ({
 
 let wc: WebContainer | null = HOST.__coloWc ?? null;
 let bootP: Promise<WebContainer | null> | null = HOST.__coloWcBoot ?? null;
-let mountedFor = "";
-let lastFiles: FileMap = {};
+let mountedFor = HOST.__coloWcMount?.projectId ?? "";
+let lastFiles: FileMap = HOST.__coloWcMount?.lastFiles ?? {};
 let running: WebContainerProcess | null = null;
 let pulling = false;
 let unsubWs: (() => void) | null = null;
@@ -53,6 +54,21 @@ function fileBytes(contents: string): string | Uint8Array {
   const out = new Uint8Array(raw.length);
   for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
   return out;
+}
+
+function scriptBody(files: FileMap, name: string) {
+  try {
+    const pkg = JSON.parse(files["package.json"] || "{}") as { scripts?: Record<string, string> };
+    return pkg.scripts?.[name] ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function rememberMount(projectId: string, files: FileMap) {
+  mountedFor = projectId;
+  lastFiles = { ...files };
+  HOST.__coloWcMount = { projectId, lastFiles };
 }
 
 export function filesToTree(files: FileMap): FileSystemTree {
@@ -80,14 +96,18 @@ function manager(files: FileMap, prefer?: string) {
   if (prefer === "pnpm" || files["pnpm-workspace.yaml"] || files["pnpm-lock.yaml"]) {
     return { bin: "pnpm", install: ["install"] as string[] };
   }
-  if (prefer === "yarn" || files["yarn.lock"]) return { bin: "yarn", install: [] as string[] };
+  if (prefer === "yarn" || (prefer !== "npm" && files["yarn.lock"])) {
+    return { bin: "yarn", install: ["install"] as string[] };
+  }
   return { bin: "npm", install: ["install"] as string[] };
 }
 
 function cleanChunk(chunk: string) {
+  const esc = String.fromCharCode(27);
+  const bel = String.fromCharCode(7);
   return String(chunk)
-    .replace(/\u001b\[[0-9;?]*[ -/]*[@-~]/g, "")
-    .replace(/\u001b\][^\u0007]*(\u0007|\u001b\\)/g, "")
+    .replace(new RegExp(`${esc}\\[[0-9;?]*[ -/]*[@-~]`, "g"), "")
+    .replace(new RegExp(`${esc}\\][^${bel}]* (${bel}|${esc}\\\\)`, "g"), "")
     .replace(/\r/g, "");
 }
 
@@ -109,8 +129,6 @@ async function stream(proc: WebContainerProcess, onLog: (s: string) => void) {
 
 async function waitServer(ms: number) {
   if (!wc) return "";
-  const already = useNodeRuntime.getState().previewUrl;
-  if (already) return already;
   return new Promise<string>((resolve) => {
     const t = window.setTimeout(() => {
       off();
@@ -155,8 +173,7 @@ async function syncFiles(files: FileMap, projectId: string) {
   if (!wc || pulling) return;
   if (mountedFor !== projectId) {
     await wc.mount(filesToTree(files));
-    mountedFor = projectId;
-    lastFiles = { ...files };
+    rememberMount(projectId, files);
     return;
   }
   const prev = lastFiles;
@@ -182,7 +199,7 @@ async function syncFiles(files: FileMap, projectId: string) {
       await wc.fs.writeFile(path, fileBytes(next));
     }
   }
-  lastFiles = { ...files };
+  rememberMount(projectId, files);
 }
 
 function watchWorkspace() {
@@ -201,9 +218,9 @@ function watchWorkspace() {
 export function nodeUnsupportedReason() {
   if (typeof window === "undefined") return "sem janela";
   if (!window.crossOriginIsolated) {
-    return "Node precisa do app em tela cheia (instalado). Nesta pré-visualização embutida o Safari não isola a origem.";
+    return "Node precisa do app em tela cheia com origem isolada. Nesta prévia embutida o Node real não sobe — cai no Preview do Colo.";
   }
-  if (typeof SharedArrayBuffer === "undefined") return "SharedArrayBuffer indisponível neste Safari";
+  if (typeof SharedArrayBuffer === "undefined") return "SharedArrayBuffer indisponível neste WebView";
   return "";
 }
 
@@ -216,6 +233,9 @@ export async function ensureNode(onLog?: (s: string) => void): Promise<WebContai
   }
   if (HOST.__coloWc) {
     wc = HOST.__coloWc;
+    mountedFor = HOST.__coloWcMount?.projectId ?? mountedFor;
+    lastFiles = HOST.__coloWcMount?.lastFiles ?? lastFiles;
+    watchWorkspace();
     if (useNodeRuntime.getState().status === "off" || useNodeRuntime.getState().status === "unsupported") {
       useNodeRuntime.setState({ status: "ready", isolated: true, reason: "" });
     }
@@ -245,8 +265,7 @@ export async function ensureNode(onLog?: (s: string) => void): Promise<WebContai
       });
       const w = useWorkspace.getState();
       await inst.mount(filesToTree(w.files));
-      mountedFor = w.projectId;
-      lastFiles = { ...w.files };
+      rememberMount(w.projectId, w.files);
       watchWorkspace();
       useNodeRuntime.setState({ status: "ready", isolated: true, reason: "" });
       onLog?.("Node pronto. npm run dev usa o Node deste iPad.");
@@ -286,7 +305,13 @@ export async function nodeInstall(args: string[], onLog: (s: string) => void, pr
   if (!inst) return { used: false, out: "" };
   await syncFiles(useWorkspace.getState().files, useWorkspace.getState().projectId);
   const m = manager(useWorkspace.getState().files, prefer);
-  const argv = args.length ? ["i", ...args] : m.install.length ? m.install : ["i"];
+  const argv = args.length
+    ? m.bin === "yarn"
+      ? ["add", ...args.filter((a) => a !== "i" && a !== "install")]
+      : ["i", ...args]
+    : m.install.length
+      ? m.install
+      : ["i"];
   onLog?.(`${m.bin} ${argv.join(" ")}`);
   const proc = await inst.spawn(m.bin, argv);
   await stream(proc, onLog);
@@ -318,6 +343,7 @@ export async function nodeRunScript(name: string, onLog: (s: string) => void, pr
       /* already dead */
     }
     running = null;
+    useNodeRuntime.setState({ previewUrl: "", status: "ready" });
   }
   const proc = await inst.spawn(m.bin, ["run", name]);
   running = proc;
@@ -331,7 +357,9 @@ export async function nodeRunScript(name: string, onLog: (s: string) => void, pr
       onLog(`npm run ${name} saiu ${code}`);
     }
   });
-  const long = /^(dev|start|preview|serve)$/.test(name);
+  const cmd = scriptBody(useWorkspace.getState().files, name);
+  const long =
+    /dev|start|preview|serve/i.test(name) || /\b(vite|next|nest|astro|remix|nuxt|tanstack)\b/i.test(cmd);
   if (long) {
     onLog(`npm run ${name} — à espera do servidor…`);
     const url = await waitServer(90_000);

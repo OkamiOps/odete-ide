@@ -468,23 +468,36 @@ function paramsOf(pat: string[], got: string[]) {
 }
 
 export function matchNextApi(files: FileMap, urlPath: string) {
-  const rest = urlPath.replace(/^[/]+/, "").replace(/^api[/]/, "");
+  const rest = urlPath.replace(/^[/]+/, "").replace(/^api[/]?/, "");
   const segs = rest.split("/").filter(Boolean);
-  const routes: { file: string; pat: string[] }[] = [];
+  const routes: { file: string; pat: string[]; score: number }[] = [];
   for (const k of Object.keys(files)) {
-    let m = k.match(/^(?:src[/])?app[/]api[/](.+)[/]route[.][jt]sx?$/);
+    let m = k.match(/^(?:src[/])?app[/]api[/]route[.][jt]sx?$/);
     if (m) {
-      routes.push({ file: k, pat: m[1]!.split("/") });
+      routes.push({ file: k, pat: [], score: 3 });
+      continue;
+    }
+    m = k.match(/^(?:src[/])?app[/]api[/](.+)[/]route[.][jt]sx?$/);
+    if (m) {
+      const pat = m[1]!.split("/");
+      const catchAll = pat.some((p) => p.startsWith("[..."));
+      const dyn = pat.some((p) => p.startsWith("["));
+      routes.push({ file: k, pat, score: catchAll ? 0 : dyn ? 1 : 2 });
       continue;
     }
     m = k.match(/^(?:src[/])?pages[/]api[/](.+)[.][jt]sx?$/);
-    if (m) routes.push({ file: k, pat: m[1]!.split("/") });
+    if (m) {
+      const pat = m[1]!.split("/");
+      const catchAll = pat.some((p) => p.startsWith("[..."));
+      routes.push({ file: k, pat, score: catchAll ? 0 : 2 });
+    }
   }
+  routes.sort((a, b) => b.score - a.score);
   for (const r of routes) {
     const catchAll = r.pat.some((p) => p.startsWith("[..."));
     if (!catchAll && r.pat.length !== segs.length) continue;
     if (catchAll && segs.length < r.pat.filter((p) => !p.startsWith("[...")).length) continue;
-    if (r.pat.every((p, i) => matchSeg(p, segs[i] ?? ""))) {
+    if (r.pat.every((p, i) => matchSeg(p, segs[i] ?? "")) || (r.pat.length === 0 && segs.length === 0)) {
       return { file: r.file, params: paramsOf(r.pat, segs), pages: /pages[/]api[/]/.test(r.file) };
     }
   }
@@ -529,9 +542,9 @@ async function asFetch(value: unknown): Promise<PreviewFetch> {
   return jsonFetch(200, value);
 }
 
-async function runNextApi(files: FileMap, hit: NonNullable<ReturnType<typeof matchNextApi>>, method: string, body: string | null) {
+async function runNextApi(files: FileMap, hit: NonNullable<ReturnType<typeof matchNextApi>>, method: string, body: string | null, urlPath: string) {
   const mod = await loadEntry(files, hit.file);
-  const req = new Request(`https://colo.preview/api/${Object.values(hit.params).join("/")}`, {
+  const req = new Request(`https://colo.preview/${String(urlPath).replace(/^[/]+/, "")}`, {
     method,
     body: method === "GET" || method === "HEAD" ? undefined : body ?? undefined,
     headers: { "content-type": "application/json" },
@@ -577,8 +590,7 @@ async function runNextApi(files: FileMap, hit: NonNullable<ReturnType<typeof mat
   }
   const fn =
     (mod[method] as ((req: Request, ctx: { params: Record<string, string> }) => unknown) | undefined) ||
-    (mod[method.toLowerCase()] as ((req: Request, ctx: { params: Record<string, string> }) => unknown) | undefined) ||
-    (mod.GET as ((req: Request, ctx: { params: Record<string, string> }) => unknown) | undefined);
+    (mod[method.toLowerCase()] as ((req: Request, ctx: { params: Record<string, string> }) => unknown) | undefined);
   if (!fn) return jsonFetch(405, { error: `${method} não exportado em ${hit.file}` });
   return asFetch(await fn(req, { params: hit.params }));
 }
@@ -695,7 +707,11 @@ let nestBootedFor = "";
 export async function bootProject(files: FileMap) {
   const pkg = parsePkg(files["package.json"]);
   const stack = detectStack(pkg);
-  const key = `${stack.id}:${Object.keys(files).length}`;
+  const key = `${stack.id}:${Object.keys(files)
+    .filter((k) => k.endsWith(".ts") || k.endsWith(".js"))
+    .sort()
+    .map((k) => `${k}:${files[k]?.length ?? 0}`)
+    .join("|")}`;
   if (stack.id === "nest") {
     const main = nestEntry(files);
     if (!main) return { ok: false, out: "Nest: falta src/main.ts" };
@@ -749,7 +765,7 @@ export async function dispatchRuntime(
     const hit = nextHit || matchNextApi(files, path);
     if (hit) {
       try {
-        return await runNextApi(files, hit, method.toUpperCase(), body);
+        return await runNextApi(files, hit, method.toUpperCase(), body, path);
       } catch (e) {
         return jsonFetch(500, { error: e instanceof Error ? e.message : String(e), file: hit.file });
       }
@@ -803,14 +819,18 @@ export async function runNode(entry: string, argv: string[], files: FileMap): Pr
 
 export function runtimeHint(files: FileMap) {
   const stack = detectStack(parsePkg(files["package.json"]));
+  const isolated = typeof window !== "undefined" && !!window.crossOriginIsolated;
+  if (isolated) {
+    return `${stack.label}: npm run dev/start usa o Node deste iPad.`;
+  }
   if (stack.id === "next") {
-    return "Next no Colo: app/page no Preview + Route Handlers em /api. Sem next build, sem SSR, sem webpack.";
+    return "Next no Colo (sem isolamento): app/page no Preview + Route Handlers em /api. Sem next build, sem SSR.";
   }
   if (stack.id === "nest") {
-    return "Nest no Colo: src/main.ts sobe no Safari (decorators shim). Preview chama as rotas. Sem TCP, Prisma nativo ou microservices.";
+    return "Nest no Colo (sem isolamento): src/main.ts com decorators shim. Preview chama as rotas. Sem TCP, Prisma nativo ou microservices.";
   }
   if (stack.kind === "ssr") {
-    return `${stack.label}: o Colo tenta o client. Servidor Node real não existe neste iPad.`;
+    return `${stack.label}: sem origem isolada o Colo só emula o client. No app em tela cheia o Node sobe.`;
   }
   return "";
 }

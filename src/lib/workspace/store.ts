@@ -1,7 +1,8 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { SEED_COMMIT_MESSAGE, SEED_FILES } from "./seed";
-import { idbKv } from "./idb";
+import { usePersistHealth } from "./idb";
+import { workspaceStorage } from "./persist-storage";
 import type { BlameLine, BranchSnap, Commit, Conflict, FileMap, StashEntry, TermLine } from "./types";
 import { uid } from "../utils";
 import { rememberEdit } from "./history";
@@ -46,6 +47,7 @@ function snapBranch(s: {
   files: FileMap;
   commits: Commit[];
   staged: string[];
+  stagedBlobs: FileMap;
   lastPushedId: string | null;
   origin: Commit | null;
 }): BranchSnap {
@@ -53,6 +55,7 @@ function snapBranch(s: {
     files: cloneFiles(s.files),
     commits: s.commits,
     staged: [...s.staged],
+    stagedBlobs: cloneFiles(s.stagedBlobs),
     lastPushedId: s.lastPushedId,
     origin: s.origin,
   };
@@ -70,6 +73,7 @@ export type WorkspaceState = {
   lastPushedId: string | null;
   origin: Commit | null;
   staged: string[];
+  stagedBlobs: FileMap;
   branch: string;
   branchSnaps: Record<string, BranchSnap>;
   stash: StashEntry[];
@@ -165,6 +169,7 @@ function freshState() {
       files: cloneFiles(SEED_FILES),
     } as Commit,
     staged: [] as string[],
+    stagedBlobs: {} as FileMap,
     branch: "main",
     cwd: "",
     projectId: "seed",
@@ -297,16 +302,17 @@ export const useWorkspace = create<WorkspaceState>()(
       commit: (message, all = false) => {
         const msg = message.trim();
         if (!msg) return "informe a mensagem";
-        const { files, commits, staged } = get();
+        const { files, commits, staged, stagedBlobs } = get();
         const head = commits[commits.length - 1];
         const headFiles = head?.files ?? {};
         const changed = get().changedPaths();
-        const pick = all ? changed : staged.filter((p) => changed.includes(p));
+        const pick = all ? changed : staged.filter((p) => changed.includes(p) || stagedBlobs[p] !== undefined);
         if (!pick.length) return all ? "nada para commitar" : "nada staged — usa Stage ou git commit -a";
         const next = cloneFiles(headFiles);
         for (const p of pick) {
-          if (files[p] === undefined) delete next[p];
-          else next[p] = files[p];
+          const blob = all ? files[p] : (stagedBlobs[p] !== undefined ? stagedBlobs[p] : files[p]);
+          if (blob === undefined) delete next[p];
+          else next[p] = blob;
         }
         if (head && filesEqual(next, head.files)) return "nada para commitar";
         const c: Commit = {
@@ -315,15 +321,17 @@ export const useWorkspace = create<WorkspaceState>()(
           at: Date.now(),
           files: next,
         };
+        const leftBlobs = { ...stagedBlobs };
+        for (const p of pick) delete leftBlobs[p];
         set({
           commits: [...commits, c],
           staged: staged.filter((p) => !pick.includes(p)),
+          stagedBlobs: leftBlobs,
         });
         return `[${c.id}] ${pick.length} arquivo(s) · ${c.message}`;
       },
       gitStatus: () => {
-        const { files, commits, lastPushedId, staged, branch, origin } = get();
-        const head = commits[commits.length - 1];
+        const { files, commits, lastPushedId, staged, stagedBlobs, branch, origin } = get();
         const changed = get().changedPaths();
         const aheadN = (() => {
           if (!lastPushedId) return commits.length;
@@ -340,14 +348,17 @@ export const useWorkspace = create<WorkspaceState>()(
           .filter(Boolean)
           .join(", ");
         const unstaged = changed.filter((p) => !staged.includes(p));
+        const stagedThen = staged.filter((p) => stagedBlobs[p] !== undefined && files[p] !== stagedBlobs[p]);
         const lines = [
           `on branch ${branch}`,
           rel,
           staged.length ? "changes to be committed:" : "",
           ...staged.map((p) => `  staged:     ${p}`),
+          stagedThen.length ? "staged then modified:" : "",
+          ...stagedThen.map((p) => `  modified:   ${p}`),
           unstaged.length ? "changes not staged:" : "",
           ...unstaged.map((p) => `  modified:   ${p}`),
-          !changed.length ? "working tree clean" : "",
+          !changed.length && !staged.length ? "working tree clean" : "",
         ].filter(Boolean);
         return lines.join("\n");
       },
@@ -392,6 +403,7 @@ export const useWorkspace = create<WorkspaceState>()(
           files: cloneFiles(origin.files),
           lastPushedId: origin.id,
           staged: [],
+          stagedBlobs: {},
         });
         return `Updating ${head?.id ?? "000"}..${origin.id}\nFast-forward\nAlready on main`;
       },
@@ -404,17 +416,31 @@ export const useWorkspace = create<WorkspaceState>()(
       gitStage: (path) =>
         set((s) => ({
           staged: s.staged.includes(path) ? s.staged : [...s.staged, path],
+          stagedBlobs: { ...s.stagedBlobs, [path]: s.files[path] ?? "" },
         })),
-      gitUnstage: (path) => set((s) => ({ staged: s.staged.filter((p) => p !== path) })),
-      gitStageAll: () => set({ staged: get().changedPaths() }),
-      gitUnstageAll: () => set({ staged: [] }),
+      gitUnstage: (path) =>
+        set((s) => {
+          const blobs = { ...s.stagedBlobs };
+          delete blobs[path];
+          return { staged: s.staged.filter((p) => p !== path), stagedBlobs: blobs };
+        }),
+      gitStageAll: () => {
+        const paths = get().changedPaths();
+        const files = get().files;
+        const blobs: FileMap = {};
+        for (const p of paths) blobs[p] = files[p] ?? "";
+        set({ staged: paths, stagedBlobs: blobs });
+      },
+      gitUnstageAll: () => set({ staged: [], stagedBlobs: {} }),
       gitDiscard: (path) => {
-        const { commits, files, staged } = get();
+        const { commits, files, staged, stagedBlobs } = get();
         const head = commits[commits.length - 1];
         const next = { ...files };
         if (!head || head.files[path] === undefined) delete next[path];
         else next[path] = head.files[path];
-        set({ files: next, staged: staged.filter((p) => p !== path) });
+        const blobs = { ...stagedBlobs };
+        delete blobs[path];
+        set({ files: next, staged: staged.filter((p) => p !== path), stagedBlobs: blobs });
         scheduleSync(next, get().projectId);
         return `descartado ${path}`;
       },
@@ -422,7 +448,7 @@ export const useWorkspace = create<WorkspaceState>()(
         const { commits } = get();
         const head = commits[commits.length - 1];
         if (!head) return "nada para descartar";
-        set({ files: cloneFiles(head.files), staged: [] });
+        set({ files: cloneFiles(head.files), staged: [], stagedBlobs: {} });
         scheduleSync(head.files, get().projectId);
         return "working tree restaurada para HEAD";
       },
@@ -470,6 +496,7 @@ export const useWorkspace = create<WorkspaceState>()(
           files: cloneFiles(dest.files),
           commits: dest.commits,
           staged: dest.staged,
+          stagedBlobs: dest.stagedBlobs ? cloneFiles(dest.stagedBlobs) : {},
           lastPushedId: dest.lastPushedId,
           origin: dest.origin,
         });
@@ -487,11 +514,13 @@ export const useWorkspace = create<WorkspaceState>()(
           message: `WIP on ${s.branch}`,
           files: cloneFiles(s.files),
           staged: [...s.staged],
+          stagedBlobs: cloneFiles(s.stagedBlobs),
         };
         set({
           stash: [entry, ...s.stash].slice(0, 12),
           files: cloneFiles(head.files),
           staged: [],
+          stagedBlobs: {},
         });
         scheduleSync(head.files, get().projectId);
         return `stash@{0}: ${entry.message}`;
@@ -504,6 +533,7 @@ export const useWorkspace = create<WorkspaceState>()(
         set({
           files: cloneFiles(top.files),
           staged: top.staged,
+          stagedBlobs: top.stagedBlobs ? cloneFiles(top.stagedBlobs) : {},
           stash: s.stash.slice(1),
         });
         scheduleSync(top.files, get().projectId);
@@ -643,7 +673,7 @@ export const useWorkspace = create<WorkspaceState>()(
       replaceInFiles: (pattern, replacement, onlyPath) => {
         let re: RegExp;
         try {
-          re = new RegExp(pattern, "g");
+          re = new RegExp(pattern, "gi");
         } catch {
           return { files: 0, hits: 0 };
         }
@@ -651,6 +681,7 @@ export const useWorkspace = create<WorkspaceState>()(
         let fileCount = 0;
         let hits = 0;
         for (const [p, text] of Object.entries(files)) {
+          if (isNoisePath(p)) continue;
           if (onlyPath && p !== onlyPath) continue;
           const next = text.replace(re, () => {
             hits += 1;
@@ -661,7 +692,10 @@ export const useWorkspace = create<WorkspaceState>()(
             fileCount += 1;
           }
         }
-        if (fileCount) set({ files });
+        if (fileCount) {
+          set({ files });
+          scheduleSync(files, get().projectId);
+        }
         return { files: fileCount, hits };
       },
       resolveConflict: (path, take, merged) => {
@@ -671,6 +705,7 @@ export const useWorkspace = create<WorkspaceState>()(
         const body = take === "ours" ? c.ours : take === "theirs" ? c.theirs : (merged ?? c.ours);
         const files = { ...s.files, [path]: body };
         set({ files, conflicts: s.conflicts.filter((x) => x.path !== path) });
+        scheduleSync(files, get().projectId);
       },
       mergeRemote: (incoming) => {
         const s = get();
@@ -688,6 +723,9 @@ export const useWorkspace = create<WorkspaceState>()(
         for (const [path, theirs] of Object.entries(incoming)) {
           const ours = files[path];
           const base = origin?.files[path] ?? head?.files[path];
+          if (ours !== undefined && ours !== base && theirs === base) {
+            continue;
+          }
           if (ours === undefined || ours === theirs || ours === base) {
             files[path] = theirs;
             continue;
@@ -699,11 +737,24 @@ export const useWorkspace = create<WorkspaceState>()(
             files[path] = theirs;
           }
         }
+        if (conflicts.length) {
+          set({ files, conflicts });
+          scheduleSync(files, get().projectId);
+          return `error: merge com ${conflicts.length} conflito(s) — resolve antes de sync`;
+        }
+        if (head && filesEqual(files, head.files)) {
+          set({
+            origin: { id: head.id, message: "origin", at: Date.now(), files: cloneFiles(incoming) },
+            lastPushedId: s.lastPushedId ?? head.id,
+            conflicts: [],
+          });
+          return `Already up to date. · ${Object.keys(incoming).length} arquivos`;
+        }
         const clean = !head || filesEqual(s.files, head.files);
-        const ff = clean && origin && filesEqual(s.files, origin.files) && !conflicts.length;
+        const ff = clean && origin && filesEqual(s.files, origin.files);
         const commit: Commit = {
           id: uid().slice(0, 8),
-          message: conflicts.length ? "merge origin (com conflitos)" : ff ? "pull origin" : "merge origin",
+          message: ff ? "pull origin" : "merge origin",
           at: Date.now(),
           files: cloneFiles(files),
         };
@@ -712,15 +763,18 @@ export const useWorkspace = create<WorkspaceState>()(
           commits: [...s.commits, commit],
           origin: { id: commit.id, message: "origin", at: commit.at, files: cloneFiles(incoming) },
           lastPushedId: ff ? commit.id : s.lastPushedId,
-          conflicts,
+          conflicts: [],
           staged: [],
+          stagedBlobs: {},
         });
         scheduleSync(files, get().projectId);
-        return conflicts.length
-          ? `merge com ${conflicts.length} conflito(s)`
-          : `pull ok · ${Object.keys(incoming).length} arquivos`;
+        return `pull ok · ${Object.keys(incoming).length} arquivos`;
       },
       gitApplyFetch: (incoming) => {
+        const prev = get().origin;
+        if (prev && filesEqual(prev.files, incoming)) {
+          return `fetch origin  já atualizado · ${Object.keys(incoming).length} arquivos`;
+        }
         const origin: Commit = {
           id: `fetch-${uid().slice(0, 6)}`,
           message: "origin",
@@ -788,9 +842,10 @@ export const useWorkspace = create<WorkspaceState>()(
           openPath: files[first] !== undefined ? first : Object.keys(files)[0] ?? "README.md",
           tabs: [first],
           commits: [commit],
-          lastPushedId: p.pushed === false ? null : p.remote && p.pushed !== true ? null : commit.id,
+          lastPushedId: p.pushed === false ? null : p.remote ? commit.id : commit.id,
           origin: { ...commit, files: cloneFiles(files) },
           staged: [],
+          stagedBlobs: {},
           branch: p.branch || "main",
           cwd: "",
           projectId: p.id,
@@ -840,7 +895,7 @@ export const useWorkspace = create<WorkspaceState>()(
     }),
     {
       name: "colo-workspace-v2",
-      storage: createJSONStorage(() => idbKv),
+      storage: createJSONStorage(() => workspaceStorage),
       partialize: (s) => ({
         files: persistFiles(s.files),
         openPath: s.openPath,
@@ -854,22 +909,32 @@ export const useWorkspace = create<WorkspaceState>()(
         projectName: s.projectName,
         remote: s.remote,
         branchSnaps: Object.fromEntries(
-          Object.entries(s.branchSnaps).slice(0, 6).map(([k, v]) => [
+          Object.entries(s.branchSnaps).slice(-6).map(([k, v]) => [
             k,
             {
               ...v,
               files: persistFiles(v.files),
               commits: v.commits.slice(-8).map(persistCommit),
+              stagedBlobs: persistFiles(v.stagedBlobs ?? {}),
             },
           ]),
         ),
-        stash: s.stash.slice(0, 4).map((x) => ({ ...x, files: persistFiles(x.files) })),
+        stash: s.stash.slice(0, 4).map((x) => ({
+          ...x,
+          files: persistFiles(x.files),
+          stagedBlobs: persistFiles(x.stagedBlobs ?? {}),
+        })),
         conflicts: s.conflicts,
         staged: s.staged,
+        stagedBlobs: persistFiles(s.stagedBlobs ?? {}),
       }),
       onRehydrateStorage: () => (state) => {
         if (!state) return;
         if (!state.files || Object.keys(state.files).length === 0) {
+          if (usePersistHealth.getState().freeze || (state as { disk?: boolean }).disk) {
+            state.hydrated = true;
+            return;
+          }
           Object.assign(state, freshState());
         }
         if (!state.tabs?.length) {
@@ -887,6 +952,7 @@ export const useWorkspace = create<WorkspaceState>()(
               };
         }
         if (!state.staged) state.staged = [];
+        if (!state.stagedBlobs) state.stagedBlobs = {};
         if (!state.branch) state.branch = "main";
         if (!state.branchSnaps) state.branchSnaps = {};
         if (!state.stash) state.stash = [];

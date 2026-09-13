@@ -8,6 +8,7 @@ import {
   previewCss,
   previewHmrJs,
 } from "@/lib/workspace/preview";
+import { dispatchRuntime } from "@/lib/workspace/runtime";
 import { buildSwiftPlayground, isSwiftPath } from "@/lib/workspace/swift-play";
 import { useWorkspace } from "@/lib/workspace/store";
 import { isNoisePath } from "@/lib/workspace/ignore";
@@ -120,12 +121,29 @@ export function PreviewPane() {
       const d = e.data;
       if (!d || d.source !== "colo-preview") return;
       if (d.type === "fetch") {
-        const res = lookupPreviewAsset(filesRef.current, String(d.url || ""), String(d.method || "GET"));
-        try {
-          (e.source as Window | null)?.postMessage({ source: "colo-host", type: "fetch-res", id: d.id, ...res }, "*");
-        } catch {
-          /* iframe gone */
-        }
+        void (async () => {
+          const url = String(d.url || "");
+          const method = String(d.method || "GET");
+          const body = typeof d.body === "string" ? d.body : d.body == null ? null : String(d.body);
+          let res = lookupPreviewAsset(filesRef.current, url, method);
+          if (res.status === 404 || res.status === 501) {
+            try {
+              const dyn = await dispatchRuntime(filesRef.current, url, method, body);
+              if (dyn) res = dyn;
+            } catch (e) {
+              res = {
+                status: 500,
+                contentType: "application/json;charset=utf-8",
+                body: JSON.stringify({ error: e instanceof Error ? e.message : String(e) }),
+              };
+            }
+          }
+          try {
+            (e.source as Window | null)?.postMessage({ source: "colo-host", type: "fetch-res", id: d.id, ...res }, "*");
+          } catch {
+            /* iframe gone */
+          }
+        })();
         return;
       }
       if (d.type === "need-reload") {

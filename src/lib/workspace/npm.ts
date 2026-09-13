@@ -68,12 +68,15 @@ export function detectStack(pkg: {
 
 export function stackHint(stack: Stack) {
   if (stack.kind === "spa") {
-    return `${stack.label}: npm run dev abre o Preview (JSX/TS no Colo, HMR CSS/JS, pacotes via esm.sh). Sem binário Node.`;
+    return `${stack.label}: npm run dev abre o Preview (JSX/TS no Colo, HMR CSS/JS, pacotes via esm.sh).`;
   }
   if (stack.id === "nest") {
-    return `Nest é API Node — não sobe neste iPad (nem no TestFlight). npm i grava o lock; o Preview não emula o servidor.`;
+    return `Nest no Colo: npm run start executa src/main.ts no Safari (decorators shim) e o Preview chama as rotas. Sem TCP, Prisma nativo ou microservices.`;
   }
-  return `${stack.label} precisa de Node/SSR. Colo instala o lock e tenta o client se houver index.html. fetch('/api') serve JSON em public/api. O servidor (${stack.label} dev) não roda aqui — iPad não tem Node.`;
+  if (stack.id === "next") {
+    return `Next no Colo: app/page.tsx no Preview + Route Handlers em /api. Sem SSR, sem next build, sem webpack.`;
+  }
+  return `${stack.label}: o Colo tenta o client no Preview. fetch('/api') cai nos Route Handlers ou em public/api. Sem Node real neste iPad.`;
 }
 
 async function lookup(name: string, want?: string): Promise<NpmInfo> {
@@ -249,7 +252,7 @@ export async function npmInstall(args: string[], onNote?: (s: string) => void): 
   }
 }
 
-export function npmRunScript(name: string | undefined): { out: string; openPreview: boolean } {
+export function npmRunScript(name: string | undefined): { out: string; openPreview: boolean; boot?: string } {
   const w = useWorkspace.getState();
   const pkg = parsePkg(w.readFile("package.json"));
   const scripts = pkg.scripts ?? {};
@@ -275,15 +278,16 @@ export function npmRunScript(name: string | undefined): { out: string; openPrevi
   }
   if (isBuild) {
     return {
-      out: `npm run ${name} — ${cmd || name}\neste iPad não executa ${name} (sem Node/CLI).\nuse o Preview pra ver o app, ou rode ${name} num Mac.`,
+      out: `npm run ${name} — ${cmd || name}\neste iPad não executa ${name} (tsc/eslint/next build). Preview e \`node arquivo.js\` usam o runtime do Colo.`,
       openPreview: false,
     };
   }
   if (stack.kind !== "spa" && isDev) {
-    return { out: `npm run ${name} — ${cmd || name}\n${stackHint(stack)}`, openPreview: true };
+    return { out: `npm run ${name} — ${cmd || name}\n${stackHint(stack)}`, openPreview: true, boot: stack.id };
   }
   return {
     out: `npm run ${name} — ${cmd || "preview"}\n${stackHint(stack)}\nabri o Preview.`,
     openPreview: true,
+    boot: stack.id,
   };
 }

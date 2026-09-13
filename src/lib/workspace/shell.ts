@@ -66,7 +66,7 @@ export async function runShellAsync(raw: string): Promise<string> {
           "ls  cat  pwd  cd  mkdir  touch  rm  echo",
           "git status | log | diff | add | restore | commit -m | pull | push | fetch | sync | clone",
           "git branch | checkout | stash | stash pop | blame",
-          "npm i [pkg] [-D]   pnpm i   npm run [script]   npm ls   npx vite   clear",
+          "npm i [pkg] [-D]   pnpm i   npm run [script]   npm ls   npx vite   node [arquivo]   clear",
         ].join("\n");
         break;
       case "clear":
@@ -265,18 +265,46 @@ export async function runShellAsync(raw: string): Promise<string> {
             useChrome.getState().setCenter("preview");
             useChrome.getState().setMobile("preview");
           }
-          out = r.out;
+          if (r.boot === "nest" || r.boot === "next") {
+            const { bootProject } = await import("./runtime");
+            const b = await bootProject(w.files);
+            out = `${r.out}\n${b.out}`;
+          } else out = r.out;
         } else out = `${cmd} — use: ${cmd} i [pkg]  |  ${cmd} run [script]  |  ${cmd} ls`;
         break;
       }
       case "npx":
       case "vite": {
+        const tool = cmd === "npx" ? args[0] : "vite";
+        if (cmd === "npx" && (tool === "tsx" || tool === "ts-node")) {
+          const { runNode } = await import("./runtime");
+          out = await runNode(resolve(w.cwd, args[1] ?? ""), args.slice(2), w.files);
+          break;
+        }
+        if (cmd === "npx" && (tool === "next" || tool === "nest" || tool === "@nestjs/cli")) {
+          const r = npmRunScript("dev");
+          if (r.openPreview) {
+            useChrome.getState().setCenter("preview");
+            useChrome.getState().setMobile("preview");
+          }
+          const { bootProject } = await import("./runtime");
+          const b = await bootProject(w.files);
+          out = `${r.out}\n${b.out}`;
+          break;
+        }
         const r = npmRunScript("dev");
         if (r.openPreview) {
           useChrome.getState().setCenter("preview");
           useChrome.getState().setMobile("preview");
         }
         out = r.out;
+        break;
+      }
+      case "node":
+      case "tsx":
+      case "ts-node": {
+        const { runNode } = await import("./runtime");
+        out = await runNode(resolve(w.cwd, args[0] ?? "index.js"), args.slice(1), w.files);
         break;
       }
       case "reset":

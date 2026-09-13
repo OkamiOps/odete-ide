@@ -25,7 +25,7 @@ export function pingDone(title: string, body: string) {
     /* ignore */
   }
   const prev = document.title;
-  document.title = "● Colo";
+  document.title = "● Odete";
   window.setTimeout(() => {
     document.title = prev;
   }, 2500);

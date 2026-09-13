@@ -171,7 +171,7 @@ export async function bindFolder(projectId?: string): Promise<{ name: string }> 
     showDirectoryPicker?: (opts?: { mode?: string }) => Promise<FileSystemDirectoryHandle>;
   };
   if (!w.showDirectoryPicker) {
-    throw new Error("no app nativo a pasta é Documents/Colo. este WebView não tem picker de pasta.");
+    throw new Error("no app nativo a pasta é Documents/Odete. este WebView não tem picker de pasta.");
   }
   const dir = await w.showDirectoryPicker({ mode: "readwrite" });
   await putHandle(dir, pid);

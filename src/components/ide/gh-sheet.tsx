@@ -217,7 +217,7 @@ function FolderBody() {
     <>
       <Hd title="Salvar na pasta" />
       <div className="gh-sheet-body">
-        <p>No app nativo a pasta é Documents/Colo (FileManager). Podes apontar outra no Files.</p>
+        <p>No app nativo a pasta é Documents/Odete (FileManager). Podes apontar outra no Files.</p>
         {name ? <p>pasta atual: <b>{name}</b></p> : <p>nenhuma pasta escolhida ainda</p>}
         {!picker ? (
           <p className="agent-err">

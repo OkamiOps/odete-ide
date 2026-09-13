@@ -25,7 +25,7 @@ Uma linha, sem ponto final, verbo no infinitivo. Ex: feat(editor): destacar sele
     description: "Estilo SwiftUI simples para o playground do iPad.",
     when: ["swift", "swiftui", "view", "vstack", "playground"],
     body: `Swift neste workspace é um subset: VStack, HStack, Text, Button, padding.
-Prefira views pequenas, nomes claros, sem Combine/async. Preview usa o interpretador do Colo.`,
+Prefira views pequenas, nomes claros, sem Combine/async. Preview usa o interpretador da Odete.`,
   },
   {
     id: "review",

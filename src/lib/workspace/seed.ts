@@ -1,10 +1,10 @@
 import type { FileMap } from "./types";
 
 export const SEED_FILES: FileMap = {
-  "README.md": `# Colo
+  "README.md": `# Odete
 
-IDE no colo. Arquivos, git, terminal e um agente
-que edita este workspace — no próprio dispositivo.
+IDE no dispositivo. Arquivos, git, terminal e um agente
+que edita este workspace — no próprio iPad.
 
 ## Neste projeto
 
@@ -39,7 +39,7 @@ when: swift, swiftui, view, vstack, playground
 ---
 
 Swift neste workspace é um subset: VStack, HStack, Text, Button, padding.
-Prefira views pequenas, nomes claros, sem Combine/async. Preview usa o interpretador do Colo.
+Prefira views pequenas, nomes claros, sem Combine/async. Preview usa o interpretador da Odete.
 `,
   ".colo/skills/review.md": `---
 name: Review
@@ -59,7 +59,7 @@ when: html, css, preview, página, index
 index.html é a página do Preview. CSS em src/style.css. JS em src/main.js.
 Sem build step além do Vite. Acessível, contraste ok, sem dependência nova.
 `,
-  "AGENTS.md": `# Colo
+  "AGENTS.md": `# Odete
 
 - Preview usa index.html + src/.
 - Swift em App.swift: subset SwiftUI (VStack, Text, Button, Toggle).
@@ -67,7 +67,7 @@ Sem build step além do Vite. Acessível, contraste ok, sem dependência nova.
 - Não invente dependência nova sem pedido.
 `,
   "package.json": `{
-  "name": "colo-demo",
+  "name": "odete-demo",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -85,20 +85,20 @@ Sem build step além do Vite. Acessível, contraste ok, sem dependência nova.
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Colo</title>
+    <title>Odete</title>
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
     <div class="page">
       <header class="top">
-        <span class="mark">C</span>
-        <span class="word">COLO</span>
+        <span class="mark">O</span>
+        <span class="word">ODETE</span>
         <span class="spacer"></span>
         <span class="live" id="clock">—</span>
       </header>
       <main>
         <p class="kicker">workspace local</p>
-        <h1>IDE no colo.</h1>
+        <h1>IDE no dispositivo.</h1>
         <p class="lede">
           Arquivos, git, terminal e um agente HTTP
           no próprio dispositivo. Sem outra máquina.
@@ -289,11 +289,11 @@ struct ContentView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("COLO")
+            Text("ODETE")
                 .font(.caption.weight(.medium))
                 .tracking(3)
                 .foregroundStyle(.secondary)
-            Text("IDE no colo.")
+            Text("IDE no dispositivo.")
                 .font(.largeTitle.weight(.medium))
             Text("Copia este arquivo para o Swift Playgrounds e dá play no iPad.")
                 .foregroundStyle(.secondary)
@@ -312,7 +312,7 @@ struct ContentView: View {
   "notes.md": `# Notas
 
 - \`npm i\` e \`npm run dev\` usam o Node deste iPad quando o app está em tela cheia (origem isolada).
-- Sem isolamento (prévia embutida) o Preview usa esm.sh + JSX/TS do Colo.
+- Sem isolamento (prévia embutida) o Preview usa esm.sh + JSX/TS da Odete.
 - Git é local: commit, log, status, push (HEAD, não o rascunho).
 - O agente usa grok-4.5 no servidor do app e as tools mexem nestes arquivos.
 `,

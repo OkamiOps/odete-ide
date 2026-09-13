@@ -269,7 +269,7 @@ function watchWorkspace() {
 export function nodeUnsupportedReason() {
   if (typeof window === "undefined") return "sem janela";
   if (!window.crossOriginIsolated) {
-    return "Node precisa do app em tela cheia com origem isolada. Nesta prévia embutida o Node real não sobe — cai no Preview do Colo.";
+    return "Node precisa do app em tela cheia com origem isolada. Nesta prévia embutida o Node real não sobe — cai no Preview da Odete.";
   }
   if (typeof SharedArrayBuffer === "undefined") return "SharedArrayBuffer indisponível neste WebView";
   return "";

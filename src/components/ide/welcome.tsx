@@ -2,19 +2,17 @@ import { enterWorkspace } from "@/lib/workspace/chrome";
 
 export function Welcome() {
   return (
-    <div className="welcome" role="dialog" aria-label="Colo">
+    <div className="welcome" role="dialog" aria-label="Odete">
+      <div className="welcome-glow" aria-hidden />
       <div className="welcome-inner">
-        <p className="welcome-kicker">COLO</p>
-        <h1>No colo.</h1>
-        <p>Editor, git, terminal e agente no próprio dispositivo. Sem outra máquina ligada.</p>
+        <img className="welcome-icon" src="/brand/odete-icon.png" width={168} height={168} alt="" />
+        <img className="welcome-word" src="/brand/odete-wordmark.png" width={280} height={78} alt="Odete" />
+        <p className="welcome-kicker">IDE para iPad e iPhone</p>
+        <p className="welcome-line">Ideias se sentem mais em casa aqui.</p>
         <button type="button" className="welcome-go" onClick={enterWorkspace}>
-          Entrar no workspace
+          Entrar
         </button>
-        <div className="welcome-meta">
-          <span>no próprio iPad</span>
-          <span>preview ao vivo</span>
-          <span>agente no dispositivo</span>
-        </div>
+        <p className="welcome-meta">código · criar · em qualquer lugar</p>
       </div>
     </div>
   );

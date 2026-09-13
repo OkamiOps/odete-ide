@@ -881,7 +881,7 @@ export const useWorkspace = create<WorkspaceState>()(
         get().loadProject({
           id: uid(),
           name: title,
-          files: { "README.md": `# ${title}\n\nProjeto novo no Colo.\n` },
+          files: { "README.md": `# ${title}\n\nProjeto novo na Odete.\n` },
           remote: null,
           branch: "main",
           message: "chore: projeto novo",

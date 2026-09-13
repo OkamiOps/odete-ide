@@ -124,7 +124,7 @@ If the brief is still, keep it still.`,
 - SF Symbols for icons. System fonts unless the brief asks otherwise.
 - Padding and spacing from the system (16/20), not magic 13s.
 - iPad: regular size class, split-friendly. No phone-only assumptions.
-- Preview: keep a #Preview. Colo playground understands VStack, HStack, Text, Button, padding.
+- Preview: keep a #Preview. Odete playground understands VStack, HStack, Text, Button, padding.
 - No Combine, no async networking unless asked. State with @State / @Binding.
 
 Name views after what the user sees (EditorView), not after architecture (ContentView2).`,

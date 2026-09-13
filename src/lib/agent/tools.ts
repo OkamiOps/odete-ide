@@ -90,7 +90,7 @@ export const AGENT_TOOLS = [
     function: {
       name: "run_shell",
       description:
-        "Terminal do workspace. ls, cat, mkdir, git, npm i / pnpm i, npm run dev/start/build, node arquivo.js. Quando o app está isolado (tela cheia) o Node é de verdade — Vite, Next, Nest, Astro, Remix sobem no Preview. Sem isolamento, cai no Preview JSX/TS do Colo. Chat só lê. Plan: mkdir/touch só em .colo/.",
+        "Terminal do workspace. ls, cat, mkdir, git, npm i / pnpm i, npm run dev/start/build, node arquivo.js. Quando o app está isolado (tela cheia) o Node é de verdade — Vite, Next, Nest, Astro, Remix sobem no Preview. Sem isolamento, cai no Preview JSX/TS da Odete. Chat só lê. Plan: mkdir/touch só em .colo/.",
       parameters: {
         type: "object",
         properties: { command: { type: "string" } },
@@ -153,7 +153,7 @@ uma linha
   return `Modo BUILD: pode editar. ${read} Prefira str_replace. write_file só pra arquivo novo ou reescrita total. Depois dos patches, 1–3 linhas do que mudou.`;
 }
 
-export const SYSTEM_PROMPT = `Você é o agente da Colo, uma IDE que roda 100% no dispositivo.
+export const SYSTEM_PROMPT = `Você é o agente da Odete, uma IDE que roda 100% no dispositivo.
 O workspace é um filesystem virtual. Lista de paths vem no sistema; o conteúdo só entra se VOCÊ chamar read_file.
 Você escolhe quando abrir e qual arquivo. Em todos os modos a leitura está liberada.
 Responda em português brasileiro.

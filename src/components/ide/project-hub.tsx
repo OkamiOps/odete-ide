@@ -382,7 +382,7 @@ function NewForm() {
         <button type="button" className={dest === "ipad" ? "is-on" : undefined} onClick={() => setDest("ipad")}>
           <Tablet size={18} />
           <b>Neste iPad</b>
-          <span>biblioteca do Colo, offline</span>
+          <span>biblioteca da Odete, offline</span>
         </button>
         <button
           type="button"
@@ -499,7 +499,7 @@ function OpenForm() {
         </button>
         <button type="button" onClick={() => jsonRef.current?.click()}>
           <FileJson size={18} />
-          <b>JSON do Colo</b>
+          <b>JSON da Odete</b>
           <span>backup exportado do app</span>
         </button>
         <button type="button" onClick={() => fileRef.current?.click()}>

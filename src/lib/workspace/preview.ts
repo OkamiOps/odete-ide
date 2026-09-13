@@ -362,7 +362,7 @@ export function lookupPreviewAsset(files: FileMap, url: string, method = "GET"):
       status: 501,
       contentType: "application/json;charset=utf-8",
       body: JSON.stringify({
-        error: "sem arquivo estático pra esta API — o runtime do Colo tenta o Route Handler / Nest em seguida",
+        error: "sem arquivo estático pra esta API — o runtime da Odete tenta o Route Handler / Nest em seguida",
         path: `/${path}`,
         method,
       }),

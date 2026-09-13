@@ -711,7 +711,7 @@ function GithubBox({ remote, branch, token }: { remote: string; branch: string; 
               disabled={busy}
               onClick={() => {
                 setBusy(true);
-                void githubReviewPr(remote, token, p.number, "APPROVE", "ok pelo Colo")
+                void githubReviewPr(remote, token, p.number, "APPROVE", "ok pela Odete")
                   .then(() => setNote(`review #${p.number} aprovada`))
                   .catch((e) => setNote(e instanceof Error ? e.message : "review falhou"))
                   .finally(() => setBusy(false));

@@ -440,7 +440,7 @@ const page = React.createElement(Page);
 const tree = ${layout ? "React.createElement(Layout, null, page)" : "page"};
 createRoot(el).render(tree);
 `;
-  const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Next · Colo</title></head><body><div id="root"></div><script type="module" src="/__colo_next_entry.jsx"></script></body></html>`;
+  const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Next · Odete</title></head><body><div id="root"></div><script type="module" src="/__colo_next_entry.jsx"></script></body></html>`;
   return { path: "__colo_next_entry.jsx", code, html };
 }
 
@@ -728,7 +728,7 @@ export async function bootProject(files: FileMap) {
     const n = G.__coloNest?.handlers?.length ?? 0;
     return {
       ok: true,
-      out: `Nest no Colo · ${n} rota${n === 1 ? "" : "s"} no Preview (sem TCP, sem Prisma nativo).`,
+      out: `Nest na Odete · ${n} rota${n === 1 ? "" : "s"} no Preview (sem TCP, sem Prisma nativo).`,
     };
   }
   if (stack.id === "next") {
@@ -737,8 +737,8 @@ export async function bootProject(files: FileMap) {
     return {
       ok: true,
       out: page
-        ? `Next no Colo · página ${page.path.replace("__colo_next_entry.jsx", "app/page")} no Preview${apis ? `, ${apis} route handler` : ""}. Sem SSR/next build.`
-        : `Next no Colo · sem app/page.tsx; Route Handlers ainda respondem em /api.`,
+        ? `Next na Odete · página ${page.path.replace("__colo_next_entry.jsx", "app/page")} no Preview${apis ? `, ${apis} route handler` : ""}. Sem SSR/next build.`
+        : `Next na Odete · sem app/page.tsx; Route Handlers ainda respondem em /api.`,
     };
   }
   return { ok: true, out: "" };
@@ -824,13 +824,13 @@ export function runtimeHint(files: FileMap) {
     return `${stack.label}: npm run dev/start usa o Node deste iPad.`;
   }
   if (stack.id === "next") {
-    return "Next no Colo (sem isolamento): app/page no Preview + Route Handlers em /api. Sem next build, sem SSR.";
+    return "Next na Odete (sem isolamento): app/page no Preview + Route Handlers em /api. Sem next build, sem SSR.";
   }
   if (stack.id === "nest") {
-    return "Nest no Colo (sem isolamento): src/main.ts com decorators shim. Preview chama as rotas. Sem TCP, Prisma nativo ou microservices.";
+    return "Nest na Odete (sem isolamento): src/main.ts com decorators shim. Preview chama as rotas. Sem TCP, Prisma nativo ou microservices.";
   }
   if (stack.kind === "ssr") {
-    return `${stack.label}: sem origem isolada o Colo só emula o client. No app em tela cheia o Node sobe.`;
+    return `${stack.label}: sem origem isolada a Odete só emula o client. No app em tela cheia o Node sobe.`;
   }
   return "";
 }

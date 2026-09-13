@@ -733,7 +733,7 @@ export async function githubReviewPr(
   token: string,
   number: number,
   event: "APPROVE" | "REQUEST_CHANGES" | "COMMENT" = "APPROVE",
-  body = "ok pelo Colo",
+  body = "ok pela Odete",
 ) {
   const spec = parseRepo(remote);
   if (!spec) throw new Error("remote inválido");

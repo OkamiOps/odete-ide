@@ -445,7 +445,7 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
         },
       ]);
     } finally {
-      if (!cancel.current && gen.current === my) pingDone("Colo", "agente terminou");
+      if (!cancel.current && gen.current === my) pingDone("Odete", "agente terminou");
     }
   }
   sendFn.current = (t: string, opts?: { steer?: boolean }) => {

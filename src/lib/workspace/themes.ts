@@ -21,10 +21,10 @@ export type ThemeDef = {
 export const THEMES: ThemeDef[] = [
   {
     id: "colo",
-    label: "Colo",
-    blurb: "O tema original.",
+    label: "Odete",
+    blurb: "Noite da marca.",
     dark: true,
-    swatch: ["#0c0c0d", "#e6e4df", "#121214"],
+    swatch: ["#08080a", "#4fd4ea", "#121216"],
   },
   {
     id: "catppuccin",

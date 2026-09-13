@@ -8,7 +8,7 @@ import { AuthProvider } from "@/lib/auth/provider";
 import { PreviewHostBridge } from "@/components/preview-host-bridge";
 import appCss from "../styles.css?url";
 
-const APP_NAME = "Colo";
+const APP_NAME = "Odete";
 
 export const Route = createRootRoute({
   head: () => ({
@@ -19,11 +19,12 @@ export const Route = createRootRoute({
       {
         name: "description",
         content:
-          "IDE no colo: editor, git, terminal e agente HTTP no próprio dispositivo.",
+          "Odete — IDE para iPad e iPhone. Editor, git, terminal e agente no próprio dispositivo.",
       },
-      { name: "theme-color", content: "#0c0c0d" },
+      { name: "theme-color", content: "#08080a" },
     ],
     links: [
+      { rel: "icon", type: "image/png", href: "/favicon.png" },
       { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
       { rel: "stylesheet", href: appCss },
       {

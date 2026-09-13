@@ -16,7 +16,7 @@ export type CenterId = "code" | "preview" | "split" | "diff" | "dual";
 export type MobileTab = "files" | "edit" | "agent" | "term" | "preview" | "settings";
 export type MinimapId = "off" | "s" | "m" | "l";
 
-const ENTERED_KEY = "colo-entered";
+const ENTERED_KEY = "odete-entered";
 
 export function hasEnteredWorkspace() {
   try {

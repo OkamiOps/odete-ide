@@ -72,7 +72,7 @@ export function stackHint(stack: Stack) {
     if (stack.kind === "spa") {
       return `${stack.label}: origem não isolada — Preview com esm.sh (não é o Vite). No app em tela cheia, npm run dev sobe o Node.`;
     }
-    return `${stack.label}: precisa do app em tela cheia com origem isolada pra subir o servidor. Aqui o Colo só emula o client.`;
+    return `${stack.label}: precisa do app em tela cheia com origem isolada pra subir o servidor. Aqui a Odete só emula o client.`;
   }
   if (stack.kind === "spa") {
     return `${stack.label}: npm run dev sobe o Vite no Node deste iPad. HMR de verdade.`;
@@ -243,7 +243,7 @@ export async function npmInstall(args: string[], onNote?: (s: string) => void): 
       next();
     });
 
-    if (!pkg.name) pkg.name = w.projectName || "colo-app";
+    if (!pkg.name) pkg.name = w.projectName || "odete-app";
     const ws = useWorkspace.getState();
     ws.writeFile("package.json", JSON.stringify(pkg, null, 2) + "\n");
     ws.writeFile("package-lock.colo.json", JSON.stringify({ lock, at: Date.now() }, null, 2) + "\n");
@@ -253,7 +253,7 @@ export async function npmInstall(args: string[], onNote?: (s: string) => void): 
     const cap = Object.keys(lock).length >= MAX_PACKAGES ? `\nparou em ${MAX_PACKAGES} pacotes` : "";
     const wsN = ctx.packages.filter((p) => p.dir).length;
     const wsLine = wsN ? `\nworkspace ${wsN} pacote${wsN > 1 ? "s" : ""} · catalog ${Object.keys(ctx.catalog).length}` : "";
-    return `added ${lines.length} · lock ${Object.keys(lock).length}  (${stack.label})${wsLine}\n${lines.slice(0, 40).join("\n")}${lines.length > 40 ? `\n… +${lines.length - 40}` : ""}\n${stackHint(stack)}\nnode_modules não entra no editor (quota). Preview usa esm.sh + JSX/TS do Colo.${extra}${miss}${cap}`;
+    return `added ${lines.length} · lock ${Object.keys(lock).length}  (${stack.label})${wsLine}\n${lines.slice(0, 40).join("\n")}${lines.length > 40 ? `\n… +${lines.length - 40}` : ""}\n${stackHint(stack)}\nnode_modules não entra no editor (quota). Preview usa esm.sh + JSX/TS da Odete.${extra}${miss}${cap}`;
   } finally {
     resumeSync(useWorkspace.getState().files, useWorkspace.getState().projectId);
   }
@@ -285,7 +285,7 @@ export function npmRunScript(name: string | undefined): { out: string; openPrevi
   }
   if (isBuild) {
     return {
-      out: `npm run ${name} — ${cmd || name}\nsem Node isolado o Colo não corre ${name} (tsc/eslint/next build). no app em tela cheia, npm run ${name} usa o Node.`,
+      out: `npm run ${name} — ${cmd || name}\nsem Node isolado a Odete não corre ${name} (tsc/eslint/next build). no app em tela cheia, npm run ${name} usa o Node.`,
       openPreview: false,
     };
   }

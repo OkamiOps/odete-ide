@@ -11,6 +11,7 @@ import { formatWorkspace } from "./tools";
 import { projectRules } from "./rules";
 import { abortSignal, isAborted, startAbort } from "./abort";
 import { needsPermit, waitPermit, type PermitMode } from "./permit";
+import { hasSteer, subscribeSteer, takeAllSteer, clearSteer } from "./steer";
 
 const MAX_ROUNDS = 8;
 
@@ -55,7 +56,17 @@ async function streamTurn(
   const onAbort = () => ac.abort();
   extra?.addEventListener("abort", onAbort);
   if (extra?.aborted) ac.abort();
-  const stopped = () => shouldStop?.() || ac.signal.aborted || isAborted(payload.slot ?? "a");
+  const slot = payload.slot ?? "a";
+  const unsubSteer = subscribeSteer(() => {
+    if (hasSteer(slot)) ac.abort();
+  });
+  if (hasSteer(slot)) ac.abort();
+  const stopped = () => shouldStop?.() || ac.signal.aborted || isAborted(slot);
+  const redirected = () => hasSteer(slot) && !isAborted(slot);
+  let thinking = "";
+  let text = "";
+  let tool_calls: AgentMessage["tool_calls"];
+  let use = emptyUse();
   try {
     const res = await fetch("/api/agent", {
       method: "POST",
@@ -64,17 +75,16 @@ async function streamTurn(
       signal: ac.signal,
     });
     if (!res.ok || !res.body) {
+      if (redirected()) {
+        return { ok: true, message: { role: "assistant", content: text, thinking: thinking || undefined, tool_calls }, use };
+      }
       if (stopped()) return { ok: false, error: "parado" };
       return agentTurn({ data: payload });
     }
     const reader = res.body.getReader();
     const dec = new TextDecoder();
     let buf = "";
-    let thinking = "";
-    let text = "";
-    let tool_calls: AgentMessage["tool_calls"];
     let err = "";
-    let use = emptyUse();
     while (true) {
       if (stopped()) {
         try {
@@ -115,8 +125,8 @@ async function streamTurn(
         }
       }
     }
-    if (stopped()) return { ok: false, error: "parado" };
-    if (err) return { ok: false, error: err };
+    if (stopped() && !redirected()) return { ok: false, error: "parado" };
+    if (err && !redirected()) return { ok: false, error: err };
     return {
       ok: true,
       message: {
@@ -128,12 +138,20 @@ async function streamTurn(
       use,
     };
   } catch (e) {
+    if (redirected()) {
+      return {
+        ok: true,
+        message: { role: "assistant", content: text, thinking: thinking || undefined, tool_calls },
+        use,
+      };
+    }
     if (ac.signal.aborted || (e instanceof DOMException && e.name === "AbortError") || stopped()) {
       return { ok: false, error: "parado" };
     }
     return agentTurn({ data: payload });
   } finally {
     extra?.removeEventListener("abort", onAbort);
+    unsubSteer();
   }
 }
 
@@ -168,8 +186,31 @@ export async function runAgentLoop(
   const permit = auth.permit ?? "auto";
   const slot = auth.slot ?? "a";
   startAbort(slot);
+  clearSteer(slot);
   const stopped = () => shouldStop?.() || isAborted(slot);
   let hitCap = false;
+
+  function applySteer(): boolean {
+    const note = takeAllSteer(slot);
+    if (!note) return false;
+    messages.push({
+      role: "user",
+      content: `Redireciona a execução agora. Interrompe o plano anterior e segue isto:\n\n${note}`,
+    });
+    push({ id: crypto.randomUUID(), kind: "user", text: note });
+    return true;
+  }
+
+  function cancelOpenTools(calls: NonNullable<AgentMessage["tool_calls"]>, from = 0) {
+    for (let i = from; i < calls.length; i++) {
+      const call = calls[i]!;
+      messages.push({
+        role: "tool",
+        tool_call_id: call.id,
+        content: "cancelado: o usuário redirecionou a execução",
+      });
+    }
+  }
 
   for (let round = 0; round < MAX_ROUNDS; round++) {
     if (stopped()) break;
@@ -209,8 +250,13 @@ export async function runAgentLoop(
       },
       stopped,
     );
-    if (stopped()) break;
+    if (stopped() && !hasSteer(slot)) break;
     if (!result.ok) {
+      if (hasSteer(slot)) {
+        applySteer();
+        round = -1;
+        continue;
+      }
       push({ id: crypto.randomUUID(), kind: "error", text: result.error });
       break;
     }
@@ -230,19 +276,36 @@ export async function runAgentLoop(
     });
 
     const calls = msg.tool_calls ?? [];
+    if (hasSteer(slot)) {
+      cancelOpenTools(calls);
+      applySteer();
+      round = -1;
+      continue;
+    }
     if (calls.length === 0) {
       const text = (msg.content ?? "").trim() || answer;
       if (text) upsert({ id: textId, kind: "assistant", text });
+      if (hasSteer(slot)) {
+        applySteer();
+        round = -1;
+        continue;
+      }
       break;
     }
 
+    let doneCalls = 0;
     for (const call of calls) {
-      if (stopped()) break;
+      if (stopped() && !hasSteer(slot)) break;
+      if (hasSteer(slot)) {
+        cancelOpenTools(calls, doneCalls);
+        break;
+      }
       const name = call.function.name;
       if (mode === "chat" && (name === "write_file" || name === "str_replace")) {
         const detail = "chat não edita. mude pra Plan ou Build.";
         push({ id: call.id, kind: "tool", name, detail });
         messages.push({ role: "tool", tool_call_id: call.id, content: detail });
+        doneCalls += 1;
         continue;
       }
       let args: Record<string, unknown> = {};
@@ -267,6 +330,7 @@ export async function runAgentLoop(
             tool_call_id: call.id,
             content: "usuário recusou esta ação",
           });
+          doneCalls += 1;
           continue;
         }
         upsert({ id: call.id, kind: "permit", name, detail: hint, status: "ok" });
@@ -298,6 +362,12 @@ export async function runAgentLoop(
         tool_call_id: call.id,
         content: detail,
       });
+      doneCalls += 1;
+    }
+    if (hasSteer(slot)) {
+      applySteer();
+      round = -1;
+      continue;
     }
     if (round === MAX_ROUNDS - 1) hitCap = true;
   }

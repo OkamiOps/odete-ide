@@ -14,6 +14,7 @@ import { agentById } from "@/lib/agent/providers";
 import type { AgentImage, AgentMessage } from "@/lib/agent/server";
 import { answerPermit, type PermitMode } from "@/lib/agent/permit";
 import { abortFetch, fireAbort } from "@/lib/agent/abort";
+import { clearSteer, pushSteer } from "@/lib/agent/steer";
 import type { AgentMode } from "@/lib/agent/tools";
 import { authForTurn } from "@/lib/agent/session";
 import { agentConnected, currentAgentModel, currentEffort, useChrome } from "@/lib/workspace/chrome";
@@ -71,6 +72,13 @@ async function fileToImage(file: File): Promise<AgentImage | null> {
   return { mime: "image/jpeg", data };
 }
 
+type AgentJob = {
+  id: string;
+  prompt: string;
+  body: string;
+  pics: AgentImage[];
+};
+
 export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
   const agentId = useChrome((s) => s.slotAgent?.[slot] ?? s.agentId);
   const connected = useChrome((s) => agentConnected({ ...s, agentId }));
@@ -86,7 +94,10 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
   const cancel = useRef(false);
   const gen = useRef(0);
   const draftRef = useRef("");
-  const sendFn = useRef<(t: string) => void>(() => {});
+  const sendFn = useRef<(t: string, opts?: { steer?: boolean }) => void>(() => {});
+  const running = useRef(false);
+  const queueRef = useRef<AgentJob[]>([]);
+  const [queued, setQueued] = useState<AgentJob[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
   const clipRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -198,9 +209,19 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
       if (!want && slot !== "a") return;
       sendFn.current(draftRef.current);
     }
+    function onSteer(e: Event) {
+      const want = (e as CustomEvent<{ slot?: string }>).detail?.slot;
+      if (want && want !== slot) return;
+      if (!want && slot !== "a") return;
+      sendFn.current(draftRef.current, { steer: true });
+    }
     window.addEventListener("colo-send-agent", onSend);
-    return () => window.removeEventListener("colo-send-agent", onSend);
-  }, []);
+    window.addEventListener("colo-steer-model", onSteer);
+    return () => {
+      window.removeEventListener("colo-send-agent", onSend);
+      window.removeEventListener("colo-steer-model", onSteer);
+    };
+  }, [slot]);
 
   const [caret, setCaret] = useState(0);
   const caretRef = useRef(0);
@@ -305,7 +326,7 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
     placeCaret(pos);
   }
 
-  async function send(text: string) {
+  async function send(text: string, opts?: { steer?: boolean }) {
     const quote = useNav.getState().quote.trim();
     const prompt = text.trim();
     const pics = shots;
@@ -314,20 +335,64 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
         ? `Trecho:\n\`\`\`\n${quote}\n\`\`\`\n\n${prompt}`
         : `explica este trecho:\n\`\`\`\n${quote}\n\`\`\``
       : prompt;
-    if ((!body && !pics.length) || busy || !connected) return;
-    const my = ++gen.current;
-    useCheckpoints.getState().take(prompt.slice(0, 40) || "turno", slot);
-    armNotify();
+    if (!connected) return;
+    if (!body && !pics.length) {
+      if (!running.current && queueRef.current.length) {
+        const next = queueRef.current[0]!;
+        queueRef.current = queueRef.current.slice(1);
+        setQueued(queueRef.current);
+        await runJob(next);
+      }
+      return;
+    }
+    const job: AgentJob = {
+      id: crypto.randomUUID(),
+      prompt: prompt || (pics.length ? "imagem" : "trecho"),
+      body,
+      pics,
+    };
     useNav.getState().setQuote("");
     setDraft("");
     setShots([]);
+    if (opts?.steer && running.current) {
+      pushSteer(slot, job.body);
+      return;
+    }
+    if (running.current) {
+      queueRef.current = [...queueRef.current, job];
+      setQueued(queueRef.current);
+      return;
+    }
+    await runJob(job);
+  }
+
+  async function runJob(first: AgentJob) {
+    running.current = true;
     setBusy(true);
+    let current: AgentJob | undefined = first;
+    while (current) {
+      await runTurn(current);
+      if (cancel.current) break;
+      current = queueRef.current[0];
+      if (current) {
+        queueRef.current = queueRef.current.slice(1);
+        setQueued(queueRef.current);
+      }
+    }
+    running.current = false;
+    setBusy(false);
+  }
+
+  async function runTurn(job: AgentJob) {
+    const my = ++gen.current;
+    useCheckpoints.getState().take(job.prompt.slice(0, 40) || "turno", slot);
+    armNotify();
     cancel.current = false;
-    const thumbs = pics.map((p) => `data:${p.mime};base64,${p.data}`);
+    const thumbs = job.pics.map((p) => `data:${p.mime};base64,${p.data}`);
     const userItem: ChatItem = {
-      id: crypto.randomUUID(),
+      id: job.id,
       kind: "user",
-      text: prompt || (pics.length ? "imagem" : "trecho"),
+      text: job.prompt,
       images: thumbs,
     };
     setItems((prev) => [...prev, userItem]);
@@ -336,7 +401,7 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
       const chrome = useChrome.getState();
       const next = await runAgentLoop(
         history.current,
-        expandMentions(body),
+        expandMentions(job.body),
         (extra) => {
           if (cancel.current || gen.current !== my) return;
           setItems((prev) => {
@@ -365,7 +430,7 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
           })(),
         },
         () => cancel.current || gen.current !== my,
-        pics,
+        job.pics,
         (use) => useAgentChats.getState().addUsage(projectId, use, slot),
       );
       if (gen.current === my && !cancel.current) history.current = next;
@@ -380,12 +445,11 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
         },
       ]);
     } finally {
-      if (gen.current === my) setBusy(false);
       if (!cancel.current && gen.current === my) pingDone("Colo", "agente terminou");
     }
   }
-  sendFn.current = (t: string) => {
-    void send(t);
+  sendFn.current = (t: string, opts?: { steer?: boolean }) => {
+    void send(t, opts);
   };
 
   const chats = useMemo(
@@ -757,6 +821,27 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
             </div>
           ) : null}
           {voiceErr ? <p className="agent-voice-err">{voiceErr}</p> : null}
+          {queued.length ? (
+            <ul className="agent-queue">
+              {queued.map((q, i) => (
+                <li key={q.id}>
+                  <span>
+                    fila {i + 1}: {q.prompt.slice(0, 52)}
+                  </span>
+                  <button
+                    type="button"
+                    aria-label="tirar da fila"
+                    onClick={() => {
+                      queueRef.current = queueRef.current.filter((x) => x.id !== q.id);
+                      setQueued(queueRef.current);
+                    }}
+                  >
+                    <X size={12} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
           <form
             className="agent-compose"
             onSubmit={(e) => {
@@ -794,7 +879,8 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
                   });
                 }}
                 onKeyDown={(e) => {
-                  if (menuLen) {
+                  const liveMenu = Boolean(atHit || slashHit);
+                  if (liveMenu && menuLen) {
                     if (e.key === "ArrowDown") {
                       e.preventDefault();
                       setPickIx((i) => i + 1);
@@ -805,7 +891,7 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
                       setPickIx((i) => i - 1);
                       return;
                     }
-                    if (e.key === "Tab" || e.key === "Enter") {
+                    if (e.key === "Tab" || (e.key === "Enter" && !e.metaKey && !e.ctrlKey)) {
                       e.preventDefault();
                       if (skillMenu?.length) pickSkill(skillMenu[activeIx]!.id);
                       else if (fileMenu?.length) pickFile(fileMenu[activeIx]!);
@@ -817,13 +903,14 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
                       return;
                     }
                   }
-                  if (e.key === "Enter" && !e.shiftKey) {
+                  if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+                  if (e.key === "Enter" && !e.shiftKey && !e.metaKey && !e.ctrlKey) {
                     e.preventDefault();
                     void send(draft);
                   }
                 }}
                 rows={1}
-                placeholder={`Fala com o ${def.label}…`}
+                placeholder={busy ? `Enter na fila · ⌘Enter redireciona o ${def.label}` : `Fala com o ${def.label}… Enter envia`}
                 className="agent-input"
               />
             </div>
@@ -920,21 +1007,29 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
                   type="button"
                   className="agent-send is-stop"
                   aria-label="parar"
+                  title="Parar"
                   onClick={() => {
                     cancel.current = true;
+                    clearSteer(slot);
                     fireAbort(slot);
                     gen.current += 1;
                     answerPermit(false, slot);
+                    running.current = false;
                     setBusy(false);
                   }}
                 >
                   <Square size={14} fill="currentColor" />
                 </button>
-              ) : (
-                <button type="submit" className="agent-send" disabled={!draft.trim() && !quote && !shots.length} aria-label="enviar">
-                  <Send size={18} />
-                </button>
-              )}
+              ) : null}
+              <button
+                type="submit"
+                className="agent-send"
+                disabled={!draft.trim() && !quote && !shots.length && !queued.length}
+                aria-label={busy ? "enfileirar" : "enviar"}
+                title={busy ? "Enter: fila · ⌘Enter: redireciona" : "Enter envia · ⌘Enter redireciona"}
+              >
+                <Send size={18} />
+              </button>
             </div>
           </form>
         </div>

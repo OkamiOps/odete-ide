@@ -19,10 +19,12 @@ export function ModelSelect({
   provider,
   compact,
   slot,
+  onPicked,
 }: {
   provider: AgentId;
   compact?: boolean;
   slot?: "a" | "b";
+  onPicked?: (id: string) => void;
 }) {
   const grokModel = useChrome((s) => s.grokModel);
   const claudeModel = useChrome((s) => s.claudeModel);
@@ -102,6 +104,7 @@ export function ModelSelect({
   function pick(id: string) {
     apply(id);
     if (!fav) setFav(provider, id);
+    onPicked?.(id);
   }
 
   const list = (

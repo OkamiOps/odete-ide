@@ -164,7 +164,7 @@ export function IdeApp() {
         useChrome.setState({ agent: true, mobile: "agent" });
         const focused = document.querySelector<HTMLElement>("[data-agent-slot]:focus-within");
         const slot = focused?.getAttribute("data-agent-slot") || "a";
-        window.dispatchEvent(new CustomEvent("colo-send-agent", { detail: { slot } }));
+        window.dispatchEvent(new CustomEvent("colo-steer-model", { detail: { slot } }));
         return;
       }
       if (e.shiftKey && e.altKey && is("f")) {

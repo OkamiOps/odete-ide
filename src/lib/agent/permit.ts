@@ -1,3 +1,5 @@
+import { hasSteer, subscribeSteer } from "./steer";
+
 export type PermitMode = "ask" | "auto" | "full";
 
 const SAFE = new Set(["read_file", "list_dir", "grep", "read_terminal"]);
@@ -13,7 +15,15 @@ const waiters = new Map<string, (ok: boolean) => void>();
 export function waitPermit(slot = "a") {
   waiters.get(slot)?.(false);
   return new Promise<boolean>((resolve) => {
-    waiters.set(slot, resolve);
+    const unsub = subscribeSteer(() => {
+      if (hasSteer(slot)) finish(false);
+    });
+    function finish(ok: boolean) {
+      unsub();
+      waiters.delete(slot);
+      resolve(ok);
+    }
+    waiters.set(slot, finish);
   });
 }
 

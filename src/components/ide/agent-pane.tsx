@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { AtSign, Check, FolderOpen, History, ImagePlus, LoaderCircle, Paperclip, Plus, Send, Square, SquarePen, Undo2, X } from "lucide-react";
+import { AtSign, Check, FolderOpen, History, ImagePlus, LoaderCircle, Paperclip, Plus, Send, Shield, Square, SquarePen, Undo2, X } from "lucide-react";
 import { AgentConnect } from "@/components/ide/settings-pane";
 import { ModelSelect } from "@/components/ide/model-select";
 import { contextWindow, estimateTokens, fmtTok, useAgentChats } from "@/lib/agent/chats";
@@ -8,12 +8,13 @@ import { runAgentLoop, type ChatItem } from "@/lib/agent/loop";
 import { usePatches } from "@/lib/agent/patches";
 import { AGENTS, agentById } from "@/lib/agent/providers";
 import type { AgentImage, AgentMessage } from "@/lib/agent/server";
+import { answerPermit, type PermitMode } from "@/lib/agent/permit";
 import type { AgentMode } from "@/lib/agent/tools";
-import { hunksOf } from "@/lib/workspace/hunks";
 import { authForTurn } from "@/lib/agent/session";
 import { agentConnected, currentAgentModel, currentEffort, useChrome } from "@/lib/workspace/chrome";
 import { useNav } from "@/lib/workspace/nav";
 import { allSkills } from "@/lib/workspace/skills";
+import { hunksOf } from "@/lib/workspace/hunks";
 import { useWorkspace } from "@/lib/workspace/store";
 
 const STARTERS = [
@@ -26,6 +27,12 @@ const MODE_META: { id: AgentMode; label: string }[] = [
   { id: "chat", label: "chat" },
   { id: "plan", label: "plan" },
   { id: "build", label: "build" },
+];
+
+const PERM_META: { id: PermitMode; label: string; hint: string }[] = [
+  { id: "ask", label: "ask", hint: "Pergunta quase tudo antes de agir." },
+  { id: "auto", label: "auto", hint: "Lê sozinho. Pergunta pra escrever e terminal." },
+  { id: "full", label: "full", hint: "Segue sem perguntar." },
 ];
 
 function expandMentions(text: string) {
@@ -71,9 +78,11 @@ export function AgentPane() {
   const clipRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [plus, setPlus] = useState(false);
+  const [permOpen, setPermOpen] = useState(false);
   const [picker, setPicker] = useState<false | "file" | "skill">(false);
   const [histOpen, setHistOpen] = useState(false);
   const agentMode = useChrome((s) => s.agentMode);
+  const permitMode = useChrome((s) => s.permitMode);
   const threadMap = useAgentChats((s) => s.threads);
 
   useEffect(() => {
@@ -139,6 +148,7 @@ export function AgentPane() {
 
   function clear() {
     cancel.current = true;
+    answerPermit(false);
     setBusy(false);
     const t = useAgentChats.getState().newChat(projectId);
     history.current = t.messages;
@@ -220,6 +230,7 @@ export function AgentPane() {
           access: tokens.access,
           accountId: tokens.accountId,
           mode: chrome.agentMode,
+          permit: chrome.permitMode,
           effort:
             currentEffort(chrome) ||
             defaultEffort(effortsForModel(chrome.agentId, currentAgentModel(chrome))) ||
@@ -456,6 +467,23 @@ export function AgentPane() {
                 <span className="mention-empty">nenhum arquivo</span>
               )}
             </div>
+          ) : permOpen ? (
+            <div className="perm-menu">
+              {PERM_META.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  className={permitMode === p.id ? "is-on" : undefined}
+                  onClick={() => {
+                    useChrome.getState().setPermitMode(p.id);
+                    setPermOpen(false);
+                  }}
+                >
+                  <b>{p.label}</b>
+                  <span>{p.hint}</span>
+                </button>
+              ))}
+            </div>
           ) : plus ? (
             <div className="plus-menu">
               <button
@@ -600,10 +628,24 @@ export function AgentPane() {
                 aria-label="Anexar"
                 onClick={() => {
                   setPicker(false);
+                  setPermOpen(false);
                   setPlus((v) => !v);
                 }}
               >
                 <Plus size={20} />
+              </button>
+              <button
+                type="button"
+                className={`agent-icon-btn${permOpen ? " is-on" : ""}`}
+                title={`Permissão: ${permitMode}`}
+                aria-label="níveis de permissão"
+                onClick={() => {
+                  setPlus(false);
+                  setPicker(false);
+                  setPermOpen((v) => !v);
+                }}
+              >
+                <Shield size={18} />
               </button>
               <span className={`agent-ctx${ctxPct >= 85 ? " is-hot" : ctxPct >= 60 ? " is-warm" : ""}`} title="contexto estimado">
                 {fmtTok(usedTok)}
@@ -616,6 +658,7 @@ export function AgentPane() {
                   aria-label="parar"
                   onClick={() => {
                     cancel.current = true;
+                    answerPermit(false);
                     setBusy(false);
                   }}
                 >
@@ -676,6 +719,28 @@ function Message({ item }: { item: ChatItem }) {
       <div className="agent-tool">
         <b>{item.name}</b>
         {path ? <FileLink path={path} label={item.detail} /> : <span className="min-w-0 truncate">{item.detail}</span>}
+      </div>
+    );
+  }
+  if (item.kind === "permit") {
+    return (
+      <div className={`agent-permit is-${item.status}`}>
+        <div>
+          <b>{item.name}</b>
+          <span>{item.detail}</span>
+        </div>
+        {item.status === "pending" ? (
+          <div className="agent-permit-ops">
+            <button type="button" className="is-ok" onClick={() => answerPermit(true)}>
+              Permitir
+            </button>
+            <button type="button" onClick={() => answerPermit(false)}>
+              Recusar
+            </button>
+          </div>
+        ) : (
+          <em>{item.status === "ok" ? "ok" : "recusado"}</em>
+        )}
       </div>
     );
   }

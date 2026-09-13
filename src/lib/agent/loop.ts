@@ -7,6 +7,7 @@ import { useWorkspace } from "@/lib/workspace/store";
 import { usePatches } from "./patches";
 import { allSkills, formatSkillsPrompt } from "@/lib/workspace/skills";
 import { formatWorkspace } from "./tools";
+import { needsPermit, waitPermit, type PermitMode } from "./permit";
 
 const MAX_ROUNDS = 8;
 
@@ -15,6 +16,7 @@ export type ChatItem =
   | { id: string; kind: "assistant"; text: string }
   | { id: string; kind: "think"; text: string; live?: boolean }
   | { id: string; kind: "tool"; name: string; detail: string }
+  | { id: string; kind: "permit"; name: string; detail: string; status: "pending" | "ok" | "no" }
   | { id: string; kind: "error"; text: string }
   | { id: string; kind: "patch"; patchId: string; path: string; before: string; after: string };
 
@@ -25,6 +27,7 @@ export type LoopAuth = {
   accountId?: string;
   mode?: AgentMode;
   effort?: string;
+  permit?: PermitMode;
 };
 
 async function streamTurn(
@@ -130,6 +133,7 @@ export async function runAgentLoop(
   const userMsg: AgentMessage = { role: "user", content: userText, images: images?.length ? images : undefined };
   const messages: AgentMessage[] = [...history, userMsg];
   const mode = auth.mode ?? "build";
+  const permit = auth.permit ?? "auto";
 
   for (let round = 0; round < MAX_ROUNDS; round++) {
     if (shouldStop?.()) break;
@@ -199,31 +203,47 @@ export async function runAgentLoop(
         messages.push({ role: "tool", tool_call_id: call.id, content: detail });
         continue;
       }
+      let args: Record<string, unknown> = {};
+      try {
+        args = JSON.parse(call.function.arguments || "{}") as Record<string, unknown>;
+      } catch {
+        args = {};
+      }
+      const path = typeof args.path === "string" ? args.path : "";
+      const hint =
+        path ||
+        (typeof args.pattern === "string" ? args.pattern : "") ||
+        (typeof args.command === "string" ? args.command : "") ||
+        name;
+      if (needsPermit(permit, name)) {
+        upsert({ id: call.id, kind: "permit", name, detail: hint, status: "pending" });
+        const ok = await waitPermit();
+        if (shouldStop?.() || !ok) {
+          upsert({ id: call.id, kind: "permit", name, detail: hint, status: "no" });
+          messages.push({
+            role: "tool",
+            tool_call_id: call.id,
+            content: "usuário recusou esta ação",
+          });
+          continue;
+        }
+        upsert({ id: call.id, kind: "permit", name, detail: hint, status: "ok" });
+      }
       const detail = executeTool(name, call.function.arguments);
       if (detail.startsWith("PATCH:")) {
         const patchId = detail.slice(6);
         const patch = usePatches.getState().items.find((p) => p.id === patchId);
         if (patch) {
           push({
-            id: call.id,
+            id: crypto.randomUUID(),
             kind: "patch",
             patchId: patch.id,
             path: patch.path,
             before: patch.before,
             after: patch.after,
           });
-        } else {
-          push({ id: call.id, kind: "tool", name, detail: "patch" });
         }
-      } else {
-        let args: Record<string, unknown> = {};
-        try {
-          args = JSON.parse(call.function.arguments || "{}") as Record<string, unknown>;
-        } catch {
-          args = {};
-        }
-        const path = typeof args.path === "string" ? args.path : "";
-        const hint = path || (typeof args.pattern === "string" ? args.pattern : "") || (typeof args.command === "string" ? args.command : "");
+      } else if (!needsPermit(permit, name)) {
         push({
           id: call.id,
           kind: "tool",

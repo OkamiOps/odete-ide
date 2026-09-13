@@ -6,6 +6,7 @@ import type { TokenBundle } from "@/lib/agent/oauth";
 import type { ThemeId } from "./themes";
 import type { SynColors } from "./themes";
 import type { IconPackId } from "./icons";
+import type { PermitMode } from "@/lib/agent/permit";
 
 export type SideId = "files" | "search" | "git" | "settings" | "problems";
 export type CenterId = "code" | "preview" | "split" | "diff" | "dual";
@@ -72,6 +73,7 @@ const ACTIONS = [
   "setEditFocus",
   "setCheatsheet",
   "setAgentMode",
+  "setPermitMode",
   "setFindOpen",
   "setEffort",
   "setPluginEmmet",
@@ -91,6 +93,7 @@ type ChromeState = {
   paletteKind: PaletteKind;
   findOpen: boolean;
   agentMode: AgentMode;
+  permitMode: PermitMode;
   effortByKey: Record<string, EffortId>;
   mobile: MobileTab;
   creating: boolean;
@@ -139,6 +142,7 @@ type ChromeState = {
   setPalette: (v: boolean, kind?: PaletteKind) => void;
   setFindOpen: (v: boolean) => void;
   setAgentMode: (m: AgentMode) => void;
+  setPermitMode: (m: PermitMode) => void;
   setEffort: (key: string, effort: EffortId) => void;
   setMobile: (t: MobileTab) => void;
   setCreating: (v: boolean) => void;
@@ -221,6 +225,7 @@ export const useChrome = create<ChromeState>()(
       paletteKind: "all" as PaletteKind,
       findOpen: false,
       agentMode: "build" as AgentMode,
+      permitMode: "auto" as PermitMode,
       effortByKey: {} as Record<string, EffortId>,
       mobile: "edit",
       creating: false,
@@ -276,6 +281,7 @@ export const useChrome = create<ChromeState>()(
         set((s) => ({ palette, paletteKind: kind ?? (palette ? s.paletteKind : "all") })),
       setFindOpen: (findOpen) => set({ findOpen }),
       setAgentMode: (agentMode) => set({ agentMode }),
+      setPermitMode: (permitMode) => set({ permitMode }),
       setEffort: (key, effort) =>
         set((s) => ({ effortByKey: { ...s.effortByKey, [key]: effort } })),
       setMobile: (mobile) => set({ mobile }),
@@ -361,6 +367,7 @@ export const useChrome = create<ChromeState>()(
         agentW: s.agentW,
         termH: s.termH,
         agentMode: s.agentMode,
+        permitMode: s.permitMode,
         effortByKey: s.effortByKey,
       }),
       merge: (persisted, current) => {

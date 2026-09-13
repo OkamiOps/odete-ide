@@ -74,6 +74,10 @@ export async function writeTree(dir: FileSystemDirectoryHandle, files: FileMap) 
   }
 }
 
+export async function saveHandle(dir: FileSystemDirectoryHandle) {
+  await putHandle(dir);
+}
+
 export async function bindFolder() {
   const w = window as Window & {
     showDirectoryPicker?: (opts?: { mode?: string }) => Promise<FileSystemDirectoryHandle>;

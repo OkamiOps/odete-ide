@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiAgentRouteImport } from './routes/api/agent'
+import { Route as ApiNpmRouteImport } from './routes/api/npm'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -22,31 +23,40 @@ const ApiAgentRoute = ApiAgentRouteImport.update({
   path: '/api/agent',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiNpmRoute = ApiNpmRouteImport.update({
+  id: '/api/npm',
+  path: '/api/npm',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/api/agent': typeof ApiAgentRoute
+  '/api/npm': typeof ApiNpmRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/api/agent': typeof ApiAgentRoute
+  '/api/npm': typeof ApiNpmRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/api/agent': typeof ApiAgentRoute
+  '/api/npm': typeof ApiNpmRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/agent'
+  fullPaths: '/' | '/api/agent' | '/api/npm'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/agent'
-  id: '__root__' | '/' | '/api/agent'
+  to: '/' | '/api/agent' | '/api/npm'
+  id: '__root__' | '/' | '/api/agent' | '/api/npm'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ApiAgentRoute: typeof ApiAgentRoute
+  ApiNpmRoute: typeof ApiNpmRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -65,12 +75,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAgentRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/npm': {
+      id: '/api/npm'
+      path: '/api/npm'
+      fullPath: '/api/npm'
+      preLoaderRoute: typeof ApiNpmRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ApiAgentRoute: ApiAgentRoute,
+  ApiNpmRoute: ApiNpmRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

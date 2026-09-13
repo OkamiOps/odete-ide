@@ -151,7 +151,7 @@ export function IdeApp() {
         e.stopPropagation();
         useChrome.getState().toggleAgent();
         useChrome.setState({ agent: true, mobile: "agent" });
-        window.dispatchEvent(new CustomEvent("colo-send-agent"));
+        window.dispatchEvent(new CustomEvent("colo-send-agent", { detail: { slot: "a" } }));
         return;
       }
       if (e.shiftKey && e.altKey && is("f")) {
@@ -173,6 +173,8 @@ export function IdeApp() {
         return;
       }
       if (meta && (e.key === "/" || e.key === "?" || code === "Slash")) {
+        const inEditor = document.querySelector(".cm-editor.cm-focused");
+        if (inEditor && !e.shiftKey) return;
         e.preventDefault();
         e.stopPropagation();
         useChrome.getState().setCheatsheet(!useChrome.getState().cheatsheet);
@@ -222,17 +224,11 @@ function DesktopColumns({ agent, term }: { agent: boolean; term: boolean }) {
   const sideW = useChrome((s) => s.sideW);
   const agentW = useChrome((s) => s.agentW);
   const termH = useChrome((s) => s.termH);
+  const split = useHub((s) => s.agentSplit);
+  const colW = split ? Math.max(agentW, 420) : agentW;
   const toggleSide = useChrome((s) => s.toggleSide);
   const toggleAgent = useChrome((s) => s.toggleAgent);
   const toggleTerm = useChrome((s) => s.toggleTerm);
-  const split = useHub((s) => s.agentSplit);
-  if (split) {
-    return (
-      <div className="agent-full">
-        <AgentDock />
-      </div>
-    );
-  }
   return (
     <div className="desk-wrap">
       <div className="desk">
@@ -279,7 +275,7 @@ function DesktopColumns({ agent, term }: { agent: boolean; term: boolean }) {
                 useChrome.setState((s) => ({ agentW: clamp(s.agentW - d, 240, 720) }))
               }
             />
-            <div className="agent-col" style={{ width: agentW, flex: `0 0 ${agentW}px` }}>
+            <div className="agent-col" style={{ width: colW, flex: `0 0 ${colW}px` }}>
               <PaneError name="Agente">
                 <AgentDock />
               </PaneError>

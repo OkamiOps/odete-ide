@@ -2125,11 +2125,12 @@ html[data-dragging] { cursor: grabbing; user-select: none; }
 }
 .agent-dock.is-split {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr 1fr;
   flex-direction: unset;
 }
-.agent-dock.is-split > * { min-width: 0; min-height: 0; height: 100%; overflow: hidden; border-left: 1px solid var(--color-border); }
-.agent-dock.is-split > *:first-child { border-left: 0; }
+.agent-dock.is-split > * { min-width: 0; min-height: 0; height: 100%; overflow: hidden; border-top: 1px solid var(--color-border); border-left: 0; }
+.agent-dock.is-split > *:first-child { border-top: 0; }
 .gh-sheet { width: min(560px, 96vw); max-height: 80vh; display: flex; flex-direction: column; }
 .gh-sheet-body { overflow: auto; padding: 12px 14px 18px; display: flex; flex-direction: column; gap: 8px; }
 .gh-sheet-body h3 { margin: 8px 0 4px; font-size: 13px; }

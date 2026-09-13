@@ -1,5 +1,8 @@
 import { create } from "zustand";
 import type { EditorView } from "@codemirror/view";
+import { expandAtCursor } from "./editor-plugins";
+import { useChrome } from "./chrome";
+import { useWorkspace } from "./store";
 
 let view: EditorView | null = null;
 
@@ -95,6 +98,11 @@ export function sendEscape() {
 }
 
 export function sendTab() {
+  if (view) {
+    const path = useWorkspace.getState().openPath;
+    const emmet = useChrome.getState().pluginEmmet;
+    if (expandAtCursor(view, path, emmet)) return;
+  }
   insertAtCursor("  ");
 }
 

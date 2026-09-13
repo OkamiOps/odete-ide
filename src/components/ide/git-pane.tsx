@@ -18,6 +18,7 @@ import {
   Upload,
 } from "lucide-react";
 import { githubCreateIssue, githubCreatePr, githubFork, githubIssues, githubMergePr, githubPrFiles, githubPulls, githubPullTree, githubPushTree, githubReviewPr, type CloneResult } from "@/lib/github/api";
+import { remoteFetch, remotePull, remotePush, remoteSync } from "@/lib/workspace/git-remote";
 import { PickList } from "@/components/ide/pick-list";
 import { diffStats, fileStatus } from "@/lib/workspace/diff";
 import { hunksOf } from "@/lib/workspace/hunks";
@@ -92,26 +93,10 @@ export function GitPane() {
     }
     setBusy(true);
     try {
-      if (kind === "fetch" || kind === "pull" || kind === "sync") {
-        const r = await githubPullTree(remote, branch, token);
-        if (kind === "fetch") {
-          setNote(`fetch ${Object.keys(r.files).length} arquivos`);
-        } else {
-          setNote(w().mergeRemote(r.files));
-        }
-      }
-      if (kind === "push" || kind === "sync") {
-        const sha = await githubPushTree(
-          remote,
-          branch,
-          w().files,
-          token,
-          msg.trim() || "colo push",
-          setNote,
-        );
-        w().gitPush();
-        setNote((n) => `${n}\nGitHub ${sha}`);
-      }
+      if (kind === "fetch") setNote(await remoteFetch());
+      else if (kind === "pull") setNote(await remotePull());
+      else if (kind === "push") setNote(await remotePush(msg.trim() || "colo push", setNote));
+      else setNote(await remoteSync(msg.trim() || "colo sync"));
     } catch (e) {
       setNote(e instanceof Error ? e.message : "git falhou");
     } finally {
@@ -625,6 +610,7 @@ function GithubBox({ remote, branch, token }: { remote: string; branch: string; 
   const [prFiles, setPrFiles] = useState<{ path: string; status: string; add: number; del: number; patch: string }[] | null>(null);
   const [prOpen, setPrOpen] = useState<number | null>(null);
   const [title, setTitle] = useState("");
+  const [base, setBase] = useState("main");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   function load() {
@@ -730,6 +716,7 @@ function GithubBox({ remote, branch, token }: { remote: string; branch: string; 
       ))}
       <div className="git-branch-row" style={{ padding: "8px 10px" }}>
         <input className="field" placeholder="título da issue / PR" value={title} onChange={(e) => setTitle(e.target.value)} />
+        <input className="field" placeholder="base da PR" value={base} onChange={(e) => setBase(e.target.value)} />
         <button
           type="button"
           className="chip"
@@ -753,8 +740,14 @@ function GithubBox({ remote, branch, token }: { remote: string; branch: string; 
           className="chip is-on"
           disabled={!title.trim() || busy}
           onClick={() => {
+            const head = branch || "main";
+            const into = base.trim() || "main";
+            if (head === into) {
+              setNote("PR: o head e o base são iguais. muda o branch ou o base.");
+              return;
+            }
             setBusy(true);
-            void githubCreatePr(remote, token, title.trim(), "", branch, "main")
+            void githubCreatePr(remote, token, title.trim(), "", head, into)
               .then((r) => {
                 setNote(`PR #${r.number}`);
                 setTitle("");

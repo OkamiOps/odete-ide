@@ -167,7 +167,10 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
   }, [draft]);
 
   useEffect(() => {
-    function onSend() {
+    function onSend(e: Event) {
+      const want = (e as CustomEvent<{ slot?: string }>).detail?.slot;
+      if (want && want !== slot) return;
+      if (!want && slot !== "a") return;
       sendFn.current(draftRef.current);
     }
     window.addEventListener("colo-send-agent", onSend);
@@ -331,7 +334,7 @@ export function AgentPane({ slot = "a" }: { slot?: "a" | "b" }) {
         },
         () => cancel.current,
         pics,
-        (use) => useAgentChats.getState().addUsage(projectId, use),
+        (use) => useAgentChats.getState().addUsage(projectId, use, slot),
       );
       if (!cancel.current) history.current = next;
     } catch (e) {

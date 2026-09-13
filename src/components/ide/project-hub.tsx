@@ -457,7 +457,9 @@ function OpenForm() {
     }
     setBusy("lendo pasta…");
     try {
-      const root = await picker();
+      const root = await picker({ mode: "readwrite" } as never);
+      const { saveHandle } = await import("@/lib/workspace/folder");
+      await saveHandle(root);
       const files = await readDirectoryHandle(root);
       if (!Object.keys(files).length) {
         setErr("pasta vazia ou só binários");

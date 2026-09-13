@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MessageSquarePlus, Play, Plus, X } from "lucide-react";
-import { runShell } from "@/lib/workspace/shell";
+import { runShellAsync } from "@/lib/workspace/shell";
 import { quoteSelection } from "@/lib/workspace/nav";
 import { useChrome } from "@/lib/workspace/chrome";
 import { useTerms } from "@/lib/workspace/terms";
@@ -88,10 +88,11 @@ export function TerminalPane() {
     if (!t) return;
     useTerms.getState().pushHist(t);
     setHistI(-1);
-    runShell(t);
-    if (/^(npm run |npx vite|vite)/.test(t)) {
-      useChrome.getState().setCenter("preview");
-    }
+    void runShellAsync(t).then(() => {
+      if (/^(npm run |npm start|npx vite|vite)/.test(t)) {
+        useChrome.getState().setCenter("preview");
+      }
+    });
     setCmd("");
   }
 

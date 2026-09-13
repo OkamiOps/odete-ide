@@ -8,6 +8,7 @@ import { rememberEdit } from "./history";
 import { discardHunk, keepOnlyHunk } from "./hunks";
 import { useProjects } from "./projects";
 import { scheduleSync } from "./folder";
+import { useTerms } from "./terms";
 
 function cloneFiles(files: FileMap): FileMap {
   return { ...files };
@@ -70,6 +71,7 @@ export type WorkspaceState = {
   deleteFile: (path: string) => string | undefined;
   readFile: (path: string) => string | undefined;
   listDir: (path?: string) => string[];
+  mkdir: (path: string) => string;
   grep: (pattern: string, path?: string) => string;
   commit: (message: string, all?: boolean) => string;
   gitStatus: () => string;
@@ -233,6 +235,17 @@ export const useWorkspace = create<WorkspaceState>()(
           }
         }
         return [...names];
+      },
+      mkdir: (path) => {
+        const p = path.replace(/^\/+|\/+$/g, "");
+        if (!p) return "mkdir: caminho?";
+        const keep = `${p}/.gitkeep`;
+        const { files } = get();
+        if (files[keep] !== undefined) return `ok ${p}/`;
+        const hasKids = Object.keys(files).some((k) => k === p || k.startsWith(p + "/"));
+        if (hasKids) return `ok ${p}/`;
+        set({ files: { ...files, [keep]: "" } });
+        return `criado ${p}/`;
       },
       grep: (pattern, path) => {
         let re: RegExp;
@@ -473,8 +486,8 @@ export const useWorkspace = create<WorkspaceState>()(
             if (cur.files[k] === undefined) delete next[k];
           }
         }
-        set({ files: next });
-        return `cherry-pick ${id} ${cur.message}`;
+        set({ files: next, staged: Object.keys(next).filter((k) => next[k] !== files[k] || files[k] === undefined) });
+        return get().commit(`cherry-pick ${id}: ${cur.message}`);
       },
       gitBlame: (path) => {
         const { commits, files } = get();
@@ -729,6 +742,7 @@ export const useWorkspace = create<WorkspaceState>()(
         branchSnaps: s.branchSnaps,
         stash: s.stash,
         conflicts: s.conflicts,
+        staged: s.staged,
       }),
       onRehydrateStorage: () => (state) => {
         if (!state) return;

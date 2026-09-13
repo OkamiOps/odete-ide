@@ -387,9 +387,13 @@ export const useChrome = create<ChromeState>()(
         pluginComment: s.pluginComment,
         pluginUrls: s.pluginUrls,
         skillsOff: s.skillsOff,
+        sideOpen: s.sideOpen,
         sideW: s.sideW,
         agentW: s.agentW,
         termH: s.termH,
+        altPath: s.altPath,
+        editFocus: s.editFocus,
+        mobile: s.mobile,
         agentMode: s.agentMode,
         permitMode: s.permitMode,
         effortByKey: s.effortByKey,
@@ -401,7 +405,6 @@ export const useChrome = create<ChromeState>()(
         if (p.pluginMinimap === true && !p.minimap) p.minimap = "m";
         if (p.pluginMinimap === false && !p.minimap) p.minimap = "off";
         delete p.pluginMinimap;
-        delete p.sideOpen;
         if (typeof p.sideW !== "number" || p.sideW < 160) delete p.sideW;
         if (typeof p.agentW !== "number" || p.agentW < 200) delete p.agentW;
         if (typeof p.termH !== "number" || p.termH < 120) delete p.termH;

@@ -26,7 +26,7 @@ type ChatState = {
   newChat: (projectId: string, slot?: "a" | "b") => ChatThread;
   open: (projectId: string, threadId: string, slot?: "a" | "b") => ChatThread | null;
   remove: (projectId: string, threadId: string) => ChatThread;
-  addUsage: (projectId: string, use: TokenUse) => void;
+  addUsage: (projectId: string, use: TokenUse, slot?: "a" | "b") => void;
 };
 
 function titleOf(items: ChatItem[]) {
@@ -57,7 +57,10 @@ function blank(projectId: string): ChatThread {
 
 function slimItems(items: ChatItem[]): ChatItem[] {
   return items.slice(-80).map((it) => {
-    if (it.kind === "user") return { ...it, images: undefined };
+    if (it.kind === "user") {
+      const imgs = it.images?.slice(0, 2).filter((s) => s.length < 180_000);
+      return { ...it, images: imgs?.length ? imgs : undefined };
+    }
     if (it.kind === "think") return { ...it, text: it.text.slice(-8000), live: false };
     if (it.kind === "assistant") return { ...it, text: it.text.slice(0, 20000) };
     if (it.kind === "patch") {
@@ -160,10 +163,10 @@ export const useAgentChats = create<ChatState>()(
         set((s) => ({ active: { ...s.active, [keyOf(projectId, slot)]: threadId } }));
         return t;
       },
-      addUsage: (projectId, use) => {
+      addUsage: (projectId, use, slot = "a") => {
         if (!projectId) return;
         set((s) => {
-          const id = s.active[projectId];
+          const id = s.active[keyOf(projectId, slot)];
           if (!id || !s.threads[id]) return s;
           const prev = s.threads[id]!;
           return {
@@ -183,20 +186,22 @@ export const useAgentChats = create<ChatState>()(
         const s = get();
         const threads = { ...s.threads };
         delete threads[threadId];
-        let activeId = s.active[projectId];
-        if (activeId === threadId) {
+        const active = { ...s.active };
+        for (const k of Object.keys(active)) {
+          if (active[k] !== threadId) continue;
           const next = Object.values(threads)
             .filter((t) => t.projectId === projectId)
             .sort((a, b) => b.updated - a.updated)[0];
-          if (next) activeId = next.id;
+          if (next) active[k] = next.id;
           else {
             const t = blank(projectId);
             threads[t.id] = t;
-            activeId = t.id;
+            active[k] = t.id;
           }
         }
-        set({ threads, active: { ...s.active, [projectId]: activeId } });
-        return threads[activeId] ?? blank(projectId);
+        set({ threads, active });
+        const aid = active[keyOf(projectId, "a")] ?? active[projectId];
+        return threads[aid ?? ""] ?? blank(projectId);
       },
     }),
     {
@@ -238,7 +243,7 @@ export function rememberCtx(provider: string, model: string, ctx?: number) {
 }
 
 export function contextWindow(provider: string, model: string) {
-  return ctxCache.get(`${provider}:${model}`) ?? 0;
+  return ctxCache.get(`${provider}:${model}`) ?? 128_000;
 }
 
 export function estimateTokens(opts: {

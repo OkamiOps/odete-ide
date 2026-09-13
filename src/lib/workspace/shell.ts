@@ -1,11 +1,11 @@
 import { useWorkspace } from "./store";
 import { fileDiff } from "./diff";
+import { npmInstall } from "./npm";
+import { remoteFetch, remotePull, remotePush, remoteSync } from "./git-remote";
+import { useChrome } from "./chrome";
 
 function unquote(s: string) {
-  if (
-    (s.startsWith('"') && s.endsWith('"')) ||
-    (s.startsWith("'") && s.endsWith("'"))
-  ) {
+  if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
     return s.slice(1, -1);
   }
   return s;
@@ -32,7 +32,20 @@ function resolve(cwd: string, path?: string) {
   return `${cwd}/${path}`.replace(/\/+/g, "/");
 }
 
+export function isReadShell(raw: string) {
+  const cmd = raw.trim().split(/\s+/)[0] ?? "";
+  if (["ls", "cat", "pwd", "echo", "help", "clear", "head", "wc"].includes(cmd)) return true;
+  if (cmd !== "git") return false;
+  const sub = raw.trim().split(/\s+/)[1] ?? "";
+  return ["status", "log", "diff", "blame", "branch"].includes(sub);
+}
+
 export function runShell(raw: string): string {
+  void runShellAsync(raw);
+  return "";
+}
+
+export async function runShellAsync(raw: string): Promise<string> {
   const line = raw.trim();
   if (!line) return "";
   const w = useWorkspace.getState();
@@ -52,7 +65,7 @@ export function runShell(raw: string): string {
           "ls  cat  pwd  cd  mkdir  touch  rm  echo",
           "git status | log | diff | add | restore | commit -m | pull | push | fetch | sync | clone",
           "git branch | checkout | stash | stash pop | blame",
-          "npm i   npx vite   clear   reset",
+          "npm i <pkg>   npm run   npx vite   clear",
         ].join("\n");
         break;
       case "clear":
@@ -78,21 +91,27 @@ export function runShell(raw: string): string {
         out = names.join("  ") || "(vazio)";
         break;
       }
-      case "cat": {
+      case "cat":
+      case "head": {
         const p = resolve(w.cwd, args[0]);
         const body = w.readFile(p);
         if (body === undefined) {
           err = true;
-          out = `cat: ${p}: não existe`;
-        } else out = body;
+          out = `${cmd}: ${p}: não existe`;
+        } else out = cmd === "head" ? body.split("\n").slice(0, 20).join("\n") : body;
         break;
       }
       case "echo":
         out = args.join(" ");
         break;
-      case "mkdir":
-        out = `ok ${resolve(w.cwd, args[0])}/`;
+      case "mkdir": {
+        const p = resolve(w.cwd, args[0]);
+        if (!p) {
+          err = true;
+          out = "mkdir: caminho?";
+        } else out = w.mkdir(p);
         break;
+      }
       case "touch": {
         const p = resolve(w.cwd, args[0]);
         if (!p) {
@@ -136,8 +155,7 @@ export function runShell(raw: string): string {
               })
               .join("\n\n");
           }
-        }
-        else if (sub === "add") {
+        } else if (sub === "add") {
           if (!args[1] || args[1] === "." || args[1] === "-A") w.gitStageAll();
           else w.gitStage(resolve(w.cwd, args[1]));
           out = "ok";
@@ -163,10 +181,10 @@ export function runShell(raw: string): string {
             err = true;
             out = r;
           }
-        } else if (sub === "push") out = w.gitPush();
-        else if (sub === "pull") out = w.gitPull();
-        else if (sub === "fetch") out = w.gitFetch();
-        else if (sub === "sync") out = w.gitSync();
+        } else if (sub === "push") out = await remotePush(args.includes("-m") ? args[args.indexOf("-m") + 1] : "colo push", (m) => w.termPrint("out", m));
+        else if (sub === "pull") out = await remotePull();
+        else if (sub === "fetch") out = await remoteFetch();
+        else if (sub === "sync") out = await remoteSync();
         else if (sub === "branch") {
           if (args[1] && args[1] !== "-a") out = w.gitBranchCreate(args[1]);
           else out = w.gitBranchList().map((b) => (b === w.branch ? `* ${b}` : `  ${b}`)).join("\n");
@@ -186,26 +204,25 @@ export function runShell(raw: string): string {
             err = true;
             out = "git clone <owner/repo|url>";
           } else {
-            out = "clonando em segundo plano…";
-            void (async () => {
-              try {
-                const { githubClone } = await import("@/lib/github/api");
-                const { useProjects } = await import("./projects");
-                const token = useProjects.getState().github?.token;
-                const r = await githubClone(target, token, (m) => w.termPrint("out", m));
-                w.loadProject({
-                  id: `gh-${r.remote}`,
-                  name: r.name,
-                  files: r.files,
-                  remote: r.remote,
-                  branch: r.branch,
-                  message: `clone ${r.remote}`,
-                });
-                w.termPrint("ok", `ok ${r.remote}  ${Object.keys(r.files).length} arquivos`);
-              } catch (e) {
-                w.termPrint("err", e instanceof Error ? e.message : "clone falhou");
-              }
-            })();
+            out = "clonando…";
+            try {
+              const { githubClone } = await import("@/lib/github/api");
+              const { useProjects } = await import("./projects");
+              const token = useProjects.getState().github?.token;
+              const r = await githubClone(target, token, (m) => w.termPrint("out", m));
+              w.loadProject({
+                id: `gh-${r.remote}`,
+                name: r.name,
+                files: r.files,
+                remote: r.remote,
+                branch: r.branch,
+                message: `clone ${r.remote}`,
+              });
+              out = `ok ${r.remote}  ${Object.keys(r.files).length} arquivos`;
+            } catch (e) {
+              err = true;
+              out = e instanceof Error ? e.message : "clone falhou";
+            }
           }
         } else {
           err = true;
@@ -215,19 +232,17 @@ export function runShell(raw: string): string {
       }
       case "npm": {
         if (args[0] === "i" || args[0] === "install") {
-          out = [
-            "added 12 packages, and audited 13 packages in 1s",
-            "sandbox colo — sem binários nativos (sharp, etc. não entram)",
-          ].join("\n");
-        } else if (args[0] === "run") {
-          const name = args[1] || "dev";
-          out = `> ${name}\nLocal: iframe Preview  — abre a aba Preview`;
-        } else out = "npm — use: npm i  |  npm run <script>";
+          out = await npmInstall(args.slice(1), (m) => w.termPrint("out", m));
+        } else if (args[0] === "run" || args[0] === "start" || args[0] === "dev") {
+          useChrome.getState().setCenter("preview");
+          out = `> ${args[1] || args[0]}\nPreview aberto (index.html + importmap)`;
+        } else out = "npm — use: npm i [pkg]  |  npm run";
         break;
       }
       case "npx":
       case "vite":
-        out = "VITE v7 ready — abre a aba Preview para ver index.html";
+        useChrome.getState().setCenter("preview");
+        out = "preview aberto — index.html no iframe";
         break;
       case "reset":
         w.resetWorkspace();

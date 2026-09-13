@@ -106,6 +106,8 @@ export function CodeEditor({ path }: { path?: string }) {
   const todoOn = useChrome((s) => s.pluginTodoMark);
   const rainbowOn = useChrome((s) => s.pluginRainbow);
   const stickyOn = useChrome((s) => s.pluginSticky);
+  const emmetOn = useChrome((s) => s.pluginEmmet);
+  const selectMatch = useChrome((s) => s.pluginSelectMatch);
   const commentOn = useChrome((s) => s.pluginComment);
   const urlsOn = useChrome((s) => s.pluginUrls);
   const findOpen = useChrome((s) => s.findOpen);
@@ -375,7 +377,7 @@ export function CodeEditor({ path }: { path?: string }) {
           wrap ? EditorView.lineWrapping : [],
           space ? [highlightWhitespace(), highlightTrailingWhitespace()] : [],
           indent ? indentGuides() : [],
-          highlightSelectionMatches(),
+          selectMatch ? highlightSelectionMatches() : [],
           search(),
           ruler
             ? EditorView.theme({
@@ -400,7 +402,7 @@ export function CodeEditor({ path }: { path?: string }) {
           gitOn ? gitGutter(headBody, shown) : [],
           todoOn ? todoMarks() : [],
           rainbowOn ? rainbowBrackets() : [],
-          emmetTab(active),
+          emmetTab(active, emmetOn),
           stickyOn ? stickyContext() : [],
           commentOn ? lineComment(active) : [],
           urlsOn ? urlMarks() : [],

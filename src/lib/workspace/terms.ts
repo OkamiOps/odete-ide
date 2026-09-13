@@ -1,6 +1,8 @@
 import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
 import { uid } from "../utils";
 import type { TermLine } from "./types";
+import { idbKv } from "./idb";
 
 export type TermTab = {
   id: string;
@@ -32,39 +34,51 @@ type TermsState = {
   setActive: (id: string) => void;
 };
 
-export const useTerms = create<TermsState>((set, get) => {
-  const first = boot("workspace local", 1);
-  return {
-    tabs: [first],
-    active: first.id,
-    print: (kind, text) =>
-      set((s) => ({
-        tabs: s.tabs.map((t) =>
-          t.id === s.active
-            ? { ...t, lines: [...t.lines.slice(-220), { id: uid(), kind, text }] }
-            : t,
-        ),
-      })),
-    clear: () =>
-      set((s) => ({
-        tabs: s.tabs.map((t) => (t.id === s.active ? { ...t, lines: [] } : t)),
-      })),
-    pushHist: (cmd) =>
-      set((s) => ({
-        tabs: s.tabs.map((t) =>
-          t.id === s.active ? { ...t, hist: [...t.hist.filter((h) => h !== cmd), cmd].slice(-40) } : t,
-        ),
-      })),
-    add: () => {
-      const tab = boot("sessão", get().tabs.length + 1);
-      set((s) => ({ tabs: [...s.tabs, tab], active: tab.id }));
+export const useTerms = create<TermsState>()(
+  persist(
+    (set, get) => {
+      const first = boot("workspace local", 1);
+      return {
+        tabs: [first],
+        active: first.id,
+        print: (kind, text) =>
+          set((s) => ({
+            tabs: s.tabs.map((t) =>
+              t.id === s.active
+                ? { ...t, lines: [...t.lines.slice(-220), { id: uid(), kind, text }] }
+                : t,
+            ),
+          })),
+        clear: () =>
+          set((s) => ({
+            tabs: s.tabs.map((t) => (t.id === s.active ? { ...t, lines: [] } : t)),
+          })),
+        pushHist: (cmd) =>
+          set((s) => ({
+            tabs: s.tabs.map((t) =>
+              t.id === s.active ? { ...t, hist: [...t.hist.filter((h) => h !== cmd), cmd].slice(-40) } : t,
+            ),
+          })),
+        add: () => {
+          const tab = boot("sessão", get().tabs.length + 1);
+          set((s) => ({ tabs: [...s.tabs, tab], active: tab.id }));
+        },
+        close: (id) =>
+          set((s) => {
+            if (s.tabs.length === 1) return s;
+            const tabs = s.tabs.filter((t) => t.id !== id);
+            return { tabs, active: s.active === id ? tabs[tabs.length - 1]!.id : s.active };
+          }),
+        setActive: (active) => set({ active }),
+      };
     },
-    close: (id) =>
-      set((s) => {
-        if (s.tabs.length === 1) return s;
-        const tabs = s.tabs.filter((t) => t.id !== id);
-        return { tabs, active: s.active === id ? tabs[tabs.length - 1]!.id : s.active };
+    {
+      name: "colo-terms-v1",
+      storage: createJSONStorage(() => idbKv),
+      partialize: (s) => ({
+        tabs: s.tabs.map((t) => ({ ...t, lines: t.lines.slice(-80) })),
+        active: s.active,
       }),
-    setActive: (active) => set({ active }),
-  };
-});
+    },
+  ),
+);

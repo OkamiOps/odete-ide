@@ -158,28 +158,30 @@ export function expandEmmet(abbr: string): string | null {
 
 import { snippetBody } from "./complete";
 
-export function emmetTab(path = ""): Extension {
+export function expandAtCursor(view: EditorView, path = "", allowEmmet = true) {
+  const sel = view.state.selection.main;
+  if (sel.from !== sel.to) return false;
+  const line = view.state.doc.lineAt(sel.head);
+  const before = line.text.slice(0, sel.head - line.from);
+  const m = /([^\s]+)$/.exec(before);
+  if (!m) return false;
+  const token = m[1]!;
+  const expanded = snippetBody(path, token) || (allowEmmet ? expandEmmet(token) : "");
+  if (!expanded) return false;
+  const from = sel.head - token.length;
+  view.dispatch({
+    changes: { from, to: sel.head, insert: expanded },
+    selection: { anchor: from + expanded.length },
+  });
+  return true;
+}
+
+export function emmetTab(path = "", allowEmmet = true): Extension {
   return Prec.high(
     keymap.of([
       {
         key: "Tab",
-        run: (view) => {
-          const sel = view.state.selection.main;
-          if (sel.from !== sel.to) return false;
-          const line = view.state.doc.lineAt(sel.head);
-          const before = line.text.slice(0, sel.head - line.from);
-          const m = /([^\s]+)$/.exec(before);
-          if (!m) return false;
-          const token = m[1]!;
-          const expanded = snippetBody(path, token) || expandEmmet(token);
-          if (!expanded) return false;
-          const from = sel.head - token.length;
-          view.dispatch({
-            changes: { from, to: sel.head, insert: expanded },
-            selection: { anchor: from + expanded.length },
-          });
-          return true;
-        },
+        run: (view) => expandAtCursor(view, path, allowEmmet),
       },
     ]),
   );

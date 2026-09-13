@@ -35,7 +35,7 @@ export const AGENT_TOOLS = [
     function: {
       name: "write_file",
       description:
-        "Cria arquivo ou reescreve INTEIRO. Só use se str_replace não der. A edição fica pendente até o usuário aceitar.",
+        "Cria arquivo ou reescreve INTEIRO. No modo plan, grave o plano em .colo/plan.md.",
       parameters: {
         type: "object",
         properties: {
@@ -75,9 +75,20 @@ export const AGENT_TOOLS = [
   {
     type: "function" as const,
     function: {
+      name: "read_terminal",
+      description: "Lê as últimas linhas do terminal (stdout/stderr).",
+      parameters: {
+        type: "object",
+        properties: { n: { type: "number", description: "quantas linhas (default 80)" } },
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
       name: "run_shell",
       description:
-        "Terminal do workspace. ls, cat, git status/log/commit/push, npm i, npx vite, rm, touch.",
+        "Terminal do workspace. ls, cat, mkdir, git status/log/commit/push/pull, npm i, npx vite. Chat só lê.",
       parameters: {
         type: "object",
         properties: { command: { type: "string" } },
@@ -89,11 +100,13 @@ export const AGENT_TOOLS = [
 
 export type AgentTool = (typeof AGENT_TOOLS)[number];
 
-const READ_TOOLS = new Set(["read_file", "list_dir", "grep"]);
+const CHAT_TOOLS = new Set(["read_file", "list_dir", "grep", "read_terminal", "run_shell"]);
+const PLAN_TOOLS = new Set(["read_file", "list_dir", "grep", "read_terminal", "run_shell", "write_file", "str_replace"]);
 
 export function toolsForMode(mode: AgentMode): AgentTool[] {
   if (mode === "build") return [...AGENT_TOOLS];
-  return AGENT_TOOLS.filter((t) => READ_TOOLS.has(t.function.name));
+  if (mode === "plan") return AGENT_TOOLS.filter((t) => PLAN_TOOLS.has(t.function.name));
+  return AGENT_TOOLS.filter((t) => CHAT_TOOLS.has(t.function.name));
 }
 
 export function formatWorkspace(files: Record<string, string>) {
@@ -103,14 +116,19 @@ export function formatWorkspace(files: Record<string, string>) {
 }
 
 export function modePrompt(mode: AgentMode) {
-  const read = `Você decide se precisa abrir arquivo, qual, e quando. Use read_file / list_dir / grep só se o conteúdo for necessário pra responder. Não leia tudo de antemão. Não invente conteúdo.`;
+  const read = `Você decide se precisa abrir arquivo, qual, e quando. Use read_file / list_dir / grep / read_terminal só se o conteúdo for necessário. Não invente conteúdo.`;
   if (mode === "chat") {
-    return `Modo CHAT: conversa. ${read} Não edite. Não rode comandos que mudam estado.`;
+    return `Modo CHAT: conversa. ${read}
+Pode LER o terminal (read_terminal ou run_shell com ls/cat/git status).
+Não edite arquivos. Não rode npm i, git push, rm, mkdir.`;
   }
   if (mode === "plan") {
-    return `Modo PLAN: investigue só o que for preciso e entregue um plano. ${read} Não edite. Não rode npm/git que altera estado.
+    return `Modo PLAN: investigue e GRAVE o plano em \`.colo/plan.md\` (crie a pasta se precisar).
+${read}
+Pode criar/editar arquivos do plano (\`.colo/plan.md\`, docs, sketches).
+Não rode git push / npm i / rm em massa. Shell de leitura e mkdir ok.
 
-Formato:
+O arquivo \`.colo/plan.md\` deve ter:
 
 ## Objetivo
 uma linha
@@ -120,7 +138,6 @@ uma linha
 
 ## Passos
 1. arquivo — mudança
-2. …
 
 ## Riscos
 - …

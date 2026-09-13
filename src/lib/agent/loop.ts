@@ -210,8 +210,8 @@ export async function runAgentLoop(
     for (const call of calls) {
       if (shouldStop?.()) break;
       const name = call.function.name;
-      if (mode !== "build" && (name === "write_file" || name === "str_replace" || name === "run_shell")) {
-        const detail = "bloqueado neste modo";
+      if (mode === "chat" && (name === "write_file" || name === "str_replace")) {
+        const detail = "chat não edita. mude pra Plan ou Build.";
         push({ id: call.id, kind: "tool", name, detail });
         messages.push({ role: "tool", tool_call_id: call.id, content: detail });
         continue;
@@ -242,7 +242,7 @@ export async function runAgentLoop(
         }
         upsert({ id: call.id, kind: "permit", name, detail: hint, status: "ok" });
       }
-      const detail = executeTool(name, call.function.arguments);
+      const detail = await executeTool(name, call.function.arguments, mode);
       if (detail.startsWith("PATCH:")) {
         const patchId = detail.slice(6);
         const patch = usePatches.getState().items.find((p) => p.id === patchId);

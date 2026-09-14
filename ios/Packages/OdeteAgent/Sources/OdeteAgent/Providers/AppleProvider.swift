@@ -3,12 +3,18 @@ import FoundationModels
 
 /// O modelo de linguagem do sistema, no próprio aparelho.
 ///
-/// O framework `FoundationModels` só expõe a apps de terceiros o modelo local, de cerca
-/// de três bilhões de parâmetros, com janela de contexto pequena. O modelo grande que
-/// roda no Private Cloud Compute atende funcionalidades do sistema e não tem API
-/// pública, então aqui não existe opção de nuvem: ou o aparelho dá conta, ou nada.
+/// Com a SDK do iOS 26 o framework `FoundationModels` só expõe a apps de terceiros o
+/// modelo local, de cerca de três bilhões de parâmetros, com janela medida em tempo de
+/// execução: 4096 fichas contando entrada e saída. O modelo grande do Private Cloud
+/// Compute atende funcionalidades do sistema e não tem API pública aqui.
 ///
 /// Em troca: não precisa de conta, não precisa de rede e não sai nada do iPad.
+///
+/// Para ligar a nuvem quando a SDK do iOS 27 estiver instalada: trocar `model: .default`
+/// por uma `PrivateCloudComputeLanguageModel` atrás de `if #available(iOS 27, *)`,
+/// oferecer os dois como modelos diferentes em `models()` com a janela de cada um, e
+/// pedir o entitlement `com.apple.developer.private-cloud-compute`, que a Apple aprova
+/// caso a caso. O resto desta implementação continua igual: a sessão é a mesma classe.
 public struct AppleProvider: Provider {
     public let kind: ProviderKind = .apple
     /// A janela é de 4096 fichas contando entrada e saída. O orçamento de entrada é em

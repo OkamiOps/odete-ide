@@ -34,11 +34,11 @@
 - [x] Commit `git: PRs, commit por IA, histórico e blame`.
 
 ### Marco 4: Sistema
-- [ ] Pasta externa com bookmark; selo no hub.
-- [ ] iCloud Drive opcional.
-- [ ] AppIntents (abrir, rodar, perguntar, novo) + entidades.
-- [ ] Compartilhar/receber (zip) + `onOpenURL`.
-- [ ] Commit `sistema: Arquivos, iCloud, Atalhos e compartilhar`.
+- [x] Pasta externa com bookmark; selo no hub.
+- [x] iCloud Drive opcional.
+- [x] AppIntents (abrir, rodar, perguntar, novo) + entidades.
+- [x] Compartilhar/receber (zip) + `onOpenURL`.
+- [x] Commit `sistema: Arquivos, iCloud, Atalhos e compartilhar`.
 
 ### Marco 5: Loja e fechamento
 - [ ] Ícone, `PrivacyInfo.xcprivacy`, onboarding, client_id do GitHub por Info.plist, `docs/store/`.

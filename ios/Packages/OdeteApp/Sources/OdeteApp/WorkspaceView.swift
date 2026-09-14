@@ -144,6 +144,7 @@ struct SidebarView: View {
 
 struct SettingsShell: View {
     @Environment(ChromeState.self) private var chrome
+    @Environment(AppModel.self) private var app
     @Environment(\.theme) private var theme
 
     var body: some View {
@@ -203,6 +204,22 @@ struct SettingsShell: View {
                     Toggle("Terminal", isOn: $chrome.snapshot.termVisible)
                     Button("Restaurar layout") { chrome.resetLayout() }
                 } header: { header("Layout") }
+                Section {
+                    Toggle("Projetos no iCloud Drive", isOn: Binding(
+                        get: { chrome.snapshot.projectsInCloud },
+                        set: { chrome.snapshot.projectsInCloud = app.setCloud($0) }
+                    ))
+                    .disabled(!app.cloudAvailable && !chrome.snapshot.projectsInCloud)
+                    Text(app.cloudAvailable
+                        ? "Move a pasta Projects para o iCloud Drive; continua funcionando offline."
+                        :
+                        "iCloud Drive indisponível neste dispositivo (entre com o Apple ID ou habilite o iCloud Drive).")
+                        .font(OdeteFont.ui(11)).foregroundStyle(theme.fgMuted)
+                    Text(
+                        "Atalhos: Abrir projeto, Rodar comando, Perguntar à Odete e Novo projeto ficam no app Atalhos."
+                    )
+                    .font(OdeteFont.ui(11)).foregroundStyle(theme.fgMuted)
+                } header: { header("Sistema") }
                 Section { AccountsSettings() } header: { header("Contas e Git") }
                 Section { AIAccountsSettings() } header: { header("Contas de IA") }
             }

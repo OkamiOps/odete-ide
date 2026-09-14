@@ -76,6 +76,18 @@ targets:
           - UIInterfaceOrientationLandscapeRight
         ITSAppUsesNonExemptEncryption: false
         UIApplicationSupportsIndirectInputEvents: true
+        NSUbiquitousContainers:
+          iCloud.com.okamiops.odete:
+            NSUbiquitousContainerIsDocumentScopePublic: true
+            NSUbiquitousContainerName: Odete
+            NSUbiquitousContainerSupportedFolderLevels: Any
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: Projeto (zip)
+            LSHandlerRank: Alternate
+            LSItemContentTypes: [public.zip-archive]
+          - CFBundleTypeName: Pasta
+            LSHandlerRank: Alternate
+            LSItemContentTypes: [public.folder]
         UIAppFonts:
           - IBMPlexSans-Regular.ttf
           - IBMPlexSans-Medium.ttf
@@ -88,6 +100,7 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         INFOPLIST_KEY_UIUserInterfaceStyle: Automatic
+        CODE_SIGN_ENTITLEMENTS: Odete/Odete.entitlements
     dependencies:
       - package: OdeteApp
         product: OdeteApp

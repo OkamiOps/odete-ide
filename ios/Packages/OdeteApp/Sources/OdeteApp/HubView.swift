@@ -2,6 +2,7 @@ import OdeteCore
 import OdeteFiles
 import OdeteUI
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// Hub de projetos: grade de cartões, criar, renomear, duplicar, apagar, abrir.
 struct HubView: View {
@@ -11,6 +12,7 @@ struct HubView: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var creating = false
     @State private var cloning = false
+    @State private var importing = false
     @State private var renaming: Project?
     @State private var deleting: Project?
     @State private var newName = ""
@@ -37,17 +39,31 @@ struct HubView: View {
                             spacing: 14
                         ) {
                             ForEach(app.projects) { p in
-                                ProjectCard(project: p, root: app.store.url(for: p))
+                                ProjectCard(project: p, root: app.url(for: p))
                                     .onTapGesture { app.open(p, chrome: chrome) }
                                     .contextMenu {
                                         Button("Abrir", systemImage: "arrow.up.forward.square") { app.open(
                                             p,
                                             chrome: chrome
                                         ) }
-                                        Button("Renomear", systemImage: "pencil") { newName = p.name; renaming = p }
-                                        Button("Duplicar", systemImage: "plus.square.on.square") { app.duplicate(p) }
+                                        if !p.external {
+                                            Button("Renomear", systemImage: "pencil") { newName = p.name; renaming = p }
+                                            Button("Duplicar", systemImage: "plus.square.on.square") { app.duplicate(p)
+                                            }
+                                        }
+                                        if let z = app.zip(p) {
+                                            ShareLink(item: z, preview: SharePreview("\(p.name).zip")) {
+                                                Label("Compartilhar (.zip)", systemImage: "square.and.arrow.up")
+                                            }
+                                        }
                                         Divider()
-                                        Button("Apagar", systemImage: "trash", role: .destructive) { deleting = p }
+                                        if p.external {
+                                            Button("Remover do hub", systemImage: "minus.circle", role: .destructive) {
+                                                app.delete(p)
+                                            }
+                                        } else {
+                                            Button("Apagar", systemImage: "trash", role: .destructive) { deleting = p }
+                                        }
                                     }
                             }
                         }
@@ -60,6 +76,11 @@ struct HubView: View {
         }
         .sheet(isPresented: $creating) { NewProjectSheet() }
         .sheet(isPresented: $cloning) { CloneSheet() }
+        .fileImporter(isPresented: $importing, allowedContentTypes: [.folder, .zip]) { result in
+            if case let .success(url) = result {
+                app.importURL(url, chrome: chrome)
+            }
+        }
         .alert("Renomear projeto", isPresented: Binding(get: { renaming != nil }, set: {
             if !$0 {
                 renaming = nil
@@ -117,6 +138,11 @@ struct HubView: View {
                 }
             } label: {
                 Label("Tema", systemImage: "paintpalette")
+                    .labelStyle(sizeClass == .compact ? AnyLabelStyle(.iconOnly) : AnyLabelStyle(.titleAndIcon))
+            }
+            .buttonStyle(.glass)
+            Button { importing = true } label: {
+                Label("Abrir pasta", systemImage: "folder")
                     .labelStyle(sizeClass == .compact ? AnyLabelStyle(.iconOnly) : AnyLabelStyle(.titleAndIcon))
             }
             .buttonStyle(.glass)
@@ -204,6 +230,9 @@ struct ProjectCard: View {
                         in: RoundedRectangle(cornerRadius: 12, style: .continuous)
                     )
                 Spacer()
+                if project.external {
+                    Pill("externo", on: false)
+                }
                 Pill(stack.label, on: true, color: stackColor(stack))
             }
             .padding(.bottom, 2)

@@ -92,6 +92,8 @@ public struct AgentPrefs: Codable, Hashable, Sendable {
 /// Estado persistido de layout e preferências, espelhando `useChrome` da web.
 public struct ChromeSnapshot: Codable, Hashable, Sendable {
     public var welcomeDone = false
+    /// Projetos guardados no iCloud Drive (container ubíquo) em vez de Documents.
+    public var projectsInCloud = false
     public var theme: ThemeId = .odete
     public var side: SidePanel = .files
     public var sideOpen = true
@@ -118,6 +120,7 @@ public struct ChromeSnapshot: Codable, Hashable, Sendable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         let d = ChromeSnapshot()
         welcomeDone = try c.decodeIfPresent(Bool.self, forKey: .welcomeDone) ?? d.welcomeDone
+        projectsInCloud = try c.decodeIfPresent(Bool.self, forKey: .projectsInCloud) ?? d.projectsInCloud
         theme = try c.decodeIfPresent(ThemeId.self, forKey: .theme) ?? d.theme
         side = try c.decodeIfPresent(SidePanel.self, forKey: .side) ?? d.side
         sideOpen = try c.decodeIfPresent(Bool.self, forKey: .sideOpen) ?? d.sideOpen

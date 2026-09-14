@@ -167,6 +167,12 @@ struct FileRow: View {
                 }
                 Button("Renomear", systemImage: "pencil") { draft = node.name; renaming = node.path }
                 Button("Copiar caminho", systemImage: "doc.on.doc") { UIPasteboard.general.string = node.path }
+                if !node.isDirectory {
+                    ShareLink(item: ws.root.appending(path: node.path)) { Label(
+                        "Compartilhar",
+                        systemImage: "square.and.arrow.up"
+                    ) }
+                }
                 if !node.isDirectory, ws.git.isRepo {
                     Divider()
                     Button("Histórico", systemImage: "clock.arrow.circlepath") { ws.historyPath = node.path }

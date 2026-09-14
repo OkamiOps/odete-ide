@@ -1,4 +1,5 @@
 import OdeteCore
+import OdeteFiles
 import OdeteUI
 import SwiftUI
 
@@ -11,7 +12,10 @@ public struct RootView: View {
     public init() {
         let store = StateStore()
         self.store = store
-        _chrome = State(initialValue: ChromeState(snapshot: store.load()))
+        let snap = store.load()
+        _chrome = State(initialValue: ChromeState(snapshot: snap))
+        _app =
+            State(initialValue: AppModel(store: ProjectStore(root: AppModel.projectsRoot(cloud: snap.projectsInCloud))))
     }
 
     public var body: some View {
@@ -29,8 +33,10 @@ public struct RootView: View {
         .environment(app.accounts)
         .environment(app.aiAccounts)
         .odeteTheme(Theme(chrome.palette))
+        .onOpenURL { url in app.importURL(url, chrome: chrome) }
         .onAppear {
             chrome.onChange = { [store] snap in store.scheduleSave(snap) }
+            IntentBridge.shared.bind(app: app, chrome: chrome)
             if app.workspace == nil, let id = chrome.snapshot.lastProjectId,
                let p = app.projects.first(where: { $0.id == id })
             {

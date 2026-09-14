@@ -133,6 +133,7 @@ struct SidebarView: View {
     var body: some View {
         switch chrome.snapshot.side {
         case .files: FileTreeView()
+        case .outline: OutlinePane()
         case .search: SearchPane()
         case .git: GitPane()
         case .problems: ProblemsPane()

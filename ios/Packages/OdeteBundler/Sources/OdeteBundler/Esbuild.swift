@@ -84,6 +84,30 @@ public final class Esbuild: @unchecked Sendable {
         return (obj?["code"] as? String) ?? ""
     }
 
+    /// Só sintaxe: diagnósticos do esbuild para um arquivo, sem gerar código.
+    public func lint(_ code: String, file: String) async throws -> [Diagnostic] {
+        _ = try await ready()
+        let ext = (file as NSString).pathExtension.lowercased()
+        let loader = ["ts": "ts", "mts": "ts", "cts": "ts", "tsx": "tsx", "jsx": "jsx", "css": "css",
+                      "json": "json"][ext] ?? "js"
+        let json = try await engine.call("__lint", [code, loader, file])
+        guard let obj = try JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any] else { return [] }
+        func parse(_ key: String, _ kind: Diagnostic.Kind) -> [Diagnostic] {
+            ((obj[key] as? [[String: Any]]) ?? []).map { m in
+                Diagnostic(
+                    kind: kind,
+                    text: m["text"] as? String ?? "",
+                    file: file,
+                    line: m["line"] as? Int,
+                    column: (m["column"] as? Int).map { $0 + 1 },
+                    lineText: m["lineText"] as? String,
+                    source: "esbuild"
+                )
+            }
+        }
+        return parse("errors", .error) + parse("warnings", .warning)
+    }
+
     /// TS/ESM → CJS, bloqueante (para o `require` de outro runtime).
     public func transformCJSSync(_ code: String, file: String) throws -> String {
         let json = try engine.callSync("__transformCJS", [code, file])

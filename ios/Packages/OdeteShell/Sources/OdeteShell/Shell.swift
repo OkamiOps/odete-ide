@@ -269,6 +269,11 @@ public final class Shell: @unchecked Sendable {
         return r == base ? "~" : "~/" + String(r.dropFirst(base.count + 1))
     }
 
+    /// Esbuild do projeto, para quem precisa transformar/lintar fora do terminal.
+    public var bundler: Esbuild {
+        esbuildEngine()
+    }
+
     func esbuildEngine() -> Esbuild {
         lock.lock(); defer { lock.unlock() }
         if let e = esbuild {

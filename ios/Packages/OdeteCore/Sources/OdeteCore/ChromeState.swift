@@ -2,10 +2,11 @@ import Foundation
 import Observation
 
 public enum SidePanel: String, Codable, CaseIterable, Sendable {
-    case files, search, git, problems, settings
+    case files, outline, search, git, problems, settings
     public var label: String {
         switch self {
         case .files: "Arquivos"
+        case .outline: "Esboço"
         case .search: "Busca"
         case .git: "Git"
         case .problems: "Problemas"
@@ -16,6 +17,7 @@ public enum SidePanel: String, Codable, CaseIterable, Sendable {
     public var symbol: String {
         switch self {
         case .files: "doc.on.doc"
+        case .outline: "list.bullet.indent"
         case .search: "magnifyingglass"
         case .git: "arrow.triangle.branch"
         case .problems: "exclamationmark.circle"

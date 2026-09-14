@@ -16,16 +16,16 @@
 ---
 
 ### Marco 1: Polimento visual
-- [ ] Tokens (`Metrics`, `Theme.surface/separator/glassTint`, `baseFont`) e componentes `GlassBar`, `OdeteCard`, `HeaderButton` novo, `Rail` com cápsula, `EditorTabs`, `PaneHeader`.
-- [ ] Hub, Ajustes (`Form`), Workspace/retrato (barra flutuante), Git, Terminal, Agente, Preview.
-- [ ] Capturas antes/depois em `docs/store/shots/`; commit `ui: polimento Liquid Glass`.
+- [x] Tokens (`Metrics`, `Theme.surface/separator/glassTint`, `baseFont`) e componentes `GlassBar`, `OdeteCard`, `HeaderButton` novo, `Rail` com cápsula, `EditorTabs`, `PaneHeader`.
+- [x] Hub, Ajustes (`Form`), Workspace/retrato (barra flutuante), Git, Terminal, Agente, Preview.
+- [x] Capturas antes/depois em `docs/store/shots/`; commit `ui: polimento Liquid Glass`.
 
 ### Marco 2: Editor
-- [ ] `Outline` (OdeteCore) + testes; painel Esboço e `@` na paleta.
-- [ ] `Lint` (OdeteBundler transform + regras; Swift parser) + Problemas + sublinhado.
-- [ ] `Complete` (palavras, caminhos, snippets) + popover no editor.
-- [ ] `GitGutter` (diff por linha) + decorações + popover do hunk.
-- [ ] Commit `editor: gutter git, esboço, lint e autocompletar`.
+- [x] `Outline` (OdeteCore) + testes; painel Esboço e `@` na paleta.
+- [x] `Lint` (OdeteBundler transform + regras; Swift parser) + Problemas + sublinhado.
+- [x] `Complete` (palavras, caminhos, snippets) + popover no editor.
+- [x] `GitGutter` (diff por linha) + decorações + popover do hunk.
+- [x] Commit `editor: gutter git, esboço, lint e autocompletar`.
 
 ### Marco 3: Git
 - [ ] `GitHubAPI` PRs (lista, detalhe, arquivos, comentários, checks, merge, criar) + `PullRequestsPane`.

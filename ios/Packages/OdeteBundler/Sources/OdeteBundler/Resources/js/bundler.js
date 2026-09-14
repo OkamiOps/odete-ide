@@ -51,6 +51,17 @@
     return { code: r.code, map: r.map, warnings: r.warnings.map(fmtMsg) };
   };
 
+  // só checa sintaxe: erros do esbuild sem gerar código útil
+  globalThis.__lint = async (code, loader, file) => {
+    await ready;
+    try {
+      const r = await globalThis.esbuild.transform(code, { loader, sourcefile: file, logLevel: "silent" });
+      return { errors: [], warnings: r.warnings.map(fmtMsg) };
+    } catch (e) {
+      return { errors: (e.errors || [{ text: e.message }]).map(fmtMsg), warnings: (e.warnings || []).map(fmtMsg) };
+    }
+  };
+
   // transforma TS/ESM → CJS para o require do runtime
   globalThis.__transformCJS = async (code, file) => {
     await ready;

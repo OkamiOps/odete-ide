@@ -34,6 +34,8 @@ public final class GitModel {
 
     private let accounts: AccountStore
     private var refreshTask: Task<Void, Never>?
+    /// Chamado depois de cada `refresh()` (o workspace atualiza o gutter).
+    public var onRefreshed: (() -> Void)?
 
     public init(root: URL, accounts: AccountStore) {
         self.root = root
@@ -123,6 +125,7 @@ public final class GitModel {
         } catch {
             self.error = error.localizedDescription
         }
+        onRefreshed?()
     }
 
     public func setDiff(_ source: Repository.DiffSource, path: String? = nil) {

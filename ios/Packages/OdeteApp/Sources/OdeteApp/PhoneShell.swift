@@ -75,7 +75,7 @@ struct PhoneShell: View {
                     Button { app.closeWorkspace() } label: { Label("Projetos", systemImage: "square.grid.2x2") }
                         .buttonStyle(.glass)
                     Picker("Painel", selection: $chrome.snapshot.side) {
-                        ForEach([SidePanel.files, .search, .git, .problems], id: \.self) { p in
+                        ForEach([SidePanel.files, .outline, .search, .git, .problems], id: \.self) { p in
                             Image(systemName: p.symbol).tag(p)
                         }
                     }

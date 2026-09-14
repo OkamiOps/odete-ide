@@ -3,7 +3,7 @@ import OdeteUI
 import SwiftUI
 
 struct PaletteItem: Identifiable, Hashable {
-    enum Kind { case file, command }
+    enum Kind { case file, command, symbol }
     var id: String
     var kind: Kind
     var title: String
@@ -130,8 +130,26 @@ struct CommandPalette: View {
         }
     }
 
+    var symbols: [PaletteItem] {
+        guard let path = ws.active else { return [] }
+        return (ws.outlines[path] ?? []).map {
+            PaletteItem(
+                id: "@\($0.line)",
+                kind: .symbol,
+                title: $0.name,
+                detail: "\($0.kind.rawValue) · linha \($0.line)",
+                symbol: $0.kind.symbol,
+                shortcut: nil
+            )
+        }
+    }
+
     var items: [PaletteItem] {
         let q = ws.paletteQuery
+        if q.hasPrefix("@") {
+            let rest = q.dropFirst().trimmingCharacters(in: .whitespaces)
+            return symbols.filter { rest.isEmpty || fuzzy(rest, $0.title) }.prefix(60).map(\.self)
+        }
         if q.hasPrefix(">") {
             let rest = q.dropFirst().trimmingCharacters(in: .whitespaces)
             return commands.filter { rest.isEmpty || fuzzy(rest, $0.title) }.prefix(40).map(\.self)
@@ -151,10 +169,11 @@ struct CommandPalette: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 10) {
-                Image(systemName: ws.paletteQuery.hasPrefix(">") ? "chevron.right" : "magnifyingglass")
+                Image(systemName: ws.paletteQuery.hasPrefix(">") ? "chevron.right" : ws.paletteQuery
+                    .hasPrefix("@") ? "at" : "magnifyingglass")
                     .foregroundStyle(theme.fgSubtle)
                 TextField(
-                    "arquivo, ou > comando",
+                    "arquivo, > comando, @ símbolo",
                     text: Binding(get: { ws.paletteQuery }, set: { ws.paletteQuery = $0; selection = 0 })
                 )
                 .focused($focused)
@@ -239,6 +258,10 @@ struct CommandPalette: View {
         close()
         switch item.kind {
         case .file: ws.openFile(item.id)
+        case .symbol:
+            if let path = ws.active, let line = Int(item.id.dropFirst()) {
+                ws.open(path, line: line)
+            }
         case .command:
             switch item.id {
             case ">save": ws.save()

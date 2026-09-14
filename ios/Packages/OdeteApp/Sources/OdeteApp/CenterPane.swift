@@ -1,6 +1,7 @@
 import OdeteAgent
 import OdeteCore
 import OdeteEditor
+import OdeteGit
 import OdeteUI
 import SwiftUI
 
@@ -32,21 +33,16 @@ struct CenterPane: View {
                 )
             }
             .background(theme.surface)
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: Metrics.s2) {
+            // Largura medida uma vez por layout (ViewThatFits media o ModePicker fora da main thread e travava).
+            HStack(spacing: Metrics.s2) {
+                if toolbarWidth >= 560 {
                     ModePicker(mode: $chrome.snapshot.center)
                     Spacer(minLength: Metrics.s2)
-                    if let t = ws.activeTab {
+                    if toolbarWidth >= 640, let t = ws.activeTab {
                         Pill(t.isDirty ? "não salvo" : "salvo", on: t.isDirty)
                     }
                     actions
-                }
-                HStack(spacing: Metrics.s2) {
-                    ModePicker(mode: $chrome.snapshot.center)
-                    Spacer(minLength: Metrics.s2)
-                    actions
-                }
-                HStack(spacing: Metrics.s2) {
+                } else {
                     Menu {
                         ForEach(CenterMode.allCases, id: \.self) { m in
                             Button { chrome.snapshot.center = m } label: { Label(
@@ -71,6 +67,7 @@ struct CenterPane: View {
             }
             .padding(.horizontal, Metrics.s3)
             .frame(height: 52)
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { toolbarWidth = $0 }
             content
         }
         .background(theme.bg)
@@ -106,6 +103,25 @@ struct CenterPane: View {
         }
     }
 
+    @State private var hunkAt: HunkRef?
+    @State private var toolbarWidth: CGFloat = 1000
+
+    func kind(_ k: GutterMark.Kind) -> EditorGutterMark.Kind {
+        switch k {
+        case .added: .added
+        case .modified: .modified
+        case .deleted: .deleted
+        }
+    }
+
+    func severity(_ s: LintIssue.Severity) -> EditorIssue.Severity {
+        switch s {
+        case .error: .error
+        case .warning: .warning
+        case .info: .info
+        }
+    }
+
     @ViewBuilder func editor(_ path: String?) -> some View {
         if let path, ws.git.conflicts.contains(path), !ws.forceTextEdit.contains(path),
            ConflictParser.hasMarkers(ws.text(for: path))
@@ -124,9 +140,29 @@ struct CenterPane: View {
                     palette: theme.palette,
                     prefs: chrome.snapshot.editor,
                     reveal: path == ws.active ? ws.reveal : nil,
+                    marks: (ws.gutter[path] ?? []).map { EditorGutterMark(line: $0.line, kind: kind($0.kind)) },
+                    issues: ws.issues(for: path).map {
+                        EditorIssue(
+                            line: $0.line,
+                            column: $0.column,
+                            length: $0.length,
+                            severity: severity($0.severity),
+                            message: $0.message
+                        )
+                    },
+                    completion: CompletionSource(files: ws.tree.allFiles().map(\.path), path: path),
                     onSave: { ws.save(path) },
-                    onFind: { chrome.snapshot.side = .search; chrome.snapshot.sideOpen = true }
+                    onFind: { chrome.snapshot.side = .search; chrome.snapshot.sideOpen = true },
+                    onGutterTap: { hunkAt = HunkRef(path: path, line: $0) },
+                    onCursor: {
+                        if path == ws.active {
+                            ws.cursorOffset = $0
+                        }
+                    }
                 )
+                .popover(item: $hunkAt) { ref in
+                    HunkPopover(ref: ref)
+                }
             }
         } else {
             EmptyEditor()

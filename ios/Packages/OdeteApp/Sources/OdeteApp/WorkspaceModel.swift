@@ -2,6 +2,7 @@ import Foundation
 import Observation
 import OdeteAccounts
 import OdeteAgent
+import OdeteBundler
 import OdeteCore
 import OdeteFiles
 import OdeteGit
@@ -36,6 +37,15 @@ public final class WorkspaceModel {
     public private(set) var agent: AgentModel!
     /// Arquivos em conflito que o usuário quer editar como texto puro.
     public var forceTextEdit: Set<String> = []
+    /// Análise do editor por arquivo aberto: esboço, lint e marcas do git.
+    public var outlines: [String: [OutlineItem]] = [:]
+    public var lint: [String: [LintIssue]] = [:]
+    public var syntax: [String: [Diagnostic]] = [:]
+    public var gutter: [String: [GutterMark]] = [:]
+    public var gutterFiles: [String: FileDiff] = [:]
+    public var cursorOffset = 0
+    var analysisTasks: [String: Task<Void, Never>] = [:]
+    var lintEngine: Esbuild?
 
     private let chrome: ChromeState
     private var watcher: DirectoryWatcher?
@@ -64,6 +74,11 @@ public final class WorkspaceModel {
         w.start()
         watcher = w
         agent = AgentModel(ws: self, chrome: chrome, accounts: aiAccounts)
+        git.onRefreshed = { [weak self] in self?.refreshGutters() }
+        for t in tabs {
+            analyze(t.path)
+        }
+        refreshGutters()
     }
 
     /// Recarrega o buffer de um arquivo que outra coisa (agente, shell) escreveu no disco.
@@ -71,6 +86,7 @@ public final class WorkspaceModel {
         guard buffers[path] != nil else { return }
         buffers[path] = (try? ops.read(path)) ?? ""
         markDirty(path, false)
+        analyze(path)
     }
 
     /// Mostra a gaveta do terminal (iPad) sem mexer no resto do layout.
@@ -110,6 +126,7 @@ public final class WorkspaceModel {
             if ops.exists(t.path) {
                 if let disk = try? ops.read(t.path), disk != buffers[t.path] {
                     buffers[t.path] = disk
+                    analyze(t.path)
                 }
             } else {
                 closeTab(t.path, force: true)
@@ -136,6 +153,8 @@ public final class WorkspaceModel {
         if !tabs.contains(where: { $0.path == path }) {
             tabs.append(EditorTab(path: path))
             load(path)
+            analyze(path)
+            refreshGutter(path)
         }
         active = path
         selected = path
@@ -160,6 +179,12 @@ public final class WorkspaceModel {
         }
         tabs.remove(at: i)
         buffers[path] = nil
+        outlines[path] = nil
+        lint[path] = nil
+        syntax[path] = nil
+        gutter[path] = nil
+        gutterFiles[path] = nil
+        analysisTasks[path]?.cancel()
         if active == path {
             active = tabs.isEmpty ? nil : tabs[min(i, tabs.count - 1)].path
         }
@@ -180,6 +205,7 @@ public final class WorkspaceModel {
         guard buffers[path] != text else { return }
         buffers[path] = text
         markDirty(path, true)
+        scheduleAnalysis(path)
         if chrome.snapshot.editor.autoSave {
             saveTasks[path]?.cancel()
             saveTasks[path] = Task { [weak self] in
@@ -203,6 +229,7 @@ public final class WorkspaceModel {
             try ops.write(path, text)
             markDirty(path, false)
             git.scheduleRefresh()
+            refreshGutter(path)
         } catch {
             self.error = error.localizedDescription
         }

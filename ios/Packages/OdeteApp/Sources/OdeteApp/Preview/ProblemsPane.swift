@@ -15,14 +15,16 @@ struct ProblemsPane: View {
         let diags = ws.run.diagnostics
         let swift = ws.swiftDiagnostics
         let errors = ws.preview.console.filter { $0.level == .error }
+        let lint = ws.allLint
+        let total = diags.count + errors.count + swift.count + lint.count
         VStack(spacing: 0) {
             PaneHeader(
                 "Problemas",
-                detail: diags.isEmpty && errors.isEmpty && swift.isEmpty ? "tudo limpo" : "\(diags.count + errors.count + swift.count)"
+                detail: total == 0 ? "tudo limpo" : "\(total)"
             ) {
                 HeaderButton("arrow.clockwise", label: "Rebuild") { ws.run.active?.shell.devServer?.invalidate() }
             }
-            if diags.isEmpty, errors.isEmpty, swift.isEmpty {
+            if total == 0 {
                 VStack(spacing: 10) {
                     Image(systemName: "checkmark.seal").font(.system(size: 30)).foregroundStyle(theme.ok)
                     Text("Nenhum problema").font(OdeteFont.ui(13, weight: .medium)).foregroundStyle(theme.fg)
@@ -35,6 +37,22 @@ struct ProblemsPane: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 List {
+                    if !lint.isEmpty {
+                        Section {
+                            ForEach(lint, id: \.issue.id) { item in
+                                Button { ws.open(item.path, line: item.issue.line) } label: { row(
+                                    item.issue.severity == .error ? "xmark.octagon" : item.issue
+                                        .severity == .warning ? "exclamationmark.triangle" : "info.circle",
+                                    item.issue.severity == .error ? theme.danger : item.issue
+                                        .severity == .warning ? theme.accent : theme.fgMuted,
+                                    item.issue.message,
+                                    "\(item.path):\(item.issue.line):\(item.issue.column)",
+                                    nil
+                                ) }
+                                .buttonStyle(.plain)
+                            }
+                        } header: { label("Editor · lint") }
+                    }
                     if !diags.isEmpty {
                         Section {
                             ForEach(diags) { d in

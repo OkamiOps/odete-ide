@@ -112,8 +112,9 @@ struct SettingsShell: View {
         @Bindable var chrome = chrome
         VStack(spacing: 0) {
             PaneHeader("Ajustes")
-            ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
+            // List (UICollectionView) em vez de ScrollView: rola com dedo, trackpad e roda.
+            List {
+                Group {
                     label("Tema")
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 104), spacing: 8)], spacing: 8) {
                         ForEach(ThemePalette.all) { p in
@@ -164,8 +165,13 @@ struct SettingsShell: View {
                 }
                 .font(OdeteFont.ui(13))
                 .foregroundStyle(theme.fg)
-                .padding(12)
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+                .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
             }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .environment(\.defaultMinListRowHeight, 1)
         }
     }
 

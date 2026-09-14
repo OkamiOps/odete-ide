@@ -23,6 +23,9 @@ public final class WorkspaceModel {
     public var buffers: [String: String] = [:]
     public var expanded: Set<String> = []
     public var selected: String?
+    /// Arquivo do painel da direita no modo Dois. Sem isto ele mostrava sempre a primeira
+    /// aba que não fosse a ativa, e não havia como escolher o que comparar.
+    public var secondary: String?
     public var error: String?
     public var stack: Stack = .html
     public var externalChange = false
@@ -184,6 +187,19 @@ public final class WorkspaceModel {
         persistTabs()
     }
 
+    /// Abre o arquivo no painel da direita do modo Dois, sem tirar o foco da esquerda.
+    public func openSecondary(_ path: String) {
+        guard path != active else { return }
+        if !tabs.contains(where: { $0.path == path }) {
+            tabs.append(EditorTab(path: path))
+            load(path)
+            analyze(path)
+            refreshGutter(path)
+            persistTabs()
+        }
+        secondary = path
+    }
+
     public func open(_ path: String, line: Int) {
         openFile(path)
         reveal = (line, (reveal?.token ?? 0) + 1)
@@ -201,6 +217,9 @@ public final class WorkspaceModel {
             save(path)
         }
         tabs.remove(at: i)
+        if secondary == path {
+            secondary = nil
+        }
         buffers[path] = nil
         outlines[path] = nil
         lint[path] = nil

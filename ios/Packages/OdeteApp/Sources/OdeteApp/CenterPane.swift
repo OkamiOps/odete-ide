@@ -118,9 +118,9 @@ struct CenterPane: View {
         case .diff: DiffPane()
         case .dual:
             HStack(spacing: 0) {
-                editor(ws.active)
+                painelDuplo(ws.active, direita: false)
                 Rectangle().fill(theme.border).frame(width: 1)
-                editor(ws.tabs.first { $0.path != ws.active }?.path)
+                painelDuplo(direitaPath, direita: true)
             }
         case .split:
             HStack(spacing: 0) {
@@ -133,6 +133,8 @@ struct CenterPane: View {
     }
 
     @State private var hunkAt: HunkRef?
+    /// Lado do modo Dois que está recebendo um arrasto agora.
+    @State private var sobre: String?
     @State private var toolbarWidth: CGFloat = 1000
 
     func kind(_ k: GutterMark.Kind) -> EditorGutterMark.Kind {
@@ -151,14 +153,89 @@ struct CenterPane: View {
         }
     }
 
-    @ViewBuilder func editor(_ path: String?) -> some View {
+    /// Arquivo do lado direito no modo Dois: o escolhido, ou a primeira aba que não é a
+    /// da esquerda enquanto ninguém escolheu.
+    var direitaPath: String? {
+        if let s = ws.secondary, s != ws.active, ws.tabs.contains(where: { $0.path == s }) {
+            return s
+        }
+        return ws.tabs.first { $0.path != ws.active }?.path
+    }
+
+    /// Um lado do modo Dois. Aceita arquivo arrastado da árvore e tem o seletor de
+    /// arquivo na própria trilha, para dar para comparar sem depender do arrasto.
+    @ViewBuilder func painelDuplo(_ path: String?, direita: Bool) -> some View {
+        let lado = direita ? "dir" : "esq"
+        Group {
+            if path == nil, direita {
+                EmptyState(
+                    "arrow.down.doc",
+                    title: "Nada para comparar",
+                    text: "Arraste um arquivo da lista para cá, ou escolha um na trilha do outro lado."
+                )
+            } else {
+                editor(
+                    path,
+                    escolher: { p in direita ? ws.openSecondary(p) : ws.openFile(p) },
+                    trocar: trocarLados
+                )
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .dropDestination(for: String.self) { itens, _ in
+            guard let p = itens.first, !p.isEmpty, p != path else { return false }
+            if direita {
+                ws.openSecondary(p)
+            } else {
+                ws.openFile(p)
+            }
+            return true
+        } isTargeted: { dentro in
+            sobre = dentro ? lado : (sobre == lado ? nil : sobre)
+        }
+        .overlay {
+            if sobre == lado {
+                ZStack {
+                    theme.accent.opacity(0.1)
+                    Label("Soltar aqui", systemImage: "arrow.down.doc")
+                        .font(OdeteFont.ui(12, weight: .medium))
+                        .foregroundStyle(theme.accent)
+                        .padding(.horizontal, 12).frame(height: 32)
+                        .background(theme.bgElevated, in: Capsule())
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(theme.accent, lineWidth: 2)
+                        .padding(2)
+                }
+                .allowsHitTesting(false)
+            }
+        }
+    }
+
+    func trocarLados() {
+        let esquerda = ws.active
+        let direita = direitaPath
+        if let direita {
+            ws.openFile(direita)
+        }
+        if let esquerda {
+            ws.openSecondary(esquerda)
+        }
+    }
+
+    @ViewBuilder func editor(
+        _ path: String?,
+        escolher: ((String) -> Void)? = nil,
+        trocar: (() -> Void)? = nil
+    ) -> some View {
         if let path, ws.git.conflicts.contains(path), !ws.forceTextEdit.contains(path),
            ConflictParser.hasMarkers(ws.text(for: path))
         {
             ConflictView(path: path)
         } else if let path {
             VStack(spacing: 0) {
-                Crumbs(path: path)
+                Crumbs(path: path, escolher: escolher, trocar: trocar)
                 if let p = ws.agent.pendingPatches.first(where: { $0.path == path }) {
                     PatchBanner(patch: p)
                 }
@@ -229,8 +306,38 @@ struct Crumbs: View {
     @Environment(WorkspaceModel.self) private var ws
     @Environment(ChromeState.self) private var chrome
     var path: String
+    /// Modo Dois: trocar o arquivo deste lado e inverter os lados. Fora dele é nulo e o
+    /// seletor nem aparece.
+    var escolher: ((String) -> Void)?
+    var trocar: (() -> Void)?
+
     var body: some View {
         HStack(spacing: 4) {
+            if let escolher {
+                Menu {
+                    ForEach(ws.tabs) { t in
+                        Button {
+                            escolher(t.path)
+                        } label: {
+                            Label(
+                                t.path.split(separator: "/").last.map(String.init) ?? t.path,
+                                systemImage: t.path == path ? "checkmark" : "doc"
+                            )
+                        }
+                    }
+                    if let trocar {
+                        Divider()
+                        Button("Trocar os lados", systemImage: "arrow.left.arrow.right", action: trocar)
+                    }
+                } label: {
+                    Image(systemName: "chevron.down.circle").font(.system(size: 11))
+                        .foregroundStyle(theme.fgMuted)
+                        .frame(width: 20, height: 22).contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .menuIndicator(.hidden)
+                .accessibilityLabel("Escolher arquivo deste lado")
+            }
             ForEach(Array(path.split(separator: "/").enumerated()), id: \.offset) { i, part in
                 if i >
                     0

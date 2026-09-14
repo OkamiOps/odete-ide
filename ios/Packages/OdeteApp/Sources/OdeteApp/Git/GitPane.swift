@@ -27,20 +27,19 @@ struct GitPane: View {
                 initCard
             } else {
                 ScrollView {
-                    VStack(spacing: Metrics.s2) {
+                    VStack(spacing: 14) {
                         HeroCard()
                         if !git.conflicts.isEmpty {
                             ConflictsCard()
                         }
                         ChangesCard()
-                        CommitCard()
                         if git.githubSlug != nil {
                             PullRequestsCard()
                         }
                         HistoryCard()
                         BranchesCard()
                     }
-                    .padding(Metrics.s2)
+                    .padding(12)
                 }
             }
         }
@@ -98,6 +97,8 @@ struct GitButton: View {
     }
 }
 
+/// Cabeçalho do painel: o branch é o próprio título, e o commit fica logo abaixo dele,
+/// porque é a ação que se faz a partir dali.
 struct HeroCard: View {
     @Environment(WorkspaceModel.self) private var ws
     @Environment(\.theme) private var theme
@@ -108,48 +109,25 @@ struct HeroCard: View {
     }
 
     var body: some View {
-        GitCard(title: "Branch", trailing: git.busy ? git.note : nil) {
-            HStack(spacing: 8) {
-                Image(systemName: "arrow.triangle.branch").foregroundStyle(theme.accent)
-                Text(git.current?.name ?? git.headName ?? "—").font(OdeteFont.ui(15, weight: .semibold))
-                    .foregroundStyle(theme.fg)
-                Spacer()
-                if let ab = git.aheadBehind {
-                    badge("↑\(ab.ahead)", on: ab.ahead > 0)
-                    badge("↓\(ab.behind)", on: ab.behind > 0)
-                }
-                if git.busy {
-                    ProgressView().controlSize(.small)
-                }
-            }
-            HStack(spacing: 6) {
-                if let o = git.origin {
-                    Text(o.url).font(OdeteFont.mono(10)).foregroundStyle(theme.fgSubtle).lineLimit(1)
-                        .truncationMode(.middle)
-                } else {
-                    Button("adicionar remoto…") { askingRemote = true }.font(OdeteFont.ui(11))
-                        .foregroundStyle(theme.accent)
-                }
-                Spacer()
-                if git.origin != nil, !git.hasCredentials {
-                    Text("sem conta").font(OdeteFont.mono(10)).foregroundStyle(theme.danger)
+        CardList {
+            VStack(alignment: .leading, spacing: 10) {
+                branchRow
+                if git.origin != nil {
+                    HStack(spacing: 6) {
+                        GitButton(title: "Fetch", symbol: "arrow.down.circle", disabled: git.busy) { git.fetch() }
+                        GitButton(title: "Pull", symbol: "arrow.down.to.line", disabled: git.busy) { git.pull() }
+                        GitButton(
+                            title: "Push",
+                            symbol: "arrow.up.to.line",
+                            accent: (git.aheadBehind?.ahead ?? 0) > 0,
+                            disabled: git.busy
+                        ) { git.push() }
+                    }
                 }
             }
-            if git.origin != nil {
-                HStack(spacing: 6) {
-                    GitButton(title: "Fetch", symbol: "arrow.down.circle", disabled: git.busy) { git.fetch() }
-                    GitButton(title: "Pull", symbol: "arrow.down.to.line", disabled: git.busy) { git.pull() }
-                    GitButton(
-                        title: "Push",
-                        symbol: "arrow.up.to.line",
-                        accent: (git.aheadBehind?.ahead ?? 0) > 0 || git.aheadBehind == nil,
-                        disabled: git.busy
-                    ) { git.push() }
-                }
-            }
-            if !git.busy, !git.note.isEmpty {
-                Text(git.note).font(OdeteFont.mono(11)).foregroundStyle(theme.fgMuted)
-            }
+            .padding(12)
+            Rectangle().fill(theme.separator).frame(height: 0.5)
+            CommitBox()
         }
         .alert("Remoto origin", isPresented: $askingRemote) {
             TextField("https://github.com/usuario/repo.git", text: $remoteURL)
@@ -158,8 +136,38 @@ struct HeroCard: View {
         }
     }
 
-    func badge(_ s: String, on: Bool) -> some View {
-        Pill(s, on: on)
+    var branchRow: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 7) {
+                Image(systemName: "arrow.triangle.branch").font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(theme.accent)
+                Text(git.current?.name ?? git.headName ?? "—").font(.headline).foregroundStyle(theme.fg)
+                    .lineLimit(1).truncationMode(.middle)
+                Spacer(minLength: 4)
+                if git.busy {
+                    ProgressView().controlSize(.small)
+                } else if let ab = git.aheadBehind, ab.ahead > 0 || ab.behind > 0 {
+                    Text("↑\(ab.ahead) ↓\(ab.behind)").font(.caption).monospacedDigit()
+                        .foregroundStyle(theme.fgMuted)
+                }
+            }
+            HStack(spacing: 6) {
+                if let o = git.origin {
+                    Text(o.url.replacingOccurrences(of: "https://", with: ""))
+                        .font(.caption2).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                    if !git.hasCredentials {
+                        Text("sem conta").font(.caption2).foregroundStyle(theme.danger)
+                    }
+                } else {
+                    Button("adicionar remoto…") { askingRemote = true }
+                        .font(.caption).foregroundStyle(theme.accent)
+                }
+                Spacer(minLength: 0)
+            }
+            if !git.busy, !git.note.isEmpty {
+                Text(git.note).font(.caption2).foregroundStyle(theme.fgSubtle).lineLimit(1)
+            }
+        }
     }
 }
 
@@ -174,7 +182,11 @@ struct ChangesCard: View {
         // Medidas de docs/design/README.md: título fora do cartão, linhas com ícone
         // quadrado, números na mesma linha e chevron no fim.
         VStack(alignment: .leading, spacing: 8) {
-            SectionTitle("Alterações", detail: git.isClean ? nil : "\(git.status.count)") {
+            SectionTitle(
+                "Alterações",
+                detail: git.isClean ? nil : "\(git.status.count)",
+                stat: git.isClean ? nil : git.lineStat
+            ) {
                 Button("Mandar tudo para o stage", systemImage: "plus.circle") { git.stageAll() }
                     .disabled(git.unstaged.isEmpty || git.busy)
                 Button("Tirar tudo do stage", systemImage: "minus.circle") { git.unstageAll() }
@@ -322,11 +334,19 @@ struct SectionTitle<Menu: View>: View {
     @Environment(\.theme) private var theme
     var title: String
     var detail: String?
+    /// Total de linhas que entraram e saíram, mostrado à direita do título.
+    var stat: (added: Int, removed: Int)?
     @ViewBuilder var menu: Menu
 
-    init(_ title: String, detail: String? = nil, @ViewBuilder menu: () -> Menu = { EmptyView() }) {
+    init(
+        _ title: String,
+        detail: String? = nil,
+        stat: (added: Int, removed: Int)? = nil,
+        @ViewBuilder menu: () -> Menu = { EmptyView() }
+    ) {
         self.title = title
         self.detail = detail
+        self.stat = stat
         self.menu = menu()
     }
 
@@ -338,6 +358,14 @@ struct SectionTitle<Menu: View>: View {
                     .contentTransition(.numericText())
             }
             Spacer(minLength: 0)
+            if let stat {
+                HStack(spacing: 6) {
+                    Text("+\(stat.added)").foregroundStyle(theme.ok)
+                    Text("−\(stat.removed)").foregroundStyle(theme.danger)
+                }
+                .font(.caption.weight(.medium)).monospacedDigit()
+                .contentTransition(.numericText())
+            }
             if !(menu is EmptyView) {
                 SwiftUI.Menu {
                     menu
@@ -366,7 +394,8 @@ struct CardList<Content: View>: View {
     }
 }
 
-struct CommitCard: View {
+/// Caixa de commit, agora dentro do cartão do branch.
+struct CommitBox: View {
     @Environment(WorkspaceModel.self) private var ws
     @Environment(\.theme) private var theme
     @State private var suggesting = false
@@ -374,52 +403,48 @@ struct CommitCard: View {
         ws.git
     }
 
+    var canCommit: Bool {
+        !git.busy && git.conflicts.isEmpty && (!git.staged.isEmpty || git.mergeInProgress)
+    }
+
     var body: some View {
         @Bindable var git = git
-        GitCard(title: git.mergeInProgress ? "Concluir merge" : "Commit", trailing: git.author.name) {
-            ZStack(alignment: .topTrailing) {
-                TextField("Mensagem do commit", text: $git.commitMessage, axis: .vertical)
-                    .lineLimit(2 ... 6)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .font(OdeteFont.ui(14))
-                    .padding(10)
-                    .padding(.trailing, 36)
-                    .background(theme.bgElevated, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(theme.border))
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .bottom, spacing: 6) {
+                TextField(
+                    git.mergeInProgress ? "Mensagem do merge" : "Mensagem do commit",
+                    text: $git.commitMessage,
+                    axis: .vertical
+                )
+                .lineLimit(1 ... 4)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .font(.subheadline)
+                .textFieldStyle(.plain)
                 Button {
-                    suggesting = true
-                    Task {
-                        do {
-                            let m = try await ws.agent.suggestCommitMessage()
-                            if !m.isEmpty {
-                                git.commitMessage = m
-                            }
-                        } catch { git.error = error.localizedDescription }
-                        suggesting = false
-                    }
+                    suggest()
                 } label: {
                     Group {
                         if suggesting {
                             ProgressView().controlSize(.small)
                         } else {
-                            Image(systemName: "sparkles").font(.system(size: 14))
+                            Image(systemName: "sparkles").font(.system(size: 12, weight: .semibold))
                         }
                     }
                     .foregroundStyle(git.staged.isEmpty ? theme.fgSubtle : theme.accent)
-                    .frame(width: 32, height: 32)
+                    .frame(width: 24, height: 24)
+                    .contentShape(Rectangle())
                 }
-                .buttonStyle(.glass)
+                .buttonStyle(.plain)
                 .disabled(git.staged.isEmpty || suggesting)
-                .help("Gerar mensagem com o agente a partir do diff staged")
-                .padding(4)
+                .accessibilityLabel("Sugerir mensagem a partir do que está no stage")
             }
             HStack(spacing: 6) {
                 GitButton(
                     title: git.mergeInProgress ? "Commit de merge" : "Commit",
                     symbol: "checkmark",
                     accent: true,
-                    disabled: git.busy || (git.staged.isEmpty && !git.mergeInProgress) || !git.conflicts.isEmpty
+                    disabled: !canCommit
                 ) {
                     git.commit()
                 }
@@ -427,19 +452,35 @@ struct CommitCard: View {
                     GitButton(title: "Abortar", symbol: "xmark", disabled: git.busy) { git.abortMerge() }
                 } else {
                     GitButton(
-                        title: "Undo último",
+                        title: "Desfazer",
                         symbol: "arrow.uturn.backward",
                         disabled: git.busy || git.log.isEmpty
                     ) { git.undoLastCommit() }
                 }
             }
-            if git.staged.isEmpty, !git.mergeInProgress {
-                Text("faça stage de algo para commitar").font(OdeteFont.mono(11)).foregroundStyle(theme.fgSubtle)
+            if !canCommit, !git.mergeInProgress {
+                Text(git.conflicts.isEmpty ? "faça stage de algo para commitar" : "resolva os conflitos antes")
+                    .font(.caption2).foregroundStyle(theme.fgSubtle)
             }
+        }
+        .padding(12)
+    }
+
+    func suggest() {
+        suggesting = true
+        Task {
+            do {
+                let m = try await ws.agent.suggestCommitMessage()
+                if !m.isEmpty {
+                    git.commitMessage = m
+                }
+            } catch { git.error = error.localizedDescription }
+            suggesting = false
         }
     }
 }
 
+/// Histórico: uma linha por commit, com o fio do tempo à esquerda, como no app do GitHub.
 struct HistoryCard: View {
     @Environment(WorkspaceModel.self) private var ws
     @Environment(ChromeState.self) private var chrome
@@ -449,57 +490,91 @@ struct HistoryCard: View {
         ws.git
     }
 
+    var shown: [Commit] {
+        Array(git.log.prefix(expanded ? 200 : 5))
+    }
+
     var body: some View {
-        GitCard(title: "Histórico", trailing: "\(git.log.count) commits") {
-            if git.log.isEmpty {
-                Text("nenhum commit ainda").font(OdeteFont.mono(11)).foregroundStyle(theme.fgSubtle)
-            }
-            ForEach(git.log.prefix(expanded ? 200 : 8)) { c in
-                Button {
-                    git.setDiff(.commit(c.id))
-                    chrome.snapshot.center = .diff
-                } label: {
-                    HStack(alignment: .top, spacing: 8) {
-                        Text(c.short).font(OdeteFont.mono(11)).foregroundStyle(theme.accent)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(c.summary).font(OdeteFont.ui(12.5)).foregroundStyle(theme.fg).lineLimit(2)
-                            Text("\(c.author.name) · \(c.date.formatted(.relative(presentation: .named)))")
-                                .font(OdeteFont.ui(10.5)).foregroundStyle(theme.fgSubtle)
-                        }
-                        Spacer(minLength: 0)
-                        if c.parents
-                            .count >
-                            1
-                        {
-                            Image(systemName: "arrow.triangle.merge").font(.system(size: 11))
-                                .foregroundStyle(theme.fgSubtle)
-                        }
+        VStack(alignment: .leading, spacing: 8) {
+            SectionTitle("Histórico", detail: git.log.isEmpty ? nil : "\(git.log.count)") {
+                if git.compareA != nil || git.compareB != nil {
+                    Button("Limpar comparação", systemImage: "xmark") { git.compareA = nil; git.compareB = nil }
+                }
+                if git.log.count > 5 {
+                    Button(
+                        expanded ? "Mostrar menos" : "Mostrar todos",
+                        systemImage: expanded ? "chevron.up" : "chevron.down"
+                    ) {
+                        withAnimation(.snappy) { expanded.toggle() }
                     }
-                    .padding(.vertical, 6)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .contextMenu {
-                    Button("Comparar como A", systemImage: "a.circle") { git.compareA = c.id; compare() }
-                    Button("Comparar como B", systemImage: "b.circle") { git.compareB = c.id; compare() }
-                    Button("Copiar SHA", systemImage: "doc.on.doc") { UIPasteboard.general.string = c.id }
                 }
             }
-            if git.log.count > 8 {
-                Button(expanded ? "mostrar menos" : "mostrar todos") { expanded.toggle() }.font(OdeteFont.ui(11))
-                    .foregroundStyle(theme.accent)
-            }
-            if git.compareA != nil || git.compareB != nil {
-                HStack(spacing: 6) {
-                    Text(
-                        "A \(git.compareA.map { String($0.prefix(7)) } ?? "—")  ·  B \(git.compareB.map { String($0.prefix(7)) } ?? "—")"
-                    )
-                    .font(OdeteFont.mono(11)).foregroundStyle(theme.fgMuted)
-                    Spacer()
-                    Button("limpar") { git.compareA = nil; git.compareB = nil }.font(OdeteFont.ui(11))
+            CardList {
+                if git.log.isEmpty {
+                    Text("Nenhum commit ainda.").font(.subheadline).foregroundStyle(.secondary)
+                        .padding(.horizontal, 12).padding(.vertical, 12)
+                }
+                ForEach(Array(shown.enumerated()), id: \.element.id) { i, c in
+                    row(c, first: i == 0, last: i == shown.count - 1)
+                }
+                if git.compareA != nil || git.compareB != nil {
+                    compareRow
                 }
             }
         }
+    }
+
+    func row(_ c: Commit, first: Bool, last: Bool) -> some View {
+        Button {
+            git.setDiff(.commit(c.id))
+            chrome.snapshot.center = .diff
+        } label: {
+            HStack(alignment: .top, spacing: 10) {
+                // Fio do tempo: bolinha no commit e linha ligando ao próximo.
+                VStack(spacing: 0) {
+                    Rectangle().fill(first ? .clear : theme.separator).frame(width: 1, height: 6)
+                    Circle()
+                        .fill(c.parents.count > 1 ? theme.accent : theme.fgSubtle)
+                        .frame(width: 7, height: 7)
+                    Rectangle().fill(last ? .clear : theme.separator).frame(width: 1)
+                }
+                .frame(width: 7)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(c.summary).font(.subheadline).foregroundStyle(theme.fg).lineLimit(2)
+                    HStack(spacing: 5) {
+                        Text(c.short).font(.caption2).monospaced().foregroundStyle(theme.accent)
+                        Text(c.author.name).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                        Text("·").font(.caption2).foregroundStyle(.secondary)
+                        Text(c.date.formatted(.relative(presentation: .named).locale(Locale(identifier: "pt_BR"))))
+                            .font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                    }
+                }
+                Spacer(minLength: 4)
+                Image(systemName: "chevron.right").font(.caption2.bold()).foregroundStyle(theme.fgSubtle)
+                    .padding(.top, 2)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 9)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .contextMenu {
+            Button("Comparar como A", systemImage: "a.circle") { git.compareA = c.id; compare() }
+            Button("Comparar como B", systemImage: "b.circle") { git.compareB = c.id; compare() }
+            Button("Copiar SHA", systemImage: "doc.on.doc") { UIPasteboard.general.string = c.id }
+        }
+    }
+
+    var compareRow: some View {
+        HStack(spacing: 6) {
+            Text("A \(git.compareA.map { String($0.prefix(7)) } ?? "—")")
+            Text("B \(git.compareB.map { String($0.prefix(7)) } ?? "—")")
+            Spacer(minLength: 0)
+            Button("limpar") { git.compareA = nil; git.compareB = nil }
+        }
+        .font(.caption2).monospaced().foregroundStyle(.secondary)
+        .padding(.horizontal, 12).padding(.vertical, 8)
+        .overlay(alignment: .top) { Rectangle().fill(theme.separator).frame(height: 0.5) }
     }
 
     func compare() {
@@ -510,10 +585,10 @@ struct HistoryCard: View {
     }
 }
 
+/// Branches e stash: uma linha por item, com o atual marcado e as ações no toque longo.
 struct BranchesCard: View {
     @Environment(WorkspaceModel.self) private var ws
     @Environment(\.theme) private var theme
-    @State private var open = false
     @State private var newBranch = ""
     @State private var askingBranch = false
     @State private var stashMsg = ""
@@ -522,64 +597,41 @@ struct BranchesCard: View {
         ws.git
     }
 
+    var locals: [Branch] {
+        git.branches.filter { !$0.isRemote }
+    }
+
+    var remotes: [Branch] {
+        git.branches.filter(\.isRemote)
+    }
+
     var body: some View {
-        GitCard(
-            title: "Branches e stash",
-            trailing: "\(git.branches.filter { !$0.isRemote }.count) · \(git.stashes.count)"
-        ) {
-            Button { withAnimation(.snappy) { open.toggle() } } label: {
-                HStack {
-                    Text(open ? "recolher" : "expandir").font(OdeteFont.ui(11)).foregroundStyle(theme.accent); Spacer()
+        VStack(alignment: .leading, spacing: 8) {
+            SectionTitle("Branches", detail: "\(locals.count)") {
+                Button("Nova branch…", systemImage: "plus") { newBranch = ""; askingBranch = true }
+                    .disabled(git.busy)
+                Button("Guardar stash…", systemImage: "tray.and.arrow.down") { stashMsg = ""; askingStash = true }
+                    .disabled(git.busy || git.isClean)
+            }
+            CardList {
+                ForEach(Array(locals.enumerated()), id: \.element.id) { i, b in
+                    branchRow(b, first: i == 0)
+                }
+                if !remotes.isEmpty {
+                    DisclosureGroup {
+                        ForEach(remotes) { b in branchRow(b, first: true) }
+                    } label: {
+                        Text("Remotas").font(.footnote).foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal, 12).padding(.vertical, 8)
+                    .overlay(alignment: .top) { Rectangle().fill(theme.separator).frame(height: 0.5) }
                 }
             }
-            .buttonStyle(.plain)
-            if open {
-                HStack(spacing: 6) {
-                    GitButton(title: "Nova branch", symbol: "plus", disabled: git.busy) {
-                        newBranch = ""; askingBranch = true
-                    }
-                    GitButton(
-                        title: "Guardar stash",
-                        symbol: "tray.and.arrow.down",
-                        disabled: git.busy || git.isClean
-                    ) {
-                        stashMsg = ""; askingStash = true
-                    }
-                }
-                ForEach(git.branches) { b in
-                    HStack(spacing: 8) {
-                        Image(systemName: b.isRemote ? "cloud" : "arrow.triangle.branch").font(.system(size: 11))
-                            .foregroundStyle(theme.fgSubtle).frame(width: 14)
-                        Text(b.name).font(OdeteFont.mono(12, weight: b.isHead ? .medium : .regular))
-                            .foregroundStyle(b.isHead ? theme.accent : theme.fg).lineLimit(1)
-                        Spacer()
-                        if !b.isHead {
-                            HeaderButton("arrow.right.circle", label: "Trocar para \(b.name)") { git.checkout(b.name) }
-                            HeaderButton("arrow.triangle.merge", label: "Merge \(b.name)") { git.merge(b.name) }
-                            if !b
-                                .isRemote
-                            {
-                                HeaderButton("trash", label: "Apagar \(b.name)") { git.deleteBranch(b.name) }
-                            }
-                        }
-                    }
-                    .frame(height: 36)
-                }
-                if !git.stashes.isEmpty {
-                    Text("STASH").font(OdeteFont.ui(10, weight: .medium)).tracking(0.6).foregroundStyle(theme.fgSubtle)
-                        .padding(
-                            .top,
-                            4
-                        )
-                    ForEach(git.stashes) { s in
-                        HStack(spacing: 8) {
-                            Text("@\(s.index)").font(OdeteFont.mono(11)).foregroundStyle(theme.fgSubtle)
-                            Text(s.message).font(OdeteFont.ui(12)).foregroundStyle(theme.fg).lineLimit(1)
-                            Spacer()
-                            HeaderButton("tray.and.arrow.up", label: "Aplicar") { git.stashPop(s.index) }
-                            HeaderButton("trash", label: "Apagar") { git.stashDrop(s.index) }
-                        }
-                        .frame(height: 36)
+            if !git.stashes.isEmpty {
+                SectionTitle("Stash", detail: "\(git.stashes.count)")
+                CardList {
+                    ForEach(Array(git.stashes.enumerated()), id: \.element.id) { i, st in
+                        stashRow(st, first: i == 0)
                     }
                 }
             }
@@ -593,6 +645,80 @@ struct BranchesCard: View {
             TextField("mensagem", text: $stashMsg)
             Button("Guardar") { git.stashPush(stashMsg) }
             Button("Cancelar", role: .cancel) {}
+        }
+    }
+
+    func branchRow(_ b: Branch, first: Bool) -> some View {
+        Button {
+            if !b.isHead {
+                git.checkout(b.name)
+            }
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: b.isRemote ? "cloud" : "arrow.triangle.branch")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(b.isHead ? .white : theme.fgMuted)
+                    .frame(width: 22, height: 22)
+                    .background(
+                        b.isHead ? AnyShapeStyle(theme.accent) : AnyShapeStyle(theme.fg.opacity(0.08)),
+                        in: RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    )
+                Text(b.name).font(.subheadline).foregroundStyle(theme.fg).lineLimit(1).truncationMode(.middle)
+                Spacer(minLength: 4)
+                if b.isHead {
+                    Text("atual").font(.caption2).foregroundStyle(theme.accent)
+                } else {
+                    Image(systemName: "chevron.right").font(.caption2.bold()).foregroundStyle(theme.fgSubtle)
+                }
+            }
+            .padding(.horizontal, 12)
+            .frame(height: 40)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .overlay(alignment: .top) {
+            if !first {
+                Rectangle().fill(theme.separator).frame(height: 0.5).padding(.leading, 44)
+            }
+        }
+        .contextMenu {
+            if !b.isHead {
+                Button("Trocar para \(b.name)", systemImage: "arrow.right.circle") { git.checkout(b.name) }
+                Button("Merge de \(b.name)", systemImage: "arrow.triangle.merge") { git.merge(b.name) }
+                if !b.isRemote {
+                    Button("Apagar \(b.name)", systemImage: "trash", role: .destructive) {
+                        git.deleteBranch(b.name)
+                    }
+                }
+            }
+        }
+    }
+
+    func stashRow(_ st: StashEntry, first: Bool) -> some View {
+        Button { git.stashPop(st.index) } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "tray.full").font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(theme.fgMuted)
+                    .frame(width: 22, height: 22)
+                    .background(theme.fg.opacity(0.08), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                Text(st.message.isEmpty ? "stash @\(st.index)" : st.message)
+                    .font(.subheadline).foregroundStyle(theme.fg).lineLimit(1)
+                Spacer(minLength: 4)
+                Text("aplicar").font(.caption2).foregroundStyle(theme.accent)
+            }
+            .padding(.horizontal, 12)
+            .frame(height: 40)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .overlay(alignment: .top) {
+            if !first {
+                Rectangle().fill(theme.separator).frame(height: 0.5).padding(.leading, 44)
+            }
+        }
+        .contextMenu {
+            Button("Aplicar", systemImage: "tray.and.arrow.up") { git.stashPop(st.index) }
+            Button("Apagar", systemImage: "trash", role: .destructive) { git.stashDrop(st.index) }
         }
     }
 }

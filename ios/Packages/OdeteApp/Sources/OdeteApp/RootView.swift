@@ -28,6 +28,12 @@ public struct RootView: View {
                 HubView()
             }
         }
+        // Duas `.sheet` no mesmo nível competem; esta fica um degrau abaixo da de boas-vindas.
+        .sheet(isPresented: Binding(get: { chrome.settingsOpen }, set: { chrome.settingsOpen = $0 })) {
+            SettingsSheet()
+                .environment(chrome).environment(app).environment(app.accounts).environment(app.aiAccounts)
+                .odeteTheme(Theme(chrome.palette))
+        }
         .environment(chrome)
         .environment(app)
         .environment(app.accounts)

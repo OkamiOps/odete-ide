@@ -75,7 +75,38 @@ public struct EditorPrefs: Codable, Hashable, Sendable {
     public var lineNumbers = true
     public var indentGuides = true
     public var tabWidth = 2
+    /// Altura de linha relativa (1.0 = compacta).
+    public var lineHeight: Double = 1.25
+    public var showWhitespace = false
+    public var showLineBreaks = false
+    /// Coluna da guia de página (0 = sem guia).
+    public var pageGuide = 0
+    public var highlightLine = true
+    public var autoClosePairs = true
     public init() {}
+
+    enum CodingKeys: String, CodingKey {
+        case fontSize, autoSave, wrap, minimap, lineNumbers, indentGuides, tabWidth, lineHeight, showWhitespace,
+             showLineBreaks, pageGuide, highlightLine, autoClosePairs
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let d = EditorPrefs()
+        fontSize = try c.decodeIfPresent(Double.self, forKey: .fontSize) ?? d.fontSize
+        autoSave = try c.decodeIfPresent(Bool.self, forKey: .autoSave) ?? d.autoSave
+        wrap = try c.decodeIfPresent(Bool.self, forKey: .wrap) ?? d.wrap
+        minimap = try c.decodeIfPresent(MinimapSize.self, forKey: .minimap) ?? d.minimap
+        lineNumbers = try c.decodeIfPresent(Bool.self, forKey: .lineNumbers) ?? d.lineNumbers
+        indentGuides = try c.decodeIfPresent(Bool.self, forKey: .indentGuides) ?? d.indentGuides
+        tabWidth = try c.decodeIfPresent(Int.self, forKey: .tabWidth) ?? d.tabWidth
+        lineHeight = try c.decodeIfPresent(Double.self, forKey: .lineHeight) ?? d.lineHeight
+        showWhitespace = try c.decodeIfPresent(Bool.self, forKey: .showWhitespace) ?? d.showWhitespace
+        showLineBreaks = try c.decodeIfPresent(Bool.self, forKey: .showLineBreaks) ?? d.showLineBreaks
+        pageGuide = try c.decodeIfPresent(Int.self, forKey: .pageGuide) ?? d.pageGuide
+        highlightLine = try c.decodeIfPresent(Bool.self, forKey: .highlightLine) ?? d.highlightLine
+        autoClosePairs = try c.decodeIfPresent(Bool.self, forKey: .autoClosePairs) ?? d.autoClosePairs
+    }
 }
 
 /// Escolhas do agente por projeto.
@@ -150,6 +181,8 @@ public final class ChromeState {
 
     /// Chamado a cada mudança; `StateStore` liga aqui o salvamento debounced.
     public var onChange: (@MainActor (ChromeSnapshot) -> Void)?
+    /// Folha de Ajustes aberta (não persiste).
+    public var settingsOpen = false
 
     public init(snapshot: ChromeSnapshot = ChromeSnapshot()) {
         self.snapshot = snapshot

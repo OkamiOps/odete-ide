@@ -67,20 +67,14 @@ public struct CodeEditorView: UIViewRepresentable {
         tv.gutterTrailingPadding = 12
         tv.textContainerInset = UIEdgeInsets(top: 8, left: 0, bottom: 200, right: 8)
         tv.lineSelectionDisplayType = .line
-        tv.characterPairs = [
-            Pair("(", ")"),
-            Pair("[", "]"),
-            Pair("{", "}"),
-            Pair("\"", "\""),
-            Pair("'", "'"),
-            Pair("`", "`"),
-        ]
+        tv.characterPairs = Self.pairs
         tv.inputAccessoryView = KeyboardBar(textView: tv, onSave: onSave, onFind: onFind)
         let c = context.coordinator
         c.textView = tv
         c.overlay.onTap = { [weak c] line in c?.parent.onGutterTap(line) }
+        tv.addSubview(c.guides)
         tv.addSubview(c.overlay)
-        tv.floating = [c.overlay, c.popup]
+        tv.floating = [c.guides, c.overlay, c.popup]
         c.popup.onPick = { [weak c] item in c?.accept(item) }
         c.offsetObservation = tv.observe(\.contentOffset, options: [.new]) { [weak c] _, _ in
             Task { @MainActor in c?.positionOverlay() }
@@ -100,9 +94,7 @@ public struct CodeEditorView: UIViewRepresentable {
             c.scheduleDecorations()
         }
         c.parent = self
-        tv.showLineNumbers = prefs.lineNumbers
-        tv.isLineWrappingEnabled = prefs.wrap
-        tv.indentStrategy = .space(length: prefs.tabWidth)
+        applyPrefs(tv, context: context)
         (tv.inputAccessoryView as? KeyboardBar)?.onSave = onSave
         (tv.inputAccessoryView as? KeyboardBar)?.onFind = onFind
         if c.marks != marks || c.issues != issues || docChanged {
@@ -119,6 +111,40 @@ public struct CodeEditorView: UIViewRepresentable {
         }
     }
 
+    private func applyPrefs(_ tv: TextView, context: Context) {
+        let c = context.coordinator
+        tv.showLineNumbers = prefs.lineNumbers
+        tv.isLineWrappingEnabled = prefs.wrap
+        tv.indentStrategy = .space(length: prefs.tabWidth)
+        tv.showSpaces = prefs.showWhitespace
+        tv.showTabs = prefs.showWhitespace
+        tv.showNonBreakingSpaces = prefs.showWhitespace
+        tv.showLineBreaks = prefs.showLineBreaks
+        tv.showSoftLineBreaks = prefs.showLineBreaks && prefs.wrap
+        tv.showPageGuide = prefs.pageGuide > 0
+        tv.pageGuideColumn = max(prefs.pageGuide, 1)
+        tv.lineSelectionDisplayType = prefs.highlightLine ? .line : .disabled
+        tv.characterPairs = prefs.autoClosePairs ? Self.pairs : []
+        if c.lineHeight != prefs.lineHeight {
+            c.lineHeight = prefs.lineHeight
+            tv.lineHeightMultiplier = prefs.lineHeight
+        }
+        if c.guidesOn != prefs.indentGuides || c.tabWidth != prefs.tabWidth {
+            c.guidesOn = prefs.indentGuides
+            c.tabWidth = prefs.tabWidth
+            c.scheduleDecorations()
+        }
+    }
+
+    static let pairs: [CharacterPair] = [
+        Pair("(", ")"),
+        Pair("[", "]"),
+        Pair("{", "}"),
+        Pair("\"", "\""),
+        Pair("'", "'"),
+        Pair("`", "`"),
+    ]
+
     private func apply(to tv: TextView, context: Context, fullReset: Bool) {
         let c = context.coordinator
         c.documentId = documentId
@@ -131,6 +157,8 @@ public struct CodeEditorView: UIViewRepresentable {
         c.overlay.addedColor = UIColor(hex: palette.ok)
         c.overlay.modifiedColor = UIColor(hex: palette.syntax.keyword)
         c.overlay.deletedColor = UIColor(hex: palette.danger)
+        c.guides.color = UIColor(hex: palette.fg).withAlphaComponent(palette.dark ? 0.09 : 0.12)
+        c.guides.activeColor = UIColor(hex: palette.accent).withAlphaComponent(0.45)
         c.popup.fg = UIColor(hex: palette.fg)
         c.popup.muted = UIColor(hex: palette.fgMuted)
         c.popup.accent = UIColor(hex: palette.accent)
@@ -163,7 +191,11 @@ public struct CodeEditorView: UIViewRepresentable {
         var marks: [EditorGutterMark] = []
         var issues: [EditorIssue] = []
         let overlay = GutterOverlay(frame: .zero)
+        let guides = IndentGuides(frame: .zero)
         let popup = CompletionPopup(frame: .zero)
+        var lineHeight: Double = 0
+        var guidesOn = true
+        var tabWidth = 2
         var offsetObservation: NSKeyValueObservation?
         private var decorationTask: Task<Void, Never>?
         private var popupContext: CompletionContext?
@@ -182,6 +214,9 @@ public struct CodeEditorView: UIViewRepresentable {
 
         public func textViewDidChangeSelection(_ textView: TextView) {
             parent.onCursor(textView.selectedRange.location)
+            if guidesOn {
+                scheduleDecorations()
+            }
             if popupContext != nil, !popup.isHidden {
                 // Cursor saiu da palavra: fecha.
                 let ctx = Complete.context(
@@ -237,6 +272,7 @@ public struct CodeEditorView: UIViewRepresentable {
             overlay.placed = placed
             positionOverlay()
             overlay.setNeedsDisplay()
+            layoutGuides(tv, ns: ns, starts: starts)
 
             var ranges: [HighlightedRange] = []
             for i in issues where i.line >= 1 && i.line <= starts.count {
@@ -257,6 +293,90 @@ public struct CodeEditorView: UIViewRepresentable {
                 ))
             }
             tv.highlightedRanges = ranges
+        }
+
+        /// Guias de indentação: uma linha vertical por nível, na coluna do recuo.
+        func layoutGuides(_ tv: TextView, ns: NSString, starts: [Int]) {
+            guides.frame = CGRect(
+                x: 0,
+                y: 0,
+                width: max(tv.contentSize.width, tv.bounds.width),
+                height: max(tv.contentSize.height, tv.bounds.height)
+            )
+            guard guidesOn, starts.count <= 4000 else {
+                guides.segments = []
+                guides.setNeedsDisplay()
+                return
+            }
+            let width = max(tabWidth, 1)
+            var levels: [Int] = []
+            for (i, start) in starts.enumerated() {
+                let end = i + 1 < starts.count ? starts[i + 1] : ns.length
+                var spaces = 0
+                var p = start
+                var blank = true
+                while p < end {
+                    let ch = ns.character(at: p)
+                    if ch == 32 {
+                        spaces += 1
+                    } else if ch == 9 {
+                        spaces += width
+                    } else if ch == 10 || ch == 13 {
+                        break
+                    } else {
+                        blank = false
+                        break
+                    }
+                    p += 1
+                }
+                levels.append(blank ? -1 : spaces / width)
+            }
+            // linhas em branco herdam o nível da próxima linha não vazia
+            var next = 0
+            for i in stride(from: levels.count - 1, through: 0, by: -1) {
+                if levels[i] < 0 {
+                    levels[i] = next
+                } else {
+                    next = levels[i]
+                }
+            }
+            let cursorLine = lineIndex(of: tv.selectedRange.location, starts: starts)
+            let cursorLevel = cursorLine < levels.count ? levels[cursorLine] : 0
+            let charW = charWidth(tv)
+            var segs: [IndentGuides.Segment] = []
+            for (i, start) in starts.enumerated() where levels[i] > 0 {
+                guard let pos = tv.position(from: tv.beginningOfDocument, offset: start) else { continue }
+                let r = tv.caretRect(for: pos)
+                for level in 0 ..< levels[i] {
+                    segs.append(.init(
+                        x: r.minX + CGFloat(level * width) * charW,
+                        y: r.minY,
+                        h: r.height,
+                        active: level == cursorLevel - 1
+                    ))
+                }
+            }
+            guides.segments = segs
+            guides.setNeedsDisplay()
+        }
+
+        /// Largura de um caractere da fonte mono (mede o avanço de "0").
+        private func charWidth(_ tv: TextView) -> CGFloat {
+            let font = tv.theme.font
+            return ("0" as NSString).size(withAttributes: [.font: font]).width
+        }
+
+        private func lineIndex(of offset: Int, starts: [Int]) -> Int {
+            var lo = 0, hi = starts.count - 1
+            while lo < hi {
+                let mid = (lo + hi + 1) / 2
+                if starts[mid] <= offset {
+                    lo = mid
+                } else {
+                    hi = mid - 1
+                }
+            }
+            return max(lo, 0)
         }
 
         func positionOverlay() {

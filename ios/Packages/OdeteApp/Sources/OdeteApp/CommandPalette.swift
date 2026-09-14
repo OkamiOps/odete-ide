@@ -271,7 +271,7 @@ struct CommandPalette: View {
             case ">term": chrome.toggleTerm()
             case ">agent": chrome.toggleAgent()
             case ">search": chrome.snapshot.side = .search; chrome.snapshot.sideOpen = true
-            case ">settings": chrome.snapshot.side = .settings; chrome.snapshot.sideOpen = true
+            case ">settings": chrome.settingsOpen = true
             case ">closetab": if let a = ws.active {
                     ws.closeTab(a)
                 }

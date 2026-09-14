@@ -80,7 +80,7 @@ public struct OdeteCommands: Commands {
             }
         }
         CommandGroup(replacing: .appSettings) {
-            Button("Ajustes…") { a?.chrome.snapshot.side = .settings; a?.chrome.snapshot.sideOpen = true }
+            Button("Ajustes…") { a?.chrome.settingsOpen = true }
                 .keyboardShortcut(",", modifiers: .command)
         }
     }

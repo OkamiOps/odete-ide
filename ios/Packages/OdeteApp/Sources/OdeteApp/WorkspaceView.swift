@@ -85,7 +85,15 @@ struct WorkspaceView: View {
                 sideOpen: chrome.snapshot.sideOpen,
                 agentVisible: chrome.snapshot.agentVisible,
                 agentBusy: ws.agent.running,
-                onSelect: { chrome.select(side: $0) },
+                // Ajustes é uma folha, não um painel de coluna: numa coluna estreita a lista
+                // inteira vira uma linguiça sem hierarquia.
+                onSelect: { p in
+                    if p == .settings {
+                        chrome.settingsOpen = true
+                    } else {
+                        chrome.select(side: p)
+                    }
+                },
                 onToggleAgent: { chrome.toggleAgent() }
             )
             if chrome.snapshot.sideOpen {

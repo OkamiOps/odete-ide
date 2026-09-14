@@ -106,6 +106,37 @@ final class GutterOverlay: UIView {
     }
 }
 
+/// Guias de indentação desenhadas atrás do texto (uma por nível); a do bloco do cursor fica em destaque.
+@MainActor
+final class IndentGuides: UIView {
+    struct Segment { let x: CGFloat; let y: CGFloat; let h: CGFloat; let active: Bool }
+    var segments: [Segment] = []
+    var color = UIColor.gray.withAlphaComponent(0.1)
+    var activeColor = UIColor.systemOrange.withAlphaComponent(0.4)
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        backgroundColor = .clear
+        isOpaque = false
+        isUserInteractionEnabled = false
+    }
+
+    @available(*, unavailable) required init?(coder _: NSCoder) {
+        nil
+    }
+
+    override func draw(_: CGRect) {
+        guard let ctx = UIGraphicsGetCurrentContext() else { return }
+        ctx.setLineWidth(1)
+        for s in segments {
+            ctx.setStrokeColor((s.active ? activeColor : color).cgColor)
+            ctx.move(to: CGPoint(x: s.x + 0.5, y: s.y))
+            ctx.addLine(to: CGPoint(x: s.x + 0.5, y: s.y + s.h))
+            ctx.strokePath()
+        }
+    }
+}
+
 /// Lista flutuante de sugestões, ancorada abaixo do cursor.
 @MainActor
 final class CompletionPopup: UIView {

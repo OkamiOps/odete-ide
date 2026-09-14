@@ -49,8 +49,10 @@ public struct Rail: View {
         }
         .frame(width: Metrics.railWidth)
         .frame(maxHeight: .infinity)
-        .background(theme.surface)
-        .overlay(alignment: .trailing) { Rectangle().fill(theme.separator).frame(width: 0.5) }
+        // Um degrau abaixo dos painéis, e uma borda de verdade: com o mesmo fundo dos
+        // painéis a barra grudava na lista de arquivos e virava tudo uma coisa só.
+        .background(theme.bg)
+        .overlay(alignment: .trailing) { Rectangle().fill(theme.border).frame(width: 1) }
     }
 }
 

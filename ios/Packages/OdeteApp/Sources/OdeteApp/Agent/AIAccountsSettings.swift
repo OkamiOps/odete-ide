@@ -18,20 +18,29 @@ struct AIAccountsSettings: View {
                     CardList {
                         ForEach(Array(store.accounts.enumerated()), id: \.element.id) { i, a in
                             CardRow(
-                                a.label + (a.login.isEmpty ? "" : " · \(a.login)"),
+                                a.label,
                                 symbol: a.kind.symbol,
-                                color: a.needsReconnect ? theme.danger : theme.accent,
-                                detail: a.needsReconnect ? "sessão expirou, reconecte" : a.kind.vendor,
+                                color: a.needsReconnect ? theme.danger : ProviderCor.de(a.kind),
+                                detail: a.needsReconnect ? "sessão expirou, reconecte"
+                                    : (a.login.isEmpty ? a.kind.vendor : a.login),
                                 first: i == 0
                             ) {
-                                if a.needsReconnect {
-                                    Button("Reconectar") { adding = a.kind }
-                                        .buttonStyle(.bordered).controlSize(.small)
+                                // Lixeira vermelha em cada linha era barulho demais.
+                                Menu {
+                                    if a.needsReconnect {
+                                        Button("Reconectar", systemImage: "arrow.clockwise") { adding = a.kind }
+                                    }
+                                    Button("Remover", systemImage: "trash", role: .destructive) { store.remove(a) }
+                                } label: {
+                                    Image(systemName: "ellipsis")
+                                        .font(.system(size: 13, weight: .semibold))
+                                        .foregroundStyle(theme.fgSubtle)
+                                        .frame(width: 30, height: 30)
+                                        .contentShape(Rectangle())
                                 }
-                                Button("Remover", systemImage: "trash", role: .destructive) { store.remove(a) }
-                                    .labelStyle(.iconOnly)
-                                    .buttonStyle(.borderless)
-                                    .controlSize(.small)
+                                .menuIndicator(.hidden)
+                                .buttonStyle(.plain)
+                                .accessibilityLabel("Opções da conta")
                             }
                         }
                     }
@@ -45,7 +54,7 @@ struct AIAccountsSettings: View {
                             CardRow(
                                 k.label,
                                 symbol: k.symbol,
-                                color: k == .apple ? theme.accent : theme.fgMuted,
+                                color: ProviderCor.de(k),
                                 detail: detalhe(k),
                                 first: i == 0
                             ) {

@@ -22,7 +22,7 @@ public enum ProviderKind: String, Codable, CaseIterable, Sendable, Identifiable 
 
     public var vendor: String {
         switch self {
-        case .apple: "no aparelho · sem conta, sem rede"
+        case .apple: "no aparelho, sem conta"
         case .claude: "Anthropic · assinatura Pro/Max"
         case .codex: "OpenAI · conta ChatGPT"
         case .grok: "xAI · SuperGrok / X Premium"

@@ -133,30 +133,19 @@ struct ModelMenu: View {
     let agent: AgentModel
     let onConnect: () -> Void
 
-    var body: some View {
-        Menu { items } label: { label }
-            .buttonStyle(.plain)
-            .menuIndicator(.hidden)
-            .accessibilityLabel("Conta e modelo")
-    }
+    @State private var aberto = false
 
-    @ViewBuilder var items: some View {
-        ForEach(ProviderKind.allCases) { kind in
-            let accs = agent.accounts.accounts(of: kind)
-            if !accs.isEmpty {
-                Section(kind.label) {
-                    ForEach(accs) { a in
-                        Button { agent.setAccount(a) } label: { Label(
-                            a
-                                .label + (a.login.isEmpty ? "" : " · \(a.login)") +
-                                (a.needsReconnect ? " (reconectar)" : ""),
-                            systemImage: a.id == agent.account?.id ? "checkmark" : kind.symbol
-                        ) }
-                    }
-                }
+    var body: some View {
+        Button { aberto = true } label: { label }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Conta")
+            .popover(isPresented: $aberto, arrowEdge: .bottom) {
+                ContasPopover(
+                    agent: agent,
+                    escolher: { agent.setAccount($0); aberto = false },
+                    gerenciar: { aberto = false; onConnect() }
+                )
             }
-        }
-        Button { onConnect() } label: { Label("Contas de IA…", systemImage: "person.crop.circle.badge.plus") }
     }
 
     var label: some View {
@@ -184,7 +173,8 @@ struct ModelMenu: View {
     }
 
     var subtitle: String {
-        agent.account?.kind.label ?? "conectar"
+        guard let a = agent.account else { return "conectar" }
+        return a.login.isEmpty ? a.kind.vendor : a.login
     }
 }
 
@@ -243,5 +233,72 @@ struct HistorySheet: View {
         }
         .presentationDetents([.medium, .large])
         .pointerScrolling()
+    }
+}
+
+/// Lista de contas no formato dos cartões do resto do app, no lugar do menu do sistema,
+/// onde o e-mail quebrava no meio e o ícone do Grok parecia um erro.
+struct ContasPopover: View {
+    @Environment(\.theme) private var theme
+    let agent: AgentModel
+    var escolher: (AIAccount) -> Void
+    var gerenciar: () -> Void
+
+    var body: some View {
+        ScrollPane {
+            VStack(alignment: .leading, spacing: 14) {
+                if agent.accounts.accounts.isEmpty {
+                    CardNote("Nenhuma conta ainda. O modelo da Apple não pede conta nenhuma.")
+                } else {
+                    SectionTitle("Contas")
+                    CardList {
+                        ForEach(Array(agent.accounts.accounts.enumerated()), id: \.element.id) { i, a in
+                            Button { escolher(a) } label: {
+                                CardRow(
+                                    a.label,
+                                    symbol: a.kind.symbol,
+                                    color: a.needsReconnect ? theme.danger : ProviderCor.de(a.kind),
+                                    detail: a.needsReconnect ? "sessão expirou, reconecte"
+                                        : (a.login.isEmpty ? a.kind.vendor : a.login),
+                                    first: i == 0
+                                ) {
+                                    if a.id == agent.account?.id {
+                                        Image(systemName: "checkmark").font(.caption.bold())
+                                            .foregroundStyle(theme.accent)
+                                    }
+                                }
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+                CardList {
+                    Button { gerenciar() } label: {
+                        CardRow(
+                            "Contas de IA…",
+                            symbol: "person.crop.circle.badge.plus",
+                            color: .indigo,
+                            first: true
+                        ) {
+                            Image(systemName: "chevron.right").font(.caption2.bold())
+                                .foregroundStyle(theme.fgSubtle)
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(14)
+        }
+        // Mais largo que isto e a coluna do agente corta a coluna da direita do cartão.
+        // A altura acompanha o número de contas, senão sobra um vazio embaixo.
+        .frame(idealWidth: 280, idealHeight: altura)
+        .background(theme.bg)
+    }
+
+    var altura: CGFloat {
+        let contas = agent.accounts.accounts.count
+        return 28 + (contas == 0 ? 52 : 32 + CGFloat(contas) * 50) + 14 + 44
     }
 }

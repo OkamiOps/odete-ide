@@ -151,17 +151,17 @@ public struct WideButton: View {
                 Button(role: role, action: action) { label }.buttonStyle(.glass)
             }
         }
-        .controlSize(.regular)
+        .controlSize(.small)
     }
 
     var label: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 5) {
             if let symbol {
-                Image(systemName: symbol).font(.system(size: 12, weight: .semibold))
+                Image(systemName: symbol).font(.system(size: 11, weight: .semibold))
             }
-            Text(title).font(OdeteFont.ui(13, weight: .medium)).lineLimit(1)
+            Text(title).font(.footnote.weight(.medium)).lineLimit(1)
         }
         .frame(maxWidth: .infinity)
-        .frame(height: 22)
+        .frame(height: 18)
     }
 }

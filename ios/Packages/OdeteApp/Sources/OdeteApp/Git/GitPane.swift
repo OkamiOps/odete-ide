@@ -78,8 +78,8 @@ struct GitCard<Content: View>: View {
         VStack(alignment: .leading, spacing: 8) {
             SectionTitle(title, detail: trailing)
             CardList {
-                VStack(alignment: .leading, spacing: 12) { content }
-                    .padding(16)
+                VStack(alignment: .leading, spacing: 10) { content }
+                    .padding(12)
             }
         }
     }
@@ -189,7 +189,7 @@ struct ChangesCard: View {
                 CardList {
                     Text("Nada mudou desde o último commit.")
                         .font(.subheadline).foregroundStyle(.secondary)
-                        .padding(.horizontal, 16).padding(.vertical, 14)
+                        .padding(.horizontal, 12).padding(.vertical, 12)
                 }
             } else {
                 CardList {
@@ -230,20 +230,20 @@ struct ChangeRow: View {
             git.setDiff(staged ? .index : .workdir, path: entry.path)
             chrome.snapshot.center = .diff
         } label: {
-            HStack(spacing: 12) {
+            HStack(spacing: 10) {
                 Image(systemName: glyph)
-                    .font(.system(size: 13, weight: .bold))
+                    .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(.white)
-                    .frame(width: 28, height: 28)
-                    .background(color, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                VStack(alignment: .leading, spacing: 1) {
+                    .frame(width: 22, height: 22)
+                    .background(color, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                VStack(alignment: .leading, spacing: 0) {
                     if let dir {
-                        Text(dir).font(.caption).foregroundStyle(.secondary)
+                        Text(dir).font(.caption2).foregroundStyle(.secondary)
                             .lineLimit(1).truncationMode(.head)
                     }
-                    HStack(spacing: 6) {
-                        Text(name).font(.body).foregroundStyle(theme.fg).lineLimit(1).truncationMode(.middle)
-                            .layoutPriority(1)
+                    HStack(spacing: 5) {
+                        Text(name).font(.subheadline).foregroundStyle(theme.fg)
+                            .lineLimit(1).truncationMode(.middle).layoutPriority(1)
                         if staged {
                             Text("no stage").font(.caption2).foregroundStyle(theme.ok)
                         }
@@ -255,20 +255,20 @@ struct ChangeRow: View {
                         Text("+\(stat.added)").foregroundStyle(theme.ok)
                         Text("−\(stat.removed)").foregroundStyle(theme.danger)
                     }
-                    .font(.callout).monospacedDigit()
+                    .font(.caption).monospacedDigit()
                     .fixedSize()
                     .layoutPriority(1)
                 }
                 Image(systemName: "chevron.right").font(.caption2.bold()).foregroundStyle(theme.fgSubtle)
             }
-            .padding(.horizontal, 16)
-            .frame(height: dir == nil ? 56 : 62)
+            .padding(.horizontal, 12)
+            .frame(height: dir == nil ? 40 : 46)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .overlay(alignment: .top) {
             if !first {
-                Rectangle().fill(theme.separator).frame(height: 0.5).padding(.leading, 56)
+                Rectangle().fill(theme.separator).frame(height: 0.5).padding(.leading, 44)
             }
         }
         .contextMenu {
@@ -332,9 +332,9 @@ struct SectionTitle<Menu: View>: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Text(title).font(.title3.bold()).foregroundStyle(theme.fg)
+            Text(title).font(.headline).foregroundStyle(theme.fg)
             if let detail {
-                Text(detail).font(.subheadline).foregroundStyle(.secondary)
+                Text(detail).font(.footnote).foregroundStyle(.secondary)
                     .contentTransition(.numericText())
             }
             Spacer(minLength: 0)
@@ -343,9 +343,9 @@ struct SectionTitle<Menu: View>: View {
                     menu
                 } label: {
                     Image(systemName: "ellipsis")
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(theme.fgMuted)
-                        .frame(width: 30, height: 30)
+                        .frame(width: 26, height: 26)
                         .contentShape(Rectangle())
                 }
                 .menuIndicator(.hidden)
@@ -362,7 +362,7 @@ struct CardList<Content: View>: View {
 
     var body: some View {
         VStack(spacing: 0) { content }
-            .background(theme.bgElevated, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .background(theme.bgElevated, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 }
 

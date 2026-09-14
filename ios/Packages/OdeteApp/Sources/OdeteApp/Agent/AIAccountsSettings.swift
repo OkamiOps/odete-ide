@@ -271,39 +271,74 @@ struct DeviceCodeSheet: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 16) {
+            VStack(spacing: 18) {
+                Cabecalho(
+                    kind: kind,
+                    titulo: "Conectar \(kind.label)",
+                    texto: kind == .grok
+                        ? "Entre na xAI com a conta SuperGrok ou X Premium e digite o código."
+                        : "Entre no ChatGPT e digite o código. Se pedir, ligue \"Device code\" em Ajustes → Segurança."
+                )
                 if let s = start {
-                    Text(kind == .grok ? "Na xAI, entre com a conta SuperGrok ou X Premium e digite o código:" :
-                        "No ChatGPT, entre e digite o código (ative \"Device code\" em Ajustes → Segurança se pedir):")
-                        .font(OdeteFont.ui(13)).foregroundStyle(theme.fgMuted).multilineTextAlignment(.center)
-                    Text(s.userCode).font(OdeteFont.mono(30, weight: .medium)).foregroundStyle(theme.fg)
-                        .textSelection(.enabled)
-                    HStack {
-                        Button("Copiar") { UIPasteboard.general.string = s.userCode }.buttonStyle(.glass)
-                        Button("Abrir \(s.verificationURL.host() ?? "site")") { openURL(s.verificationURL) }
-                            .buttonStyle(.glassProminent)
-                    }
-                    HStack(spacing: 6) {
-                        ProgressView().controlSize(.small); Text("aguardando autorização…").font(OdeteFont.ui(11))
-                            .foregroundStyle(theme.fgSubtle)
+                    codigo(s.userCode)
+                    Button("Abrir \(s.verificationURL.host() ?? "site")") { openURL(s.verificationURL) }
+                        .buttonStyle(.glassProminent)
+                        .controlSize(.large)
+                    HStack(spacing: 7) {
+                        ProgressView().controlSize(.small)
+                        Text("aguardando você autorizar…").font(.footnote).foregroundStyle(.secondary)
                     }
                 } else if error == nil {
-                    ProgressView("pedindo código…")
+                    Spacer(minLength: 0)
+                    ProgressView("pedindo o código…").font(.footnote)
+                    Spacer(minLength: 0)
                 }
                 if let error {
-                    Text(error).font(OdeteFont.ui(12)).foregroundStyle(theme.danger)
-                        .multilineTextAlignment(.center); Button("Tentar de novo") { begin() }.buttonStyle(.glass)
+                    Text(error).font(.footnote).foregroundStyle(theme.danger)
+                        .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
+                    Button("Tentar de novo") { begin() }.buttonStyle(.glass)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(20)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(theme.bg)
+            .navigationTitle("Nova conta")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancelar") { task?.cancel(); dismiss() }
                 }
             }
-            .padding(24)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .navigationTitle("Conectar \(kind.label)")
-            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancelar") { task?.cancel(); dismiss() } }
-            }
         }
-        .presentationDetents([.medium])
+        .presentationSizing(.form)
         .onAppear { begin() }
         .onDisappear { task?.cancel() }
+    }
+
+    /// O código é a única coisa que a pessoa precisa ler e copiar, então ele é o bloco
+    /// principal da tela, com o botão de copiar do lado e não escondido embaixo.
+    func codigo(_ texto: String) -> some View {
+        HStack(spacing: 12) {
+            Text(texto)
+                .font(.system(size: 30, weight: .semibold, design: .monospaced))
+                .tracking(2)
+                .foregroundStyle(theme.fg)
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity)
+            Button {
+                UIPasteboard.general.string = texto
+            } label: {
+                Image(systemName: "doc.on.doc").font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(theme.accent)
+                    .frame(width: 40, height: 40)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Copiar código")
+        }
+        .padding(.horizontal, 10).padding(.vertical, 14)
+        .background(theme.bgElevated, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     func begin() {
@@ -345,24 +380,33 @@ struct ApiKeySheet: View {
     @State private var key = ""
     @State private var error: String?
 
+    @Environment(\.theme) private var theme
+
     var body: some View {
         NavigationStack {
-            Form {
-                TextField("nome (ex.: OpenRouter, Ollama do escritório)", text: $label)
-                TextField("URL base", text: $base, prompt: Text(kind.defaultBaseURL)).autocorrectionDisabled()
-                    .textInputAutocapitalization(.never).keyboardType(.URL)
-                SecureField("chave de API", text: $key)
-                Section {
-                    Text(kind == .openaiCompat ?
-                        "Qualquer API no formato /chat/completions da OpenAI: OpenAI, OpenRouter, Groq, Together, Ollama, LM Studio…" :
-                        "Qualquer API no formato /v1/messages da Anthropic. Para a Anthropic oficial use a URL padrão.")
-                        .font(.footnote).foregroundStyle(.secondary)
+            ScrollPane {
+                VStack(alignment: .leading, spacing: 16) {
+                    Cabecalho(kind: kind, titulo: kind.label, texto: "Endereço e chave do serviço.")
+                    CardList {
+                        campo("Nome", dica: "opcional, ex.: OpenRouter", texto: $label, first: true)
+                        campo("URL base", dica: kind.defaultBaseURL, texto: $base, url: true)
+                        chave
+                    }
+                    CardNote(kind == .openaiCompat
+                        ? "Vale qualquer API no formato /chat/completions da OpenAI: OpenAI, OpenRouter, Groq, "
+                        + "Together, Ollama, LM Studio."
+                        : "Vale qualquer API no formato /v1/messages da Anthropic. Para a Anthropic oficial, "
+                        + "deixe a URL padrão.")
+                    if let error {
+                        Text(error).font(.footnote).foregroundStyle(theme.danger)
+                            .fixedSize(horizontal: false, vertical: true).padding(.horizontal, 4)
+                    }
                 }
-                if let error {
-                    Text(error).foregroundStyle(.red).font(.footnote)
-                }
+                .padding(16)
             }
-            .navigationTitle(kind.label)
+            .background(theme.bg)
+            .navigationTitle("Nova conta")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancelar") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
@@ -370,7 +414,40 @@ struct ApiKeySheet: View {
                 }
             }
         }
-        .presentationDetents([.medium])
+        .presentationSizing(.form)
+    }
+
+    /// Rótulo em cima, campo embaixo: com o rótulo dentro do campo some quando se digita.
+    func campo(_ titulo: String, dica: String, texto: Binding<String>, url: Bool = false, first: Bool = false)
+        -> some View
+    {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(titulo).font(.caption).foregroundStyle(.secondary)
+            TextField("", text: texto, prompt: Text(dica).foregroundStyle(theme.fgSubtle))
+                .font(.body).foregroundStyle(theme.fg)
+                .textFieldStyle(.plain)
+                .autocorrectionDisabled(url)
+                .textInputAutocapitalization(url ? .never : .sentences)
+                .keyboardType(url ? .URL : .default)
+        }
+        .padding(.horizontal, 12).padding(.vertical, 9)
+        .overlay(alignment: .top) {
+            if !first {
+                Rectangle().fill(theme.separator).frame(height: 0.5).padding(.leading, 12)
+            }
+        }
+    }
+
+    var chave: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("Chave de API").font(.caption).foregroundStyle(.secondary)
+            SecureField("", text: $key, prompt: Text("cole aqui").foregroundStyle(theme.fgSubtle))
+                .font(.body).foregroundStyle(theme.fg).textFieldStyle(.plain)
+        }
+        .padding(.horizontal, 12).padding(.vertical, 9)
+        .overlay(alignment: .top) {
+            Rectangle().fill(theme.separator).frame(height: 0.5).padding(.leading, 12)
+        }
     }
 
     func save() {
@@ -407,5 +484,25 @@ struct Marca: View {
                 apagada ? theme.danger : ProviderCor.de(kind),
                 in: RoundedRectangle(cornerRadius: lado * 0.28, style: .continuous)
             )
+    }
+}
+
+/// Abertura das folhas de conexão: marca grande, nome e uma linha do que fazer.
+struct Cabecalho: View {
+    @Environment(\.theme) private var theme
+    var kind: ProviderKind
+    var titulo: String
+    var texto: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Marca(kind: kind, lado: 44, glifo: 20, apagada: false)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(titulo).font(.title3.weight(.semibold)).foregroundStyle(theme.fg)
+                Text(texto).font(.subheadline).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
     }
 }

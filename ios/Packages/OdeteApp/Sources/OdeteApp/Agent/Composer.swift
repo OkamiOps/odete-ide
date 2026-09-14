@@ -15,6 +15,7 @@ struct Composer: View {
     @State private var photo: PhotosPickerItem?
     @State private var contexto = false
     @State private var janela = false
+    @State private var modelos = false
     @State private var ditado = Dictation()
 
     var vazio: Bool {
@@ -122,7 +123,7 @@ struct Composer: View {
 
     /// Uma linha só: anexar, ditar, modo, e no canto o modelo, o contexto e o enviar.
     func controles(modoComTexto: Bool) -> some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 3) {
             iconeBotao("plus", label: "Contexto") { contexto = true }
             iconeBotao(
                 ditado.running ? "mic.fill" : "mic",
@@ -131,8 +132,9 @@ struct Composer: View {
             ) { ditado.toggle(atual: agent.draft) }
             modoMenu(comTexto: modoComTexto)
             Spacer(minLength: 6)
-            // Sem prioridade o espaçador come a largura do nome e sobra só "…".
-            modeloMenu.layoutPriority(1)
+            // Sem prioridade o espaçador come a largura do nome e sobra só "…". Na versão
+            // apertada o esforço também sai: ele está a um toque, no mesmo popover.
+            modeloMenu(comEsforco: modoComTexto).layoutPriority(1)
             anelContexto
             enviar
         }
@@ -148,7 +150,7 @@ struct Composer: View {
     var anelContexto: some View {
         Button { janela = true } label: {
             ContextGauge(fracao: fracaoContexto, mostrarTexto: false)
-                .frame(width: 26, height: 28)
+                .frame(width: 24, height: 28)
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Janela de contexto")
@@ -190,48 +192,27 @@ struct Composer: View {
         .accessibilityLabel("Modo: \(agent.mode.label)")
     }
 
-    /// Modelo e esforço no canto, como na barra de digitação da Claude. O esforço mora
-    /// dentro do menu: é ajuste do modelo e não precisa de cápsula própria na barra.
-    var modeloMenu: some View {
-        Menu {
-            if let acc = agent.account {
-                Section("Modelo · \(acc.kind.label)") {
-                    if agent.loadingModels {
-                        Text("carregando…")
-                    }
-                    ForEach(agent.models) { m in Button { agent.setModel(m.id) } label: { Label(
-                        m.label,
-                        systemImage: m.id == agent.model ? "checkmark" : ""
-                    ) } }
-                    if agent.models.isEmpty, !agent.loadingModels {
-                        Button("usar \(acc.kind.defaultModel)") { agent.setModel(acc.kind.defaultModel) }
-                    }
-                    Button("Recarregar modelos") { Task { await agent.loadModels() } }
-                }
-            }
-            if !agent.effortOptions.isEmpty {
-                Section("Esforço") {
-                    Picker("Esforço", selection: Binding(get: { agent.effort }, set: { agent.setEffort($0) })) {
-                        ForEach(agent.effortOptions, id: \.self) { e in Text(Effort.labels[e] ?? e).tag(e) }
-                    }
-                }
-            }
-        } label: {
+    /// Modelo e esforço no canto. Popover de cartões e não menu do sistema: aberto de
+    /// baixo para cima o menu inverte a ordem dos itens e fica ilegível.
+    func modeloMenu(comEsforco: Bool) -> some View {
+        Button { modelos = true } label: {
             HStack(spacing: 4) {
                 Text(nomeModelo).font(.caption.weight(.medium)).lineLimit(1).truncationMode(.tail)
-                if !agent.effortOptions.isEmpty, let e = Effort.labels[agent.effort] {
+                if comEsforco, !agent.effortOptions.isEmpty, let e = Effort.labels[agent.effort] {
                     Text(e).font(.caption2).foregroundStyle(theme.fgSubtle).fixedSize()
                 }
                 Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold)).opacity(0.7)
             }
             .foregroundStyle(theme.fgMuted)
-            .padding(.horizontal, 4)
+            .padding(.horizontal, 2)
             .frame(height: 28)
             .contentShape(Rectangle())
         }
-        .menuIndicator(.hidden)
         .buttonStyle(.plain)
-        .accessibilityLabel("Modelo")
+        .accessibilityLabel("Modelo: \(nomeModelo)")
+        .popover(isPresented: $modelos) {
+            ModeloPopover(agent: agent) { modelos = false }
+        }
     }
 
     /// Nome curto: na barra cabe o essencial, o resto está no menu.
@@ -269,7 +250,7 @@ struct Composer: View {
             Button { agent.stop() } label: {
                 Image(systemName: "stop.fill").font(.system(size: 12, weight: .bold))
                     .foregroundStyle(.white)
-                    .frame(width: 30, height: 30)
+                    .frame(width: 28, height: 28)
                     .background(theme.danger, in: Circle())
             }
             .buttonStyle(.plain)
@@ -279,7 +260,7 @@ struct Composer: View {
                 Image(systemName: agent.running ? "arrow.triangle.turn.up.right" : "arrow.up")
                     .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(vazio ? theme.fgSubtle : theme.accentFg)
-                    .frame(width: 30, height: 30)
+                    .frame(width: 28, height: 28)
                     .background(vazio ? theme.fg.opacity(0.08) : theme.accent, in: Circle())
             }
             .buttonStyle(.plain)
@@ -375,5 +356,96 @@ struct MentionMenu: View {
         }
         .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .padding(.horizontal, 12)
+    }
+}
+
+/// Lista de modelos e níveis de esforço, no formato dos cartões do app.
+struct ModeloPopover: View {
+    @Environment(\.theme) private var theme
+    let agent: AgentModel
+    var fechar: () -> Void
+
+    var body: some View {
+        ScrollPane {
+            VStack(alignment: .leading, spacing: 14) {
+                if let acc = agent.account {
+                    VStack(alignment: .leading, spacing: 8) {
+                        SectionTitle("Modelo", detail: acc.kind.label) {
+                            Button("Recarregar", systemImage: "arrow.clockwise") {
+                                Task { await agent.loadModels() }
+                            }
+                        }
+                        CardList {
+                            if agent.models.isEmpty {
+                                Button { agent.setModel(acc.kind.defaultModel); fechar() } label: {
+                                    linha(acc.kind.defaultModel, escolhido: true, first: true, kind: acc.kind)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                            ForEach(Array(agent.models.enumerated()), id: \.element.id) { i, m in
+                                Button { agent.setModel(m.id); fechar() } label: {
+                                    linha(m.label, escolhido: m.id == agent.model, first: i == 0, kind: acc.kind)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        if agent.loadingModels {
+                            CardNote("carregando a lista…")
+                        }
+                    }
+                } else {
+                    CardNote("Conecte uma conta para escolher o modelo.")
+                }
+                if !agent.effortOptions.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        SectionTitle("Esforço")
+                        CardList {
+                            ForEach(Array(agent.effortOptions.enumerated()), id: \.element) { i, e in
+                                Button { agent.setEffort(e); fechar() } label: {
+                                    linha(
+                                        Effort.labels[e] ?? e,
+                                        escolhido: e == agent.effort,
+                                        first: i == 0,
+                                        kind: nil
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(14)
+        }
+        .frame(idealWidth: 260, idealHeight: altura)
+        .background(theme.bg)
+    }
+
+    var altura: CGFloat {
+        let modelos = max(agent.models.count, 1)
+        let esforcos = agent.effortOptions.count
+        return 28 + 32 + CGFloat(modelos) * 44 + (esforcos == 0 ? 0 : 14 + 32 + CGFloat(esforcos) * 44)
+    }
+
+    func linha(_ texto: String, escolhido: Bool, first: Bool, kind: ProviderKind?) -> some View {
+        HStack(spacing: 10) {
+            if let kind {
+                Marca(kind: kind, lado: 22, glifo: 11, apagada: false)
+            }
+            Text(texto).font(.subheadline).foregroundStyle(theme.fg).lineLimit(1).truncationMode(.middle)
+            Spacer(minLength: 8)
+            if escolhido {
+                Image(systemName: "checkmark").font(.caption.bold()).foregroundStyle(theme.accent)
+            }
+        }
+        .padding(.horizontal, 12)
+        .frame(height: 44)
+        .contentShape(Rectangle())
+        .overlay(alignment: .top) {
+            if !first {
+                Rectangle().fill(theme.separator).frame(height: 0.5)
+                    .padding(.leading, kind == nil ? 12 : 44)
+            }
+        }
     }
 }

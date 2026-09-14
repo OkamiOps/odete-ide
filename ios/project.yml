@@ -32,6 +32,8 @@ packages:
     path: Packages/OdeteGit
   OdeteAccounts:
     path: Packages/OdeteAccounts
+  OdeteRuntime:
+    path: Packages/OdeteRuntime
   OdeteApp:
     path: Packages/OdeteApp
 targets:

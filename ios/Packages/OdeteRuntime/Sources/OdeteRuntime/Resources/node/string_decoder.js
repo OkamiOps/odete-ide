@@ -1,0 +1,4 @@
+__nodeDefine("string_decoder", (module) => {
+  class StringDecoder { constructor(enc = "utf8") { this.encoding = enc; this._rest = new Uint8Array(0); } write(b) { if (typeof b === "string") return b; const all = new Uint8Array(this._rest.length + b.length); all.set(this._rest); all.set(b, this._rest.length); if (this.encoding.replace("-", "") !== "utf8") { this._rest = new Uint8Array(0); return Buffer.from(all).toString(this.encoding); } let cut = all.length; for (let i = Math.max(0, all.length - 3); i < all.length; i++) { const c = all[i]; const need = c >= 0xf0 ? 4 : c >= 0xe0 ? 3 : c >= 0xc0 ? 2 : 0; if (need && i + need > all.length) { cut = i; break; } } this._rest = all.subarray(cut); return Buffer.from(all.subarray(0, cut)).toString("utf8"); } end(b) { let s = b ? this.write(b) : ""; if (this._rest.length) { s += Buffer.from(this._rest).toString(this.encoding); this._rest = new Uint8Array(0); } return s; } }
+  module.exports = { StringDecoder };
+});

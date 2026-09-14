@@ -11,9 +11,10 @@ struct Composer: View {
     @Environment(WorkspaceModel.self) private var ws
     @Environment(\.theme) private var theme
     @Bindable var agent: AgentModel
-    @FocusState private var focused: Bool
+    @State private var focused = false
     @State private var photo: PhotosPickerItem?
     @State private var contexto = false
+    @State private var janela = false
     @State private var ditado = Dictation()
 
     var vazio: Bool {
@@ -89,37 +90,23 @@ struct Composer: View {
 
     var caixa: some View {
         VStack(alignment: .leading, spacing: 6) {
-            // Faixa de contexto em cima, como a do repositório no Cursor: aqui é o modelo
-            // e o esforço, que numa coluna de 300 pt não cabem junto dos botões.
-            modeloMenu
-            TextField(
-                agent.running ? "redirecionar o agente…" : "Peça algo à Odete…",
+            faixa
+            GrowingTextView(
                 text: $agent.draft,
-                axis: .vertical
-            )
-            .font(.subheadline)
-            .foregroundStyle(theme.fg)
-            .textFieldStyle(.plain)
-            .lineLimit(1 ... 14)
-            .focused($focused)
-            // Enter envia. Shift, Option ou Control com Enter quebram a linha: devolver
-            // .ignored deixa o próprio campo inserir a quebra, com o cursor no lugar.
-            // Não existe `onSubmit` aqui de propósito, era ele que mandava no shift+enter.
-            .onKeyPress(.return, phases: .down) { press in
-                let mods = press.modifiers
-                if mods.contains(.shift) || mods.contains(.option) || mods.contains(.control) {
-                    return .ignored
+                placeholder: agent.running ? "redirecionar o agente…" : "Peça algo à Odete…",
+                minHeight: 22,
+                maxHeight: 220,
+                focusRequest: agent.focusRequest,
+                focused: $focused,
+                onSend: { send() },
+                onEscape: {
+                    if agent.running {
+                        agent.stop()
+                    }
                 }
-                send()
-                return .handled
-            }
-            .onKeyPress(.escape) {
-                if agent.running {
-                    agent.stop(); return .handled
-                }; return .ignored
-            }
+            )
             .padding(.horizontal, 6)
-            .padding(.top, 6)
+            .padding(.vertical, 2)
             HStack(spacing: 4) {
                 iconeBotao("plus", label: "Contexto") { contexto = true }
                 iconeBotao(
@@ -127,8 +114,6 @@ struct Composer: View {
                     label: ditado.running ? "Parar ditado" : "Ditar",
                     cor: ditado.running ? theme.accent : theme.fgMuted
                 ) { ditado.toggle(atual: agent.draft) }
-                // Prioridade nas cápsulas: sem isto o espaçador come a largura delas e
-                // "Build" vira "…".
                 modoMenu
                 Spacer(minLength: 4)
                 enviar
@@ -139,6 +124,49 @@ struct Composer: View {
         .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous)
             .stroke(theme.accent.opacity(focused ? 0.5 : 0), lineWidth: 1))
         .padding(.horizontal, 12)
+    }
+
+    /// Faixa de cima: modelo, esforço e quanto da janela de contexto já foi.
+    var faixa: some View {
+        HStack(spacing: 8) {
+            modeloMenu
+            if !agent.effortOptions.isEmpty {
+                esforcoMenu
+            }
+            Spacer(minLength: 6)
+            Button { janela = true } label: { ContextGauge(fracao: fracaoContexto) }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Janela de contexto")
+                .popover(isPresented: $janela) {
+                    ContextPopover(agent: agent).presentationCompactAdaptation(.popover)
+                }
+        }
+        .padding(.leading, 6)
+    }
+
+    var fracaoContexto: Double {
+        let usado = max(agent.thread.lastInput, agent.estimatedTokens)
+        return min(1, Double(usado) / Double(max(1, agent.contextWindow)))
+    }
+
+    var esforcoMenu: some View {
+        Menu {
+            Picker("Esforço", selection: Binding(get: { agent.effort }, set: { agent.setEffort($0) })) {
+                ForEach(agent.effortOptions, id: \.self) { e in Text(Effort.labels[e] ?? e).tag(e) }
+            }
+        } label: {
+            HStack(spacing: 3) {
+                Image(systemName: "gauge.with.dots.needle.33percent").font(.system(size: 10, weight: .semibold))
+                Text(Effort.labels[agent.effort] ?? agent.effort).font(.caption.weight(.medium)).fixedSize()
+                Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold)).opacity(0.7)
+            }
+            .foregroundStyle(theme.fgMuted)
+            .frame(height: 24)
+            .contentShape(Rectangle())
+        }
+        .menuIndicator(.hidden)
+        .buttonStyle(.plain)
+        .accessibilityLabel("Esforço")
     }
 
     func iconeBotao(
@@ -175,27 +203,14 @@ struct Composer: View {
                     Button("Recarregar modelos") { Task { await agent.loadModels() } }
                 }
             }
-            if !agent.effortOptions.isEmpty {
-                Section("Esforço") {
-                    ForEach(agent.effortOptions, id: \.self) { e in Button { agent.setEffort(e) } label: { Label(
-                        Effort.labels[e] ?? e,
-                        systemImage: e == agent.effort ? "checkmark" : ""
-                    ) } }
-                }
-            }
         } label: {
             HStack(spacing: 5) {
                 Image(systemName: agent.account?.kind.symbol ?? "sparkles")
                     .font(.system(size: 10, weight: .semibold))
                 Text(nomeModelo).font(.caption.weight(.medium)).lineLimit(1).truncationMode(.middle)
-                if !agent.effortOptions.isEmpty, let e = Effort.labels[agent.effort] {
-                    Text("· " + e).font(.caption).foregroundStyle(theme.fgSubtle).fixedSize()
-                }
                 Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold)).opacity(0.7)
-                Spacer(minLength: 0)
             }
             .foregroundStyle(theme.fgMuted)
-            .padding(.horizontal, 6)
             .frame(height: 24)
             .contentShape(Rectangle())
         }
@@ -274,7 +289,8 @@ struct Composer: View {
     }
 
     func send() {
-        agent.send(); focused = true
+        agent.send()
+        agent.focusRequest += 1
     }
 
     struct MenuState { let kind: MentionMenu.Kind; let query: String; let range: Range<String.Index> }

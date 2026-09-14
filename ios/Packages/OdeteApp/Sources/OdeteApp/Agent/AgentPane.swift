@@ -11,7 +11,6 @@ struct AgentPane: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var history = false
     @State private var showAccounts = false
-    @State private var width: CGFloat = 0
 
     var body: some View {
         let ag = ws.agent!
@@ -22,10 +21,8 @@ struct AgentPane: View {
                 patchBar(ag)
             }
             Composer(agent: ag)
-            footer(ag)
         }
         .background(theme.bgElevated)
-        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
         .overlay(alignment: .leading) {
             if sizeClass != .compact {
                 Rectangle().fill(theme.border).frame(width: 1)
@@ -83,25 +80,6 @@ struct AgentPane: View {
         .padding(.horizontal, 12).frame(height: 48)
         .background(theme.bg)
         .overlay(alignment: .top) { Rectangle().fill(theme.separator).frame(height: 0.5) }
-    }
-
-    /// Consumo do contexto: rótulo discreto e uma barra nativa, sem cápsula desenhada.
-    func footer(_ ag: AgentModel) -> some View {
-        let used = max(ag.thread.lastInput, ag.estimatedTokens)
-        let frac = min(1, Double(used) / Double(max(1, ag.contextWindow)))
-        return HStack(spacing: 8) {
-            if width >= 380 {
-                Text("turno \(fmtTok(ag.lastTurnUse.input))↑ \(fmtTok(ag.lastTurnUse.output))↓")
-            }
-            Spacer(minLength: 0)
-            Text("\(fmtTok(used)) / \(fmtTok(ag.contextWindow))")
-            ProgressView(value: frac)
-                .progressViewStyle(.linear)
-                .frame(width: 54)
-                .tint(frac > 0.85 ? theme.danger : theme.accent)
-        }
-        .font(.caption2).monospacedDigit().foregroundStyle(.secondary).lineLimit(1)
-        .padding(.horizontal, 16).padding(.top, 2).padding(.bottom, 8)
     }
 }
 

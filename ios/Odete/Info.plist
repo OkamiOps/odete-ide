@@ -59,6 +59,8 @@
 			<string>Any</string>
 		</dict>
 	</dict>
+	<key>OdeteGitHubClientId</key>
+	<string></string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>IBMPlexSans-Regular.ttf</string>

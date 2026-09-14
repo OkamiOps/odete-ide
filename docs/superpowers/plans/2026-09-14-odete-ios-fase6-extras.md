@@ -41,5 +41,5 @@
 - [x] Commit `sistema: Arquivos, iCloud, Atalhos e compartilhar`.
 
 ### Marco 5: Loja e fechamento
-- [ ] Ícone, `PrivacyInfo.xcprivacy`, onboarding, client_id do GitHub por Info.plist, `docs/store/`.
-- [ ] `make lint`, `make unit`, `make test`; README; memória; commit `ios: fase 6 concluída`.
+- [x] Ícone, `PrivacyInfo.xcprivacy`, onboarding, client_id do GitHub por Info.plist, `docs/store/`.
+- [x] `make lint`, `make unit`, `make test`; README; memória; commit `ios: fase 6 concluída`.

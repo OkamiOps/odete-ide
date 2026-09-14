@@ -76,6 +76,8 @@ targets:
           - UIInterfaceOrientationLandscapeRight
         ITSAppUsesNonExemptEncryption: false
         UIApplicationSupportsIndirectInputEvents: true
+        # Client ID do OAuth App do GitHub (device flow). Preencha ao registrar o app.
+        OdeteGitHubClientId: ""
         NSUbiquitousContainers:
           iCloud.com.okamiops.odete:
             NSUbiquitousContainerIsDocumentScopePublic: true

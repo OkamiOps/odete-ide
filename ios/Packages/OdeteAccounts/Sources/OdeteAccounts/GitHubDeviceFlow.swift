@@ -2,7 +2,13 @@ import Foundation
 
 /// Device flow do GitHub. `clientId` é público (OAuth App da Odete); sem client secret.
 public struct GitHubDeviceFlow: Sendable {
-    public static let defaultClientId = "" // registrar OAuth App "Odete" em github.com/settings/developers
+    /// Client ID do OAuth App "Odete" (github.com/settings/developers → Device flow), lido de
+    /// `OdeteGitHubClientId` no Info.plist. Vazio = botão "Entrar com GitHub" escondido.
+    public static var defaultClientId: String {
+        (Bundle.main.object(forInfoDictionaryKey: "OdeteGitHubClientId") as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    }
+
     public static let scopes = "repo read:org workflow read:user user:email"
 
     public struct DeviceCode: Codable, Sendable, Equatable {

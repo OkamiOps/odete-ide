@@ -131,10 +131,34 @@ IBM Plex Sans e Mono em `Odete/Fonts/` (licença OFL em `LICENSE-IBM-Plex.txt`).
 - Spec e plano: `../docs/superpowers/specs/2026-09-14-odete-ios-fase5-swift-design.md`,
   `../docs/superpowers/plans/2026-09-14-odete-ios-fase5-swift.md`.
 
+## Polimento e extras (Fase 6)
+
+- Interface no vocabulário do iPadOS 26: Liquid Glass nas barras, botões `.glass`/`.glassProminent`,
+  cards `OdeteCard`, rail com cápsula, abas arredondadas, Ajustes em `Form`, retrato com barra
+  flutuante. Tokens em `OdeteUI` (`Metrics`, `Theme.surface/separator/glassTint`).
+- Editor: marcas do git na margem (verde/azul/vermelho; toque abre o hunk com "Descartar"),
+  painel Esboço (funções, classes, títulos, seletores, chaves) e `@` na paleta, lint leve por
+  linguagem + sintaxe pelo esbuild (Problemas e sublinhado), autocompletar com palavras do
+  arquivo, caminhos do projeto e snippets (Tab/Enter aceita o primeiro, toque escolhe).
+- Git: card de Pull requests no painel (abertos, criar, ver todos), detalhe do PR com
+  Markdown, checks, patch por arquivo, comentários e merge; ✨ gera a mensagem de commit a
+  partir do diff staged e o título/descrição do PR a partir dos commits; Histórico por arquivo
+  e Blame no cabeçalho do editor e no menu da árvore.
+- Sistema: "Abrir pasta" no hub (bookmark de segurança; selo "externo"), projetos no iCloud
+  Drive (Ajustes → Sistema; precisa do entitlement e de Apple ID), compartilhar projeto como
+  `.zip` e arquivo avulso, receber `.zip`/pasta por `onOpenURL`; Atalhos: Abrir projeto, Rodar
+  comando, Perguntar à Odete e Novo projeto (`Odete/Intents`).
+- Loja: ícone com variantes dark/tinted, `PrivacyInfo.xcprivacy` (sem coleta), onboarding em
+  três telas na primeira abertura, `OdeteGitHubClientId` no `Info.plist` (via `project.yml`),
+  textos e capturas em `../docs/store/`.
+- Spec e plano: `../docs/superpowers/specs/2026-09-14-odete-ios-fase6-extras-design.md`,
+  `../docs/superpowers/plans/2026-09-14-odete-ios-fase6-extras.md`.
+
 ## Pendências conhecidas
 
 - Dois agentes em paralelo, MCP e voz ficam para depois.
 - SourceKit/autocompletar Swift e GeometryReader/Canvas no preview não existem; use o Playgrounds.
 - `astro build` e `next build` ainda não rodam; Next e Astro só como SPA de desenvolvimento.
-- Marcas de git na margem do editor ainda não existem (o Diff cobre isso por enquanto).
-- `GitHubDeviceFlow.defaultClientId` vazio até registrar o OAuth App; por ora, token.
+- Autocompletar não navega com as setas (só Tab/Enter no primeiro item ou toque).
+- iCloud Drive só funciona com o app assinado com o container `iCloud.com.okamiops.odete`.
+- `OdeteGitHubClientId` vazio até registrar o OAuth App; por ora, token.

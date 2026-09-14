@@ -65,10 +65,10 @@ struct WorkspaceView: View {
 
     var padLayout: some View {
         GeometryReader { geo in
-            // O centro precisa de ~520 pt; sidebar e agente cedem antes de estourar a tela.
-            let agentW = chrome.snapshot.agentVisible ? min(chrome.snapshot.agentWidth, geo.size.width * 0.34) : 0
-            let budget = geo.size.width - Metrics.railWidth - 24 - agentW - 520
-            let sideW = min(chrome.snapshot.sideWidth, max(Metrics.minSide, budget))
+            // O centro precisa de ~470 pt; o agente cede antes da sidebar.
+            let sideW = chrome.snapshot.sideOpen ? min(chrome.snapshot.sideWidth, geo.size.width * 0.26) : 0
+            let free = geo.size.width - Metrics.railWidth - 24 - sideW - 470
+            let agentW = chrome.snapshot.agentVisible ? min(chrome.snapshot.agentWidth, max(Metrics.minAgent, free)) : 0
             columns(narrow: false, sideW: sideW, agentW: agentW)
         }
         .background(theme.bg)

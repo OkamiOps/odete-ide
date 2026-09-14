@@ -18,6 +18,14 @@ struct HubView: View {
     var body: some View {
         ZStack {
             theme.bg.ignoresSafeArea()
+            RadialGradient(
+                colors: [theme.accent.opacity(theme.dark ? 0.16 : 0.10), .clear],
+                center: .topLeading,
+                startRadius: 0,
+                endRadius: 520
+            )
+            .ignoresSafeArea()
+            .allowsHitTesting(false)
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     header
@@ -185,24 +193,34 @@ struct ProjectCard: View {
 
     var body: some View {
         let stack = stackOf()
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Image(systemName: symbol(stack))
-                    .font(.system(size: 17, weight: .medium))
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(theme.accent)
-                    .frame(width: 38, height: 38)
-                    .background(theme.glassTint, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(stackColor(stack))
+                    .frame(width: 40, height: 40)
+                    .background(
+                        stackColor(stack).opacity(0.16),
+                        in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    )
                 Spacer()
-                Pill(stack.label)
+                Pill(stack.label, on: true, color: stackColor(stack))
             }
+            .padding(.bottom, 2)
             Text(project.name)
-                .font(OdeteFont.ui(15, weight: .semibold))
+                .font(OdeteFont.ui(16, weight: .semibold))
                 .foregroundStyle(theme.fg)
                 .lineLimit(1)
+            if let blurb {
+                Text(blurb).font(OdeteFont.ui(12)).foregroundStyle(theme.fgMuted).lineLimit(2).fixedSize(
+                    horizontal: false,
+                    vertical: true
+                )
+            }
             Text(when)
                 .font(OdeteFont.ui(11))
                 .foregroundStyle(theme.fgSubtle)
+                .padding(.top, 2)
         }
         .padding(Metrics.s4)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -220,7 +238,31 @@ struct ProjectCard: View {
 
     var when: String {
         let d = project.lastOpenedAt ?? project.createdAt
-        return (project.lastOpenedAt == nil ? "criado " : "aberto ") + d.formatted(.relative(presentation: .named))
+        let rel = d.formatted(.relative(presentation: .named).locale(Locale(identifier: "pt_BR")))
+        return (project.lastOpenedAt == nil ? "criado " : "aberto ") + rel
+    }
+
+    /// Primeira linha de texto do README, como descrição.
+    var blurb: String? {
+        guard let s = try? String(contentsOf: root.appending(path: "README.md"), encoding: .utf8) else { return nil }
+        for line in s.split(separator: "\n") {
+            let t = line.trimmingCharacters(in: .whitespaces)
+            if t.isEmpty || t.hasPrefix("#") || t.hasPrefix("|") || t.hasPrefix("`") {
+                continue
+            }
+            return String(t.prefix(90))
+        }
+        return nil
+    }
+
+    func stackColor(_ s: Stack) -> Color {
+        switch s.kind {
+        case .swift: Color(hex: "#f05138")
+        case .api: Color(hex: "#e0234e")
+        case .ssr: Color(hex: "#bc52ee")
+        case .spa: Color(hex: "#ffc820")
+        case .html: Color(hex: "#7c9cff")
+        }
     }
 
     func stackOf() -> Stack {

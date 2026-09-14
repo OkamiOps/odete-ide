@@ -32,18 +32,41 @@ struct CenterPane: View {
                 )
             }
             .background(theme.surface)
-            HStack(spacing: Metrics.s2) {
-                ModePicker(mode: $chrome.snapshot.center)
-                Spacer()
-                if let t = ws.activeTab {
-                    Pill(t.isDirty ? "não salvo" : "salvo", on: t.isDirty)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: Metrics.s2) {
+                    ModePicker(mode: $chrome.snapshot.center)
+                    Spacer(minLength: Metrics.s2)
+                    if let t = ws.activeTab {
+                        Pill(t.isDirty ? "não salvo" : "salvo", on: t.isDirty)
+                    }
+                    actions
                 }
-                GlassBar {
-                    HeaderButton("command", label: "Paleta") { ws.paletteOpen = true }
-                    HeaderButton("square.and.arrow.down", label: "Salvar") { ws.save() }
-                    HeaderButton("sidebar.left", label: "Sidebar") { chrome.toggleSide() }
-                    HeaderButton("terminal", label: "Terminal") { chrome.toggleTerm() }
-                    HeaderButton("sidebar.right", label: "Agente") { chrome.toggleAgent() }
+                HStack(spacing: Metrics.s2) {
+                    ModePicker(mode: $chrome.snapshot.center)
+                    Spacer(minLength: Metrics.s2)
+                    actions
+                }
+                HStack(spacing: Metrics.s2) {
+                    Menu {
+                        ForEach(CenterMode.allCases, id: \.self) { m in
+                            Button { chrome.snapshot.center = m } label: { Label(
+                                m.label,
+                                systemImage: m == chrome.snapshot.center ? "checkmark" : ""
+                            ) }
+                        }
+                    } label: {
+                        HStack(spacing: 6) { Text(chrome.snapshot.center.label).font(OdeteFont.ui(
+                            12,
+                            weight: .semibold
+                        )); Image(systemName: "chevron.down").font(.system(size: 9, weight: .bold)) }
+                            .foregroundStyle(theme.fg).padding(.horizontal, 12).frame(height: 30).glassEffect(
+                                .regular,
+                                in: Capsule()
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    Spacer(minLength: Metrics.s2)
+                    actions
                 }
             }
             .padding(.horizontal, Metrics.s3)
@@ -51,6 +74,16 @@ struct CenterPane: View {
             content
         }
         .background(theme.bg)
+    }
+
+    var actions: some View {
+        GlassBar {
+            HeaderButton("command", label: "Paleta") { ws.paletteOpen = true }
+            HeaderButton("square.and.arrow.down", label: "Salvar") { ws.save() }
+            HeaderButton("sidebar.left", label: "Sidebar") { chrome.toggleSide() }
+            HeaderButton("terminal", label: "Terminal") { chrome.toggleTerm() }
+            HeaderButton("sidebar.right", label: "Agente") { chrome.toggleAgent() }
+        }
     }
 
     @ViewBuilder var content: some View {

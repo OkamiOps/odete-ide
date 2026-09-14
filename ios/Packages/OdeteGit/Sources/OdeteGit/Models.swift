@@ -62,6 +62,11 @@ public struct Branch: Sendable, Hashable, Identifiable {
 public struct Remote: Sendable, Hashable, Identifiable {
     public var name: String
     public var url: String
+    public init(name: String, url: String) {
+        self.name = name
+        self.url = url
+    }
+
     public var id: String {
         name
     }

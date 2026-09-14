@@ -38,6 +38,8 @@ packages:
     path: Packages/OdeteNpm
   OdeteBundler:
     path: Packages/OdeteBundler
+  OdeteShell:
+    path: Packages/OdeteShell
   OdeteApp:
     path: Packages/OdeteApp
 targets:

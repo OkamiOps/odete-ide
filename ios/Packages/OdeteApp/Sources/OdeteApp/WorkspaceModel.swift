@@ -25,6 +25,7 @@ public final class WorkspaceModel {
     public var paletteOpen = false
     public var paletteQuery = ""
     public let git: GitModel
+    public let run: RunModel
     /// Arquivos em conflito que o usuário quer editar como texto puro.
     public var forceTextEdit: Set<String> = []
 
@@ -38,6 +39,7 @@ public final class WorkspaceModel {
         self.chrome = chrome
         ops = FileOps(root: root)
         git = GitModel(root: root, accounts: accounts)
+        run = RunModel(root: root, git: git)
         tabs = chrome.tabs(for: project.id).filter { ops.exists($0.path) }.map { EditorTab(path: $0.path) }
         active = chrome.activeTab(for: project.id).flatMap { p in tabs.contains { $0.path == p } ? p : nil } ?? tabs
             .first?.path
@@ -55,6 +57,7 @@ public final class WorkspaceModel {
 
     func stop() {
         watcher?.stop()
+        run.stopAll()
         for t in saveTasks.values {
             t.cancel()
         }

@@ -59,7 +59,7 @@ struct PhoneShell: View {
                 AgentColumn()
             }
             Tab(PhoneTab.term.label, systemImage: PhoneTab.term.symbol, value: PhoneTab.term) {
-                TerminalDrawer()
+                TerminalPane()
             }
             Tab(PhoneTab.preview.label, systemImage: PhoneTab.preview.symbol, value: PhoneTab.preview) {
                 ShellPanel(

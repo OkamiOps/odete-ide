@@ -67,7 +67,7 @@ struct WorkspaceView: View {
                         range: Metrics.minTerm ... Metrics.maxTerm,
                         direction: -1
                     )
-                    TerminalDrawer()
+                    TerminalPane()
                         .frame(height: chrome.snapshot.termHeight)
                 }
             }
@@ -206,26 +206,5 @@ struct AgentColumn: View {
         }
         .background(theme.bgElevated)
         .overlay(alignment: .leading) { Rectangle().fill(theme.border).frame(width: 1) }
-    }
-}
-
-struct TerminalDrawer: View {
-    @Environment(ChromeState.self) private var chrome
-    @Environment(WorkspaceModel.self) private var ws
-    @Environment(\.theme) private var theme
-    var body: some View {
-        VStack(spacing: 0) {
-            PaneHeader("Terminal", detail: "~/\(ws.project.name)") {
-                HeaderButton("xmark", label: "Fechar terminal") { chrome.toggleTerm() }
-            }
-            VStack(alignment: .leading, spacing: 4) {
-                Text("odete ~/\(ws.project.name) %").font(OdeteFont.mono(12)).foregroundStyle(theme.accent)
-                Text("shell nativo, npm por ESM e Node em JavaScriptCore chegam na Fase 3").font(OdeteFont.mono(12))
-                    .foregroundStyle(theme.fgMuted)
-            }
-            .padding(12)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        }
-        .background(theme.bgElevated)
     }
 }

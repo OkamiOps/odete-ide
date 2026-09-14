@@ -31,9 +31,21 @@ struct AgentPane: View {
         .sheet(isPresented: $history) { HistorySheet(agent: ag) }
         .sheet(isPresented: $showAccounts) {
             NavigationStack {
-                ScrollPane { AIAccountsSettings().padding() }.navigationTitle("Contas de IA")
-                    .toolbar { ToolbarItem(placement: .confirmationAction) { Button("OK") { showAccounts = false } } }
+                // Fundo mais fundo que os cartões: com `surface` eles somem, porque é a
+                // mesma cor de `bgElevated`.
+                ScrollPane { AIAccountsSettings().padding(16) }
+                    .background(theme.bg)
+                    .navigationTitle("Contas de IA")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Concluído") { showAccounts = false }
+                        }
+                    }
             }
+            // Tamanho de formulário. `.fitted` não mede uma área de rolagem e a folha
+            // colapsava; a altura cheia deixava meia tela vazia.
+            .presentationSizing(.form)
         }
         .task { await ag.loadModels() }
     }

@@ -119,21 +119,21 @@ struct WorkspaceView: View {
     func columns(narrow: Bool, medidas m: Medidas) -> some View {
         @Bindable var chrome = chrome
         return HStack(spacing: 0) {
+            let problemas = ws.problemCounts
             Rail(
                 side: chrome.snapshot.side,
                 sideOpen: chrome.snapshot.sideOpen,
                 agentVisible: chrome.snapshot.agentVisible,
                 agentBusy: ws.agent.running,
-                // Ajustes é uma folha, não um painel de coluna: numa coluna estreita a lista
-                // inteira vira uma linguiça sem hierarquia.
-                onSelect: { p in
-                    if p == .settings {
-                        chrome.settingsOpen = true
-                    } else {
-                        chrome.select(side: p)
-                    }
-                },
-                onToggleAgent: { chrome.toggleAgent() }
+                problemas: problemas.errors + problemas.warnings,
+                problemasGraves: problemas.errors > 0,
+                alteracoes: ws.git.status.count,
+                onSelect: { chrome.select(side: $0) },
+                onToggleAgent: { chrome.toggleAgent() },
+                // Ajustes é uma folha, não um painel de coluna: numa coluna estreita a
+                // lista inteira vira uma linguiça sem hierarquia.
+                onSettings: { chrome.settingsOpen = true },
+                onProjects: { app.closeWorkspace() }
             )
             if chrome.snapshot.sideOpen {
                 SidebarView()
@@ -182,11 +182,9 @@ struct SidebarView: View {
     var body: some View {
         switch chrome.snapshot.side {
         case .files: FileTreeView()
-        case .outline: OutlinePane()
         case .search: SearchPane()
         case .git: GitPane()
         case .problems: ProblemsPane()
-        case .settings: SettingsShell()
         }
     }
 }

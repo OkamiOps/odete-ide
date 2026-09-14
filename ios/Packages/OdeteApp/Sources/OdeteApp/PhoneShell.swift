@@ -75,7 +75,7 @@ struct PhoneShell: View {
                     Button { app.closeWorkspace() } label: { Label("Projetos", systemImage: "square.grid.2x2") }
                         .buttonStyle(.glass)
                     Picker("Painel", selection: $chrome.snapshot.side) {
-                        ForEach([SidePanel.files, .outline, .search, .git, .problems], id: \.self) { p in
+                        ForEach(SidePanel.allCases, id: \.self) { p in
                             Image(systemName: p.symbol).tag(p)
                         }
                     }
@@ -86,11 +86,7 @@ struct PhoneShell: View {
                         .lineLimit(1)
                 }
                 .padding(10)
-                if chrome.snapshot.side == .settings {
-                    FileTreeView()
-                } else {
-                    SidebarView()
-                }
+                SidebarView()
             }
             .background(theme.bgElevated)
             .onChange(of: ws.active) { _, new in

@@ -16,7 +16,7 @@ struct StatusBar: View {
 
     var body: some View {
         @Bindable var chrome = chrome
-        let errors = problemCounts()
+        let errors = ws.problemCounts
         HStack(spacing: 2) {
             if ws.git.isRepo {
                 item(symbol: "arrow.triangle.branch", text: branchText, tint: theme.accent) {
@@ -77,8 +77,8 @@ struct StatusBar: View {
                     item(text: eol(in: path)) {}
                 }
                 Button {
-                    chrome.snapshot.side = .outline
-                    chrome.snapshot.sideOpen = true
+                    ws.paletteOpen = true
+                    ws.paletteQuery = "@"
                 } label: {
                     HStack(spacing: 5) {
                         FileGlyph(path: path, size: 10)
@@ -108,33 +108,6 @@ struct StatusBar: View {
             s += "  \(ab.ahead)↑ \(ab.behind)↓"
         }
         return s
-    }
-
-    func problemCounts() -> (errors: Int, warnings: Int) {
-        var e = 0, w = 0
-        for d in ws.run.diagnostics {
-            if d.kind == .error {
-                e += 1
-            } else {
-                w += 1
-            }
-        }
-        for d in ws.swiftDiagnostics {
-            if d.kind == .error {
-                e += 1
-            } else {
-                w += 1
-            }
-        }
-        for item in ws.allLint {
-            if item.issue.severity == .error {
-                e += 1
-            } else {
-                w += 1
-            }
-        }
-        e += ws.preview.console.filter { $0.level == .error }.count
-        return (e, w)
     }
 
     func cursor(in path: String) -> (Int, Int) {

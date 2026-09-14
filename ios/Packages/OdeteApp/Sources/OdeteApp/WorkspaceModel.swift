@@ -137,6 +137,23 @@ public final class WorkspaceModel {
         }
     }
 
+    /// Problemas de todas as fontes: build, Swift, lint do editor e erros do preview.
+    /// A barra de status e a barra lateral leem daqui, para contarem a mesma coisa.
+    public var problemCounts: (errors: Int, warnings: Int) {
+        var e = 0, w = 0
+        for d in run.diagnostics {
+            d.kind == .error ? (e += 1) : (w += 1)
+        }
+        for d in swiftDiagnostics {
+            d.kind == .error ? (e += 1) : (w += 1)
+        }
+        for item in allLint {
+            item.issue.severity == .error ? (e += 1) : (w += 1)
+        }
+        e += preview.console.filter { $0.level == .error }.count
+        return (e, w)
+    }
+
     public func toggle(_ path: String) {
         if expanded.contains(path) {
             expanded.remove(path)

@@ -2,26 +2,34 @@ import Foundation
 import Observation
 
 public enum SidePanel: String, Codable, CaseIterable, Sendable {
-    case files, outline, search, git, problems, settings
+    /// Sem "esboço": a lista de símbolos do arquivo já mora na paleta de comandos, em @,
+    /// e como painel ela passava a maior parte do tempo vazia. Ajustes saiu daqui porque
+    /// abre numa folha, nunca foi um painel de coluna.
+    case files, search, git, problems
+
+    /// Valor desconhecido vira arquivos, em vez de derrubar a decodificação: o estado
+    /// salvo de quem já usou o app guarda painéis que não existem mais, e um erro aqui
+    /// levava junto o tema, as abas e a lista de projetos.
+    public init(from decoder: any Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = SidePanel(rawValue: raw) ?? .files
+    }
+
     public var label: String {
         switch self {
         case .files: "Arquivos"
-        case .outline: "Esboço"
         case .search: "Busca"
         case .git: "Git"
         case .problems: "Problemas"
-        case .settings: "Ajustes"
         }
     }
 
     public var symbol: String {
         switch self {
         case .files: "doc.on.doc"
-        case .outline: "list.bullet.indent"
         case .search: "magnifyingglass"
         case .git: "arrow.triangle.branch"
         case .problems: "exclamationmark.circle"
-        case .settings: "gearshape"
         }
     }
 }

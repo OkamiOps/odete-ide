@@ -31,7 +31,7 @@ struct AgentPane: View {
         .sheet(isPresented: $history) { HistorySheet(agent: ag) }
         .sheet(isPresented: $showAccounts) {
             NavigationStack {
-                ScrollView { AIAccountsSettings().padding() }.navigationTitle("Contas de IA")
+                ScrollPane { AIAccountsSettings().padding() }.navigationTitle("Contas de IA")
                     .toolbar { ToolbarItem(placement: .confirmationAction) { Button("OK") { showAccounts = false } } }
             }
         }
@@ -242,5 +242,6 @@ struct HistorySheet: View {
             }
         }
         .presentationDetents([.medium, .large])
+        .pointerScrolling()
     }
 }

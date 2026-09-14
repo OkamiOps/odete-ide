@@ -67,7 +67,7 @@ struct SearchPane: View {
                 Text("nada encontrado").font(OdeteFont.ui(12)).foregroundStyle(theme.fgSubtle).padding(16)
                 Spacer()
             } else {
-                ScrollView {
+                ScrollPane {
                     LazyVStack(alignment: .leading, spacing: 0) {
                         ForEach(grouped, id: \.path) { g in
                             HStack(spacing: 6) {

@@ -43,7 +43,7 @@ struct ContextPopover: View {
     }
 
     var body: some View {
-        ScrollView {
+        ScrollPane {
             VStack(alignment: .leading, spacing: 18) {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 8) {

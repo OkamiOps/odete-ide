@@ -35,7 +35,7 @@ struct OutlinePane: View {
                 .padding(.horizontal, 10).frame(height: 32)
                 .glassEffect(.regular, in: Capsule())
                 .padding(.horizontal, Metrics.s2).padding(.vertical, Metrics.s1)
-                ScrollView {
+                ScrollPane {
                     LazyVStack(spacing: 1) {
                         ForEach(shown) { it in
                             Button { ws.open(path!, line: it.line) } label: {

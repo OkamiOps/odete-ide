@@ -174,7 +174,7 @@ struct PreviewConsole: View {
             .padding(.horizontal, 10).frame(height: 32)
             .overlay(alignment: .top) { Rectangle().fill(theme.border).frame(height: 1) }
             ScrollViewReader { proxy in
-                ScrollView {
+                ScrollPane {
                     LazyVStack(alignment: .leading, spacing: 2) {
                         if pv.console.isEmpty {
                             Text("console.log do seu app aparece aqui.").font(OdeteFont.mono(11))

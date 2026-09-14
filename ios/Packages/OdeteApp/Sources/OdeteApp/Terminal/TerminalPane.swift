@@ -14,7 +14,7 @@ struct TerminalPane: View {
         let run = ws.run
         VStack(spacing: 0) {
             HStack(spacing: 0) {
-                ScrollView(.horizontal, showsIndicators: false) {
+                ScrollPane(.horizontal, showsIndicators: false) {
                     HStack(spacing: 2) {
                         ForEach(run.sessions) { s in
                             TermTab(
@@ -106,7 +106,7 @@ struct TerminalView: View {
     var body: some View {
         VStack(spacing: 0) {
             ScrollViewReader { proxy in
-                ScrollView {
+                ScrollPane {
                     LazyVStack(alignment: .leading, spacing: 1) {
                         ForEach(session.lines) { line in
                             Text(line.text)

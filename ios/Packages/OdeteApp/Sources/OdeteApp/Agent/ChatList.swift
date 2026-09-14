@@ -9,7 +9,7 @@ struct ChatList: View {
 
     var body: some View {
         ScrollViewReader { proxy in
-            ScrollView {
+            ScrollPane {
                 LazyVStack(alignment: .leading, spacing: 10) {
                     if agent.items.isEmpty {
                         starters
@@ -559,7 +559,7 @@ struct MarkdownText: View {
             }
             .padding(.leading, 12).padding(.trailing, 6).frame(height: 30)
             Rectangle().fill(theme.separator).frame(height: 0.5)
-            ScrollView(.horizontal, showsIndicators: false) {
+            ScrollPane(.horizontal, showsIndicators: false) {
                 Text(c).font(OdeteFont.mono(11.5)).foregroundStyle(theme.fg).textSelection(.enabled)
                     .padding(.horizontal, 12).padding(.vertical, 10)
             }

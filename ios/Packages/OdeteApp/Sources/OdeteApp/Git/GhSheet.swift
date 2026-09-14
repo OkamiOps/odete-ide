@@ -235,7 +235,7 @@ struct PullDetail: View {
                             }
                             .buttonStyle(.plain)
                             if openFiles.contains(f.id), let patch = f.patch {
-                                ScrollView(.horizontal) {
+                                ScrollPane(.horizontal) {
                                     VStack(alignment: .leading, spacing: 0) {
                                         ForEach(
                                             Array(patch.split(separator: "\n", omittingEmptySubsequences: false)

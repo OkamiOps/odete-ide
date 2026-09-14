@@ -79,7 +79,7 @@ struct ConflictView: View {
             .padding(.horizontal, 12)
             .frame(height: 46)
             .overlay(alignment: .bottom) { Rectangle().fill(theme.border).frame(height: 1) }
-            ScrollView {
+            ScrollPane {
                 if let p = parsed {
                     LazyVStack(alignment: .leading, spacing: 10) {
                         ForEach(p.blocks) { b in

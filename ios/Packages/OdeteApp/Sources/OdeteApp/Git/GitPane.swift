@@ -27,7 +27,7 @@ struct GitPane: View {
             if !git.isRepo {
                 initCard
             } else {
-                ScrollView {
+                ScrollPane {
                     VStack(spacing: 14) {
                         HeroCard()
                         if !git.conflicts.isEmpty {

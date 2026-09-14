@@ -28,7 +28,7 @@ struct HubView: View {
             )
             .ignoresSafeArea()
             .allowsHitTesting(false)
-            ScrollView {
+            ScrollPane {
                 VStack(alignment: .leading, spacing: 20) {
                     header
                     if app.projects.isEmpty {

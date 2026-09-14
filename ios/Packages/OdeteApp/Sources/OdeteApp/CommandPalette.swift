@@ -193,7 +193,7 @@ struct CommandPalette: View {
             .frame(height: 50)
             .overlay(alignment: .bottom) { Rectangle().fill(theme.border).frame(height: 1) }
             ScrollViewReader { proxy in
-                ScrollView {
+                ScrollPane {
                     LazyVStack(spacing: 0) {
                         ForEach(Array(items.enumerated()), id: \.element.id) { i, it in
                             Button { activate(it) } label: {

@@ -19,7 +19,7 @@ struct FileTreeView: View {
                 HeaderButton("folder.badge.plus", label: "Nova pasta") { draft = ""; newFolderAt = ws.selected ?? "" }
                 HeaderButton("arrow.clockwise", label: "Recarregar") { ws.reload() }
             }
-            ScrollView {
+            ScrollPane {
                 LazyVStack(spacing: 0) {
                     ForEach(ws.tree.children ?? []) { node in
                         FileRow(

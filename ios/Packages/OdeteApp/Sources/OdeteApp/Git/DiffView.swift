@@ -56,7 +56,7 @@ struct DiffPane: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                ScrollView {
+                ScrollPane {
                     LazyVStack(spacing: 14) {
                         ForEach(git.diff.files) { f in FileDiffView(file: f, source: git.diffSource) }
                     }

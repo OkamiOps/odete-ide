@@ -41,7 +41,7 @@ struct HunkPopover: View {
             }
             .padding(.horizontal, 12).frame(height: 40)
             if let (_, h) = found {
-                ScrollView {
+                ScrollPane {
                     VStack(alignment: .leading, spacing: 0) {
                         ForEach(h.lines) { l in
                             HStack(spacing: 8) {

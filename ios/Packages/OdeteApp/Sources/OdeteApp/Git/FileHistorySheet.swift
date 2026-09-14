@@ -46,7 +46,7 @@ struct FileHistorySheet: View {
                 Divider()
                 Group {
                     if let diff, let selected {
-                        ScrollView {
+                        ScrollPane {
                             FileDiffView(file: diff, source: .commit(selected.id)).padding(Metrics.s2)
                         }
                     } else {
@@ -112,7 +112,7 @@ struct BlameSheet: View {
                 } else if let error {
                     EmptyState("person.text.rectangle", title: "Sem blame", text: error)
                 } else {
-                    ScrollView {
+                    ScrollPane {
                         VStack(alignment: .leading, spacing: 0) {
                             ForEach(hunks) { h in
                                 ForEach(0 ..< h.lines, id: \.self) { i in

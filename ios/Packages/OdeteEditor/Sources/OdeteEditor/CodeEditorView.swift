@@ -63,6 +63,9 @@ public struct CodeEditorView: UIViewRepresentable {
         tv.spellCheckingType = .no
         tv.keyboardType = .asciiCapable
         tv.alwaysBounceVertical = true
+        // Trackpad e Magic Mouse mandam scroll contínuo; sem isto o editor só rola
+        // com o dedo ou clicando e arrastando.
+        tv.panGestureRecognizer.allowedScrollTypesMask = .all
         tv.gutterLeadingPadding = 8
         tv.gutterTrailingPadding = 12
         tv.textContainerInset = UIEdgeInsets(top: 8, left: 0, bottom: 200, right: 8)

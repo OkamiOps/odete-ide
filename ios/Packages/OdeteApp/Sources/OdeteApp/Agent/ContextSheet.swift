@@ -15,7 +15,7 @@ struct ContextSheet: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
+            ScrollPane {
                 VStack(alignment: .leading, spacing: 16) {
                     HStack(spacing: 10) {
                         PhotosPicker(selection: $photo, matching: .images) {

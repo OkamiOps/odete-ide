@@ -65,7 +65,7 @@ struct Composer: View {
     }
 
     var anexos: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
+        ScrollPane(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
                 ForEach(agent.attachments.indices, id: \.self) { i in
                     ZStack(alignment: .topTrailing) {

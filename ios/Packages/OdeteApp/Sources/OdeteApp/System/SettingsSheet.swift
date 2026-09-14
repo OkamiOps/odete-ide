@@ -103,6 +103,7 @@ struct SettingsSheet: View {
         }
         .presentationSizing(.page)
         .presentationDetents([.large])
+        .pointerScrolling()
     }
 }
 
@@ -115,7 +116,7 @@ struct SettingsContent: View {
     var section: SettingsSection
 
     var body: some View {
-        ScrollView {
+        ScrollPane {
             VStack(alignment: .leading, spacing: 16) {
                 switch section {
                 case .appearance: appearance

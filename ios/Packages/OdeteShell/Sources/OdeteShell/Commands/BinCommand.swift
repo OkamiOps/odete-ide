@@ -8,6 +8,13 @@ struct BinCommand: ShellCommand {
     let name = "npx"
     let help = "roda um binário de node_modules/.bin (vite, tsc, …)"
 
+    /// Ferramentas que a Odete substitui por conta própria. Valem mesmo sem
+    /// `node_modules`, e precisam responder pelo nome puro: `npm run dev` com
+    /// `"dev": "vite"` executa `vite`, não `npx vite`.
+    static let substituidos: Set<String> = [
+        "vite", "astro", "next", "nest", "serve", "http-server", "tsx", "ts-node",
+    ]
+
     static func binPath(_ name: String, root: URL) -> URL? {
         let link = root.appending(path: "node_modules/.bin/\(name)")
         guard FileManager.default.fileExists(atPath: link.path) else { return nil }

@@ -189,10 +189,16 @@ public final class Shell: @unchecked Sendable {
         {
             return await NodeCommand().run(argv, ctx)
         }
-        if BinCommand.binPath(name, root: root) != nil {
+        if BinCommand.binPath(name, root: root) != nil || BinCommand.substituidos.contains(name) {
             return await BinCommand().run(argv, ctx)
         }
-        io.err("odete: comando não encontrado: \(name). Digite help.")
+        let temPacote = FileManager.default.fileExists(atPath: root.appending(path: "package.json").path)
+        let temModulos = FileManager.default.fileExists(atPath: root.appending(path: "node_modules").path)
+        if temPacote, !temModulos {
+            io.err("odete: comando não encontrado: \(name). Rode npm install primeiro.")
+        } else {
+            io.err("odete: comando não encontrado: \(name). Digite help.")
+        }
         return 127
     }
 

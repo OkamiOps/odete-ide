@@ -18,6 +18,21 @@ struct PreviewTests {
     }
 
     @Test func viewports() {
-        #expect(Viewport.phone.width == 390 && Viewport.fill.width == nil && Viewport.allCases.count == 3)
+        #expect(Viewport.phone.width == 390)
+        #expect(Viewport.fill.width == nil)
+        #expect(Viewport.allCases.count == 5)
+    }
+
+    /// Só os formatos 16:9 têm altura própria, e a proporção tem que bater.
+    @Test func dezesseisPorNove() throws {
+        for v in [Viewport.desktop, .wide] {
+            let l = try #require(v.width)
+            let a = try #require(v.height)
+            #expect(abs(l / a - 16.0 / 9.0) < 0.001)
+            #expect(v.medida == "\(Int(l)) × \(Int(a))")
+        }
+        #expect(Viewport.fill.height == nil)
+        #expect(Viewport.phone.height == nil)
+        #expect(Viewport.tablet.height == nil)
     }
 }

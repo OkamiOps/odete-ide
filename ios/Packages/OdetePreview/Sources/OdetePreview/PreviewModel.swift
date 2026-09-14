@@ -12,23 +12,58 @@ public struct ConsoleLine: Identifiable, Sendable, Hashable {
     public var line: Int?
 }
 
-/// Larguras de viewport que o preview simula.
+/// Viewports que o preview simula.
 public enum Viewport: String, CaseIterable, Sendable, Identifiable {
-    case fill, phone, tablet
+    case fill, phone, tablet, desktop, wide
     public var id: String {
         rawValue
     }
 
     public var width: CGFloat? {
-        switch self { case .fill: nil; case .phone: 390; case .tablet: 820 }
+        switch self {
+        case .fill: nil
+        case .phone: 390
+        case .tablet: 820
+        case .desktop: 1280
+        case .wide: 1920
+        }
+    }
+
+    /// Altura fixa, para os formatos que precisam de proporção e não só de largura.
+    /// Nos de aparelho a altura segue o painel, que é o que se quer ao testar rolagem.
+    public var height: CGFloat? {
+        switch self {
+        case .desktop: 720
+        case .wide: 1080
+        default: nil
+        }
     }
 
     public var label: String {
-        switch self { case .fill: "Livre"; case .phone: "iPhone"; case .tablet: "iPad" }
+        switch self {
+        case .fill: "Livre"
+        case .phone: "iPhone"
+        case .tablet: "iPad"
+        case .desktop: "Desktop 16:9"
+        case .wide: "Full HD 16:9"
+        }
     }
 
     public var symbol: String {
-        switch self { case .fill: "rectangle"; case .phone: "iphone"; case .tablet: "ipad" }
+        switch self {
+        case .fill: "rectangle"
+        case .phone: "iphone"
+        case .tablet: "ipad"
+        case .desktop: "display"
+        case .wide: "macwindow"
+        }
+    }
+
+    /// Texto curto para a barra: "1280 × 720".
+    public var medida: String? {
+        guard let w = width else { return nil }
+        guard let h = height else { return "\(Int(w)) pt" }
+        return "\(Int(w)) × \(Int(h))"
     }
 }
 

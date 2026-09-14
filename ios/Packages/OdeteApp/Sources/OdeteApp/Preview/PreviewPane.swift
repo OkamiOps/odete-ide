@@ -35,14 +35,19 @@ struct PreviewPane: View {
                     .padding(.horizontal, 12).frame(height: 32)
                     .glassEffect(.regular, in: Capsule())
                 Menu {
-                    ForEach(Viewport.allCases) { v in
-                        Button { pv.viewport = v } label: { Label(v.label, systemImage: v.symbol) }
+                    Picker("Viewport", selection: Binding(get: { pv.viewport }, set: { pv.viewport = $0 })) {
+                        ForEach(Viewport.allCases) { v in
+                            Label(v.medida.map { "\(v.label) · \($0)" } ?? v.label, systemImage: v.symbol).tag(v)
+                        }
                     }
                 } label: {
                     Image(systemName: pv.viewport.symbol).font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(theme.fgMuted).frame(width: 32, height: 32)
+                        .foregroundStyle(pv.viewport == .fill ? theme.fgMuted : theme.accent)
+                        .frame(width: 32, height: 32)
                 }
+                .menuIndicator(.hidden)
                 .buttonStyle(.plain)
+                .accessibilityLabel("Viewport: \(pv.viewport.label)")
                 HeaderButton("terminal", label: pv.errorCount > 0 ? "Console (\(pv.errorCount) erros)" : "Console") {
                     pv.consoleOpen.toggle()
                 }
@@ -104,27 +109,46 @@ struct PreviewPane: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             GeometryReader { geo in
-                let w = pv.viewport.width.map { min($0, geo.size.width) } ?? geo.size.width
-                HStack {
-                    if w < geo.size.width {
-                        Spacer(minLength: 0)
-                    }
+                // Formatos com altura própria (16:9) são desenhados no tamanho real e
+                // reduzidos para caber no painel, senão nunca daria para ver um desktop
+                // inteiro numa coluna de iPad.
+                if let largura = pv.viewport.width, let altura = pv.viewport.height {
+                    let escala = min(1, min(geo.size.width / largura, geo.size.height / altura))
                     PreviewView(model: pv)
-                        .frame(width: w)
-                        .clipShape(RoundedRectangle(cornerRadius: w < geo.size.width ? 12 : 0, style: .continuous))
+                        .frame(width: largura, height: altura)
+                        .clipShape(RoundedRectangle(cornerRadius: 12 / escala, style: .continuous))
                         .overlay {
-                            if w < geo.size
-                                .width
-                            {
-                                RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(theme.borderStrong)
-                            }
+                            RoundedRectangle(cornerRadius: 12 / escala, style: .continuous)
+                                .stroke(theme.borderStrong, lineWidth: 1 / escala)
                         }
-                    if w < geo.size.width {
-                        Spacer(minLength: 0)
+                        .scaleEffect(escala)
+                        .frame(width: geo.size.width, height: geo.size.height)
+                        .background(theme.bgSubtle)
+                } else {
+                    let w = pv.viewport.width.map { min($0, geo.size.width) } ?? geo.size.width
+                    HStack {
+                        if w < geo.size.width {
+                            Spacer(minLength: 0)
+                        }
+                        PreviewView(model: pv)
+                            .frame(width: w)
+                            .clipShape(RoundedRectangle(
+                                cornerRadius: w < geo.size.width ? 12 : 0,
+                                style: .continuous
+                            ))
+                            .overlay {
+                                if w < geo.size.width {
+                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        .stroke(theme.borderStrong)
+                                }
+                            }
+                        if w < geo.size.width {
+                            Spacer(minLength: 0)
+                        }
                     }
+                    .frame(width: geo.size.width, height: geo.size.height)
+                    .background(w < geo.size.width ? theme.bgSubtle : theme.bg)
                 }
-                .frame(width: geo.size.width, height: geo.size.height)
-                .background(w < geo.size.width ? theme.bgSubtle : theme.bg)
             }
         }
     }

@@ -24,7 +24,6 @@ struct CenterPane: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Projetos")
-                .overlay(alignment: .trailing) { Rectangle().fill(theme.border).frame(width: 1) }
                 EditorTabs(
                     tabs: ws.tabs,
                     active: ws.active,
@@ -32,27 +31,23 @@ struct CenterPane: View {
                     onClose: { ws.closeTab($0) }
                 )
             }
-            .background(theme.bgElevated)
-            HStack {
+            .background(theme.surface)
+            HStack(spacing: Metrics.s2) {
                 ModePicker(mode: $chrome.snapshot.center)
                 Spacer()
                 if let t = ws.activeTab {
-                    Text(t.isDirty ? "não salvo" : "salvo")
-                        .font(OdeteFont.mono(10))
-                        .foregroundStyle(t.isDirty ? theme.accent : theme.fgSubtle)
-                        .lineLimit(1)
-                        .fixedSize()
-                        .padding(.trailing, 6)
+                    Pill(t.isDirty ? "não salvo" : "salvo", on: t.isDirty)
                 }
-                HeaderButton("command", label: "Paleta") { ws.paletteOpen = true }
-                HeaderButton("square.and.arrow.down", label: "Salvar") { ws.save() }
-                HeaderButton("sidebar.left", label: "Sidebar") { chrome.toggleSide() }
-                HeaderButton("terminal", label: "Terminal") { chrome.toggleTerm() }
-                HeaderButton("sidebar.right", label: "Agente") { chrome.toggleAgent() }
+                GlassBar {
+                    HeaderButton("command", label: "Paleta") { ws.paletteOpen = true }
+                    HeaderButton("square.and.arrow.down", label: "Salvar") { ws.save() }
+                    HeaderButton("sidebar.left", label: "Sidebar") { chrome.toggleSide() }
+                    HeaderButton("terminal", label: "Terminal") { chrome.toggleTerm() }
+                    HeaderButton("sidebar.right", label: "Agente") { chrome.toggleAgent() }
+                }
             }
-            .padding(.horizontal, 10)
-            .frame(height: 46)
-            .overlay(alignment: .bottom) { Rectangle().fill(theme.border).frame(height: 1) }
+            .padding(.horizontal, Metrics.s3)
+            .frame(height: 52)
             content
         }
         .background(theme.bg)

@@ -27,34 +27,43 @@ struct PhoneShell: View {
             }
             .tabViewStyle(.tabBarOnly)
         } else {
-            VStack(spacing: 0) {
-                content(tabs.contains(chrome.snapshot.phoneTab) ? chrome.snapshot.phoneTab : .files)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                bottomBar
-            }
+            content(tabs.contains(chrome.snapshot.phoneTab) ? chrome.snapshot.phoneTab : .files)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .safeAreaInset(edge: .bottom) { bottomBar }
         }
     }
 
     /// Barra de abas do iPad em retrato.
     var bottomBar: some View {
-        HStack(spacing: 4) {
-            ForEach(tabs, id: \.self) { t in
-                let on = chrome.snapshot.phoneTab == t
-                Button { chrome.snapshot.phoneTab = t } label: {
-                    VStack(spacing: 3) {
-                        Image(systemName: t.symbol).font(.system(size: 18, weight: on ? .semibold : .regular))
-                        Text(t.label).font(OdeteFont.ui(10, weight: on ? .semibold : .regular))
+        GlassEffectContainer {
+            HStack(spacing: 2) {
+                ForEach(tabs, id: \.self) { t in
+                    let on = chrome.snapshot.phoneTab == t
+                    Button { withAnimation(.snappy(duration: 0.2)) { chrome.snapshot.phoneTab = t } } label: {
+                        VStack(spacing: 3) {
+                            Image(systemName: t.symbol)
+                                .font(.system(size: 17, weight: .medium))
+                                .symbolRenderingMode(.hierarchical)
+                                .symbolVariant(on ? .fill : .none)
+                            Text(t.label).font(OdeteFont.ui(10, weight: on ? .semibold : .regular))
+                        }
+                        .foregroundStyle(on ? theme.accent : theme.fgMuted)
+                        .frame(maxWidth: .infinity).frame(height: 50)
+                        .background {
+                            if on {
+                                Capsule().fill(theme.glassTint)
+                            }
+                        }
+                        .contentShape(Capsule())
                     }
-                    .foregroundStyle(on ? theme.accent : theme.fgMuted)
-                    .frame(maxWidth: .infinity).frame(height: 52)
-                    .contentShape(Rectangle())
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
+            .padding(4)
+            .glassEffect(.regular, in: Capsule())
         }
-        .padding(.horizontal, 8)
-        .background(theme.bgElevated)
-        .overlay(alignment: .top) { Rectangle().fill(theme.border).frame(height: 1) }
+        .padding(.horizontal, Metrics.s4)
+        .padding(.bottom, Metrics.s2)
     }
 
     @ViewBuilder func content(_ tab: PhoneTab) -> some View {

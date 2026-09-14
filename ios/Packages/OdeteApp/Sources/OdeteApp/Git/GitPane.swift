@@ -27,7 +27,7 @@ struct GitPane: View {
                 initCard
             } else {
                 ScrollView {
-                    VStack(spacing: 10) {
+                    VStack(spacing: Metrics.s2) {
                         HeroCard()
                         if !git.conflicts.isEmpty {
                             ConflictsCard()
@@ -37,10 +37,11 @@ struct GitPane: View {
                         HistoryCard()
                         BranchesCard()
                     }
-                    .padding(10)
+                    .padding(Metrics.s2)
                 }
             }
         }
+        .background(theme.surface)
         .sheet(isPresented: $showGh) { GhSheet() }
         .alert("Git", isPresented: Binding(get: { git.error != nil }, set: {
             if !$0 {
@@ -52,15 +53,14 @@ struct GitPane: View {
     }
 
     var initCard: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "arrow.triangle.branch").font(.system(size: 28, weight: .light))
-                .foregroundStyle(theme.fgSubtle)
-            Text("Este projeto ainda não tem git.").font(OdeteFont.ui(13)).foregroundStyle(theme.fgMuted)
+        EmptyState(
+            "arrow.triangle.branch",
+            title: "Sem git ainda",
+            text: "Inicie um repositório para ter histórico, branches e push para o GitHub."
+        ) {
             Button { git.initRepository() } label: { Label("Iniciar repositório", systemImage: "plus") }
                 .buttonStyle(.glassProminent)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(20)
     }
 }
 
@@ -71,24 +71,16 @@ struct GitCard<Content: View>: View {
     @ViewBuilder var content: Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(title.uppercased()).font(OdeteFont.label).tracking(1).foregroundStyle(theme.fgSubtle)
-                Spacer()
-                if let trailing {
-                    Text(trailing).font(OdeteFont.mono(11)).foregroundStyle(theme.fgMuted)
-                }
+        OdeteCard {
+            VStack(alignment: .leading, spacing: Metrics.s2) {
+                SectionLabel(title, trailing: trailing)
+                content
             }
-            content
         }
-        .padding(10)
-        .background(theme.bg, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(theme.border))
     }
 }
 
 struct GitButton: View {
-    @Environment(\.theme) private var theme
     var title: String
     var symbol: String?
     var accent = false
@@ -96,24 +88,8 @@ struct GitButton: View {
     var action: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            HStack(spacing: 6) {
-                if let symbol {
-                    Image(systemName: symbol).font(.system(size: 12, weight: .medium))
-                }
-                Text(title).font(OdeteFont.ui(12.5, weight: .medium)).lineLimit(1)
-            }
-            .foregroundStyle(accent ? theme.accentFg : theme.fg)
-            .frame(maxWidth: .infinity)
-            .frame(height: 40)
-            .background(
-                accent ? theme.accent : theme.bgSubtle,
-                in: RoundedRectangle(cornerRadius: 12, style: .continuous)
-            )
-        }
-        .buttonStyle(.plain)
-        .disabled(disabled)
-        .opacity(disabled ? 0.4 : 1)
+        WideButton(title, symbol: symbol, prominent: accent, action: action)
+            .disabled(disabled)
     }
 }
 
@@ -178,10 +154,7 @@ struct HeroCard: View {
     }
 
     func badge(_ s: String, on: Bool) -> some View {
-        Text(s).font(OdeteFont.mono(11)).foregroundStyle(on ? theme.accent : theme.fgSubtle)
-            .padding(.horizontal, 8).frame(height: 24)
-            .background(theme.bgElevated, in: Capsule())
-            .overlay(Capsule().stroke(on ? theme.accent : theme.border))
+        Pill(s, on: on)
     }
 }
 
@@ -507,6 +480,5 @@ struct ConflictsCard: View {
             }
             GitButton(title: "Abortar merge", symbol: "xmark", disabled: git.busy) { git.abortMerge() }
         }
-        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(theme.danger.opacity(0.5)))
     }
 }

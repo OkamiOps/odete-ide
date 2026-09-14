@@ -65,8 +65,11 @@ struct WorkspaceView: View {
 
     var padLayout: some View {
         GeometryReader { geo in
-            let sideW = min(chrome.snapshot.sideWidth, geo.size.width * 0.3)
-            columns(narrow: false, sideW: sideW, agentW: chrome.snapshot.agentWidth)
+            // O centro precisa de ~520 pt; sidebar e agente cedem antes de estourar a tela.
+            let agentW = chrome.snapshot.agentVisible ? min(chrome.snapshot.agentWidth, geo.size.width * 0.34) : 0
+            let budget = geo.size.width - Metrics.railWidth - 24 - agentW - 520
+            let sideW = min(chrome.snapshot.sideWidth, max(Metrics.minSide, budget))
+            columns(narrow: false, sideW: sideW, agentW: agentW)
         }
         .background(theme.bg)
         .animation(.snappy(duration: 0.2), value: chrome.snapshot.sideOpen)
@@ -81,13 +84,14 @@ struct WorkspaceView: View {
                 side: chrome.snapshot.side,
                 sideOpen: chrome.snapshot.sideOpen,
                 agentVisible: chrome.snapshot.agentVisible,
+                agentBusy: ws.agent.running,
                 onSelect: { chrome.select(side: $0) },
                 onToggleAgent: { chrome.toggleAgent() }
             )
             if chrome.snapshot.sideOpen {
                 SidebarView()
                     .frame(width: sideW)
-                    .background(theme.bgElevated)
+                    .background(theme.surface)
                 Splitter(
                     value: $chrome.snapshot.sideWidth,
                     axis: .horizontal,
@@ -145,70 +149,73 @@ struct SettingsShell: View {
         @Bindable var chrome = chrome
         VStack(spacing: 0) {
             PaneHeader("Ajustes")
-            // List (UICollectionView) em vez de ScrollView: rola com dedo, trackpad e roda.
-            List {
-                Group {
-                    label("Tema")
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 104), spacing: 8)], spacing: 8) {
+            Form {
+                Section {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 96), spacing: Metrics.s2)], spacing: Metrics.s2) {
                         ForEach(ThemePalette.all) { p in
-                            Button { chrome.snapshot.theme = p.id } label: {
+                            Button { withAnimation(.snappy(duration: 0.2)) { chrome.snapshot.theme = p.id } } label: {
                                 VStack(alignment: .leading, spacing: 6) {
                                     HStack(spacing: 4) {
                                         Circle().fill(Color(hex: p.bg)).frame(width: 12, height: 12)
+                                            .overlay(Circle().stroke(
+                                                .white.opacity(0.15),
+                                                lineWidth: 0.5
+                                            ))
                                         Circle().fill(Color(hex: p.accent)).frame(width: 12, height: 12)
                                         Circle().fill(Color(hex: p.bgSubtle)).frame(width: 12, height: 12)
                                     }
-                                    Text(p.label).font(OdeteFont.ui(12, weight: .medium)).foregroundStyle(theme.fg)
-                                    Text(p.blurb).font(OdeteFont.ui(10)).foregroundStyle(theme.fgMuted).lineLimit(1)
+                                    Text(p.label).font(OdeteFont.ui(12.5, weight: .medium))
+                                        .foregroundStyle(Color(hex: p.fg))
+                                    Text(p.blurb).font(OdeteFont.ui(10.5)).foregroundStyle(Color(hex: p.fgMuted))
+                                        .lineLimit(1)
                                 }
                                 .padding(10)
                                 .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(theme.bg, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                                .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(
-                                    p.id == chrome.snapshot.theme ? theme.accent : theme.border,
-                                    lineWidth: 1
+                                .background(
+                                    Color(hex: p.bg),
+                                    in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                )
+                                .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(
+                                    p.id == chrome.snapshot.theme ? theme.accent : theme.separator,
+                                    lineWidth: p.id == chrome.snapshot.theme ? 1.5 : 0.5
                                 ))
                             }
                             .buttonStyle(.plain)
                         }
                     }
-                    label("Editor").padding(.top, 6)
-                    HStack {
-                        Text("Tamanho da fonte")
-                        Spacer()
-                        Stepper(
-                            "\(Int(chrome.snapshot.editor.fontSize)) pt",
-                            value: $chrome.snapshot.editor.fontSize,
-                            in: 10 ... 22,
-                            step: 1
-                        )
-                        .fixedSize()
+                    .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
+                    .listRowBackground(Color.clear)
+                } header: { header("Tema") }
+                Section {
+                    Stepper(value: $chrome.snapshot.editor.fontSize, in: 10 ... 22, step: 1) {
+                        LabeledContent("Tamanho da fonte") {
+                            Text("\(Int(chrome.snapshot.editor.fontSize)) pt").font(OdeteFont.mono(12))
+                                .foregroundStyle(theme.fgMuted)
+                        }
                     }
                     Toggle("Salvar automaticamente", isOn: $chrome.snapshot.editor.autoSave)
                     Toggle("Quebrar linhas", isOn: $chrome.snapshot.editor.wrap)
                     Toggle("Números de linha", isOn: $chrome.snapshot.editor.lineNumbers)
-                    label("Layout").padding(.top, 6)
+                } header: { header("Editor") }
+                Section {
                     Toggle("Agente", isOn: $chrome.snapshot.agentVisible)
                     Toggle("Terminal", isOn: $chrome.snapshot.termVisible)
                     Button("Restaurar layout") { chrome.resetLayout() }
-                    label("Contas e Git").padding(.top, 6)
-                    AccountsSettings()
-                    label("Contas de IA").padding(.top, 6)
-                    AIAccountsSettings()
-                }
-                .font(OdeteFont.ui(13))
-                .foregroundStyle(theme.fg)
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
-                .listRowInsets(EdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12))
+                } header: { header("Layout") }
+                Section { AccountsSettings() } header: { header("Contas e Git") }
+                Section { AIAccountsSettings() } header: { header("Contas de IA") }
             }
-            .listStyle(.plain)
+            .formStyle(.grouped)
             .scrollContentBackground(.hidden)
-            .environment(\.defaultMinListRowHeight, 1)
+            .listRowBackground(theme.bg.opacity(theme.dark ? 0.55 : 0.7))
+            .font(OdeteFont.ui(13.5))
+            .foregroundStyle(theme.fg)
+            .tint(theme.accent)
         }
+        .background(theme.surface)
     }
 
-    func label(_ s: String) -> some View {
-        Text(s.uppercased()).font(OdeteFont.label).tracking(1).foregroundStyle(theme.fgSubtle)
+    func header(_ s: String) -> some View {
+        Text(s.uppercased()).font(OdeteFont.label).tracking(1.2).foregroundStyle(theme.fgSubtle)
     }
 }

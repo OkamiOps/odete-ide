@@ -38,10 +38,21 @@ public enum OdeteFont {
 }
 
 public enum Metrics {
-    public static let railWidth: CGFloat = 52
+    /// Escala de espaçamento.
+    public static let s1: CGFloat = 4
+    public static let s2: CGFloat = 8
+    public static let s3: CGFloat = 12
+    public static let s4: CGFloat = 16
+    public static let s5: CGFloat = 24
+    public static let s6: CGFloat = 32
+    /// Raios: controles, cards, painéis flutuantes.
+    public static let rControl: CGFloat = 8
+    public static let rCard: CGFloat = 14
+    public static let rFloat: CGFloat = 20
+    public static let railWidth: CGFloat = 56
     public static let touch: CGFloat = 44
     public static let row: CGFloat = 40
-    public static let paneHeader: CGFloat = 36
+    public static let paneHeader: CGFloat = 40
     public static let tab: CGFloat = 44
     public static let minSide: CGFloat = 200
     public static let maxSide: CGFloat = 520

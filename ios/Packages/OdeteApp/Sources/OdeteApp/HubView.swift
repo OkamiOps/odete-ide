@@ -156,10 +156,14 @@ struct WelcomeView: View {
             .buttonStyle(.glassProminent)
             .controlSize(.large)
         }
-        .padding(28)
+        .padding(Metrics.s6)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(theme.bgElevated, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(theme.border))
+        .background(theme.surface, in: RoundedRectangle(cornerRadius: Metrics.rFloat, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Metrics.rFloat, style: .continuous).stroke(
+            theme.separator,
+            lineWidth: 0.5
+        ))
+        .shadow(color: .black.opacity(theme.dark ? 0.25 : 0.08), radius: 16, y: 6)
     }
 
     func step(_ n: Int, _ s: String) -> some View {
@@ -184,17 +188,13 @@ struct ProjectCard: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Image(systemName: symbol(stack))
-                    .font(.system(size: 18))
+                    .font(.system(size: 17, weight: .medium))
+                    .symbolRenderingMode(.hierarchical)
                     .foregroundStyle(theme.accent)
-                    .frame(width: 34, height: 34)
-                    .background(theme.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                    .frame(width: 38, height: 38)
+                    .background(theme.glassTint, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
                 Spacer()
-                Text(stack.label)
-                    .font(OdeteFont.mono(10))
-                    .foregroundStyle(theme.fgMuted)
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 3)
-                    .background(theme.bgSubtle, in: Capsule())
+                Pill(stack.label)
             }
             Text(project.name)
                 .font(OdeteFont.ui(15, weight: .semibold))
@@ -204,11 +204,15 @@ struct ProjectCard: View {
                 .font(OdeteFont.ui(11))
                 .foregroundStyle(theme.fgSubtle)
         }
-        .padding(14)
+        .padding(Metrics.s4)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(theme.bgElevated, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(theme.border))
-        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(theme.surface, in: RoundedRectangle(cornerRadius: Metrics.rCard, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: Metrics.rCard, style: .continuous).stroke(
+            theme.separator,
+            lineWidth: 0.5
+        ))
+        .shadow(color: .black.opacity(theme.dark ? 0.25 : 0.08), radius: 12, y: 5)
+        .contentShape(RoundedRectangle(cornerRadius: Metrics.rCard, style: .continuous))
         .hoverEffect(.lift)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)

@@ -60,8 +60,8 @@ struct TerminalPane: View {
             }
             .padding(.horizontal, 6)
             .frame(height: Metrics.tab)
-            .background(theme.bgElevated)
-            .overlay(alignment: .bottom) { Rectangle().fill(theme.border).frame(height: 1) }
+            .background(theme.surface)
+            .overlay(alignment: .bottom) { Rectangle().fill(theme.separator).frame(height: 0.5) }
             if let s = run.active {
                 TerminalView(session: s)
                     .id(s.id)
@@ -197,17 +197,17 @@ struct TermKeys: View {
             }
             .padding(.horizontal, 10)
         }
-        .frame(height: 36)
-        .background(theme.bgElevated)
-        .overlay(alignment: .top) { Rectangle().fill(theme.border).frame(height: 1) }
+        .frame(height: 40)
+        .background(theme.surface)
+        .overlay(alignment: .top) { Rectangle().fill(theme.separator).frame(height: 0.5) }
     }
 
     func key(_ t: String, _ action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Text(t).font(OdeteFont.mono(11)).foregroundStyle(theme.fg)
-                .padding(.horizontal, 9).frame(height: 26)
-                .background(theme.bgSubtle, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            Text(t).font(OdeteFont.mono(11.5, weight: .medium)).foregroundStyle(theme.fg)
+                .padding(.horizontal, 10).frame(height: 28)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.glass)
+        .controlSize(.small)
     }
 }

@@ -124,7 +124,7 @@ struct FileRow: View {
                     FileGlyph(path: node.path, isDirectory: node.isDirectory, expanded: open)
                     Text(node.name)
                         .font(OdeteFont.ui(13))
-                        .foregroundStyle(selected ? theme.fg : theme.fg.opacity(0.9))
+                        .foregroundStyle(selected ? theme.fg : theme.fg.opacity(0.88))
                         .lineLimit(1)
                     Spacer(minLength: 0)
                     if ws.tabs.first(where: { $0.path == node.path })?.isDirty == true {
@@ -132,9 +132,14 @@ struct FileRow: View {
                     }
                 }
                 .padding(.leading, 10 + CGFloat(depth) * 16)
-                .frame(height: Metrics.row)
+                .frame(height: Metrics.row - 4)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(selected ? theme.bgSubtle : (over ? theme.accent.opacity(0.12) : .clear))
+                .background(
+                    selected ? theme.glassTint : (over ? theme.accent.opacity(0.12) : .clear),
+                    in: RoundedRectangle(cornerRadius: Metrics.rControl, style: .continuous)
+                )
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)

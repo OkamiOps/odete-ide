@@ -24,7 +24,7 @@ public struct EditorTabs: View {
     public var body: some View {
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 0) {
+                HStack(spacing: 2) {
                     ForEach(tabs) { tab in
                         TabItem(
                             tab: tab,
@@ -35,6 +35,8 @@ public struct EditorTabs: View {
                         .id(tab.path)
                     }
                 }
+                .padding(.horizontal, 6)
+                .padding(.top, 6)
             }
             .onChange(of: active) { _, new in
                 if let new {
@@ -43,8 +45,8 @@ public struct EditorTabs: View {
             }
         }
         .frame(height: Metrics.tab)
-        .background(theme.bgElevated)
-        .overlay(alignment: .bottom) { Rectangle().fill(theme.border).frame(height: 1) }
+        .background(theme.surface)
+        .overlay(alignment: .bottom) { Rectangle().fill(theme.separator).frame(height: 0.5) }
     }
 }
 
@@ -54,45 +56,56 @@ struct TabItem: View {
     var on: Bool
     var onSelect: () -> Void
     var onClose: () -> Void
+    @State private var hover = false
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 4) {
             Button(action: onSelect) {
                 HStack(spacing: 7) {
-                    FileGlyph(path: tab.path, size: 14)
+                    FileGlyph(path: tab.path, size: 13)
                     Text(tab.path.split(separator: "/").last.map(String.init) ?? tab.path)
                         .font(OdeteFont.ui(12.5, weight: on ? .medium : .regular))
                         .foregroundStyle(on ? theme.fg : theme.fgMuted)
                         .lineLimit(1)
                 }
                 .padding(.leading, 12)
-                .frame(height: Metrics.tab)
+                .frame(height: Metrics.tab - 6)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             Button(action: onClose) {
                 ZStack {
-                    if tab.isDirty {
+                    if tab.isDirty, !hover {
                         Circle().fill(theme.accent).frame(width: 7, height: 7)
                     } else {
                         Image(systemName: "xmark").font(.system(size: 9, weight: .bold))
                     }
                 }
                 .foregroundStyle(theme.fgSubtle)
-                .frame(width: 28, height: Metrics.tab)
+                .frame(width: 26, height: Metrics.tab - 6)
                 .contentShape(Rectangle())
+                .opacity(on || hover || tab.isDirty ? 1 : 0.35)
             }
             .buttonStyle(.plain)
             .accessibilityLabel(tab.isDirty ? "Fechar (não salvo)" : "Fechar")
             .padding(.trailing, 4)
         }
-        .background(on ? theme.bg : .clear)
+        .background(
+            on ? theme.bg : (hover ? theme.fg.opacity(0.05) : .clear),
+            in: UnevenRoundedRectangle(
+                topLeadingRadius: 9,
+                bottomLeadingRadius: 0,
+                bottomTrailingRadius: 0,
+                topTrailingRadius: 9,
+                style: .continuous
+            )
+        )
         .overlay(alignment: .top) {
             if on {
-                Rectangle().fill(theme.accent).frame(height: 2)
+                Capsule().fill(theme.accent).frame(height: 2).padding(.horizontal, 10)
             }
         }
-        .overlay(alignment: .trailing) { Rectangle().fill(theme.border).frame(width: 1) }
+        .onHover { hover = $0 }
         .accessibilityElement(children: .contain)
         .accessibilityAddTraits(on ? .isSelected : [])
     }

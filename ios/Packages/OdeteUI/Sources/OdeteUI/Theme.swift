@@ -81,6 +81,21 @@ public struct Theme: Sendable, Hashable {
         Color(hex: palette.ok)
     }
 
+    /// Fundo de painel: um degrau acima do `bg`, sem borda.
+    public var surface: Color {
+        bgElevated
+    }
+
+    /// Separador discreto (a borda a 60 %).
+    public var separator: Color {
+        border.opacity(0.6)
+    }
+
+    /// Tinta do vidro para seleção e destaque.
+    public var glassTint: Color {
+        accent.opacity(0.18)
+    }
+
     public var colorScheme: ColorScheme {
         dark ? .dark : .light
     }

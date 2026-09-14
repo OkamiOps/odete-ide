@@ -10,6 +10,7 @@ struct GitPane: View {
     @Environment(ChromeState.self) private var chrome
     @Environment(\.theme) private var theme
     @State private var showGh = false
+    @State private var largura: CGFloat = 320
 
     var git: GitModel {
         ws.git
@@ -44,6 +45,10 @@ struct GitPane: View {
             }
         }
         .background(theme.surface)
+        // Um painel de 200 pt e um de 500 não podem desenhar a mesma coisa. Os cartões
+        // leem esta largura para decidir entre rótulo e só ícone.
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { largura = $0 }
+        .environment(\.paneWidth, largura)
         .sheet(isPresented: $showGh) { GhSheet() }
         .alert("Git", isPresented: Binding(get: { git.error != nil }, set: {
             if !$0 {
@@ -84,16 +89,42 @@ struct GitCard<Content: View>: View {
     }
 }
 
+/// Botão de ação do painel. Em coluna estreita vira só o ícone, em vez de espremer
+/// "Fetch" até virar "F...".
 struct GitButton: View {
+    @Environment(\.paneWidth) private var paneWidth
     var title: String
     var symbol: String?
     var accent = false
     var disabled = false
+    /// Ações principais nunca viram só ícone: a pessoa precisa ler o que vai acontecer.
+    var keepsLabel = false
     var action: () -> Void
 
     var body: some View {
-        WideButton(title, symbol: symbol, prominent: accent, action: action)
-            .disabled(disabled)
+        Group {
+            if let symbol, paneWidth < 260, !keepsLabel {
+                icone(symbol)
+            } else {
+                WideButton(title, symbol: symbol, prominent: accent, action: action)
+            }
+        }
+        .disabled(disabled)
+    }
+
+    @ViewBuilder
+    func icone(_ symbol: String) -> some View {
+        let rotulo = Image(systemName: symbol).font(.system(size: 12, weight: .semibold))
+            .frame(maxWidth: .infinity).frame(height: 18)
+        Group {
+            if accent {
+                Button(action: action) { rotulo }.buttonStyle(.glassProminent)
+            } else {
+                Button(action: action) { rotulo }.buttonStyle(.glass)
+            }
+        }
+        .controlSize(.small)
+        .accessibilityLabel(title)
     }
 }
 
@@ -333,6 +364,7 @@ struct ChangeRow: View {
 
 /// Caixa de commit, agora dentro do cartão do branch.
 struct CommitBox: View {
+    @Environment(\.paneWidth) private var paneWidth
     @Environment(WorkspaceModel.self) private var ws
     @Environment(\.theme) private var theme
     @State private var suggesting = false
@@ -396,11 +428,12 @@ struct CommitBox: View {
             }
             HStack(spacing: 6) {
                 GitButton(
-                    title: git.mergeInProgress ? "Commit de merge"
-                        : git.origin == nil ? "Commit" : "Commit e push",
+                    title: git.mergeInProgress ? (paneWidth < 300 ? "Merge" : "Commit de merge")
+                        : git.origin == nil || paneWidth < 300 ? "Commit" : "Commit e push",
                     symbol: "checkmark",
                     accent: true,
-                    disabled: !canCommit
+                    disabled: !canCommit,
+                    keepsLabel: true
                 ) {
                     writing = false
                     if nothingStaged {
@@ -467,6 +500,7 @@ struct HistoryCard: View {
     @Environment(WorkspaceModel.self) private var ws
     @Environment(ChromeState.self) private var chrome
     @Environment(\.theme) private var theme
+    @Environment(\.paneWidth) private var paneWidth
     @State private var expanded = false
     var git: GitModel {
         ws.git
@@ -524,11 +558,17 @@ struct HistoryCard: View {
                 VStack(alignment: .leading, spacing: 1) {
                     Text(c.summary).font(.subheadline).foregroundStyle(theme.fg).lineLimit(2)
                     HStack(spacing: 5) {
-                        Text(c.short).font(.caption2).monospaced().foregroundStyle(theme.accent)
-                        Text(c.author.name).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
-                        Text("·").font(.caption2).foregroundStyle(.secondary)
-                        Text(c.date.formatted(.relative(presentation: .named).locale(Locale(identifier: "pt_BR"))))
-                            .font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                        Text(c.short).font(.caption2).monospaced().foregroundStyle(theme.accent).fixedSize()
+                        if paneWidth >= 260 {
+                            Text(c.author.name).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                            Text("·").font(.caption2).foregroundStyle(.secondary)
+                        }
+                        Text(c.date.formatted(Date.RelativeFormatStyle(
+                            presentation: .named,
+                            unitsStyle: paneWidth < 260 ? .narrow : .wide,
+                            locale: Locale(identifier: "pt_BR")
+                        )))
+                        .font(.caption2).foregroundStyle(.secondary).lineLimit(1).fixedSize()
                     }
                 }
                 Spacer(minLength: 4)

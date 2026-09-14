@@ -7,6 +7,7 @@ import SwiftUI
 /// Título de seção fora do cartão, com detalhe, números opcionais e um menu de reticências.
 public struct SectionTitle<MenuContent: View>: View {
     @Environment(\.theme) private var theme
+    @Environment(\.paneWidth) private var paneWidth
     var title: String
     var detail: String?
     /// Total de linhas que entraram e saíram, mostrado à direita do título.
@@ -27,9 +28,13 @@ public struct SectionTitle<MenuContent: View>: View {
 
     public var body: some View {
         HStack(spacing: 8) {
+            // O título nunca quebra: era ele que virava "Pull\nrequests" na coluna estreita.
             Text(title).font(.headline).foregroundStyle(theme.fg)
-            if let detail {
+                .lineLimit(1).fixedSize()
+            // Abaixo disto o detalhe só caberia cortado ("0 abe…"), então sai de cena.
+            if let detail, paneWidth >= 240 {
                 Text(detail).font(.footnote).foregroundStyle(.secondary)
+                    .lineLimit(1)
                     .contentTransition(.numericText())
             }
             Spacer(minLength: 0)

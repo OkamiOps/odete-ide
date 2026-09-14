@@ -113,6 +113,9 @@ public struct Theme: Sendable, Hashable {
 
 public extension EnvironmentValues {
     @Entry var theme: Theme = .odete
+    /// Largura do painel que está desenhando. Os cartões usam isto para virar a versão
+    /// compacta em vez de espremer rótulo até virar reticências.
+    @Entry var paneWidth: CGFloat = 320
 }
 
 public extension View {

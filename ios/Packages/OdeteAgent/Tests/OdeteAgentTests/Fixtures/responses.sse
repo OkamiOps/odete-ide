@@ -1,0 +1,17 @@
+data: {"type":"response.created","response":{"id":"r1"}}
+
+data: {"type":"response.reasoning_summary_text.delta","delta":"analisando"}
+
+data: {"type":"response.output_text.delta","delta":"Vou "}
+
+data: {"type":"response.output_text.delta","delta":"abrir."}
+
+data: {"type":"response.output_item.added","output_index":1,"item":{"type":"function_call","id":"fc_1","call_id":"call_9","name":"read_file","arguments":""}}
+
+data: {"type":"response.function_call_arguments.delta","item_id":"fc_1","delta":"{\"path\":\"a"}
+
+data: {"type":"response.function_call_arguments.delta","item_id":"fc_1","delta":".txt\"}"}
+
+data: {"type":"response.output_item.done","output_index":1,"item":{"type":"function_call","id":"fc_1","call_id":"call_9","name":"read_file","arguments":"{\"path\":\"a.txt\"}"}}
+
+data: {"type":"response.completed","response":{"id":"r1","usage":{"input_tokens":300,"output_tokens":20,"input_tokens_details":{"cached_tokens":10},"output_tokens_details":{"reasoning_tokens":7}}}}

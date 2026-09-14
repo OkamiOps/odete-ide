@@ -79,6 +79,7 @@ public struct CodeEditorView: UIViewRepresentable {
         tv.addSubview(c.overlay)
         tv.addSubview(c.minimap)
         tv.floating = [c.guides, c.overlay, c.minimap, c.popup]
+        tv.aoLayout = { [weak c] in c?.positionOverlay() }
         c.minimap.aoNavegar = { [weak tv] f in
             guard let tv else { return }
             let maximo = max(0, tv.contentSize.height - tv.bounds.height)
@@ -152,8 +153,8 @@ public struct CodeEditorView: UIViewRepresentable {
             c.minimap.tamanho = prefs.minimap
             c.minimapTexto = ""
             c.atualizarMinimapa(tv.text)
-            c.positionOverlay()
         }
+        c.positionOverlay()
         // O texto não pode correr por baixo do mapa.
         let reservado = MinimapView.largura(prefs.minimap)
         if tv.textContainerInset.right != reservado + 8 {
@@ -426,7 +427,9 @@ public struct CodeEditorView: UIViewRepresentable {
                 width: tv.gutterWidth,
                 height: max(tv.contentSize.height, tv.bounds.height)
             )
-            tv.bringSubviewToFront(overlay)
+            // Sem `bringSubviewToFront` aqui: esta função agora roda dentro do
+            // layoutSubviews da TextView, e reordenar subviews ali pede novo layout.
+            // A ordem das camadas já é garantida no próprio layoutSubviews.
             let larguraMapa = MinimapView.largura(minimapSize)
             minimap.isHidden = minimapSize == .off || tv.bounds.width < larguraMapa * 3
             if !minimap.isHidden {
@@ -440,10 +443,6 @@ public struct CodeEditorView: UIViewRepresentable {
                 minimap.fracao = min(1, max(0, tv.contentOffset.y / rolavel))
                 minimap.visivel = min(1, tv.bounds.height / max(1, tv.contentSize.height))
                 minimap.setNeedsDisplay()
-                tv.bringSubviewToFront(minimap)
-            }
-            if !popup.isHidden {
-                tv.bringSubviewToFront(popup)
             }
         }
 
@@ -553,8 +552,13 @@ public struct CodeEditorView: UIViewRepresentable {
 /// O Runestone traz o gutter para a frente a cada layout; as decorações da Odete vêm depois dele.
 final class OdeteTextView: TextView {
     var floating: [UIView] = []
+    /// Chamado a cada passagem de layout: é aqui que as camadas flutuantes se
+    /// reposicionam. Sem isto elas só se mexiam quando o conteúdo rolava.
+    var aoLayout: (() -> Void)?
+
     override func layoutSubviews() {
         super.layoutSubviews()
+        aoLayout?()
         for v in floating where v.superview === self {
             bringSubviewToFront(v)
         }

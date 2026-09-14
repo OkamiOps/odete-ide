@@ -1,6 +1,6 @@
 # Odete iOS Fase 4 — Agente — Plano de implementação
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Agente com paridade ao Odete web rodando no iPad/iPhone: cinco tipos de conta, streaming dos três formatos, loop com sete ferramentas sobre o projeto real, patches, checkpoints, conversas e a UI completa.
 
@@ -34,8 +34,8 @@
 - `GrokDeviceAuth.start()`, `poll`, `refresh` (RFC 8628).
 - `actor Session { init(account:, secrets:, http:) ; func accessToken() async throws -> String }` renovação única sob concorrência, 300 s de folga.
 
-- [ ] Escrever `AuthTests`: PKCE gera verifier/challenge S256 válidos; Claude exchange envia JSON certo; OpenAI device poll 403 = pendente e depois troca; Grok device `authorization_pending` → `slow_down` → tokens; `Session` com dois `accessToken()` concorrentes faz um refresh só.
-- [ ] Implementar até passar. Commit: `agent: contas Claude, Codex, Grok e compatíveis com sessões`.
+- [x] Escrever `AuthTests`: PKCE gera verifier/challenge S256 válidos; Claude exchange envia JSON certo; OpenAI device poll 403 = pendente e depois troca; Grok device `authorization_pending` → `slow_down` → tokens; `Session` com dois `accessToken()` concorrentes faz um refresh só.
+- [x] Implementar até passar. Commit: `agent: contas Claude, Codex, Grok e compatíveis com sessões`.
 
 ### Task 2: Streaming (Marco 2)
 
@@ -51,8 +51,8 @@
 - `Effort.options(kind:model:)`, `Effort.default(_:)`.
 - `ProviderFactory.make(account:, session:) -> Provider`.
 
-- [ ] Fixtures gravadas à mão a partir dos formatos reais; testes: cada parser reproduz think/text/tools/usage; conversões de histórico (tool result vira `user` block no Anthropic, `function_call_output` no Responses); `Effort` para 6 modelos.
-- [ ] Implementar. Commit: `agent: streaming Chat Completions, Messages e Responses`.
+- [x] Fixtures gravadas à mão a partir dos formatos reais; testes: cada parser reproduz think/text/tools/usage; conversões de histórico (tool result vira `user` block no Anthropic, `function_call_output` no Responses); `Effort` para 6 modelos.
+- [x] Implementar. Commit: `agent: streaming Chat Completions, Messages e Responses`.
 
 ### Task 3: Ferramentas, loop, patches e checkpoints (Marco 3)
 
@@ -70,8 +70,8 @@
 - `ChatStore(root:)`: `load/save/list/new/remove`.
 - `Rules.prompt(root:)`, `Skills.all(root:)`, `Skills.prompt(all:, userText:)`, `Mentions.expand(text:, root:)`.
 
-- [ ] Testes primeiro (FakeProvider com roteiro de eventos).
-- [ ] Implementar. Commit: `agent: loop com ferramentas, permissões, patches, checkpoints e conversas`.
+- [x] Testes primeiro (FakeProvider com roteiro de eventos).
+- [x] Implementar. Commit: `agent: loop com ferramentas, permissões, patches, checkpoints e conversas`.
 
 ### Task 4: UI no app (Marco 4)
 
@@ -80,13 +80,13 @@
 - Modify: `WorkspaceView.swift` (AgentColumn → AgentPane), `PhoneShell.swift`, `WorkspaceModel.swift` (`agent: AgentModel`), `Git/AccountsSettings.swift` (cinco tipos), `Commands.swift` (⌘⇧A, ⌘⏎), `CenterPane.swift` (faixa de patch pendente no editor), `OdeteApp/Package.swift`, `project.yml`, `Makefile`.
 - Test: `WorkspaceModelTests` + `AgentModelTests` com FakeProvider.
 
-- [ ] `AgentModel`: conta/modelo/esforço escolhidos (persistidos no ChromeState por projeto), thread ativa, itens, running, permit pendente, enviar/parar/redirecionar, aceitar/rejeitar patch, desfazer turno, uso de tokens.
-- [ ] Views conforme a spec; Markdown com `AttributedString(markdown:)` por bloco e código mono.
-- [ ] Contas em Ajustes com as três folhas.
-- [ ] Commit: `agent: painel do agente, composer, patches no editor e contas`.
+- [x] `AgentModel`: conta/modelo/esforço escolhidos (persistidos no ChromeState por projeto), thread ativa, itens, running, permit pendente, enviar/parar/redirecionar, aceitar/rejeitar patch, desfazer turno, uso de tokens.
+- [x] Views conforme a spec; Markdown com `AttributedString(markdown:)` por bloco e código mono.
+- [x] Contas em Ajustes com as três folhas.
+- [x] Commit: `agent: painel do agente, composer, patches no editor e contas`.
 
 ### Task 5: Verificação e fechamento (Marco 5)
 
-- [ ] Simulador: conectar Grok por device code, pedir uma mudança em `App.tsx`, ver patch, aceitar, preview recarregar; testar Claude se o usuário tiver conta.
-- [ ] `make lint`, `make unit`, `make test` verdes; README (seção Agente, pendências); memória.
-- [ ] Commit: `ios: fase 4 concluída`.
+- [ ] Simulador com conta real (pendente do usuário: conectar Grok/Claude em Ajustes → Contas de IA e pedir uma mudança em `App.tsx`).
+- [x] `make lint`, `make unit`, `make test` verdes; README (seção Agente, pendências); memória.
+- [x] Commit: `ios: fase 4 concluída`.

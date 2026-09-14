@@ -224,7 +224,7 @@ public final class AgentModel {
                         pendingPermit = nil
                     }
                     upsert(i)
-                case let .usage(u): lastTurnUse = lastTurnUse + u; thread.usage = thread.usage + u; if u
+                case let .usage(u): lastTurnUse += u; thread.usage += u; if u
                     .input > 0 {
                         thread.lastInput = u.input
                     }

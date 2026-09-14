@@ -89,7 +89,7 @@ public enum LineDiff {
                 }; pos += 1
             }
             var lines: [Hunk.Line] = []
-            let bs = bLine, as_ = aLine
+            let hunkBefore = bLine, hunkAfter = aLine
             while pos <= to {
                 switch ops[pos] {
                 case let .keep(s): lines.append(.context(s)); bLine += 1; aLine += 1
@@ -98,7 +98,7 @@ public enum LineDiff {
                 }
                 pos += 1
             }
-            out.append(Hunk(id: gi, beforeStart: bs, afterStart: as_, lines: lines))
+            out.append(Hunk(id: gi, beforeStart: hunkBefore, afterStart: hunkAfter, lines: lines))
         }
         return out
     }

@@ -5,6 +5,8 @@ import PhotosUI
 import SwiftUI
 
 /// Caixa de texto do agente: anexos, @arquivos, /skills, modo, permissão, enviar/parar.
+/// Tudo mora numa cápsula de vidro só, com uma única ação preenchida — o enviar —
+/// como nas barras flutuantes dos apps da Apple.
 struct Composer: View {
     @Environment(WorkspaceModel.self) private var ws
     @Environment(\.theme) private var theme
@@ -12,8 +14,12 @@ struct Composer: View {
     @FocusState private var focused: Bool
     @State private var photo: PhotosPickerItem?
 
+    var vazio: Bool {
+        agent.draft.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
     var body: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 8) {
             if let menu = menuState {
                 MentionMenu(
                     kind: menu.kind,
@@ -23,119 +29,9 @@ struct Composer: View {
                 ) { pick($0, menu) }
             }
             if !agent.attachments.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 6) {
-                        ForEach(agent.attachments.indices, id: \.self) { i in
-                            ZStack(alignment: .topTrailing) {
-                                if let d = Data(base64Encoded: agent.attachments[i].data), let ui = UIImage(data: d) {
-                                    Image(uiImage: ui).resizable().scaledToFill().frame(width: 56, height: 56)
-                                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                                }
-                                Button { agent.attachments.remove(at: i) } label: {
-                                    Image(systemName: "xmark.circle.fill").font(.system(size: 14)).foregroundStyle(
-                                        .white,
-                                        .black.opacity(0.6)
-                                    )
-                                }.buttonStyle(.plain).offset(x: 4, y: -4)
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 12)
-                }
+                anexos
             }
-            HStack(alignment: .bottom, spacing: 8) {
-                Menu {
-                    PhotosPicker(selection: $photo, matching: .images) { Label("Foto", systemImage: "photo") }
-                    Button { agent.attachPreview() } label: {
-                        Label("Print do preview", systemImage: "camera.viewfinder")
-                    }.disabled(ws.preview.url == nil)
-                    Button { agent.draft += (agent.draft.isEmpty ? "" : " ") + "@" } label: { Label(
-                        "Arquivo (@)",
-                        systemImage: "at"
-                    ) }
-                    Button { agent.draft += (agent.draft.isEmpty ? "" : " ") + "/" } label: { Label(
-                        "Skill (/)",
-                        systemImage: "slash.circle"
-                    ) }
-                } label: {
-                    Label("Anexar", systemImage: "plus")
-                }
-                .menuStyle(.button)
-                .buttonStyle(.glass)
-                .labelStyle(.iconOnly)
-                .controlSize(.small)
-                .tint(theme.fgMuted)
-                .padding(.bottom, 4)
-                TextField(
-                    agent.running ? "redirecionar o agente…" : "Peça algo à Odete…",
-                    text: $agent.draft,
-                    axis: .vertical
-                )
-                .font(.subheadline)
-                .foregroundStyle(theme.fg)
-                .textFieldStyle(.plain)
-                .lineLimit(1 ... 6)
-                .focused($focused)
-                .onSubmit { send() }
-                .onKeyPress(.return, phases: .down) { press in
-                    if press.modifiers.contains(.command) || press.modifiers.contains(.shift) == false && !press
-                        .modifiers.contains(.option)
-                    {
-                        send(); return .handled
-                    }
-                    return .ignored
-                }
-                .onKeyPress(.escape) {
-                    if agent.running {
-                        agent.stop(); return .handled
-                    }; return .ignored
-                }
-                .padding(.vertical, 8)
-                if agent.running, agent.draft.trimmingCharacters(in: .whitespaces).isEmpty {
-                    Button("Parar", systemImage: "stop.fill") { agent.stop() }
-                        .labelStyle(.iconOnly)
-                        .buttonStyle(.glass)
-                        .controlSize(.small)
-                        .tint(theme.danger)
-                        .padding(.bottom, 4)
-                } else {
-                    Button(
-                        agent.running ? "Redirecionar" : "Enviar",
-                        systemImage: agent.running ? "arrow.triangle.turn.up.right" : "arrow.up"
-                    ) { send() }
-                        .labelStyle(.iconOnly)
-                        .buttonStyle(.glassProminent)
-                        .controlSize(.small)
-                        .disabled(agent.draft.trimmingCharacters(in: .whitespaces).isEmpty)
-                        .padding(.bottom, 4)
-                }
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(theme.bg, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(focused ? theme.accent.opacity(0.6) : theme.border))
-            .padding(.horizontal, 10)
-            HStack(spacing: 6) {
-                Picker("Modo", selection: Binding(get: { agent.mode }, set: { agent.setMode($0) })) {
-                    ForEach(AgentMode.allCases) { m in Text(m.label).tag(m) }
-                }
-                .pickerStyle(.segmented).frame(maxWidth: 220).controlSize(.small)
-                Spacer()
-                Menu {
-                    ForEach(PermitMode.allCases) { p in Button { agent.setPermit(p) } label: { Label(
-                        "\(p.label) · \(p.hint)",
-                        systemImage: p.symbol
-                    ) } }
-                } label: {
-                    Label(agent.permit.label, systemImage: agent.permit.symbol)
-                }
-                .menuStyle(.button)
-                .buttonStyle(.glass)
-                .controlSize(.small)
-                .tint(theme.fgMuted)
-            }
-            .padding(.horizontal, 10).padding(.bottom, 6)
+            caixa
         }
         .padding(.top, Metrics.s2)
         .onChange(of: agent.focusRequest) { focused = true }
@@ -148,6 +44,174 @@ struct Composer: View {
                     agent.attach(img)
                 }; photo = nil
             }
+        }
+    }
+
+    var anexos: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(agent.attachments.indices, id: \.self) { i in
+                    ZStack(alignment: .topTrailing) {
+                        if let d = Data(base64Encoded: agent.attachments[i].data), let ui = UIImage(data: d) {
+                            Image(uiImage: ui).resizable().scaledToFill().frame(width: 56, height: 56)
+                                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        }
+                        Button { agent.attachments.remove(at: i) } label: {
+                            Image(systemName: "xmark.circle.fill").font(.system(size: 15)).foregroundStyle(
+                                .white,
+                                .black.opacity(0.6)
+                            )
+                        }
+                        .buttonStyle(.plain).offset(x: 5, y: -5)
+                        .accessibilityLabel("Remover anexo")
+                    }
+                }
+            }
+            .padding(.horizontal, 14).padding(.vertical, 4)
+        }
+    }
+
+    var caixa: some View {
+        VStack(spacing: 6) {
+            TextField(
+                agent.running ? "redirecionar o agente…" : "Peça algo à Odete…",
+                text: $agent.draft,
+                axis: .vertical
+            )
+            .font(.subheadline)
+            .foregroundStyle(theme.fg)
+            .textFieldStyle(.plain)
+            .lineLimit(1 ... 8)
+            .focused($focused)
+            .onSubmit { send() }
+            .onKeyPress(.return, phases: .down) { press in
+                if press.modifiers.contains(.command) || press.modifiers.contains(.shift) == false && !press
+                    .modifiers.contains(.option)
+                {
+                    send(); return .handled
+                }
+                return .ignored
+            }
+            .onKeyPress(.escape) {
+                if agent.running {
+                    agent.stop(); return .handled
+                }; return .ignored
+            }
+            .padding(.horizontal, 6)
+            .padding(.top, 6)
+            HStack(spacing: 6) {
+                anexarMenu
+                modoMenu
+                permissaoMenu
+                Spacer(minLength: 4)
+                enviar
+            }
+        }
+        .padding(8)
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous)
+            .stroke(theme.accent.opacity(focused ? 0.5 : 0), lineWidth: 1))
+        .padding(.horizontal, 12)
+    }
+
+    var anexarMenu: some View {
+        Menu {
+            PhotosPicker(selection: $photo, matching: .images) { Label("Foto", systemImage: "photo") }
+            Button { agent.attachPreview() } label: {
+                Label("Print do preview", systemImage: "camera.viewfinder")
+            }.disabled(ws.preview.url == nil)
+            Button { agent.draft += (agent.draft.isEmpty ? "" : " ") + "@" } label: { Label(
+                "Arquivo (@)",
+                systemImage: "at"
+            ) }
+            Button { agent.draft += (agent.draft.isEmpty ? "" : " ") + "/" } label: { Label(
+                "Skill (/)",
+                systemImage: "slash.circle"
+            ) }
+        } label: {
+            Image(systemName: "plus").font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(theme.fgMuted)
+                .frame(width: 30, height: 30)
+                .contentShape(Rectangle())
+        }
+        .menuIndicator(.hidden)
+        .buttonStyle(.plain)
+        .accessibilityLabel("Anexar")
+    }
+
+    var modoMenu: some View {
+        Menu {
+            Picker("Modo", selection: Binding(get: { agent.mode }, set: { agent.setMode($0) })) {
+                ForEach(AgentMode.allCases) { m in Label(m.label, systemImage: simbolo(m)).tag(m) }
+            }
+        } label: {
+            capsula(agent.mode.label, symbol: simbolo(agent.mode), destacada: agent.mode == .build)
+        }
+        .menuIndicator(.hidden)
+        .buttonStyle(.plain)
+        .accessibilityLabel("Modo: \(agent.mode.label)")
+    }
+
+    var permissaoMenu: some View {
+        Menu {
+            Picker("Permissão", selection: Binding(get: { agent.permit }, set: { agent.setPermit($0) })) {
+                ForEach(PermitMode.allCases) { p in Label("\(p.label) · \(p.hint)", systemImage: p.symbol).tag(p) }
+            }
+        } label: {
+            capsula(agent.permit.label, symbol: agent.permit.symbol, destacada: agent.permit == .full)
+        }
+        .menuIndicator(.hidden)
+        .buttonStyle(.plain)
+        .accessibilityLabel("Permissão: \(agent.permit.label)")
+    }
+
+    /// Cápsula de filtro do iOS: fundo tênue quando neutra, tinta de destaque quando ligada.
+    func capsula(_ text: String, symbol: String, destacada: Bool) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: symbol).font(.system(size: 10, weight: .semibold))
+            Text(text).font(.caption.weight(.medium))
+            Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold)).opacity(0.7)
+        }
+        .foregroundStyle(destacada ? theme.accent : theme.fgMuted)
+        .padding(.horizontal, 9)
+        .frame(height: 30)
+        .background(
+            destacada ? theme.accent.opacity(0.12) : theme.fg.opacity(0.06),
+            in: Capsule()
+        )
+        .contentShape(Capsule())
+    }
+
+    /// A única ação preenchida da tela.
+    @ViewBuilder var enviar: some View {
+        if agent.running, vazio {
+            Button { agent.stop() } label: {
+                Image(systemName: "stop.fill").font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 32, height: 32)
+                    .background(theme.danger, in: Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Parar")
+        } else {
+            Button { send() } label: {
+                Image(systemName: agent.running ? "arrow.triangle.turn.up.right" : "arrow.up")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(vazio ? theme.fgSubtle : theme.accentFg)
+                    .frame(width: 32, height: 32)
+                    .background(vazio ? theme.fg.opacity(0.08) : theme.accent, in: Circle())
+            }
+            .buttonStyle(.plain)
+            .disabled(vazio)
+            .accessibilityLabel(agent.running ? "Redirecionar" : "Enviar")
+        }
+    }
+
+    func simbolo(_ m: AgentMode) -> String {
+        switch m {
+        case .chat: "bubble.left"
+        case .plan: "list.bullet.clipboard"
+        case .build: "hammer"
         }
     }
 
@@ -175,6 +239,7 @@ struct Composer: View {
     }
 }
 
+/// Lista flutuante de arquivos ou skills enquanto se digita `@` ou `/`.
 struct MentionMenu: View {
     enum Kind { case file, skill }
     @Environment(\.theme) private var theme
@@ -197,36 +262,36 @@ struct MentionMenu: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            ForEach(options, id: \.0) { o in
+            ForEach(Array(options.enumerated()), id: \.element.0) { i, o in
                 Button { pick(o.0) } label: {
-                    HStack(spacing: 8) {
+                    HStack(spacing: 9) {
                         if kind == .file {
-                            FileGlyph(path: o.0, size: 12)
+                            FileGlyph(path: o.0, size: 13)
                         } else {
-                            Image(systemName: "slash.circle").font(.system(size: 11)).foregroundStyle(theme.accent)
+                            Image(systemName: "slash.circle").font(.system(size: 12)).foregroundStyle(theme.accent)
                         }
-                        Text((kind == .file ? "" : "/") + o.0).font(OdeteFont.mono(11.5)).foregroundStyle(theme.fg)
-                            .lineLimit(1)
-                        if !o.1
-                            .isEmpty
-                        {
-                            Text(o.1).font(OdeteFont.ui(11)).foregroundStyle(theme.fgSubtle).lineLimit(1)
+                        Text((kind == .file ? "" : "/") + o.0).font(.footnote).foregroundStyle(theme.fg)
+                            .lineLimit(1).truncationMode(.middle)
+                        if !o.1.isEmpty {
+                            Text(o.1).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
                         }
-                        Spacer()
+                        Spacer(minLength: 0)
                     }
-                    .padding(.horizontal, 10).frame(height: 30).contentShape(Rectangle())
+                    .padding(.horizontal, 12).frame(height: 38).contentShape(Rectangle())
+                    .overlay(alignment: .top) {
+                        if i > 0 {
+                            Rectangle().fill(theme.separator).frame(height: 0.5).padding(.leading, 33)
+                        }
+                    }
                 }
                 .buttonStyle(.plain)
             }
-            if options
-                .isEmpty
-            {
-                Text(kind == .file ? "nenhum arquivo" : "nenhuma skill").font(OdeteFont.ui(11))
-                    .foregroundStyle(theme.fgSubtle).padding(10)
+            if options.isEmpty {
+                Text(kind == .file ? "nenhum arquivo" : "nenhuma skill").font(.footnote)
+                    .foregroundStyle(.secondary).padding(.horizontal, 12).frame(height: 38)
             }
         }
-        .background(theme.bg, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(theme.border))
-        .padding(.horizontal, 10)
+        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .padding(.horizontal, 12)
     }
 }

@@ -11,6 +11,7 @@ struct AgentPane: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var history = false
     @State private var showAccounts = false
+    @State private var width: CGFloat = 0
 
     var body: some View {
         let ag = ws.agent!
@@ -24,6 +25,7 @@ struct AgentPane: View {
             footer(ag)
         }
         .background(theme.bgElevated)
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
         .overlay(alignment: .leading) {
             if sizeClass != .compact {
                 Rectangle().fill(theme.border).frame(width: 1)
@@ -39,71 +41,97 @@ struct AgentPane: View {
         .task { await ag.loadModels() }
     }
 
+    /// Barra do painel no formato das barras de navegação do iPadOS: identidade com
+    /// título e subtítulo à esquerda, ações reunidas numa única cápsula de vidro à
+    /// direita, em vez de ícones soltos.
     func header(_ ag: AgentModel) -> some View {
-        HStack(spacing: 6) {
-            ModelMenu(agent: ag, onConnect: { showAccounts = true })
+        HStack(spacing: 8) {
+            // Prioridade para a identidade: sem isto o subtítulo era comido pela
+            // cápsula de ações numa coluna de 300 pt.
+            ModelMenu(agent: ag, onConnect: { showAccounts = true }).layoutPriority(1)
             Spacer(minLength: 4)
-            if !ag.effortOptions.isEmpty {
-                Menu {
-                    ForEach(ag.effortOptions, id: \.self) { e in Button { ag.setEffort(e) } label: { Label(
-                        Effort.labels[e] ?? e,
-                        systemImage: e == ag.effort ? "checkmark" : ""
-                    ) } }
-                } label: {
-                    Text(Effort.labels[ag.effort] ?? ag.effort).font(OdeteFont.mono(10.5))
-                        .foregroundStyle(theme.fgMuted)
-                        .padding(.horizontal, 8).frame(height: 26).background(theme.bgSubtle, in: Capsule())
+            HStack(spacing: 0) {
+                PaneAction("clock.arrow.circlepath", label: "Conversas") { history = true }
+                PaneAction("arrow.uturn.backward", label: "Desfazer último turno") { _ = ag.undoLastTurn() }
+                    .disabled(!ag.canUndoTurn)
+                PaneAction("square.and.pencil", label: "Nova conversa") { ag.newChat() }
+                if sizeClass != .compact {
+                    PaneAction("sidebar.trailing", label: "Fechar agente") { chrome.toggleAgent() }
                 }
-                .buttonStyle(.plain)
             }
-            HeaderButton("clock.arrow.circlepath", label: "Conversas") { history = true }
-            HeaderButton("arrow.uturn.backward", label: "Desfazer último turno") { _ = ag.undoLastTurn() }
-                .disabled(!ag.canUndoTurn)
-            HeaderButton("plus.bubble", label: "Nova conversa") { ag.newChat() }
-            if sizeClass != .compact {
-                HeaderButton("xmark", label: "Fechar agente") { chrome.toggleAgent() }
-            }
+            .padding(.horizontal, 2)
+            .glassEffect(.regular, in: Capsule())
         }
-        .padding(.horizontal, 8)
-        .frame(height: Metrics.tab)
-        .overlay(alignment: .bottom) { Rectangle().fill(theme.border).frame(height: 1) }
+        .padding(.leading, 12)
+        .padding(.trailing, 8)
+        .frame(height: 52)
+        .overlay(alignment: .bottom) { Rectangle().fill(theme.separator).frame(height: 0.5) }
     }
 
     func patchBar(_ ag: AgentModel) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: "doc.badge.gearshape").foregroundStyle(theme.accent)
-            Text(
-                "\(ag.pendingPatches.count) patch\(ag.pendingPatches.count == 1 ? "" : "es") pendente\(ag.pendingPatches.count == 1 ? "" : "s")"
-            )
-            .font(OdeteFont.ui(12)).foregroundStyle(theme.fg)
-            Spacer()
-            Button("Rejeitar tudo") { ag.rejectAll() }.buttonStyle(.glass).font(OdeteFont.ui(12))
-            Button("Aceitar tudo") { ag.acceptAll() }.buttonStyle(.glassProminent).font(OdeteFont.ui(12))
+        let n = ag.pendingPatches.count
+        return HStack(spacing: 10) {
+            Image(systemName: "doc.badge.gearshape").font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(theme.accent)
+            Text(n == 1 ? "1 patch pendente" : "\(n) patches pendentes")
+                .font(.subheadline).foregroundStyle(theme.fg).lineLimit(1)
+            Spacer(minLength: 8)
+            Button("Rejeitar") { ag.rejectAll() }.buttonStyle(.glass)
+            Button("Aceitar") { ag.acceptAll() }.buttonStyle(.glassProminent)
         }
-        .padding(.horizontal, Metrics.s3).frame(height: 44)
-        .background(theme.glassTint)
+        .controlSize(.small)
+        .padding(.horizontal, 12).frame(height: 48)
+        .background(theme.bg)
         .overlay(alignment: .top) { Rectangle().fill(theme.separator).frame(height: 0.5) }
     }
 
+    /// Consumo do contexto: rótulo discreto e uma barra nativa, sem cápsula desenhada.
     func footer(_ ag: AgentModel) -> some View {
         let used = max(ag.thread.lastInput, ag.estimatedTokens)
         let frac = min(1, Double(used) / Double(max(1, ag.contextWindow)))
         return HStack(spacing: 8) {
-            Text("turno \(fmtTok(ag.lastTurnUse.input))↑ \(fmtTok(ag.lastTurnUse.output))↓").font(OdeteFont.mono(10))
-                .foregroundStyle(theme.fgSubtle)
-            Text("conversa \(fmtTok(ag.thread.usage.input + ag.thread.usage.output))").font(OdeteFont.mono(10))
-                .foregroundStyle(theme.fgSubtle)
-            Spacer()
-            GeometryReader { g in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(theme.bgSubtle)
-                    Capsule().fill(frac > 0.85 ? theme.danger : theme.accent).frame(width: g.size.width * frac)
-                }
+            if width >= 380 {
+                Text("turno \(fmtTok(ag.lastTurnUse.input))↑ \(fmtTok(ag.lastTurnUse.output))↓")
             }
-            .frame(width: 70, height: 5)
-            Text("\(fmtTok(used))/\(fmtTok(ag.contextWindow))").font(OdeteFont.mono(10)).foregroundStyle(theme.fgSubtle)
+            Spacer(minLength: 0)
+            Text("\(fmtTok(used)) / \(fmtTok(ag.contextWindow))")
+            ProgressView(value: frac)
+                .progressViewStyle(.linear)
+                .frame(width: 54)
+                .tint(frac > 0.85 ? theme.danger : theme.accent)
         }
-        .padding(.horizontal, 12).frame(height: 24)
+        .font(.caption2).monospacedDigit().foregroundStyle(.secondary).lineLimit(1)
+        .padding(.horizontal, 16).padding(.top, 2).padding(.bottom, 8)
+    }
+}
+
+/// Ícone de ação do cabeçalho. Um pouco mais estreito que o `HeaderButton` dos outros
+/// painéis para caber quatro deles na coluna mínima de 300 pt sem comer o título.
+struct PaneAction: View {
+    @Environment(\.theme) private var theme
+    @Environment(\.isEnabled) private var enabled
+    var symbol: String
+    var label: String
+    var action: () -> Void
+
+    init(_ symbol: String, label: String, action: @escaping () -> Void) {
+        self.symbol = symbol
+        self.label = label
+        self.action = action
+    }
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 14, weight: .medium))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(enabled ? theme.fgMuted : theme.fgSubtle.opacity(0.5))
+                .frame(width: 30, height: 30)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+        .help(label)
     }
 }
 
@@ -120,64 +148,95 @@ func fmtTok(_ n: Int) -> String {
     return String(n)
 }
 
-/// Menu de conta e modelo.
+/// Identidade do painel: conta, modelo e esforço num menu só, como o menu de título
+/// de uma barra de navegação. O esforço deixou de ser uma cápsula solta no cabeçalho.
 struct ModelMenu: View {
     @Environment(\.theme) private var theme
     let agent: AgentModel
     let onConnect: () -> Void
 
     var body: some View {
-        Menu {
-            ForEach(ProviderKind.allCases) { kind in
-                let accs = agent.accounts.accounts(of: kind)
-                if !accs.isEmpty {
-                    Section(kind.label) {
-                        ForEach(accs) { a in
-                            Button { agent.setAccount(a) } label: { Label(
-                                a
-                                    .label + (a.login.isEmpty ? "" : " · \(a.login)") +
-                                    (a.needsReconnect ? " (reconectar)" : ""),
-                                systemImage: a.id == agent.account?.id ? "checkmark" : kind.symbol
-                            ) }
-                        }
+        Menu { items } label: { label }
+            .buttonStyle(.plain)
+            .menuIndicator(.hidden)
+            .accessibilityLabel("Conta e modelo")
+    }
+
+    @ViewBuilder var items: some View {
+        ForEach(ProviderKind.allCases) { kind in
+            let accs = agent.accounts.accounts(of: kind)
+            if !accs.isEmpty {
+                Section(kind.label) {
+                    ForEach(accs) { a in
+                        Button { agent.setAccount(a) } label: { Label(
+                            a
+                                .label + (a.login.isEmpty ? "" : " · \(a.login)") +
+                                (a.needsReconnect ? " (reconectar)" : ""),
+                            systemImage: a.id == agent.account?.id ? "checkmark" : kind.symbol
+                        ) }
                     }
                 }
             }
-            if let acc = agent.account {
-                Section("Modelo · \(acc.kind.label)") {
-                    if agent.loadingModels {
-                        Text("carregando…")
-                    }
-                    ForEach(agent.models) { m in Button { agent.setModel(m.id) } label: { Label(
-                        m.label,
-                        systemImage: m.id == agent.model ? "checkmark" : ""
-                    ) } }
-                    if agent.models.isEmpty, !agent.loadingModels {
-                        Button("usar \(acc.kind.defaultModel)") { agent.setModel(acc.kind.defaultModel) }
-                        if let e = agent.modelsError {
-                            Text(e)
-                        }
-                    }
-                    Button("Recarregar modelos") { Task { await agent.loadModels() } }
-                }
-            }
-            Button { onConnect() } label: { Label("Contas de IA…", systemImage: "person.crop.circle.badge.plus") }
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: agent.account?.kind.symbol ?? "sparkles").font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(theme.accent)
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(agent.account?.label ?? "Sem conta").font(OdeteFont.ui(12, weight: .medium))
-                        .foregroundStyle(theme.fg).lineLimit(1)
-                    Text(agent.account == nil ? "toque para conectar" : agent.model).font(OdeteFont.mono(10))
-                        .foregroundStyle(theme.fgSubtle).lineLimit(1)
-                }
-                Image(systemName: "chevron.down").font(.system(size: 9, weight: .bold)).foregroundStyle(theme.fgSubtle)
-            }
-            .padding(.horizontal, 10).frame(height: 36)
-            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
-        .buttonStyle(.plain)
+        if let acc = agent.account {
+            Section("Modelo · \(acc.kind.label)") {
+                if agent.loadingModels {
+                    Text("carregando…")
+                }
+                ForEach(agent.models) { m in Button { agent.setModel(m.id) } label: { Label(
+                    m.label,
+                    systemImage: m.id == agent.model ? "checkmark" : ""
+                ) } }
+                if agent.models.isEmpty, !agent.loadingModels {
+                    Button("usar \(acc.kind.defaultModel)") { agent.setModel(acc.kind.defaultModel) }
+                    if let e = agent.modelsError {
+                        Text(e)
+                    }
+                }
+                Button("Recarregar modelos") { Task { await agent.loadModels() } }
+            }
+        }
+        if !agent.effortOptions.isEmpty {
+            Section("Esforço") {
+                ForEach(agent.effortOptions, id: \.self) { e in
+                    Button { agent.setEffort(e) } label: { Label(
+                        Effort.labels[e] ?? e,
+                        systemImage: e == agent.effort ? "checkmark" : ""
+                    ) }
+                }
+            }
+        }
+        Button { onConnect() } label: { Label("Contas de IA…", systemImage: "person.crop.circle.badge.plus") }
+    }
+
+    var label: some View {
+        HStack(spacing: 9) {
+            Image(systemName: agent.account?.kind.symbol ?? "sparkles")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(agent.account == nil ? theme.fgSubtle : theme.accent)
+                .frame(width: 28, height: 28)
+                .background(
+                    agent.account == nil ? theme.fg.opacity(0.06) : theme.accent.opacity(0.14),
+                    in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+                )
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 4) {
+                    Text(agent.account?.label ?? "Sem conta")
+                        .font(.subheadline.weight(.semibold)).foregroundStyle(theme.fg).lineLimit(1)
+                    Image(systemName: "chevron.down").font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(theme.fgSubtle)
+                }
+                Text(subtitle).font(.caption2).foregroundStyle(.secondary)
+                    .lineLimit(1).truncationMode(.middle).minimumScaleFactor(0.85)
+            }
+        }
+        .contentShape(Rectangle())
+    }
+
+    var subtitle: String {
+        guard agent.account != nil else { return "conectar" }
+        let esforco = agent.effortOptions.isEmpty ? "" : " · " + (Effort.labels[agent.effort] ?? agent.effort)
+        return agent.model + esforco
     }
 }
 
@@ -188,31 +247,50 @@ struct HistorySheet: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                ForEach(agent.threads) { t in
-                    Button { agent.open(t); dismiss() } label: {
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(t.title).font(OdeteFont.ui(13, weight: t.id == agent.thread.id ? .semibold : .regular))
-                                .foregroundStyle(theme.fg).lineLimit(2)
-                            Text(
-                                "\(t.updated.formatted(date: .abbreviated, time: .shortened)) · \(fmtTok(t.usage.input + t.usage.output)) tokens"
-                            )
-                            .font(OdeteFont.mono(10)).foregroundStyle(theme.fgSubtle)
+            Group {
+                if agent.threads.isEmpty {
+                    ContentUnavailableView(
+                        "Nenhuma conversa",
+                        systemImage: "bubble.left.and.bubble.right",
+                        description: Text("O que você perguntar à Odete aparece aqui.")
+                    )
+                } else {
+                    List {
+                        ForEach(agent.threads) { t in
+                            Button { agent.open(t); dismiss() } label: {
+                                HStack(spacing: 10) {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(t.title).font(.body).foregroundStyle(theme.fg).lineLimit(2)
+                                        Text(
+                                            "\(t.updated.formatted(date: .abbreviated, time: .shortened)) · \(fmtTok(t.usage.input + t.usage.output)) tokens"
+                                        )
+                                        .font(.caption).foregroundStyle(.secondary)
+                                    }
+                                    Spacer(minLength: 8)
+                                    if t.id == agent.thread.id {
+                                        Image(systemName: "checkmark").font(.caption.bold())
+                                            .foregroundStyle(theme.accent)
+                                    }
+                                }
+                            }
+                            .swipeActions { Button(role: .destructive) { agent.remove(t) } label: { Label(
+                                "Apagar",
+                                systemImage: "trash"
+                            ) } }
                         }
                     }
-                    .swipeActions { Button(role: .destructive) { agent.remove(t) } label: { Label(
-                        "Apagar",
-                        systemImage: "trash"
-                    ) } }
-                }
-                if agent.threads.isEmpty {
-                    Text("Nenhuma conversa ainda.").foregroundStyle(theme.fgMuted)
                 }
             }
             .navigationTitle("Conversas")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Fechar") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) { Button("Nova") { agent.newChat(); dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button { agent.newChat(); dismiss() } label: { Label(
+                        "Nova",
+                        systemImage: "square.and.pencil"
+                    ) }
+                }
             }
         }
         .presentationDetents([.medium, .large])

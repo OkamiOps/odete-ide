@@ -32,11 +32,12 @@ struct ChatList: View {
         }
     }
 
-    static let sugestoes: [(String, String)] = [
-        ("text.magnifyingglass", "Explica a estrutura deste projeto"),
-        ("play.circle", "Roda npm run dev e me diz se subiu"),
-        ("plus.square.on.square", "Cria um componente de header em src/"),
-        ("checkmark.seal", "/review no arquivo aberto"),
+    /// Uma cor por assunto, como nos grupos dos Ajustes: entender, rodar, criar, revisar.
+    static let sugestoes: [(symbol: String, color: Color, text: String)] = [
+        ("text.magnifyingglass", .blue, "Explica a estrutura deste projeto"),
+        ("play.circle", .green, "Roda npm run dev e me diz se subiu"),
+        ("plus.square.on.square", .indigo, "Cria um componente de header em src/"),
+        ("checkmark.seal", .teal, "/review no arquivo aberto"),
     ]
 
     var starters: some View {
@@ -47,8 +48,8 @@ struct ChatList: View {
                 .fixedSize(horizontal: false, vertical: true)
             CardList {
                 ForEach(Array(Self.sugestoes.enumerated()), id: \.offset) { i, s in
-                    Button { agent.draft = s.1 } label: {
-                        CardRow(s.1, symbol: s.0, color: theme.accent, first: i == 0, lines: 2) {
+                    Button { agent.draft = s.text } label: {
+                        CardRow(s.text, symbol: s.symbol, color: s.color, first: i == 0, lines: 2) {
                             Image(systemName: "arrow.up.left").font(.caption2.bold())
                                 .foregroundStyle(theme.fgSubtle)
                         }
@@ -105,62 +106,78 @@ struct ChatRow: View {
                 if let images, !images.isEmpty {
                     HStack(spacing: 6) { ForEach(images.indices, id: \.self) { i in thumb(images[i]) } }
                 }
-                Text(text).font(OdeteFont.ui(13.5)).foregroundStyle(theme.fg).textSelection(.enabled)
-                    .padding(.horizontal, 14).padding(.vertical, 9)
-                    .background(theme.glassTint, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(
-                        theme.accent.opacity(0.2),
-                        lineWidth: 0.5
-                    ))
+                // Balão neutro, como o de mensagem enviada do Mensagens. A tinta de
+                // destaque fica reservada para ações, não para blocos de texto.
+                Text(text).font(.subheadline).foregroundStyle(theme.fg).textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 14).padding(.vertical, 10)
+                    .background(
+                        theme.fg.opacity(theme.dark ? 0.10 : 0.06),
+                        in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    )
             }
             .frame(maxWidth: .infinity, alignment: .trailing)
+            .padding(.leading, 28)
         case let .assistant(_, text):
             MarkdownText(text: text).frame(maxWidth: .infinity, alignment: .leading)
         case let .think(_, text, live):
             // Nasce recolhido: o raciocínio é contexto, não a resposta.
-            VStack(alignment: .leading, spacing: 6) {
+            // Mesmo formato da linha de ferramentas: as duas são contexto do turno e
+            // precisam começar no mesmo recuo.
+            VStack(alignment: .leading, spacing: 0) {
                 Button { withAnimation(.snappy(duration: 0.2)) { open.toggle() } } label: {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 7) {
                         if live {
                             ProgressView().controlSize(.mini)
                         } else {
-                            Image(systemName: "brain").font(.system(size: 11))
+                            Image(systemName: "brain").font(.system(size: 10))
                         }
-                        Text(live ? "pensando…" : "pensou").font(.caption)
+                        Text(live ? "pensando…" : "pensou").font(.caption).lineLimit(1)
+                        Spacer(minLength: 4)
                         if !live {
                             Image(systemName: "chevron.right").font(.system(size: 9, weight: .bold))
                                 .rotationEffect(.degrees(open ? 90 : 0))
                         }
-                        Spacer(minLength: 0)
                     }
                     .foregroundStyle(theme.fgSubtle)
+                    .padding(.horizontal, 10)
+                    .frame(height: 30)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .disabled(live)
                 if open, !live {
-                    HStack(alignment: .top, spacing: 10) {
-                        Capsule().fill(theme.separator).frame(width: 2)
-                        Text(text).font(.caption).foregroundStyle(theme.fgMuted).textSelection(.enabled)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    .fixedSize(horizontal: false, vertical: true)
+                    Text(text).font(.caption).foregroundStyle(theme.fgMuted).textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 10)
+                        .padding(.bottom, 10)
+                        .overlay(alignment: .top) {
+                            Rectangle().fill(theme.separator).frame(height: 0.5).padding(.horizontal, 10)
+                        }
                 }
             }
+            .background(theme.bg, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         case let .permit(id, name, detail, status):
             PermitCard(name: name, detail: detail, status: status) { agent.approve(id, $0) }
         case let .tool(_, name, detail):
             ToolGroup(items: [.tool(id: item.id, name: name, detail: detail)])
         case let .error(_, text):
-            HStack(alignment: .top, spacing: 6) {
-                Image(systemName: "exclamationmark.triangle")
-                    .foregroundStyle(text == "parado" ? theme.fgSubtle : theme.danger)
-                Text(text).font(OdeteFont.ui(12)).foregroundStyle(text == "parado" ? theme.fgMuted : theme.danger)
+            let parado = text == "parado"
+            HStack(alignment: .top, spacing: 9) {
+                Image(systemName: parado ? "stop.circle" : "exclamationmark.triangle.fill")
+                    .font(.system(size: 13))
+                    .foregroundStyle(parado ? theme.fgSubtle : theme.danger)
+                Text(text).font(.footnote).foregroundStyle(parado ? theme.fgMuted : theme.fg)
                     .textSelection(.enabled)
-                if text.contains("Ajustes") {
-                    Spacer()
-                }
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
             }
+            .padding(.horizontal, 12).padding(.vertical, 10)
+            .background(
+                parado ? theme.fg.opacity(0.05) : theme.danger.opacity(0.12),
+                in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+            )
         case let .patch(_, patchId, path):
             if let p = agent.patches.get(patchId) {
                 PatchCard(agent: agent, patch: p)
@@ -260,23 +277,25 @@ struct PermitCard: View {
     let answer: (Bool) -> Void
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 10) {
             Image(systemName: status == .pending ? "hand.raised" : status == .ok ? "checkmark.circle" : "xmark.circle")
+                .font(.system(size: 14))
                 .foregroundStyle(status == .no ? theme.danger : theme.accent)
             VStack(alignment: .leading, spacing: 2) {
-                Text(name).font(OdeteFont.mono(11.5, weight: .medium)).foregroundStyle(theme.fg)
+                Text(name).font(OdeteFont.mono(12, weight: .medium)).foregroundStyle(theme.fg)
                 Text(detail).font(OdeteFont.mono(11)).foregroundStyle(theme.fgMuted).lineLimit(3)
             }
-            Spacer()
+            Spacer(minLength: 8)
             if status == .pending {
-                Button("Recusar") { answer(false) }.buttonStyle(.glass).font(OdeteFont.ui(12))
-                Button("Aprovar") { answer(true) }.buttonStyle(.glassProminent).font(OdeteFont.ui(12))
+                Button("Recusar") { answer(false) }.buttonStyle(.glass)
+                Button("Aprovar") { answer(true) }.buttonStyle(.glassProminent)
             }
         }
-        .padding(10)
-        .background(theme.bg, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
-            .stroke(status == .pending ? theme.accent : theme.border))
+        .controlSize(.small)
+        .padding(12)
+        .background(theme.bg, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
+            .stroke(theme.accent.opacity(status == .pending ? 0.7 : 0), lineWidth: 1))
     }
 }
 
@@ -294,14 +313,17 @@ struct PatchCard: View {
                 Button { ws.openFile(patch.path) } label: {
                     HStack(spacing: 6) {
                         FileGlyph(path: patch.path, size: 12)
-                        Text(patch.path).font(OdeteFont.mono(11.5, weight: .medium)).foregroundStyle(theme.fg)
-                            .lineLimit(1)
+                        Text(patch.path).font(OdeteFont.mono(12, weight: .medium)).foregroundStyle(theme.fg)
+                            .lineLimit(1).truncationMode(.middle)
                     }
                 }
                 .buttonStyle(.plain)
-                Text("+\(patch.additions)").font(OdeteFont.mono(10)).foregroundStyle(theme.ok)
-                Text("−\(patch.deletions)").font(OdeteFont.mono(10)).foregroundStyle(theme.danger)
-                Spacer()
+                HStack(spacing: 5) {
+                    Text("+\(patch.additions)").foregroundStyle(theme.ok)
+                    Text("−\(patch.deletions)").foregroundStyle(theme.danger)
+                }
+                .font(.caption.weight(.medium)).monospacedDigit().fixedSize()
+                Spacer(minLength: 6)
                 statusView
             }
             if open, patch.status == .pending {
@@ -311,11 +333,8 @@ struct PatchCard: View {
                             Text("@@ \(h.beforeStart) → \(h.afterStart)").font(OdeteFont.mono(10))
                                 .foregroundStyle(theme.fgSubtle)
                             Spacer()
-                            if patch.hunks
-                                .count >
-                                1
-                            {
-                                Button("Aceitar hunk") { agent.acceptHunk(patch, h.id) }.font(OdeteFont.ui(11))
+                            if patch.hunks.count > 1 {
+                                Button("Aceitar hunk") { agent.acceptHunk(patch, h.id) }.font(.caption)
                                     .buttonStyle(.plain).foregroundStyle(theme.accent)
                             }
                         }
@@ -325,9 +344,8 @@ struct PatchCard: View {
                 }
             }
         }
-        .padding(10)
-        .background(theme.bg, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(theme.border))
+        .padding(12)
+        .background(theme.bg, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     @ViewBuilder var statusView: some View {
@@ -340,11 +358,11 @@ struct PatchCard: View {
             }.buttonStyle(.glassProminent)
                 .accessibilityLabel("Aceitar")
         case .accepted:
-            Text("aceito").font(OdeteFont.ui(11)).foregroundStyle(theme.ok)
-            Button("desfazer") { agent.undoPatch(patch) }.font(OdeteFont.ui(11)).buttonStyle(.plain)
+            Text("aceito").font(.caption).foregroundStyle(theme.ok)
+            Button("desfazer") { agent.undoPatch(patch) }.font(.caption).buttonStyle(.plain)
                 .foregroundStyle(theme.fgSubtle)
-        case .rejected: Text("rejeitado").font(OdeteFont.ui(11)).foregroundStyle(theme.fgSubtle)
-        case .undone: Text("desfeito").font(OdeteFont.ui(11)).foregroundStyle(theme.fgSubtle)
+        case .rejected: Text("rejeitado").font(.caption).foregroundStyle(.secondary)
+        case .undone: Text("desfeito").font(.caption).foregroundStyle(.secondary)
         }
     }
 

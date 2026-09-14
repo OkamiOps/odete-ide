@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import OdeteAccounts
+import OdeteAgent
 import OdeteCore
 import OdeteFiles
 import OdeteGit
@@ -28,6 +29,7 @@ public final class WorkspaceModel {
     public let git: GitModel
     public let run: RunModel
     public let preview: PreviewModel
+    public private(set) var agent: AgentModel!
     /// Arquivos em conflito que o usuário quer editar como texto puro.
     public var forceTextEdit: Set<String> = []
 
@@ -35,7 +37,7 @@ public final class WorkspaceModel {
     private var watcher: DirectoryWatcher?
     private var saveTasks: [String: Task<Void, Never>] = [:]
 
-    init(project: Project, root: URL, chrome: ChromeState, accounts: AccountStore) {
+    init(project: Project, root: URL, chrome: ChromeState, accounts: AccountStore, aiAccounts: AIAccountStore) {
         self.project = project
         self.root = root
         self.chrome = chrome
@@ -43,6 +45,7 @@ public final class WorkspaceModel {
         git = GitModel(root: root, accounts: accounts)
         run = RunModel(root: root, git: git)
         preview = PreviewModel(root: root)
+        agent = nil
         tabs = chrome.tabs(for: project.id).filter { ops.exists($0.path) }.map { EditorTab(path: $0.path) }
         active = chrome.activeTab(for: project.id).flatMap { p in tabs.contains { $0.path == p } ? p : nil } ?? tabs
             .first?.path
@@ -56,6 +59,14 @@ public final class WorkspaceModel {
         }
         w.start()
         watcher = w
+        agent = AgentModel(ws: self, chrome: chrome, accounts: aiAccounts)
+    }
+
+    /// Recarrega o buffer de um arquivo que outra coisa (agente, shell) escreveu no disco.
+    public func reloadBuffer(_ path: String) {
+        guard buffers[path] != nil else { return }
+        buffers[path] = (try? ops.read(path)) ?? ""
+        markDirty(path, false)
     }
 
     /// Mostra a gaveta do terminal (iPad) sem mexer no resto do layout.
@@ -68,6 +79,7 @@ public final class WorkspaceModel {
     func stop() {
         watcher?.stop()
         run.stopAll()
+        agent.stop()
         for t in saveTasks.values {
             t.cancel()
         }

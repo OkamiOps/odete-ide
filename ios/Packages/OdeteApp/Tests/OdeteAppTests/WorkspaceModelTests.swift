@@ -1,5 +1,6 @@
 import Foundation
 import OdeteAccounts
+import OdeteAgent
 @testable import OdeteApp
 import OdeteCore
 import OdeteFiles
@@ -13,7 +14,13 @@ struct WorkspaceModelTests {
         let p = try store.create(name: "T", template: .blank)
         let chrome = ChromeState()
         let accounts = AccountStore(url: root.appending(path: "accounts.json"), keychain: MemorySecrets())
-        let ws = WorkspaceModel(project: p, root: store.url(for: p), chrome: chrome, accounts: accounts)
+        let ws = WorkspaceModel(
+            project: p,
+            root: store.url(for: p),
+            chrome: chrome,
+            accounts: accounts,
+            aiAccounts: AIAccountStore(url: root.appending(path: "ai.json"), secrets: MemorySecrets())
+        )
         return (ws, chrome, store.url(for: p))
     }
 
@@ -65,5 +72,43 @@ struct WorkspaceModelTests {
         let t = ws.reveal?.token
         ws.open("index.html", line: 7)
         #expect(ws.reveal?.token != t)
+    }
+}
+
+struct AgentModelTests {
+    @MainActor
+    @Test func agentWithoutAccountAndChats() async throws {
+        let base = FileManager.default.temporaryDirectory.appending(path: "odete-app-ag-\(UUID().uuidString)")
+        let store = ProjectStore(root: base.appending(path: "Projects"))
+        let p = try store.create(name: "Ag", template: .blank)
+        let chrome = ChromeState()
+        let ws = WorkspaceModel(
+            project: p,
+            root: store.url(for: p),
+            chrome: chrome,
+            accounts: AccountStore(url: base.appending(path: "acc.json"), keychain: MemorySecrets()),
+            aiAccounts: AIAccountStore(url: base.appending(path: "ai.json"), secrets: MemorySecrets())
+        )
+        let ag = try #require(ws.agent)
+        #expect(ag.account == nil && ag.items.isEmpty && ag.mode == .build && ag.permit == .auto)
+        ag.draft = "oi"
+        ag.send()
+        #expect(ag.items.count == 1 && !ag.running)
+        if case let .error(_, t) = ag.items[0] {
+            #expect(t.contains("Conecte"))
+        } else {
+            Issue.record("esperava erro")
+        }
+        ag.setMode(.plan); ag.setPermit(.full)
+        #expect(chrome.snapshot.agentByProject[p.id]?.mode == "plan" && ag.permit == .full)
+        // patches do host aparecem e o editor recarrega
+        try ag.host.write("index.html", "<h1>novo</h1>")
+        ag.patches.queue(path: "index.html", before: "", after: "<h1>novo</h1>")
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(ag.pendingPatches.count == 1)
+        ag.rejectAll()
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(ag.pendingPatches.isEmpty)
+        ws.stop()
     }
 }

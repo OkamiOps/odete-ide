@@ -52,6 +52,13 @@ public struct OdeteCommands: Commands {
         CommandMenu("Ver") {
             Button("Sidebar") { a?.chrome.toggleSide() }.keyboardShortcut("b", modifiers: .command)
             Button("Agente") { a?.chrome.toggleAgent() }.keyboardShortcut("i", modifiers: .command)
+            Button("Falar com o agente") {
+                if a?.chrome.snapshot.agentVisible == false {
+                    a?.chrome.toggleAgent()
+                }
+                a?.ws.agent.focusRequest += 1
+            }
+            .keyboardShortcut("a", modifiers: [.command, .shift])
             Button("Terminal") { a?.chrome.toggleTerm() }.keyboardShortcut("j", modifiers: .command)
             Divider()
             ForEach(CenterMode.allCases, id: \.self) { m in

@@ -76,6 +76,17 @@ public struct EditorPrefs: Codable, Hashable, Sendable {
     public init() {}
 }
 
+/// Escolhas do agente por projeto.
+public struct AgentPrefs: Codable, Hashable, Sendable {
+    public var accountId: UUID?
+    public var model = ""
+    public var effort = ""
+    public var mode = "build"
+    public var permit = "auto"
+    public var threadId: String?
+    public init() {}
+}
+
 /// Estado persistido de layout e preferências, espelhando `useChrome` da web.
 public struct ChromeSnapshot: Codable, Hashable, Sendable {
     public var welcomeDone = false
@@ -95,7 +106,34 @@ public struct ChromeSnapshot: Codable, Hashable, Sendable {
     public var tabsByProject: [UUID: [EditorTab]] = [:]
     public var activeTabByProject: [UUID: String] = [:]
     public var expandedByProject: [UUID: [String]] = [:]
+    public var agentByProject: [UUID: AgentPrefs] = [:]
+    /// Esforço escolhido por "provedor:modelo".
+    public var agentEffortByModel: [String: String] = [:]
     public init() {}
+
+    /// Campos novos podem faltar no state.json antigo: cada um cai no padrão.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let d = ChromeSnapshot()
+        welcomeDone = try c.decodeIfPresent(Bool.self, forKey: .welcomeDone) ?? d.welcomeDone
+        theme = try c.decodeIfPresent(ThemeId.self, forKey: .theme) ?? d.theme
+        side = try c.decodeIfPresent(SidePanel.self, forKey: .side) ?? d.side
+        sideOpen = try c.decodeIfPresent(Bool.self, forKey: .sideOpen) ?? d.sideOpen
+        center = try c.decodeIfPresent(CenterMode.self, forKey: .center) ?? d.center
+        agentVisible = try c.decodeIfPresent(Bool.self, forKey: .agentVisible) ?? d.agentVisible
+        termVisible = try c.decodeIfPresent(Bool.self, forKey: .termVisible) ?? d.termVisible
+        sideWidth = try c.decodeIfPresent(Double.self, forKey: .sideWidth) ?? d.sideWidth
+        agentWidth = try c.decodeIfPresent(Double.self, forKey: .agentWidth) ?? d.agentWidth
+        termHeight = try c.decodeIfPresent(Double.self, forKey: .termHeight) ?? d.termHeight
+        phoneTab = try c.decodeIfPresent(PhoneTab.self, forKey: .phoneTab) ?? d.phoneTab
+        editor = try c.decodeIfPresent(EditorPrefs.self, forKey: .editor) ?? d.editor
+        lastProjectId = try c.decodeIfPresent(UUID.self, forKey: .lastProjectId)
+        tabsByProject = try c.decodeIfPresent([UUID: [EditorTab]].self, forKey: .tabsByProject) ?? [:]
+        activeTabByProject = try c.decodeIfPresent([UUID: String].self, forKey: .activeTabByProject) ?? [:]
+        expandedByProject = try c.decodeIfPresent([UUID: [String]].self, forKey: .expandedByProject) ?? [:]
+        agentByProject = try c.decodeIfPresent([UUID: AgentPrefs].self, forKey: .agentByProject) ?? [:]
+        agentEffortByModel = try c.decodeIfPresent([String: String].self, forKey: .agentEffortByModel) ?? [:]
+    }
 }
 
 @MainActor

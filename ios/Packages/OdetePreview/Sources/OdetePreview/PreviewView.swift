@@ -30,6 +30,10 @@ public struct PreviewView: UIViewRepresentable {
         wv.backgroundColor = .clear
         context.coordinator.webView = wv
         context.coordinator.observe()
+        model.snapshotter = { [weak wv] done in
+            guard let wv else { done(nil); return }
+            wv.takeSnapshot(with: nil) { img, _ in done(img) }
+        }
         if let u = model.url {
             wv.load(URLRequest(url: u))
         }

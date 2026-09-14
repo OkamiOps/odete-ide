@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import OdeteAccounts
+import OdeteAgent
 import OdeteCore
 import OdeteFiles
 
@@ -13,9 +14,16 @@ public final class AppModel {
     public var workspace: WorkspaceModel?
     public var error: String?
 
-    public init(store: ProjectStore = ProjectStore(), accounts: AccountStore = AccountStore()) {
+    public let aiAccounts: AIAccountStore
+
+    public init(
+        store: ProjectStore = ProjectStore(),
+        accounts: AccountStore = AccountStore(),
+        aiAccounts: AIAccountStore = AIAccountStore()
+    ) {
         self.store = store
         self.accounts = accounts
+        self.aiAccounts = aiAccounts
         refresh()
     }
 
@@ -50,7 +58,13 @@ public final class AppModel {
 
     public func open(_ p: Project, chrome: ChromeState) {
         let touched = (try? store.touch(p)) ?? p
-        workspace = WorkspaceModel(project: touched, root: store.url(for: touched), chrome: chrome, accounts: accounts)
+        workspace = WorkspaceModel(
+            project: touched,
+            root: store.url(for: touched),
+            chrome: chrome,
+            accounts: accounts,
+            aiAccounts: aiAccounts
+        )
         chrome.snapshot.lastProjectId = touched.id
         refresh()
     }

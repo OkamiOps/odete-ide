@@ -44,19 +44,23 @@ Packages/
   OdeteShell           shell da Odete: parser (| > >> < && || ; & $VAR), builtins, git, npm,
                        node, binários de .bin, vite/astro/next, jobs, histórico, Tab
   OdetePreview         WKWebView do preview, esquema odete://static/ e ponte de console
+  OdeteAgent           agente: contas (Claude OAuth, Codex e Grok por device code, chaves
+                       OpenAI/Anthropic-compatíveis), streaming dos três formatos, loop com
+                       sete ferramentas, patches, checkpoints, conversas, regras e skills
   OdeteUI              design system: Theme, Rail, PaneHeader, EditorTabs, ModePicker, Splitter, FileGlyph
   OdeteApp             telas: RootView, HubView, WorkspaceView, PhoneShell, FileTreeView,
                        CenterPane, SearchPane, CommandPalette, SettingsShell, Commands,
                        Git/ (GitModel, GitPane, DiffView, ConflictView, CloneSheet,
                        AccountsSettings, GhSheet), Terminal/ (RunModel, TerminalPane),
-                       Preview/ (PreviewPane, ProblemsPane)
+                       Preview/ (PreviewPane, ProblemsPane), Agent/ (AgentModel, AgentPane,
+                       ChatList, Composer, AIAccountsSettings, AppToolHost)
 Vendor/libgit2         build-libgit2.sh + libgit2.xcframework (1.9.7, SecureTransport, sem SSH)
 Tests/OdeteUITests     XCUITest de fumaça
 ```
 
-Dependências entre pacotes: `OdeteApp → {OdeteUI, OdeteGit, OdeteAccounts, OdeteShell, OdetePreview}`,
+Dependências entre pacotes: `OdeteApp → {OdeteUI, OdeteGit, OdeteAccounts, OdeteShell, OdetePreview, OdeteAgent}`,
 `OdeteShell → {OdeteGit, OdeteNpm, OdeteRuntime, OdeteBundler}`, `OdeteBundler → OdeteRuntime`,
-tudo sobre `OdeteCore`. Fases futuras entram como `OdeteAgent` e `OdeteSwift`.
+tudo sobre `OdeteCore`. A fase 5 entra como `OdeteSwift`.
 
 ## Fontes
 
@@ -90,9 +94,28 @@ IBM Plex Sans e Mono em `Odete/Fonts/` (licença OFL em `LICENSE-IBM-Plex.txt`).
 - Spec e plano: `../docs/superpowers/specs/2026-09-14-odete-ios-fase3-runtime-design.md`,
   `../docs/superpowers/plans/2026-09-14-odete-ios-fase3-runtime.md`.
 
+## Agente (Fase 4)
+
+- Contas em Ajustes → Contas de IA: Claude pela assinatura (OAuth do Claude Code, cola o
+  código), Codex e Grok por device code (mesmos clients do Codex CLI e do Grok CLI), e
+  quantas contas OpenAI-compatíveis ou Anthropic-compatíveis quiser, por chave e URL base.
+  Tokens só no Keychain; renovação automática; `invalid_grant` pede reconectar.
+- O agente fala direto com os provedores (Chat Completions, Messages e Responses por SSE).
+  Ferramentas rodam no projeto real: ler, editar (vira patch), listar, grep, ler o terminal e
+  rodar no shell da Odete numa aba própria. Modos Chat/Plan/Build; permissões Ask/Auto/Full.
+- Patches: aceitar, rejeitar, aceitar por hunk, desfazer; faixa no editor e cards no chat.
+  Checkpoint antes de cada turno em `.odete/checkpoints/` com "desfazer último turno".
+- Conversas em `.odete/chats/`, regras em `AGENTS.md`/`CLAUDE.md`/`.odete/rules.md`, skills
+  em `.odete/skills/*.md` por `/nome`, `@arquivo` cola o conteúdo, anexos de foto e print do
+  preview. Redirecionar no meio: mande outra mensagem enquanto roda.
+- Atenção: entrar com a assinatura usa os clients OAuth do Claude Code e do Codex CLI, que
+  a Anthropic e a OpenAI restringem a seus próprios apps. É escolha do usuário.
+- Spec e plano: `../docs/superpowers/specs/2026-09-14-odete-ios-fase4-agente-design.md`,
+  `../docs/superpowers/plans/2026-09-14-odete-ios-fase4-agente.md`.
+
 ## Pendências conhecidas
 
-- Painel Agente é casca ("chega na Fase 4").
+- Dois agentes em paralelo, MCP e voz ficam para depois.
 - `astro build` e `next build` ainda não rodam; Next e Astro só como SPA de desenvolvimento.
 - Marcas de git na margem do editor ainda não existem (o Diff cobre isso por enquanto).
 - `GitHubDeviceFlow.defaultClientId` vazio até registrar o OAuth App; por ora, token.

@@ -16,6 +16,7 @@ let package = Package(
         .package(path: "../OdeteAccounts"),
         .package(path: "../OdeteShell"),
         .package(path: "../OdetePreview"),
+        .package(path: "../OdeteAgent"),
     ],
     targets: [
         .target(
@@ -29,6 +30,7 @@ let package = Package(
                 .product(name: "OdeteAccounts", package: "OdeteAccounts"),
                 .product(name: "OdeteShell", package: "OdeteShell"),
                 .product(name: "OdetePreview", package: "OdetePreview"),
+                .product(name: "OdeteAgent", package: "OdeteAgent"),
             ],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),

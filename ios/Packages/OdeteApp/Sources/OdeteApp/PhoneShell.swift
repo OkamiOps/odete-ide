@@ -56,18 +56,13 @@ struct PhoneShell: View {
                 .background(theme.bg)
             }
             Tab(PhoneTab.agent.label, systemImage: PhoneTab.agent.symbol, value: PhoneTab.agent) {
-                AgentColumn()
+                AgentPane()
             }
             Tab(PhoneTab.term.label, systemImage: PhoneTab.term.symbol, value: PhoneTab.term) {
                 TerminalPane()
             }
             Tab(PhoneTab.preview.label, systemImage: PhoneTab.preview.symbol, value: PhoneTab.preview) {
-                ShellPanel(
-                    "Preview",
-                    symbol: "play.rectangle",
-                    phase: 3,
-                    blurb: "O app do usuário rodando no dispositivo."
-                ).background(theme.bg)
+                PreviewPane()
             }
             Tab(PhoneTab.settings.label, systemImage: PhoneTab.settings.symbol, value: PhoneTab.settings) {
                 SettingsShell().background(theme.bgElevated)

@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import UIKit
 
 /// Uma linha do console do app do usuário (ou erro de página).
 public struct ConsoleLine: Identifiable, Sendable, Hashable {
@@ -47,6 +48,8 @@ public final class PreviewModel {
     public var reloadTick = 0
     public var navTick = 0
     public var backTick = 0
+    /// Ligado pela PreviewView: tira um print da página.
+    public var snapshotter: (@MainActor (@escaping @MainActor (UIImage?) -> Void) -> Void)?
     private var seq = 0
 
     public init(root: URL) {

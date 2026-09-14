@@ -1,3 +1,4 @@
+import OdeteAgent
 import OdeteCore
 import OdeteEditor
 import OdeteUI
@@ -85,6 +86,9 @@ struct CenterPane: View {
         } else if let path {
             VStack(spacing: 0) {
                 Crumbs(path: path)
+                if let p = ws.agent.pendingPatches.first(where: { $0.path == path }) {
+                    PatchBanner(patch: p)
+                }
                 CodeEditorView(
                     text: Binding(get: { ws.text(for: path) }, set: { ws.setText($0, for: path) }),
                     documentId: "\(ws.project.id):\(path)",
@@ -151,5 +155,32 @@ struct EmptyEditor: View {
                 .background(theme.bgSubtle, in: RoundedRectangle(cornerRadius: 5))
             Text(what).font(OdeteFont.ui(11)).foregroundStyle(theme.fgSubtle)
         }
+    }
+}
+
+/// Faixa no topo do editor quando o agente deixou um patch pendente neste arquivo.
+struct PatchBanner: View {
+    @Environment(WorkspaceModel.self) private var ws
+    @Environment(ChromeState.self) private var chrome
+    @Environment(\.theme) private var theme
+    let patch: Patch
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "sparkles").foregroundStyle(theme.accent)
+            Text("Patch do agente: +\(patch.additions) −\(patch.deletions)").font(OdeteFont.ui(12))
+                .foregroundStyle(theme.fg)
+            Spacer()
+            Button("Ver no chat") {
+                if !chrome.snapshot.agentVisible {
+                    chrome.toggleAgent()
+                }
+            }.buttonStyle(.plain)
+                .font(OdeteFont.ui(12)).foregroundStyle(theme.fgMuted)
+            Button("Rejeitar") { ws.agent.reject(patch) }.buttonStyle(.glass).font(OdeteFont.ui(12))
+            Button("Aceitar") { ws.agent.accept(patch) }.buttonStyle(.glassProminent).font(OdeteFont.ui(12))
+        }
+        .padding(.horizontal, 12).frame(height: 38)
+        .background(theme.accent.opacity(0.08))
+        .overlay(alignment: .bottom) { Rectangle().fill(theme.border).frame(height: 1) }
     }
 }

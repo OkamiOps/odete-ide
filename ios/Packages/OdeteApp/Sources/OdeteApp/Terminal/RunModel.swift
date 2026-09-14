@@ -72,6 +72,18 @@ public final class RunModel {
         sessions.flatMap(\.jobs)
     }
 
+    /// Aba dedicada ao agente (criada na primeira vez).
+    public var agentSessionId: UUID?
+    public func agentSession() -> TerminalSession {
+        if let id = agentSessionId, let s = sessions.first(where: { $0.id == id }) {
+            return s
+        }
+        let s = newSession()
+        s.append(.system, "aba do agente")
+        agentSessionId = s.id
+        return s
+    }
+
     public func stopAll() {
         for s in sessions {
             s.shell.killAll()

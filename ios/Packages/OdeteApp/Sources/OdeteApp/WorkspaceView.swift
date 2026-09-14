@@ -79,7 +79,7 @@ struct WorkspaceView: View {
                     range: Metrics.minAgent ... Metrics.maxAgent,
                     direction: -1
                 )
-                AgentColumn()
+                AgentPane()
                     .frame(width: chrome.snapshot.agentWidth)
             }
         }
@@ -159,9 +159,8 @@ struct SettingsShell: View {
                     Button("Restaurar layout") { chrome.resetLayout() }
                     label("Contas e Git").padding(.top, 6)
                     AccountsSettings()
-                    label("Em breve").padding(.top, 6)
-                    Text("Agente e chaves de IA (Fase 4)")
-                        .font(OdeteFont.ui(12)).foregroundStyle(theme.fgMuted)
+                    label("Contas de IA").padding(.top, 6)
+                    AIAccountsSettings()
                 }
                 .font(OdeteFont.ui(13))
                 .foregroundStyle(theme.fg)
@@ -172,34 +171,5 @@ struct SettingsShell: View {
 
     func label(_ s: String) -> some View {
         Text(s.uppercased()).font(OdeteFont.label).tracking(1).foregroundStyle(theme.fgSubtle)
-    }
-}
-
-struct AgentColumn: View {
-    @Environment(\.theme) private var theme
-    var body: some View {
-        VStack(spacing: 0) {
-            PaneHeader("Agente", detail: "Claude · Sonnet") {
-                HeaderButton("plus.bubble", label: "Novo chat") {}
-            }
-            ShellPanel(
-                "Agente",
-                symbol: "sparkles",
-                phase: 4,
-                blurb: "Claude, Codex e Grok pela sua assinatura, editando o projeto."
-            )
-            HStack(spacing: 8) {
-                Text("Peça algo à Odete…").font(OdeteFont.ui(13)).foregroundStyle(theme.fgSubtle)
-                Spacer()
-                Image(systemName: "arrow.up.circle.fill").font(.system(size: 22)).foregroundStyle(theme.fgSubtle)
-            }
-            .padding(.horizontal, 12)
-            .frame(height: 48)
-            .background(theme.bg, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(theme.border))
-            .padding(10)
-        }
-        .background(theme.bgElevated)
-        .overlay(alignment: .leading) { Rectangle().fill(theme.border).frame(width: 1) }
     }
 }

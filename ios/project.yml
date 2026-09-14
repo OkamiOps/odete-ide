@@ -42,6 +42,8 @@ packages:
     path: Packages/OdeteShell
   OdetePreview:
     path: Packages/OdetePreview
+  OdeteAgent:
+    path: Packages/OdeteAgent
   OdeteApp:
     path: Packages/OdeteApp
 targets:

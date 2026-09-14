@@ -54,7 +54,7 @@ public enum Metrics {
     public static let row: CGFloat = 40
     public static let paneHeader: CGFloat = 40
     public static let tab: CGFloat = 44
-    public static let minSide: CGFloat = 200
+    public static let minSide: CGFloat = 280
     public static let maxSide: CGFloat = 520
     public static let minAgent: CGFloat = 300
     public static let maxAgent: CGFloat = 640

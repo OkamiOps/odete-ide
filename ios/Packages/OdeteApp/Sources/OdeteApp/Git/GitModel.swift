@@ -29,6 +29,8 @@ public final class GitModel {
     public var diffSource: Repository.DiffSource = .headToWorkdir
     public var diffPath: String?
     public private(set) var diff: Diff = .empty
+    /// Diff completo do working tree contra o HEAD, só para contar linhas.
+    public private(set) var stat: Diff = .empty
     public var compareA: String?
     public var compareB: String?
 
@@ -60,6 +62,20 @@ public final class GitModel {
 
     public var isClean: Bool {
         status.isEmpty
+    }
+
+    /// Linhas que entraram e saíram no working tree inteiro.
+    public var lineStat: (added: Int, removed: Int) {
+        stat.files.reduce(into: (0, 0)) { acc, f in
+            acc.0 += f.additions
+            acc.1 += f.deletions
+        }
+    }
+
+    /// Linhas que entraram e saíram num arquivo.
+    public func lineStat(for path: String) -> (added: Int, removed: Int)? {
+        guard let f = stat.files.first(where: { $0.path == path }) else { return nil }
+        return (f.additions, f.deletions)
     }
 
     public var origin: Remote? {
@@ -122,6 +138,7 @@ public final class GitModel {
             conflicts = try await repo.conflictedPaths()
             mergeInProgress = await repo.mergeInProgress
             diff = try await repo.diff(diffSource, path: diffPath)
+            stat = try await repo.diff(.headToWorkdir, context: 0)
         } catch {
             self.error = error.localizedDescription
         }

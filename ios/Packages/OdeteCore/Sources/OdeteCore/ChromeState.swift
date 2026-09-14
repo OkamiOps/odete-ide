@@ -100,7 +100,7 @@ public struct ChromeSnapshot: Codable, Hashable, Sendable {
     public var center: CenterMode = .code
     public var agentVisible = true
     public var termVisible = false
-    public var sideWidth: Double = 260
+    public var sideWidth: Double = 330
     public var agentWidth: Double = 360
     public var termHeight: Double = 220
     public var phoneTab: PhoneTab = .files

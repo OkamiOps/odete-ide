@@ -67,6 +67,7 @@ struct GitPane: View {
     }
 }
 
+/// Seção do painel no formato do app do GitHub: título fora, cartão embaixo.
 struct GitCard<Content: View>: View {
     @Environment(\.theme) private var theme
     var title: String
@@ -74,10 +75,11 @@ struct GitCard<Content: View>: View {
     @ViewBuilder var content: Content
 
     var body: some View {
-        OdeteCard {
-            VStack(alignment: .leading, spacing: Metrics.s2) {
-                SectionLabel(title, trailing: trailing)
-                content
+        VStack(alignment: .leading, spacing: 8) {
+            SectionTitle(title, detail: trailing)
+            CardList {
+                VStack(alignment: .leading, spacing: 12) { content }
+                    .padding(16)
             }
         }
     }
@@ -163,84 +165,204 @@ struct HeroCard: View {
 
 struct ChangesCard: View {
     @Environment(WorkspaceModel.self) private var ws
-    @Environment(ChromeState.self) private var chrome
     @Environment(\.theme) private var theme
     var git: GitModel {
         ws.git
     }
 
     var body: some View {
-        GitCard(title: "Alterações", trailing: git.isClean ? "working tree limpa" : nil) {
-            if !git.staged.isEmpty {
-                group("Staged", git.staged, staged: true)
-            }
-            if !git.unstaged.isEmpty {
-                group("Não staged", git.unstaged, staged: false)
-            }
-            if !git.isClean {
-                HStack(spacing: 6) {
-                    GitButton(title: "Stage all", disabled: git.unstaged.isEmpty || git.busy) { git.stageAll() }
-                    GitButton(title: "Unstage all", disabled: git.staged.isEmpty || git.busy) { git.unstageAll() }
+        // Medidas de docs/design/README.md: título fora do cartão, linhas com ícone
+        // quadrado, números na mesma linha e chevron no fim.
+        VStack(alignment: .leading, spacing: 8) {
+            SectionTitle("Alterações", detail: git.isClean ? nil : "\(git.status.count)") {
+                Button("Mandar tudo para o stage", systemImage: "plus.circle") { git.stageAll() }
+                    .disabled(git.unstaged.isEmpty || git.busy)
+                Button("Tirar tudo do stage", systemImage: "minus.circle") { git.unstageAll() }
+                    .disabled(git.staged.isEmpty || git.busy)
+                Divider()
+                Button("Descartar tudo", systemImage: "arrow.uturn.backward", role: .destructive) {
+                    git.discard(git.unstaged.map(\.path))
                 }
+                .disabled(git.unstaged.isEmpty || git.busy)
             }
-        }
-    }
-
-    func group(_ title: String, _ entries: [StatusEntry], staged: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack {
-                Text(title.uppercased()).font(OdeteFont.ui(10, weight: .medium)).tracking(0.6)
-                    .foregroundStyle(theme.fgSubtle)
-                Text("\(entries.count)").font(OdeteFont.mono(10)).foregroundStyle(theme.fgMuted)
-            }
-            .padding(.vertical, 4)
-            ForEach(entries) { e in
-                let change = staged ? e.staged! : e.unstaged!
-                HStack(spacing: 8) {
-                    Text(change.symbol).font(OdeteFont.mono(11, weight: .semibold))
-                        .foregroundStyle(color(change))
-                        .frame(width: 20, height: 20)
-                        .background(color(change).opacity(0.15), in: RoundedRectangle(cornerRadius: 5))
-                    FileGlyph(path: e.path, size: 12)
-                    Text(e.path).font(OdeteFont.ui(12.5)).foregroundStyle(theme.fg).lineLimit(1).truncationMode(.middle)
-                    Spacer(minLength: 4)
-                    HeaderButton(staged ? "minus.circle" : "plus.circle", label: staged ? "Unstage" : "Stage") {
-                        staged ? git.unstage([e.path]) : git.stage([e.path])
-                    }
-                    if !staged {
-                        HeaderButton("arrow.uturn.backward.circle", label: "Descartar") { git.discard([e.path]) }
-                    }
+            if git.isClean {
+                CardList {
+                    Text("Nada mudou desde o último commit.")
+                        .font(.subheadline).foregroundStyle(.secondary)
+                        .padding(.horizontal, 16).padding(.vertical, 14)
                 }
-                .frame(height: Metrics.row)
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    git.setDiff(staged ? .index : .workdir, path: e.path)
-                    chrome.snapshot.center = .diff
-                }
-                .contextMenu {
-                    Button("Abrir no editor", systemImage: "doc.text") { ws.openFile(e.path) }
-                    Button(staged ? "Unstage" : "Stage", systemImage: staged ? "minus.circle" : "plus.circle") {
-                        staged ? git.unstage([e.path]) : git.stage([e.path])
+            } else {
+                CardList {
+                    ForEach(Array(git.staged.enumerated()), id: \.element.id) { i, e in
+                        ChangeRow(entry: e, staged: true, first: i == 0)
                     }
-                    if !staged {
-                        Button(
-                            "Descartar alterações",
-                            systemImage: "arrow.uturn.backward",
-                            role: .destructive
-                        ) { git.discard([e.path]) }
+                    ForEach(Array(git.unstaged.enumerated()), id: \.element.id) { i, e in
+                        ChangeRow(entry: e, staged: false, first: i == 0 && git.staged.isEmpty)
                     }
                 }
             }
         }
     }
+}
 
-    func color(_ c: Change) -> Color {
-        switch c {
+/// Linha de arquivo alterado no formato do app do GitHub: quadrado colorido do tipo de
+/// mudança, pasta pequena em cima do nome, contagem de linhas e chevron.
+struct ChangeRow: View {
+    @Environment(WorkspaceModel.self) private var ws
+    @Environment(ChromeState.self) private var chrome
+    @Environment(\.theme) private var theme
+    let entry: StatusEntry
+    let staged: Bool
+    /// A primeira linha do cartão não leva separador em cima.
+    var first = false
+
+    var git: GitModel {
+        ws.git
+    }
+
+    var change: Change {
+        (staged ? entry.staged : entry.unstaged) ?? .modified
+    }
+
+    var body: some View {
+        let stat = git.lineStat(for: entry.path)
+        return Button {
+            git.setDiff(staged ? .index : .workdir, path: entry.path)
+            chrome.snapshot.center = .diff
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: glyph)
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 28, height: 28)
+                    .background(color, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                VStack(alignment: .leading, spacing: 1) {
+                    if let dir {
+                        Text(dir).font(.caption).foregroundStyle(.secondary)
+                            .lineLimit(1).truncationMode(.head)
+                    }
+                    HStack(spacing: 6) {
+                        Text(name).font(.body).foregroundStyle(theme.fg).lineLimit(1).truncationMode(.middle)
+                            .layoutPriority(1)
+                        if staged {
+                            Text("no stage").font(.caption2).foregroundStyle(theme.ok)
+                        }
+                    }
+                }
+                Spacer(minLength: 8)
+                if let stat {
+                    HStack(spacing: 6) {
+                        Text("+\(stat.added)").foregroundStyle(theme.ok)
+                        Text("−\(stat.removed)").foregroundStyle(theme.danger)
+                    }
+                    .font(.callout).monospacedDigit()
+                    .fixedSize()
+                    .layoutPriority(1)
+                }
+                Image(systemName: "chevron.right").font(.caption2.bold()).foregroundStyle(theme.fgSubtle)
+            }
+            .padding(.horizontal, 16)
+            .frame(height: dir == nil ? 56 : 62)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .overlay(alignment: .top) {
+            if !first {
+                Rectangle().fill(theme.separator).frame(height: 0.5).padding(.leading, 56)
+            }
+        }
+        .contextMenu {
+            Button("Abrir no editor", systemImage: "doc.text") { ws.openFile(entry.path) }
+            Button(
+                staged ? "Tirar do stage" : "Mandar para o stage",
+                systemImage: staged ? "minus.circle" : "plus.circle"
+            ) {
+                staged ? git.unstage([entry.path]) : git.stage([entry.path])
+            }
+            Button("Histórico do arquivo", systemImage: "clock.arrow.circlepath") { ws.historyPath = entry.path }
+            if !staged {
+                Button("Descartar alterações", systemImage: "arrow.uturn.backward", role: .destructive) {
+                    git.discard([entry.path])
+                }
+            }
+        }
+    }
+
+    var name: String {
+        entry.path.split(separator: "/").last.map(String.init) ?? entry.path
+    }
+
+    var dir: String? {
+        let parts = entry.path.split(separator: "/")
+        return parts.count > 1 ? parts.dropLast().joined(separator: "/") : nil
+    }
+
+    var color: Color {
+        switch change {
         case .added, .untracked: theme.ok
-        case .deleted: theme.danger
-        case .conflicted: theme.danger
+        case .deleted, .conflicted: theme.danger
+        case .renamed: .purple
         default: theme.accent
         }
+    }
+
+    var glyph: String {
+        switch change {
+        case .added, .untracked: "plus"
+        case .deleted: "minus"
+        case .renamed: "arrow.turn.up.right"
+        case .conflicted: "exclamationmark"
+        default: "pencil"
+        }
+    }
+}
+
+/// Título de seção fora do cartão, com o menu de reticências na borda direita.
+struct SectionTitle<Menu: View>: View {
+    @Environment(\.theme) private var theme
+    var title: String
+    var detail: String?
+    @ViewBuilder var menu: Menu
+
+    init(_ title: String, detail: String? = nil, @ViewBuilder menu: () -> Menu = { EmptyView() }) {
+        self.title = title
+        self.detail = detail
+        self.menu = menu()
+    }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Text(title).font(.title3.bold()).foregroundStyle(theme.fg)
+            if let detail {
+                Text(detail).font(.subheadline).foregroundStyle(.secondary)
+                    .contentTransition(.numericText())
+            }
+            Spacer(minLength: 0)
+            if !(menu is EmptyView) {
+                SwiftUI.Menu {
+                    menu
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(theme.fgMuted)
+                        .frame(width: 30, height: 30)
+                        .contentShape(Rectangle())
+                }
+                .menuIndicator(.hidden)
+            }
+        }
+        .padding(.horizontal, 4)
+    }
+}
+
+/// Cartão branco que envolve um grupo de linhas, como os do app do GitHub.
+struct CardList<Content: View>: View {
+    @Environment(\.theme) private var theme
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        VStack(spacing: 0) { content }
+            .background(theme.bgElevated, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 }
 

@@ -1,16 +1,17 @@
 import Foundation
 
-/// Os cinco tipos de conta de IA.
+/// Os tipos de conta de IA. `apple` é o modelo do próprio sistema e não tem conta.
 public enum ProviderKind: String, Codable, CaseIterable, Sendable, Identifiable {
-    case claude, codex, grok, openaiCompat, anthropicCompat
+    case apple, claude, codex, grok, openaiCompat, anthropicCompat
     public var id: String {
         rawValue
     }
 
-    public enum AuthStyle: Sendable { case oauthPaste, deviceCode, apiKey }
+    public enum AuthStyle: Sendable { case oauthPaste, deviceCode, apiKey, builtIn }
 
     public var label: String {
         switch self {
+        case .apple: "Apple Intelligence"
         case .claude: "Claude"
         case .codex: "Codex"
         case .grok: "Grok"
@@ -21,6 +22,7 @@ public enum ProviderKind: String, Codable, CaseIterable, Sendable, Identifiable 
 
     public var vendor: String {
         switch self {
+        case .apple: "no aparelho · sem conta, sem rede"
         case .claude: "Anthropic · assinatura Pro/Max"
         case .codex: "OpenAI · conta ChatGPT"
         case .grok: "xAI · SuperGrok / X Premium"
@@ -31,6 +33,7 @@ public enum ProviderKind: String, Codable, CaseIterable, Sendable, Identifiable 
 
     public var authStyle: AuthStyle {
         switch self {
+        case .apple: .builtIn
         case .claude: .oauthPaste
         case .codex, .grok: .deviceCode
         case .openaiCompat, .anthropicCompat: .apiKey
@@ -39,6 +42,7 @@ public enum ProviderKind: String, Codable, CaseIterable, Sendable, Identifiable 
 
     public var defaultBaseURL: String {
         switch self {
+        case .apple: ""
         case .claude, .anthropicCompat: "https://api.anthropic.com"
         case .codex: "https://chatgpt.com/backend-api/codex"
         case .grok: "https://cli-chat-proxy.grok.com/v1"
@@ -48,6 +52,7 @@ public enum ProviderKind: String, Codable, CaseIterable, Sendable, Identifiable 
 
     public var symbol: String {
         switch self {
+        case .apple: "apple.logo"
         case .claude: "sparkle"
         case .codex: "circle.hexagongrid"
         case .grok: "xmark.circle"
@@ -57,6 +62,7 @@ public enum ProviderKind: String, Codable, CaseIterable, Sendable, Identifiable 
 
     public var defaultModel: String {
         switch self {
+        case .apple: "apple-on-device"
         case .claude, .anthropicCompat: "claude-sonnet-5"
         case .codex: "gpt-5.4-codex"
         case .grok: "grok-4.6"

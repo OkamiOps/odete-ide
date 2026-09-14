@@ -63,7 +63,7 @@ public final class IntentBridge {
         if let id, let p = projects().first(where: { $0.id == id }) {
             system += " O usuário está falando do projeto \"\(p.name)\"."
         }
-        let provider = HTTPProvider(account: acc, session: accounts.session(for: acc))
+        let provider = ProviderFactory.make(account: acc, session: accounts.session(for: acc))
         let model = app?.workspace?.agent.model ?? ""
         let turn = TurnRequest(
             system: system,

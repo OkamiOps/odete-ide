@@ -45,6 +45,12 @@ public final class AIAccountStore {
         upsert(a)
     }
 
+    /// Conta sem segredo nenhum, como o modelo do próprio sistema.
+    public func addBuiltIn(_ account: AIAccount) {
+        guard !accounts.contains(where: { $0.kind == account.kind }) else { return }
+        upsert(account)
+    }
+
     /// Conta por chave de API.
     public func add(_ account: AIAccount, apiKey: String) throws {
         try secrets.set(apiKey, for: account.keychainPrefix + ":key")
@@ -161,7 +167,7 @@ public actor Session {
                 case .claude: try await ClaudeAuth(http: http).refresh(refresh)
                 case .codex: try await OpenAIDeviceAuth(http: http).refresh(refresh)
                 case .grok: try await GrokDeviceAuth(http: http).refresh(refresh)
-                case .openaiCompat, .anthropicCompat: throw AgentError.noAccount
+                case .apple, .openaiCompat, .anthropicCompat: throw AgentError.noAccount
                 }
                 try secrets.set(t.access, for: account.keychainPrefix + ":access")
                 try secrets.set(t.refresh, for: account.keychainPrefix + ":refresh")

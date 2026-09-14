@@ -21,6 +21,8 @@ public struct HTTPProvider: Provider {
 
     func headers(token: String, conversationId: String = "") -> [String: String] {
         switch kind {
+        // Nunca chega aqui: conta da Apple é atendida pelo AppleProvider.
+        case .apple: return [:]
         case .claude: return [
                 "Authorization": "Bearer \(token)",
                 "anthropic-version": "2023-06-01",
@@ -60,7 +62,7 @@ public struct HTTPProvider: Provider {
                         lines = try await open(turn, token: token)
                     }
                     let events: AsyncThrowingStream<StreamEvent, Error> = switch kind {
-                    case .claude, .anthropicCompat: MessagesStream.events(lines)
+                    case .apple, .claude, .anthropicCompat: MessagesStream.events(lines)
                     case .grok: ResponsesStream.events(lines)
                     case .codex, .openaiCompat: ChatCompletionsStream.events(lines)
                     }
@@ -81,7 +83,8 @@ public struct HTTPProvider: Provider {
         let url: URL
         let body: [String: Any]
         switch kind {
-        case .claude, .anthropicCompat: url = URL(string: base + "/v1/messages")!; body = MessagesStream.body(turn)
+        case .apple, .claude, .anthropicCompat:
+            url = URL(string: base + "/v1/messages")!; body = MessagesStream.body(turn)
         case .grok:
             url = URL(string: base + "/responses")!; body = ResponsesStream.body(turn)
             h["x-grok-model-override"] = turn.model
@@ -101,7 +104,7 @@ public struct HTTPProvider: Provider {
         let token = try await session.accessToken()
         let h = headers(token: token)
         let urls: [String] = switch kind {
-        case .claude, .anthropicCompat: [base + "/v1/models?limit=100"]
+        case .apple, .claude, .anthropicCompat: [base + "/v1/models?limit=100"]
         case .codex: [
                 "https://chatgpt.com/backend-api/codex/models?client_version=0.145.0",
                 "https://chatgpt.com/backend-api/codex/models",

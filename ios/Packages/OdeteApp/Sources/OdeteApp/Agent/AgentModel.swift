@@ -126,7 +126,7 @@ public final class AgentModel {
         modelsError = nil
         defer { loadingModels = false }
         do {
-            let p = HTTPProvider(account: acc, session: accounts.session(for: acc))
+            let p = ProviderFactory.make(account: acc, session: accounts.session(for: acc))
             let list = try await p.models()
             models = list
             modelsFor = acc.id
@@ -206,7 +206,7 @@ public final class AgentModel {
         let images = attachments
         draft = ""
         attachments = []
-        let provider = HTTPProvider(account: acc, session: accounts.session(for: acc))
+        let provider = ProviderFactory.make(account: acc, session: accounts.session(for: acc))
         let loop = AgentLoop(provider: provider, host: host, patches: patches, checkpoints: checkpoints)
         self.loop = loop
         running = true

@@ -8,6 +8,7 @@ struct AIAccountsSettings: View {
     @Environment(AIAccountStore.self) private var store
     @Environment(\.theme) private var theme
     @State private var adding: ProviderKind?
+    @State private var recado: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -39,16 +40,16 @@ struct AIAccountsSettings: View {
             VStack(alignment: .leading, spacing: 8) {
                 SectionTitle(store.accounts.isEmpty ? "Conectar uma conta" : "Adicionar")
                 CardList {
-                    ForEach(Array(ProviderKind.allCases.enumerated()), id: \.element.id) { i, k in
-                        Button { adding = k } label: {
+                    ForEach(Array(faltando.enumerated()), id: \.element.id) { i, k in
+                        Button { escolher(k) } label: {
                             CardRow(
                                 k.label,
                                 symbol: k.symbol,
-                                color: theme.fgMuted,
-                                detail: k.authStyle == .apiKey ? "chave de API" : "assinatura",
+                                color: k == .apple ? theme.accent : theme.fgMuted,
+                                detail: detalhe(k),
                                 first: i == 0
                             ) {
-                                Image(systemName: "chevron.right").font(.caption2.bold())
+                                Image(systemName: k == .apple ? "plus" : "chevron.right").font(.caption2.bold())
                                     .foregroundStyle(theme.fgSubtle)
                             }
                             .contentShape(Rectangle())
@@ -56,9 +57,11 @@ struct AIAccountsSettings: View {
                         .buttonStyle(.plain)
                     }
                 }
-                if store.accounts.isEmpty {
-                    CardNote("Entre com a assinatura da Claude, do Codex ou do Grok, ou use uma chave de API.")
-                }
+                CardNote(
+                    "O modelo da Apple roda no próprio iPad, sem conta e sem rede, e serve para " +
+                        "conversar sobre o projeto. Para editar arquivos e rodar comandos é preciso " +
+                        "uma conta de IA."
+                )
             }
         }
         .sheet(item: $adding) { k in
@@ -66,7 +69,43 @@ struct AIAccountsSettings: View {
             case .oauthPaste: ClaudeConnectSheet()
             case .deviceCode: DeviceCodeSheet(kind: k)
             case .apiKey: ApiKeySheet(kind: k)
+            case .builtIn: EmptyView()
             }
+        }
+        .alert("Apple Intelligence", isPresented: Binding(
+            get: { recado != nil },
+            set: {
+                if !$0 {
+                    recado = nil
+                }
+            }
+        )) {
+            Button("OK") { recado = nil }
+        } message: { Text(recado ?? "") }
+    }
+
+    /// Só o que ainda não foi conectado. O modelo do sistema entra uma vez só.
+    var faltando: [ProviderKind] {
+        ProviderKind.allCases.filter { k in k != .apple || !store.accounts.contains { $0.kind == .apple } }
+    }
+
+    func detalhe(_ k: ProviderKind) -> String {
+        switch k.authStyle {
+        case .apiKey: "chave de API"
+        case .builtIn: AppleProvider.impedimento ?? "no aparelho, sem conta"
+        default: "assinatura"
+        }
+    }
+
+    func escolher(_ k: ProviderKind) {
+        guard k == .apple else {
+            adding = k
+            return
+        }
+        if let impedimento = AppleProvider.impedimento {
+            recado = impedimento
+        } else {
+            store.addBuiltIn(AIAccount(kind: .apple))
         }
     }
 }

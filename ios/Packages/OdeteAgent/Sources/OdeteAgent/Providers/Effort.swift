@@ -23,6 +23,8 @@ public enum Effort {
             id.range(of: p, options: .regularExpression) != nil
         }
         switch kind {
+        // O modelo do sistema não tem nível de esforço.
+        case .apple: return []
         case .grok:
             if has("non[-_]?reasoning|imagine|image|tts|video|composer") {
                 return []

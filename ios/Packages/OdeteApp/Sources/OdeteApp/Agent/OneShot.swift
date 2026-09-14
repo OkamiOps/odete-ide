@@ -12,7 +12,7 @@ extension AgentModel {
 
     func oneShot(system: String, user: String) async throws -> String {
         guard let acc = account, !acc.needsReconnect else { throw NoAccount() }
-        let provider = HTTPProvider(account: acc, session: accounts.session(for: acc))
+        let provider = ProviderFactory.make(account: acc, session: accounts.session(for: acc))
         let turn = TurnRequest(
             system: system,
             messages: [.user(user)],

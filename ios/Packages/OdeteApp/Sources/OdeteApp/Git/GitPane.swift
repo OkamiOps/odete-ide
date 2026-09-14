@@ -399,31 +399,40 @@ struct CommitBox: View {
     @Environment(WorkspaceModel.self) private var ws
     @Environment(\.theme) private var theme
     @State private var suggesting = false
+    @FocusState private var writing: Bool
+
     var git: GitModel {
         ws.git
     }
 
     var canCommit: Bool {
-        !git.busy && git.conflicts.isEmpty && (!git.staged.isEmpty || git.mergeInProgress)
+        !git.busy && git.conflicts.isEmpty && !git.commitMessage.trimmingCharacters(in: .whitespaces).isEmpty
+            && (!git.staged.isEmpty || git.mergeInProgress)
     }
 
     var body: some View {
         @Bindable var git = git
-        return VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .bottom, spacing: 6) {
+        return VStack(alignment: .leading, spacing: 10) {
+            // Cresce com o texto até doze linhas e depois rola por dentro, em vez de
+            // ficar preso numa linha só.
+            ZStack(alignment: .topTrailing) {
                 TextField(
                     git.mergeInProgress ? "Mensagem do merge" : "Mensagem do commit",
                     text: $git.commitMessage,
                     axis: .vertical
                 )
-                .lineLimit(1 ... 4)
-                .textInputAutocapitalization(.never)
+                .lineLimit(3 ... 12)
+                .textInputAutocapitalization(.sentences)
                 .autocorrectionDisabled()
                 .font(.subheadline)
                 .textFieldStyle(.plain)
-                Button {
-                    suggest()
-                } label: {
+                .focused($writing)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 9)
+                .padding(.trailing, 26)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
+                .background(theme.fg.opacity(0.06), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                Button { suggest() } label: {
                     Group {
                         if suggesting {
                             ProgressView().controlSize(.small)
@@ -432,12 +441,13 @@ struct CommitBox: View {
                         }
                     }
                     .foregroundStyle(git.staged.isEmpty ? theme.fgSubtle : theme.accent)
-                    .frame(width: 24, height: 24)
+                    .frame(width: 26, height: 26)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .disabled(git.staged.isEmpty || suggesting)
                 .accessibilityLabel("Sugerir mensagem a partir do que está no stage")
+                .padding(4)
             }
             HStack(spacing: 6) {
                 GitButton(
@@ -447,6 +457,7 @@ struct CommitBox: View {
                     disabled: !canCommit
                 ) {
                     git.commit()
+                    writing = false
                 }
                 if git.mergeInProgress {
                     GitButton(title: "Abortar", symbol: "xmark", disabled: git.busy) { git.abortMerge() }
@@ -458,12 +469,21 @@ struct CommitBox: View {
                     ) { git.undoLastCommit() }
                 }
             }
-            if !canCommit, !git.mergeInProgress {
-                Text(git.conflicts.isEmpty ? "faça stage de algo para commitar" : "resolva os conflitos antes")
-                    .font(.caption2).foregroundStyle(theme.fgSubtle)
+            if let aviso {
+                Text(aviso).font(.caption2).foregroundStyle(theme.fgSubtle)
             }
         }
         .padding(12)
+    }
+
+    var aviso: String? {
+        if !git.conflicts.isEmpty {
+            return "resolva os conflitos antes de commitar"
+        }
+        if git.staged.isEmpty, !git.mergeInProgress {
+            return "faça stage de algo para commitar"
+        }
+        return nil
     }
 
     func suggest() {

@@ -106,6 +106,8 @@ struct SettingsSheet: View {
     }
 }
 
+/// Conteúdo de uma seção, no mesmo formato do painel Git: título fora do cartão, cartão de
+/// linhas com quadrado de ícone, e a explicação embaixo em texto de apoio.
 struct SettingsContent: View {
     @Environment(ChromeState.self) private var chrome
     @Environment(AppModel.self) private var app
@@ -113,123 +115,251 @@ struct SettingsContent: View {
     var section: SettingsSection
 
     var body: some View {
-        @Bindable var chrome = chrome
-        Form {
-            switch section {
-            case .appearance:
-                Section {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 132), spacing: 10)], spacing: 10) {
-                        ForEach(ThemePalette.all) { p in ThemeCard(palette: p, on: p.id == chrome.snapshot.theme) {
-                            withAnimation(.snappy(duration: 0.2)) { chrome.snapshot.theme = p.id }
-                        } }
-                    }
-                    .listRowInsets(EdgeInsets()).listRowBackground(Color.clear)
-                } header: { Text("Tema") }
-            case .editor:
-                Section("Texto") {
-                    Stepper(value: $chrome.snapshot.editor.fontSize, in: 10 ... 22, step: 1) {
-                        row("Tamanho da fonte", "\(Int(chrome.snapshot.editor.fontSize)) pt")
-                    }
-                    Picker("Altura da linha", selection: $chrome.snapshot.editor.lineHeight) {
-                        Text("Compacta").tag(1.1); Text("Normal").tag(1.25); Text("Arejada").tag(1.45)
-                    }
-                    Toggle("Quebrar linhas", isOn: $chrome.snapshot.editor.wrap)
-                    Picker("Indentação", selection: $chrome.snapshot.editor.tabWidth) {
-                        Text("2 espaços").tag(2); Text("4 espaços").tag(4); Text("8 espaços").tag(8)
-                    }
-                }
-                Section("Exibição") {
-                    Toggle("Números de linha", isOn: $chrome.snapshot.editor.lineNumbers)
-                    Toggle("Destacar linha atual", isOn: $chrome.snapshot.editor.highlightLine)
-                    Toggle("Guias de indentação", isOn: $chrome.snapshot.editor.indentGuides)
-                    Toggle("Mostrar espaços e tabs", isOn: $chrome.snapshot.editor.showWhitespace)
-                    Toggle("Mostrar quebras de linha", isOn: $chrome.snapshot.editor.showLineBreaks)
-                    Picker("Guia de página", selection: $chrome.snapshot.editor.pageGuide) {
-                        Text("Nenhuma").tag(0); Text("80 colunas").tag(80); Text("100 colunas")
-                            .tag(100); Text("120 colunas").tag(120)
-                    }
-                }
-                Section("Edição") {
-                    Toggle("Fechar pares automaticamente", isOn: $chrome.snapshot.editor.autoClosePairs)
-                    Toggle("Salvar automaticamente", isOn: $chrome.snapshot.editor.autoSave)
-                    Text(
-                        "O salvamento automático espera 1 s depois de parar de digitar. Sem ele, ⌘S ou o botão Salvar."
-                    )
-                    .font(OdeteFont.ui(11.5)).foregroundStyle(theme.fgMuted)
-                }
-            case .layout:
-                Section("Painéis") {
-                    Toggle("Sidebar", isOn: $chrome.snapshot.sideOpen)
-                    Toggle("Agente", isOn: $chrome.snapshot.agentVisible)
-                    Toggle("Terminal", isOn: $chrome.snapshot.termVisible)
-                }
-                Section {
-                    Button("Restaurar layout padrão") { chrome.resetLayout() }
-                    Text("Volta as larguras da sidebar, do agente e a altura do terminal.")
-                        .font(OdeteFont.ui(11.5)).foregroundStyle(theme.fgMuted)
-                }
-            case .git:
-                Section { AccountsSettings() }
-            case .ai:
-                Section { AIAccountsSettings() }
-            case .system:
-                Section("Projetos") {
-                    Toggle("Projetos no iCloud Drive", isOn: Binding(
-                        get: { chrome.snapshot.projectsInCloud },
-                        set: { chrome.snapshot.projectsInCloud = app.setCloud($0) }
-                    ))
-                    .disabled(!app.cloudAvailable && !chrome.snapshot.projectsInCloud)
-                    Text(app.cloudAvailable
-                        ? "Move a pasta Projects para o iCloud Drive; continua funcionando offline."
-                        :
-                        "iCloud Drive indisponível neste dispositivo (entre com o Apple ID ou habilite o iCloud Drive).")
-                        .font(OdeteFont.ui(11.5)).foregroundStyle(theme.fgMuted)
-                }
-                Section("Atalhos") {
-                    Text("No app Atalhos: Abrir projeto, Rodar comando, Perguntar à Odete e Novo projeto.")
-                        .font(OdeteFont.ui(12.5)).foregroundStyle(theme.fg)
-                    Text("Os projetos locais ficam em Arquivos → Odete → Projects e podem ser abertos por outros apps.")
-                        .font(OdeteFont.ui(11.5)).foregroundStyle(theme.fgMuted)
-                }
-            case .about:
-                Section {
-                    HStack(spacing: 14) {
-                        BrandIcon(size: 56)
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text("Odete").font(OdeteFont.ui(18, weight: .semibold)).foregroundStyle(theme.fg)
-                            Text(
-                                "IDE no colo · versão \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?") (\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"))"
-                            )
-                            .font(OdeteFont.ui(12)).foregroundStyle(theme.fgMuted)
-                        }
-                    }
-                    .padding(.vertical, 6)
-                    Text(
-                        "Tudo roda no iPad: JavaScriptCore com camada Node, esbuild, libgit2, Runestone e um agente que edita com patches. Sem servidores da Odete."
-                    )
-                    .font(OdeteFont.ui(12.5)).foregroundStyle(theme.fg)
-                }
-                Section("Créditos") {
-                    Text(
-                        "IBM Plex (OFL) · Runestone e tree-sitter (MIT) · libgit2 (GPLv2 com exceção de linking) · esbuild (MIT)"
-                    )
-                    .font(OdeteFont.ui(11.5)).foregroundStyle(theme.fgMuted)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                switch section {
+                case .appearance: appearance
+                case .editor: editor
+                case .layout: layout
+                case .git: AccountsSettings()
+                case .ai: AIAccountsSettings()
+                case .system: system
+                case .about: about
                 }
             }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 12)
         }
-        .formStyle(.grouped)
-        .scrollContentBackground(.hidden)
-        .font(OdeteFont.ui(13.5))
-        .foregroundStyle(theme.fg)
+        .scrollIndicators(.hidden)
         .tint(theme.accent)
     }
 
-    func row(_ label: String, _ value: String) -> some View {
-        HStack(spacing: 8) {
-            Text(label)
-            Spacer()
-            Text(value).font(OdeteFont.mono(12)).foregroundStyle(theme.fgMuted).contentTransition(.numericText())
+    // MARK: aparência
+
+    var appearance: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            SectionTitle("Tema")
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 10)], spacing: 10) {
+                ForEach(ThemePalette.all) { p in
+                    ThemeCard(palette: p, on: p.id == chrome.snapshot.theme) {
+                        withAnimation(.snappy(duration: 0.2)) { chrome.snapshot.theme = p.id }
+                    }
+                }
+            }
         }
+    }
+
+    // MARK: editor
+
+    var editor: some View {
+        @Bindable var chrome = chrome
+        return Group {
+            VStack(alignment: .leading, spacing: 8) {
+                SectionTitle("Texto")
+                CardList {
+                    CardRow("Tamanho da fonte", symbol: "textformat.size", color: .blue, first: true) {
+                        // O rótulo do Stepper fica escondido; o valor vai ao lado, como nos
+                        // Ajustes do sistema.
+                        Text("\(Int(chrome.snapshot.editor.fontSize)) pt")
+                            .font(.footnote).monospacedDigit().foregroundStyle(.secondary)
+                        Stepper("Tamanho da fonte", value: $chrome.snapshot.editor.fontSize, in: 10 ... 22, step: 1)
+                            .labelsHidden()
+                            .fixedSize()
+                    }
+                    CardRow("Altura da linha", symbol: "arrow.up.and.down.text.horizontal", color: .blue) {
+                        Picker("", selection: $chrome.snapshot.editor.lineHeight) {
+                            Text("Compacta").tag(1.1)
+                            Text("Normal").tag(1.25)
+                            Text("Arejada").tag(1.45)
+                        }
+                        .labelsHidden()
+                    }
+                    CardRow("Quebrar linhas", symbol: "text.append", color: .blue) {
+                        Toggle("", isOn: $chrome.snapshot.editor.wrap).labelsHidden()
+                    }
+                    CardRow("Indentação", symbol: "increase.indent", color: .blue) {
+                        Picker("", selection: $chrome.snapshot.editor.tabWidth) {
+                            Text("2 espaços").tag(2)
+                            Text("4 espaços").tag(4)
+                            Text("8 espaços").tag(8)
+                        }
+                        .labelsHidden()
+                    }
+                }
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                SectionTitle("Exibição")
+                CardList {
+                    CardRow("Números de linha", symbol: "list.number", color: .indigo, first: true) {
+                        Toggle("", isOn: $chrome.snapshot.editor.lineNumbers).labelsHidden()
+                    }
+                    CardRow(
+                        "Destacar linha atual",
+                        symbol: "text.line.first.and.arrowtriangle.forward",
+                        color: .indigo
+                    ) {
+                        Toggle("", isOn: $chrome.snapshot.editor.highlightLine).labelsHidden()
+                    }
+                    CardRow("Guias de indentação", symbol: "rectangle.split.3x1", color: .indigo) {
+                        Toggle("", isOn: $chrome.snapshot.editor.indentGuides).labelsHidden()
+                    }
+                    CardRow("Mostrar espaços e tabs", symbol: "space", color: .indigo) {
+                        Toggle("", isOn: $chrome.snapshot.editor.showWhitespace).labelsHidden()
+                    }
+                    CardRow("Mostrar quebras de linha", symbol: "return", color: .indigo) {
+                        Toggle("", isOn: $chrome.snapshot.editor.showLineBreaks).labelsHidden()
+                    }
+                    CardRow("Guia de página", symbol: "ruler", color: .indigo) {
+                        Picker("", selection: $chrome.snapshot.editor.pageGuide) {
+                            Text("Nenhuma").tag(0)
+                            Text("80 colunas").tag(80)
+                            Text("100 colunas").tag(100)
+                            Text("120 colunas").tag(120)
+                        }
+                        .labelsHidden()
+                    }
+                }
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                SectionTitle("Edição")
+                CardList {
+                    CardRow("Fechar pares automaticamente", symbol: "parentheses", color: .teal, first: true) {
+                        Toggle("", isOn: $chrome.snapshot.editor.autoClosePairs).labelsHidden()
+                    }
+                    CardRow("Salvar automaticamente", symbol: "square.and.arrow.down", color: .teal) {
+                        Toggle("", isOn: $chrome.snapshot.editor.autoSave).labelsHidden()
+                    }
+                }
+                CardNote(
+                    "O salvamento automático espera 1 s depois de você parar de digitar. Sem ele, ⌘S ou o botão Salvar."
+                )
+            }
+        }
+    }
+
+    // MARK: layout
+
+    var layout: some View {
+        @Bindable var chrome = chrome
+        return Group {
+            VStack(alignment: .leading, spacing: 8) {
+                SectionTitle("Painéis")
+                CardList {
+                    CardRow("Sidebar", symbol: "sidebar.left", color: .orange, first: true) {
+                        Toggle("", isOn: $chrome.snapshot.sideOpen).labelsHidden()
+                    }
+                    CardRow("Agente", symbol: "sparkles", color: .orange) {
+                        Toggle("", isOn: $chrome.snapshot.agentVisible).labelsHidden()
+                    }
+                    CardRow("Terminal", symbol: "terminal", color: .orange) {
+                        Toggle("", isOn: $chrome.snapshot.termVisible).labelsHidden()
+                    }
+                }
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                CardList {
+                    Button { chrome.resetLayout() } label: {
+                        CardRow(
+                            "Restaurar layout padrão",
+                            symbol: "arrow.counterclockwise",
+                            color: .gray,
+                            first: true
+                        ) {
+                            Image(systemName: "chevron.right").font(.caption2.bold())
+                                .foregroundStyle(theme.fgSubtle)
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+                CardNote("Volta as larguras da sidebar e do agente e a altura do terminal.")
+            }
+        }
+    }
+
+    // MARK: sistema
+
+    @ViewBuilder
+    var system: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            SectionTitle("Projetos")
+            CardList {
+                CardRow("Projetos no iCloud Drive", symbol: "icloud", color: .cyan, first: true) {
+                    Toggle("", isOn: Binding(
+                        get: { chrome.snapshot.projectsInCloud },
+                        set: { chrome.snapshot.projectsInCloud = app.setCloud($0) }
+                    ))
+                    .labelsHidden()
+                    .disabled(!app.cloudAvailable && !chrome.snapshot.projectsInCloud)
+                }
+            }
+            CardNote(app.cloudAvailable
+                ? "Move a pasta Projects para o iCloud Drive; continua funcionando offline."
+                : "iCloud Drive indisponível neste aparelho. Entre com o Apple ID ou habilite o iCloud Drive.")
+        }
+        VStack(alignment: .leading, spacing: 8) {
+            SectionTitle("Atalhos e arquivos")
+            CardList {
+                CardRow(
+                    "Atalhos",
+                    symbol: "app.badge",
+                    color: .purple,
+                    detail: "Abrir projeto, Rodar comando, Perguntar à Odete, Novo projeto",
+                    first: true
+                )
+                CardRow(
+                    "Arquivos",
+                    symbol: "folder",
+                    color: .purple,
+                    detail: "Odete → Projects, aberto para outros apps"
+                )
+            }
+        }
+    }
+
+    // MARK: sobre
+
+    @ViewBuilder
+    var about: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            CardList {
+                HStack(spacing: 14) {
+                    BrandIcon(size: 52)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Odete").font(.title3.bold()).foregroundStyle(theme.fg)
+                        Text("IDE no colo · versão \(versao) (\(build))")
+                            .font(.footnote).foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(14)
+            }
+            CardNote(
+                "Tudo roda no iPad: JavaScriptCore com camada Node, esbuild, libgit2, Runestone e um agente que edita com patches. Sem servidores da Odete."
+            )
+        }
+        VStack(alignment: .leading, spacing: 8) {
+            SectionTitle("Créditos")
+            CardList {
+                CardRow("IBM Plex", symbol: "textformat", color: .gray, detail: "OFL", first: true)
+                CardRow("Runestone e tree-sitter", symbol: "curlybraces", color: .gray, detail: "MIT")
+                CardRow(
+                    "libgit2",
+                    symbol: "arrow.triangle.branch",
+                    color: .gray,
+                    detail: "GPLv2 com exceção de linking"
+                )
+                CardRow("esbuild", symbol: "shippingbox", color: .gray, detail: "MIT")
+            }
+        }
+    }
+
+    var versao: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
+    }
+
+    var build: String {
+        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
     }
 }
 

@@ -10,48 +10,54 @@ struct AIAccountsSettings: View {
     @State private var adding: ProviderKind?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            ForEach(store.accounts) { a in
-                HStack(spacing: 10) {
-                    Image(systemName: a.kind.symbol).foregroundStyle(a.needsReconnect ? theme.danger : theme.accent)
-                        .frame(width: 20)
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(a.label + (a.login.isEmpty ? "" : " · \(a.login)")).font(OdeteFont.ui(13, weight: .medium))
-                            .foregroundStyle(theme.fg)
-                        Text(a.needsReconnect ? "sessão expirou, reconecte" : a.kind.vendor).font(OdeteFont.mono(10.5))
-                            .foregroundStyle(a.needsReconnect ? theme.danger : theme.fgSubtle)
+        VStack(alignment: .leading, spacing: 16) {
+            if !store.accounts.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    SectionTitle("Conectadas", detail: "\(store.accounts.count)")
+                    CardList {
+                        ForEach(Array(store.accounts.enumerated()), id: \.element.id) { i, a in
+                            CardRow(
+                                a.label + (a.login.isEmpty ? "" : " · \(a.login)"),
+                                symbol: a.kind.symbol,
+                                color: a.needsReconnect ? theme.danger : theme.accent,
+                                detail: a.needsReconnect ? "sessão expirou, reconecte" : a.kind.vendor,
+                                first: i == 0
+                            ) {
+                                if a.needsReconnect {
+                                    Button("Reconectar") { adding = a.kind }
+                                        .buttonStyle(.bordered).controlSize(.small)
+                                }
+                                Button("Remover", systemImage: "trash", role: .destructive) { store.remove(a) }
+                                    .labelStyle(.iconOnly)
+                                    .buttonStyle(.borderless)
+                                    .controlSize(.small)
+                            }
+                        }
                     }
-                    Spacer()
-                    if a
-                        .needsReconnect
-                    {
-                        Button("Reconectar") { adding = a.kind }.buttonStyle(.glass).font(OdeteFont.ui(12))
-                    }
-                    HeaderButton("trash", label: "Remover") { store.remove(a) }
                 }
-                .frame(minHeight: 40)
             }
-            if store.accounts.isEmpty {
-                Text("Nenhuma conta de IA. Entre com a assinatura (Claude, Codex, Grok) ou com uma chave de API.")
-                    .font(OdeteFont.ui(12)).foregroundStyle(theme.fgMuted)
-            }
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 6)], spacing: 6) {
-                ForEach(ProviderKind.allCases) { k in
-                    Button { adding = k } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: k.symbol).font(.system(size: 12))
-                            VStack(alignment: .leading, spacing: 0) {
-                                Text(k.label).font(OdeteFont.ui(12, weight: .medium))
-                                Text(k.authStyle == .apiKey ? "chave de API" : "assinatura").font(OdeteFont.ui(10))
+            VStack(alignment: .leading, spacing: 8) {
+                SectionTitle(store.accounts.isEmpty ? "Conectar uma conta" : "Adicionar")
+                CardList {
+                    ForEach(Array(ProviderKind.allCases.enumerated()), id: \.element.id) { i, k in
+                        Button { adding = k } label: {
+                            CardRow(
+                                k.label,
+                                symbol: k.symbol,
+                                color: theme.fgMuted,
+                                detail: k.authStyle == .apiKey ? "chave de API" : "assinatura",
+                                first: i == 0
+                            ) {
+                                Image(systemName: "chevron.right").font(.caption2.bold())
                                     .foregroundStyle(theme.fgSubtle)
                             }
-                            Spacer()
+                            .contentShape(Rectangle())
                         }
-                        .foregroundStyle(theme.fg).padding(8).frame(maxWidth: .infinity)
-                        .background(theme.bg, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(theme.border))
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
+                }
+                if store.accounts.isEmpty {
+                    CardNote("Entre com a assinatura da Claude, do Codex ou do Grok, ou use uma chave de API.")
                 }
             }
         }

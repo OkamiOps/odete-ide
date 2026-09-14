@@ -19,24 +19,29 @@ struct AccountsSettings: View {
 
     var body: some View {
         @Bindable var accounts = accounts
-        VStack(alignment: .leading, spacing: 10) {
-            ForEach(accounts.accounts) { a in
-                HStack(spacing: 10) {
-                    Image(systemName: a.kind == .github ? "cat" : "server.rack").foregroundStyle(theme.accent)
-                        .frame(width: 20)
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text("\(a.login) · \(a.kind.label)").font(OdeteFont.ui(13, weight: .medium))
-                            .foregroundStyle(theme.fg)
-                        Text(a.host).font(OdeteFont.mono(10.5)).foregroundStyle(theme.fgSubtle)
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 8) {
+                SectionTitle("Contas", detail: accounts.accounts.isEmpty ? nil : "\(accounts.accounts.count)")
+                if accounts.accounts.isEmpty {
+                    CardNote("Sem conta, push e clone de repositórios privados não funcionam.")
+                } else {
+                    CardList {
+                        ForEach(Array(accounts.accounts.enumerated()), id: \.element.id) { i, a in
+                            CardRow(
+                                "\(a.login) · \(a.kind.label)",
+                                symbol: a.kind == .github ? "cat" : "server.rack",
+                                color: theme.accent,
+                                detail: a.host,
+                                first: i == 0
+                            ) {
+                                Button("Remover", systemImage: "trash", role: .destructive) { accounts.remove(a) }
+                                    .labelStyle(.iconOnly)
+                                    .buttonStyle(.borderless)
+                                    .controlSize(.small)
+                            }
+                        }
                     }
-                    Spacer()
-                    HeaderButton("trash", label: "Remover") { accounts.remove(a) }
                 }
-                .frame(minHeight: 40)
-            }
-            if accounts.accounts.isEmpty {
-                Text("Nenhuma conta. Sem conta, push e clone de repositórios privados não funcionam.")
-                    .font(OdeteFont.ui(12)).foregroundStyle(theme.fgMuted)
             }
             if let d = device {
                 VStack(alignment: .leading, spacing: 6) {
@@ -58,21 +63,66 @@ struct AccountsSettings: View {
                 .background(theme.bg, in: RoundedRectangle(cornerRadius: 12))
                 .overlay(RoundedRectangle(cornerRadius: 12).stroke(theme.accent))
             }
-            HStack(spacing: 6) {
-                if GitHubDeviceFlow().isConfigured {
-                    GitButton(title: "Entrar com GitHub", symbol: "cat", accent: true, disabled: waiting) {
-                        startDeviceFlow()
+            VStack(alignment: .leading, spacing: 8) {
+                SectionTitle("Adicionar")
+                CardList {
+                    if GitHubDeviceFlow().isConfigured {
+                        Button { startDeviceFlow() } label: {
+                            CardRow("Entrar com GitHub", symbol: "cat", color: theme.accent, first: true) {
+                                if waiting {
+                                    ProgressView().controlSize(.small)
+                                } else {
+                                    Image(systemName: "chevron.right").font(.caption2.bold())
+                                        .foregroundStyle(theme.fgSubtle)
+                                }
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(waiting)
+                    }
+                    Button { adding = true } label: {
+                        CardRow(
+                            "Adicionar por token",
+                            symbol: "key",
+                            color: theme.fgMuted,
+                            detail: "GitHub, GitLab ou qualquer host",
+                            first: !GitHubDeviceFlow().isConfigured
+                        ) {
+                            Image(systemName: "chevron.right").font(.caption2.bold())
+                                .foregroundStyle(theme.fgSubtle)
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+                if let error {
+                    CardNote(error)
+                }
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                SectionTitle("Autor dos commits")
+                CardList {
+                    CardRow("Nome", symbol: "person", color: .gray, first: true) {
+                        TextField("seu nome", text: $accounts.authorName)
+                            .multilineTextAlignment(.trailing)
+                            .textFieldStyle(.plain)
+                            .font(.subheadline)
+                            .frame(maxWidth: 220)
+                    }
+                    CardRow("E-mail", symbol: "envelope", color: .gray) {
+                        TextField("seu@email", text: $accounts.authorEmail)
+                            .multilineTextAlignment(.trailing)
+                            .textFieldStyle(.plain)
+                            .font(.subheadline)
+                            .keyboardType(.emailAddress)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .frame(maxWidth: 220)
                     }
                 }
-                GitButton(title: "Adicionar por token", symbol: "key") { adding = true }
+                CardNote("Vai assinado em cada commit feito daqui.")
             }
-            if let error {
-                Text(error).font(OdeteFont.ui(11)).foregroundStyle(theme.danger)
-            }
-            Text("AUTOR DOS COMMITS").font(OdeteFont.label).tracking(1).foregroundStyle(theme.fgSubtle).padding(.top, 8)
-            TextField("Nome", text: $accounts.authorName).textFieldStyle(.roundedBorder)
-            TextField("E-mail", text: $accounts.authorEmail).textFieldStyle(.roundedBorder).keyboardType(.emailAddress)
-                .textInputAutocapitalization(.never)
         }
         .sheet(isPresented: $adding) { tokenSheet }
     }

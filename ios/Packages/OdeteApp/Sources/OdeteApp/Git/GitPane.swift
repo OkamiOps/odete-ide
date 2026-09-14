@@ -399,15 +399,23 @@ struct CommitBox: View {
     @Environment(WorkspaceModel.self) private var ws
     @Environment(\.theme) private var theme
     @State private var suggesting = false
+    @State private var asking = false
     @FocusState private var writing: Bool
 
     var git: GitModel {
         ws.git
     }
 
+    /// Basta ter mensagem escrita e alguma alteração; se nada estiver no stage,
+    /// perguntamos na hora do commit em vez de deixar o botão apagado.
     var canCommit: Bool {
-        !git.busy && git.conflicts.isEmpty && !git.commitMessage.trimmingCharacters(in: .whitespaces).isEmpty
-            && (!git.staged.isEmpty || git.mergeInProgress)
+        !git.busy && git.conflicts.isEmpty
+            && !git.commitMessage.trimmingCharacters(in: .whitespaces).isEmpty
+            && (!git.status.isEmpty || git.mergeInProgress)
+    }
+
+    var nothingStaged: Bool {
+        git.staged.isEmpty && !git.mergeInProgress && !git.unstaged.isEmpty
     }
 
     var body: some View {
@@ -456,8 +464,12 @@ struct CommitBox: View {
                     accent: true,
                     disabled: !canCommit
                 ) {
-                    git.commit()
                     writing = false
+                    if nothingStaged {
+                        asking = true
+                    } else {
+                        git.commit()
+                    }
                 }
                 if git.mergeInProgress {
                     GitButton(title: "Abortar", symbol: "xmark", disabled: git.busy) { git.abortMerge() }
@@ -469,21 +481,22 @@ struct CommitBox: View {
                     ) { git.undoLastCommit() }
                 }
             }
-            if let aviso {
-                Text(aviso).font(.caption2).foregroundStyle(theme.fgSubtle)
+            if !git.conflicts.isEmpty {
+                Text("resolva os conflitos antes de commitar")
+                    .font(.caption2).foregroundStyle(theme.danger)
             }
         }
         .padding(12)
-    }
-
-    var aviso: String? {
-        if !git.conflicts.isEmpty {
-            return "resolva os conflitos antes de commitar"
+        .confirmationDialog(
+            "Nada está no stage",
+            isPresented: $asking,
+            titleVisibility: .visible
+        ) {
+            Button("Commitar as \(git.unstaged.count) alterações") { git.commit(stagingEverything: true) }
+            Button("Cancelar", role: .cancel) {}
+        } message: {
+            Text("Quer mandar tudo para o stage e commitar?")
         }
-        if git.staged.isEmpty, !git.mergeInProgress {
-            return "faça stage de algo para commitar"
-        }
-        return nil
     }
 
     func suggest() {

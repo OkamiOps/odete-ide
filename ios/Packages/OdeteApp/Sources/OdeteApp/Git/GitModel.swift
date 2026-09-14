@@ -221,12 +221,18 @@ public final class GitModel {
         ); return nil }
     }
 
-    public func commit() {
+    /// `stageFirst` manda tudo para o stage antes de commitar, numa operação só: chamar
+    /// `stageAll()` e `commit()` em seguida não funciona porque a segunda cai no guarda de
+    /// ocupado enquanto a primeira ainda roda.
+    public func commit(stagingEverything stageFirst: Bool = false) {
         let msg = commitMessage.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !msg.isEmpty else { error = "escreva a mensagem do commit"; return }
         let author = author
         let merging = mergeInProgress
         run("commit…") { repo in
+            if stageFirst {
+                try await repo.stageAll()
+            }
             if merging {
                 try await repo.finishMerge(message: msg, author: author)
             } else {

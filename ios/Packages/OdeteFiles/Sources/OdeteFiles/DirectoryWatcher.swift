@@ -5,6 +5,10 @@ import Foundation
 public final class DirectoryWatcher: @unchecked Sendable {
     private let url: URL
     private let onChange: @Sendable () -> Void
+    /// Chamado a cada volta do relógio, mudando algo ou não. A assinatura da árvore só
+    /// enxerga data de pasta, ou seja, arquivo criado, apagado ou renomeado; conteúdo
+    /// reescrito por fora (agente, terminal, git) não mexe na pasta e passava batido.
+    private let onTick: (@Sendable () -> Void)?
     private var source: DispatchSourceFileSystemObject?
     private var fd: Int32 = -1
     private var timer: DispatchSourceTimer?
@@ -12,9 +16,14 @@ public final class DirectoryWatcher: @unchecked Sendable {
     private let queue = DispatchQueue(label: "odete.watcher", qos: .utility)
     private var pending: DispatchWorkItem?
 
-    public init(url: URL, onChange: @escaping @Sendable () -> Void) {
+    public init(
+        url: URL,
+        onChange: @escaping @Sendable () -> Void,
+        onTick: (@Sendable () -> Void)? = nil
+    ) {
         self.url = url
         self.onChange = onChange
+        self.onTick = onTick
     }
 
     public func start() {
@@ -41,6 +50,7 @@ public final class DirectoryWatcher: @unchecked Sendable {
                     lastSignature = sig
                     fire()
                 }
+                onTick?()
             }
             t.resume()
             timer = t

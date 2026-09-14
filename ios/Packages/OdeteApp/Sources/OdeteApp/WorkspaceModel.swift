@@ -79,6 +79,8 @@ public final class WorkspaceModel {
         }
         let w = DirectoryWatcher(url: root) { [weak self] in
             Task { @MainActor in self?.externalReload() }
+        } onTick: { [weak self] in
+            Task { @MainActor in self?.conferirDisco() }
         }
         w.start()
         watcher = w
@@ -125,6 +127,30 @@ public final class WorkspaceModel {
             reloadTick += 1
         } catch {
             self.error = error.localizedDescription
+        }
+    }
+
+    /// Data de modificação vista por último em cada arquivo aberto.
+    private var marcaDisco: [String: Date] = [:]
+
+    /// Arquivo aberto reescrito por fora volta para a tela.
+    ///
+    /// Sem isto o editor seguia mostrando o texto velho depois de um `git checkout`, de um
+    /// script no terminal ou do agente escrevendo, e o salvamento automático gravava o
+    /// velho por cima do novo. Buffer com alteração não salva é deixado em paz: ali quem
+    /// manda é o que a pessoa digitou.
+    func conferirDisco() {
+        for t in tabs {
+            guard let data = ops.modifiedAt(t.path) else { continue }
+            let antes = marcaDisco[t.path]
+            marcaDisco[t.path] = data
+            guard let antes, antes != data, !t.isDirty else { continue }
+            if let disco = try? ops.read(t.path), disco != buffers[t.path] {
+                buffers[t.path] = disco
+                reloadTick += 1
+                analyze(t.path)
+                refreshGutter(t.path)
+            }
         }
     }
 
@@ -209,6 +235,7 @@ public final class WorkspaceModel {
         if buffers[path] == nil {
             buffers[path] = (try? ops.read(path)) ?? ""
         }
+        marcaDisco[path] = ops.modifiedAt(path)
     }
 
     public func closeTab(_ path: String, force: Bool = false) {
@@ -269,6 +296,7 @@ public final class WorkspaceModel {
         guard let path = path ?? active, let text = buffers[path] else { return }
         do {
             try ops.write(path, text)
+            marcaDisco[path] = ops.modifiedAt(path)
             markDirty(path, false)
             git.scheduleRefresh()
             refreshGutter(path)

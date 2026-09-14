@@ -73,6 +73,12 @@ public struct FileOps: Sendable {
         try FileManager.default.removeItem(at: url(rel))
     }
 
+    /// Data de modificação, para saber quando um arquivo aberto mudou por fora.
+    public func modifiedAt(_ rel: String) -> Date? {
+        guard let u = try? url(rel) else { return nil }
+        return try? u.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
+    }
+
     public func isDirectory(_ rel: String) -> Bool {
         guard let u = try? url(rel) else { return false }
         var isDir: ObjCBool = false

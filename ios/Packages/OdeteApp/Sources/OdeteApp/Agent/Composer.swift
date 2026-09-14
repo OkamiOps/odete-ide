@@ -138,8 +138,7 @@ struct Composer: View {
             }
             .padding(.horizontal, 10).padding(.bottom, 6)
         }
-        .padding(.top, 6)
-        .overlay(alignment: .top) { Rectangle().fill(theme.border).frame(height: 1) }
+        .padding(.top, Metrics.s2)
         .onChange(of: agent.focusRequest) { focused = true }
         .onChange(of: photo) { _, item in
             guard let item else { return }

@@ -32,9 +32,8 @@ struct PreviewPane: View {
                     .keyboardType(.URL)
                     .submitLabel(.go)
                     .onSubmit { navigate(urlText) }
-                    .padding(.horizontal, 10).frame(height: 30)
-                    .background(theme.bg, in: Capsule())
-                    .overlay(Capsule().stroke(theme.border))
+                    .padding(.horizontal, 12).frame(height: 32)
+                    .glassEffect(.regular, in: Capsule())
                 Menu {
                     ForEach(Viewport.allCases) { v in
                         Button { pv.viewport = v } label: { Label(v.label, systemImage: v.symbol) }
@@ -60,10 +59,9 @@ struct PreviewPane: View {
                     }
                 }
             }
-            .padding(.horizontal, 8)
-            .frame(height: 44)
-            .background(theme.bgElevated)
-            .overlay(alignment: .bottom) { Rectangle().fill(theme.border).frame(height: 1) }
+            .padding(.horizontal, Metrics.s2)
+            .frame(height: 48)
+            .background(theme.surface)
             content
             if pv.consoleOpen {
                 PreviewConsole()

@@ -44,10 +44,10 @@ struct ChatList: View {
                 id: \.self
             ) { s in
                 Button { agent.draft = s } label: {
-                    Text(s).font(OdeteFont.ui(12)).foregroundStyle(theme.fg).padding(.horizontal, 10).frame(height: 32)
-                        .background(theme.bgSubtle, in: Capsule())
+                    Text(s).font(OdeteFont.ui(12.5)).foregroundStyle(theme.fg).padding(.horizontal, 12)
+                        .frame(height: 34)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.glass)
             }
         }
         .padding(.top, 8)
@@ -56,7 +56,10 @@ struct ChatList: View {
     enum Group: Identifiable {
         case single(ChatItem), tools(String, [ChatItem])
         var id: String {
-            switch self { case let .single(i): i.id; case let .tools(id, _): id }
+            switch self {
+            case let .single(i): i.id
+            case let .tools(id, _): id
+            }
         }
     }
 
@@ -64,7 +67,9 @@ struct ChatList: View {
         var out: [Group] = []
         for it in items {
             let isTool: Bool = switch it {
-            case .tool: true; case let .permit(_, _, _, s): s != .pending; default: false
+            case .tool: true
+            case let .permit(_, _, _, s): s != .pending
+            default: false
             }
             if isTool, case let .tools(id, list)? = out.last {
                 out[out.count - 1] = .tools(id, list + [it])
@@ -92,9 +97,13 @@ struct ChatRow: View {
                 if let images, !images.isEmpty {
                     HStack(spacing: 6) { ForEach(images.indices, id: \.self) { i in thumb(images[i]) } }
                 }
-                Text(text).font(OdeteFont.ui(13)).foregroundStyle(theme.fg).textSelection(.enabled)
-                    .padding(.horizontal, 12).padding(.vertical, 8)
-                    .background(theme.bgSubtle, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                Text(text).font(OdeteFont.ui(13.5)).foregroundStyle(theme.fg).textSelection(.enabled)
+                    .padding(.horizontal, 14).padding(.vertical, 9)
+                    .background(theme.glassTint, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(
+                        theme.accent.opacity(0.2),
+                        lineWidth: 0.5
+                    ))
             }
             .frame(maxWidth: .infinity, alignment: .trailing)
         case let .assistant(_, text):
@@ -305,7 +314,9 @@ struct MarkdownText: View {
 
     enum Block: Identifiable { case code(Int, String, String), para(Int, String), heading(Int, String)
         var id: Int {
-            switch self { case let .code(i, _, _), let .para(i, _), let .heading(i, _): i }
+            switch self {
+            case let .code(i, _, _), let .para(i, _), let .heading(i, _): i
+            }
         }
     }
 

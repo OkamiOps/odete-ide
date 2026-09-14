@@ -67,7 +67,7 @@ struct TerminalPane: View {
                     .id(s.id)
             }
         }
-        .background(theme.bgElevated)
+        .background(theme.bg)
     }
 }
 
@@ -91,7 +91,7 @@ struct TermTab: View {
         .foregroundStyle(active ? theme.fg : theme.fgMuted)
         .padding(.horizontal, 10)
         .frame(height: Metrics.tab - 8)
-        .background(active ? theme.bg : .clear, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+        .background(active ? theme.glassTint : .clear, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         .contentShape(Rectangle())
         .onTapGesture(perform: onSelect)
     }
@@ -154,9 +154,9 @@ struct TerminalView: View {
                     ProgressView().controlSize(.small)
                 }
             }
-            .padding(.horizontal, 12).frame(height: 40)
+            .padding(.horizontal, Metrics.s3).frame(height: 42)
             .background(theme.bg)
-            .overlay(alignment: .top) { Rectangle().fill(theme.border).frame(height: 1) }
+            .overlay(alignment: .top) { Rectangle().fill(theme.separator).frame(height: 0.5) }
             TermKeys(session: session)
         }
         .onAppear { focused = true }

@@ -80,9 +80,9 @@ struct AgentPane: View {
             Button("Rejeitar tudo") { ag.rejectAll() }.buttonStyle(.glass).font(OdeteFont.ui(12))
             Button("Aceitar tudo") { ag.acceptAll() }.buttonStyle(.glassProminent).font(OdeteFont.ui(12))
         }
-        .padding(.horizontal, 10).frame(height: 40)
-        .background(theme.bgSubtle)
-        .overlay(alignment: .top) { Rectangle().fill(theme.border).frame(height: 1) }
+        .padding(.horizontal, Metrics.s3).frame(height: 44)
+        .background(theme.glassTint)
+        .overlay(alignment: .top) { Rectangle().fill(theme.separator).frame(height: 0.5) }
     }
 
     func footer(_ ag: AgentModel) -> some View {
@@ -174,8 +174,8 @@ struct ModelMenu: View {
                 }
                 Image(systemName: "chevron.down").font(.system(size: 9, weight: .bold)).foregroundStyle(theme.fgSubtle)
             }
-            .padding(.horizontal, 8).frame(height: 32)
-            .background(theme.bgSubtle, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .padding(.horizontal, 10).frame(height: 36)
+            .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
         .buttonStyle(.plain)
     }

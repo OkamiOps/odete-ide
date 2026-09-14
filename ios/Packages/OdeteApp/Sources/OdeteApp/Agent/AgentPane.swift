@@ -60,10 +60,13 @@ struct AgentPane: View {
             ModelMenu(agent: ag, onConnect: { showAccounts = true }).layoutPriority(1)
             Spacer(minLength: 4)
             HStack(spacing: 0) {
-                PaneAction("clock.arrow.circlepath", label: "Conversas") { history = true }
+                // A contagem em cima do relógio: sem ela o botão parecia desligado, como
+                // se não houvesse conversa nenhuma guardada.
+                PaneAction("clock.arrow.circlepath", label: "Conversas", conta: ag.threads.count) { history = true }
                 PaneAction("arrow.uturn.backward", label: "Desfazer último turno") { _ = ag.undoLastTurn() }
                     .disabled(!ag.canUndoTurn)
                 PaneAction("square.and.pencil", label: "Nova conversa") { ag.newChat() }
+                    .disabled(ag.thread.isEmpty)
                 if sizeClass != .compact {
                     PaneAction("sidebar.trailing", label: "Fechar agente") { chrome.toggleAgent() }
                 }
@@ -102,25 +105,41 @@ struct PaneAction: View {
     @Environment(\.isEnabled) private var enabled
     var symbol: String
     var label: String
+    /// Número no canto do ícone. Zero não desenha nada.
+    var conta = 0
     var action: () -> Void
 
-    init(_ symbol: String, label: String, action: @escaping () -> Void) {
+    init(_ symbol: String, label: String, conta: Int = 0, action: @escaping () -> Void) {
         self.symbol = symbol
         self.label = label
+        self.conta = conta
         self.action = action
     }
 
     var body: some View {
         Button(action: action) {
             Image(systemName: symbol)
+                // Ligado é o texto normal, não o cinza apagado: com `fgMuted` todo botão
+                // parecia desabilitado, e o desabilitado de verdade não se distinguia.
                 .font(.system(size: 14, weight: .medium))
                 .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(enabled ? theme.fgMuted : theme.fgSubtle.opacity(0.5))
+                .foregroundStyle(enabled ? theme.fg.opacity(0.9) : theme.fgSubtle.opacity(0.4))
                 .frame(width: 30, height: 30)
+                .overlay(alignment: .topTrailing) {
+                    if conta > 1, enabled {
+                        Text("\(min(conta, 99))")
+                            .font(.system(size: 8.5, weight: .bold)).monospacedDigit()
+                            .foregroundStyle(theme.accentFg)
+                            .padding(.horizontal, 3).frame(minWidth: 13, minHeight: 13)
+                            .background(theme.accent, in: Capsule())
+                            .offset(x: 2, y: 1)
+                    }
+                }
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(label)
+        .hoverEffect(.highlight)
+        .accessibilityLabel(conta > 1 ? "\(label), \(conta)" : label)
         .help(label)
     }
 }
@@ -187,64 +206,6 @@ struct ModelMenu: View {
     var subtitle: String {
         guard let a = agent.account else { return "conectar" }
         return a.login.isEmpty ? a.kind.vendor : a.login
-    }
-}
-
-struct HistorySheet: View {
-    @Environment(\.dismiss) private var dismiss
-    @Environment(\.theme) private var theme
-    let agent: AgentModel
-
-    var body: some View {
-        NavigationStack {
-            Group {
-                if agent.threads.isEmpty {
-                    ContentUnavailableView(
-                        "Nenhuma conversa",
-                        systemImage: "bubble.left.and.bubble.right",
-                        description: Text("O que você perguntar à Odete aparece aqui.")
-                    )
-                } else {
-                    List {
-                        ForEach(agent.threads) { t in
-                            Button { agent.open(t); dismiss() } label: {
-                                HStack(spacing: 10) {
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(t.title).font(.body).foregroundStyle(theme.fg).lineLimit(2)
-                                        Text(
-                                            "\(t.updated.formatted(date: .abbreviated, time: .shortened)) · \(fmtTok(t.usage.input + t.usage.output)) tokens"
-                                        )
-                                        .font(.caption).foregroundStyle(.secondary)
-                                    }
-                                    Spacer(minLength: 8)
-                                    if t.id == agent.thread.id {
-                                        Image(systemName: "checkmark").font(.caption.bold())
-                                            .foregroundStyle(theme.accent)
-                                    }
-                                }
-                            }
-                            .swipeActions { Button(role: .destructive) { agent.remove(t) } label: { Label(
-                                "Apagar",
-                                systemImage: "trash"
-                            ) } }
-                        }
-                    }
-                }
-            }
-            .navigationTitle("Conversas")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Fechar") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button { agent.newChat(); dismiss() } label: { Label(
-                        "Nova",
-                        systemImage: "square.and.pencil"
-                    ) }
-                }
-            }
-        }
-        .presentationDetents([.medium, .large])
-        .pointerScrolling()
     }
 }
 

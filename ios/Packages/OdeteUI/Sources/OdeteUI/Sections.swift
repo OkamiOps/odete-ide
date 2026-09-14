@@ -38,12 +38,16 @@ public struct SectionTitle<MenuContent: View>: View {
                     .contentTransition(.numericText())
             }
             Spacer(minLength: 0)
-            if let stat {
+            // O par +/− nunca quebra: sem `fixedSize` ele virava três linhas de dígitos
+            // soltos numa coluna estreita. Abaixo de 230 pt some de vez.
+            if let stat, paneWidth >= 230 {
                 HStack(spacing: 6) {
                     Text("+\(stat.added)").foregroundStyle(theme.ok)
                     Text("−\(stat.removed)").foregroundStyle(theme.danger)
                 }
                 .font(.caption.weight(.medium)).monospacedDigit()
+                .lineLimit(1)
+                .fixedSize()
                 .contentTransition(.numericText())
             }
             if !(menu is EmptyView) {

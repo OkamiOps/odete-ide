@@ -66,10 +66,12 @@ struct PullRequestsCard: View {
 
     var body: some View {
         GitCard(title: "Pull requests", trailing: loading ? "…" : "\(pulls.count) abertos") {
-            if let error {
-                Text(error).font(OdeteFont.ui(11)).foregroundStyle(theme.danger)
+            if let recado {
+                // "GitHub 404: Not Found" no meio do painel não diz o que fazer.
+                Text(recado).font(.caption).foregroundStyle(theme.fgMuted)
+                    .fixedSize(horizontal: false, vertical: true)
             } else if pulls.isEmpty, !loading {
-                Text("nenhum PR aberto").font(OdeteFont.mono(11)).foregroundStyle(theme.fgSubtle)
+                Text("Nenhum PR aberto.").font(.caption).foregroundStyle(.secondary)
             }
             ForEach(pulls.prefix(5)) { p in
                 Button { sheet = GhTarget(tab: 0, pull: p) } label: {
@@ -105,6 +107,21 @@ struct PullRequestsCard: View {
         }
         .task(id: ws.git.githubSlug) { await load() }
         .sheet(item: $sheet, onDismiss: { Task { await load() } }) { t in GhSheet(tab: t.tab, pull: t.pull) }
+    }
+
+    /// Recado no lugar do erro cru da API.
+    var recado: String? {
+        if ws.git.githubToken == nil {
+            return "Conecte uma conta do GitHub nos Ajustes para ver e abrir pull requests."
+        }
+        guard let error else { return nil }
+        if error.contains("404") {
+            return "Não achei este repositório no GitHub. Confira o remoto e se a conta tem acesso a ele."
+        }
+        if error.contains("401") || error.contains("403") {
+            return "A conta do GitHub não tem acesso a este repositório."
+        }
+        return error
     }
 
     func load() async {

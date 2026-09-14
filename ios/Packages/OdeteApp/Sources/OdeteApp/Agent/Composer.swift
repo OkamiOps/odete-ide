@@ -90,7 +90,6 @@ struct Composer: View {
 
     var caixa: some View {
         VStack(alignment: .leading, spacing: 6) {
-            faixa
             GrowingTextView(
                 text: $agent.draft,
                 placeholder: agent.running ? "redirecionar o agente…" : "Peça algo à Odete…",
@@ -107,16 +106,11 @@ struct Composer: View {
             )
             .padding(.horizontal, 6)
             .padding(.vertical, 2)
-            HStack(spacing: 4) {
-                iconeBotao("plus", label: "Contexto") { contexto = true }
-                iconeBotao(
-                    ditado.running ? "mic.fill" : "mic",
-                    label: ditado.running ? "Parar ditado" : "Ditar",
-                    cor: ditado.running ? theme.accent : theme.fgMuted
-                ) { ditado.toggle(atual: agent.draft) }
-                modoMenu
-                Spacer(minLength: 4)
-                enviar
+            // Numa coluna estreita o modo abre mão do rótulo antes que o nome do modelo
+            // vire reticências.
+            ViewThatFits(in: .horizontal) {
+                controles(modoComTexto: true)
+                controles(modoComTexto: false)
             }
         }
         .padding(8)
@@ -126,22 +120,22 @@ struct Composer: View {
         .padding(.horizontal, 12)
     }
 
-    /// Faixa de cima: modelo, esforço e quanto da janela de contexto já foi.
-    var faixa: some View {
-        HStack(spacing: 8) {
-            modeloMenu
-            if !agent.effortOptions.isEmpty {
-                esforcoMenu
-            }
+    /// Uma linha só: anexar, ditar, modo, e no canto o modelo, o contexto e o enviar.
+    func controles(modoComTexto: Bool) -> some View {
+        HStack(spacing: 4) {
+            iconeBotao("plus", label: "Contexto") { contexto = true }
+            iconeBotao(
+                ditado.running ? "mic.fill" : "mic",
+                label: ditado.running ? "Parar ditado" : "Ditar",
+                cor: ditado.running ? theme.accent : theme.fgMuted
+            ) { ditado.toggle(atual: agent.draft) }
+            modoMenu(comTexto: modoComTexto)
             Spacer(minLength: 6)
-            Button { janela = true } label: { ContextGauge(fracao: fracaoContexto) }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Janela de contexto")
-                .popover(isPresented: $janela) {
-                    ContextPopover(agent: agent).presentationCompactAdaptation(.popover)
-                }
+            // Sem prioridade o espaçador come a largura do nome e sobra só "…".
+            modeloMenu.layoutPriority(1)
+            anelContexto
+            enviar
         }
-        .padding(.leading, 6)
     }
 
     var fracaoContexto: Double {
@@ -149,24 +143,18 @@ struct Composer: View {
         return min(1, Double(usado) / Double(max(1, agent.contextWindow)))
     }
 
-    var esforcoMenu: some View {
-        Menu {
-            Picker("Esforço", selection: Binding(get: { agent.effort }, set: { agent.setEffort($0) })) {
-                ForEach(agent.effortOptions, id: \.self) { e in Text(Effort.labels[e] ?? e).tag(e) }
-            }
-        } label: {
-            HStack(spacing: 3) {
-                Image(systemName: "gauge.with.dots.needle.33percent").font(.system(size: 10, weight: .semibold))
-                Text(Effort.labels[agent.effort] ?? agent.effort).font(.caption.weight(.medium)).fixedSize()
-                Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold)).opacity(0.7)
-            }
-            .foregroundStyle(theme.fgMuted)
-            .frame(height: 24)
-            .contentShape(Rectangle())
+    /// Anel do contexto sem percentual escrito: o número não cabe na mesma linha dos
+    /// controles, e o detalhe está a um toque.
+    var anelContexto: some View {
+        Button { janela = true } label: {
+            ContextGauge(fracao: fracaoContexto, mostrarTexto: false)
+                .frame(width: 26, height: 28)
         }
-        .menuIndicator(.hidden)
         .buttonStyle(.plain)
-        .accessibilityLabel("Esforço")
+        .accessibilityLabel("Janela de contexto")
+        .popover(isPresented: $janela) {
+            ContextPopover(agent: agent).presentationCompactAdaptation(.popover)
+        }
     }
 
     func iconeBotao(
@@ -185,7 +173,25 @@ struct Composer: View {
         .accessibilityLabel(label)
     }
 
-    /// Modelo e esforço no canto, como na barra de digitação da Claude.
+    func modoMenu(comTexto: Bool) -> some View {
+        Menu {
+            Picker("Modo", selection: Binding(get: { agent.mode }, set: { agent.setMode($0) })) {
+                ForEach(AgentMode.allCases) { m in Label(m.label, systemImage: simbolo(m)).tag(m) }
+            }
+        } label: {
+            capsula(
+                comTexto ? agent.mode.label : nil,
+                symbol: simbolo(agent.mode),
+                destacada: agent.mode == .build
+            )
+        }
+        .menuIndicator(.hidden)
+        .buttonStyle(.plain)
+        .accessibilityLabel("Modo: \(agent.mode.label)")
+    }
+
+    /// Modelo e esforço no canto, como na barra de digitação da Claude. O esforço mora
+    /// dentro do menu: é ajuste do modelo e não precisa de cápsula própria na barra.
     var modeloMenu: some View {
         Menu {
             if let acc = agent.account {
@@ -203,15 +209,24 @@ struct Composer: View {
                     Button("Recarregar modelos") { Task { await agent.loadModels() } }
                 }
             }
+            if !agent.effortOptions.isEmpty {
+                Section("Esforço") {
+                    Picker("Esforço", selection: Binding(get: { agent.effort }, set: { agent.setEffort($0) })) {
+                        ForEach(agent.effortOptions, id: \.self) { e in Text(Effort.labels[e] ?? e).tag(e) }
+                    }
+                }
+            }
         } label: {
-            HStack(spacing: 5) {
-                Image(systemName: agent.account?.kind.symbol ?? "sparkles")
-                    .font(.system(size: 10, weight: .semibold))
-                Text(nomeModelo).font(.caption.weight(.medium)).lineLimit(1).truncationMode(.middle)
+            HStack(spacing: 4) {
+                Text(nomeModelo).font(.caption.weight(.medium)).lineLimit(1).truncationMode(.tail)
+                if !agent.effortOptions.isEmpty, let e = Effort.labels[agent.effort] {
+                    Text(e).font(.caption2).foregroundStyle(theme.fgSubtle).fixedSize()
+                }
                 Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold)).opacity(0.7)
             }
             .foregroundStyle(theme.fgMuted)
-            .frame(height: 24)
+            .padding(.horizontal, 4)
+            .frame(height: 28)
             .contentShape(Rectangle())
         }
         .menuIndicator(.hidden)
@@ -219,30 +234,23 @@ struct Composer: View {
         .accessibilityLabel("Modelo")
     }
 
+    /// Nome curto: na barra cabe o essencial, o resto está no menu.
     var nomeModelo: String {
-        guard agent.account != nil else { return "escolher conta e modelo" }
+        guard agent.account != nil else { return "conectar" }
         let cheio = agent.models.first { $0.id == agent.model }?.label ?? agent.model
-        return cheio.isEmpty ? "modelo" : cheio
-    }
-
-    var modoMenu: some View {
-        Menu {
-            Picker("Modo", selection: Binding(get: { agent.mode }, set: { agent.setMode($0) })) {
-                ForEach(AgentMode.allCases) { m in Label(m.label, systemImage: simbolo(m)).tag(m) }
-            }
-        } label: {
-            capsula(agent.mode.label, symbol: simbolo(agent.mode), destacada: agent.mode == .build)
-        }
-        .menuIndicator(.hidden)
-        .buttonStyle(.plain)
-        .accessibilityLabel("Modo: \(agent.mode.label)")
+        let primeiro = cheio.split(separator: "·").first.map {
+            $0.trimmingCharacters(in: .whitespaces)
+        } ?? cheio
+        return primeiro.isEmpty ? "modelo" : primeiro
     }
 
     /// Cápsula de filtro do iOS: fundo tênue quando neutra, tinta de destaque quando ligada.
-    func capsula(_ text: String, symbol: String, destacada: Bool) -> some View {
+    func capsula(_ text: String?, symbol: String, destacada: Bool) -> some View {
         HStack(spacing: 4) {
             Image(systemName: symbol).font(.system(size: 10, weight: .semibold))
-            Text(text).font(.caption.weight(.medium)).fixedSize()
+            if let text {
+                Text(text).font(.caption.weight(.medium)).fixedSize()
+            }
             Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold)).opacity(0.7)
         }
         .foregroundStyle(destacada ? theme.accent : theme.fgMuted)

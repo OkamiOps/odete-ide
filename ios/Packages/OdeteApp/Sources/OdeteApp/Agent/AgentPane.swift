@@ -161,11 +161,11 @@ struct ModelMenu: View {
     }
 
     var label: some View {
-        HStack(spacing: 9) {
+        HStack(spacing: 7) {
             Image(systemName: agent.account?.kind.symbol ?? "sparkles")
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(agent.account == nil ? theme.fgSubtle : theme.accent)
-                .frame(width: 28, height: 28)
+                .frame(width: 24, height: 24)
                 .background(
                     agent.account == nil ? theme.fg.opacity(0.06) : theme.accent.opacity(0.14),
                     in: RoundedRectangle(cornerRadius: 8, style: .continuous)

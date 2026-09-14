@@ -60,7 +60,7 @@ public struct AppleProvider: Provider {
     }
 
     public func models() async throws -> [ModelInfo] {
-        [ModelInfo(id: "apple-on-device", label: "Apple · no aparelho", efforts: nil, ctx: Self.janela)]
+        [ModelInfo(id: "apple-on-device", label: "Apple", efforts: nil, ctx: Self.janela)]
     }
 
     public func stream(_ turn: TurnRequest) -> AsyncThrowingStream<StreamEvent, Error> {

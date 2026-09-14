@@ -106,6 +106,7 @@ struct ContextPopover: View {
 struct ContextGauge: View {
     @Environment(\.theme) private var theme
     var fracao: Double
+    var mostrarTexto = true
 
     var body: some View {
         HStack(spacing: 5) {
@@ -119,8 +120,10 @@ struct ContextGauge: View {
                     .rotationEffect(.degrees(-90))
             }
             .frame(width: 13, height: 13)
-            Text("\(Int((fracao * 100).rounded()))%")
-                .font(.caption).monospacedDigit().foregroundStyle(theme.fgMuted)
+            if mostrarTexto {
+                Text("\(Int((fracao * 100).rounded()))%")
+                    .font(.caption).monospacedDigit().foregroundStyle(theme.fgMuted)
+            }
         }
         .contentShape(Rectangle())
     }

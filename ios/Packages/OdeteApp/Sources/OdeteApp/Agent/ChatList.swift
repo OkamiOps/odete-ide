@@ -526,7 +526,7 @@ struct MarkdownText: View {
                 case let .para(_, t):
                     Text(inline(t))
                         .font(.subheadline)
-                        .lineSpacing(3)
+                        .lineSpacing(2)
                         .foregroundStyle(theme.fg)
                         .textSelection(.enabled)
                         .fixedSize(horizontal: false, vertical: true)
@@ -540,7 +540,7 @@ struct MarkdownText: View {
                                     .frame(minWidth: ordered ? 18 : 10, alignment: .leading)
                                 Text(inline(item))
                                     .font(.subheadline)
-                                    .lineSpacing(3)
+                                    .lineSpacing(2)
                                     .foregroundStyle(theme.fg)
                                     .textSelection(.enabled)
                                     .fixedSize(horizontal: false, vertical: true)

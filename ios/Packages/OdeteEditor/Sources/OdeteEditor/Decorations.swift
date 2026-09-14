@@ -91,9 +91,13 @@ final class GutterOverlay: UIView {
     }
 
     override func point(inside point: CGPoint, with _: UIEvent?) -> Bool {
-        // Só a tira das marcas, e só em cima de uma marca. O resto do gutter, incluindo a
-        // folga antes do código, passa direto para o editor.
-        placed.contains { point.y >= $0.y && point.y <= $0.y + $0.h } && point.x >= bounds.width - 10
+        // A tira das marcas e nada mais. O limite da direita é o que faltava: sem ele
+        // `x >= bounds.width - 10` aceitava qualquer ponto do editor à direita do gutter,
+        // e esta view, que tem 42 pt de largura e a altura inteira do arquivo, engolia o
+        // toque no meio do código em toda linha que tivesse marca do git. Era isso que
+        // deixava o cursor preso: "só vai em determinadas linhas" eram as linhas sem marca.
+        guard point.x >= bounds.width - 12, point.x <= bounds.width else { return false }
+        return placed.contains { point.y >= $0.y && point.y <= $0.y + $0.h }
     }
 
     @objc private func pressionado(_ g: UILongPressGestureRecognizer) {

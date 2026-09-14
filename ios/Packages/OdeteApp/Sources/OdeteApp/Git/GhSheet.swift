@@ -263,7 +263,7 @@ struct PullDetail: View {
                         }
                     }
                     HStack {
-                        TextField("comentar…", text: $draft, axis: .vertical)
+                        TextField("comentar…", text: $draft, axis: .vertical).lineLimit(1 ... 6)
                         Button("Enviar") {
                             Task {
                                 try? await api.comment(slug, number: pull.number, body: draft); draft = ""; await load()

@@ -148,8 +148,8 @@ func fmtTok(_ n: Int) -> String {
     return String(n)
 }
 
-/// Identidade do painel: conta, modelo e esforço num menu só, como o menu de título
-/// de uma barra de navegação. O esforço deixou de ser uma cápsula solta no cabeçalho.
+/// Identidade do painel: só a conta. Modelo e esforço moraram aqui por um tempo, mas
+/// pertencem à barra de digitação, junto do que a pessoa está escrevendo.
 struct ModelMenu: View {
     @Environment(\.theme) private var theme
     let agent: AgentModel
@@ -175,34 +175,6 @@ struct ModelMenu: View {
                             systemImage: a.id == agent.account?.id ? "checkmark" : kind.symbol
                         ) }
                     }
-                }
-            }
-        }
-        if let acc = agent.account {
-            Section("Modelo · \(acc.kind.label)") {
-                if agent.loadingModels {
-                    Text("carregando…")
-                }
-                ForEach(agent.models) { m in Button { agent.setModel(m.id) } label: { Label(
-                    m.label,
-                    systemImage: m.id == agent.model ? "checkmark" : ""
-                ) } }
-                if agent.models.isEmpty, !agent.loadingModels {
-                    Button("usar \(acc.kind.defaultModel)") { agent.setModel(acc.kind.defaultModel) }
-                    if let e = agent.modelsError {
-                        Text(e)
-                    }
-                }
-                Button("Recarregar modelos") { Task { await agent.loadModels() } }
-            }
-        }
-        if !agent.effortOptions.isEmpty {
-            Section("Esforço") {
-                ForEach(agent.effortOptions, id: \.self) { e in
-                    Button { agent.setEffort(e) } label: { Label(
-                        Effort.labels[e] ?? e,
-                        systemImage: e == agent.effort ? "checkmark" : ""
-                    ) }
                 }
             }
         }
@@ -234,9 +206,7 @@ struct ModelMenu: View {
     }
 
     var subtitle: String {
-        guard agent.account != nil else { return "conectar" }
-        let esforco = agent.effortOptions.isEmpty ? "" : " · " + (Effort.labels[agent.effort] ?? agent.effort)
-        return agent.model + esforco
+        agent.account?.kind.label ?? "conectar"
     }
 }
 

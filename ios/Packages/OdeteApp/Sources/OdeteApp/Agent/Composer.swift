@@ -13,6 +13,8 @@ struct Composer: View {
     @Bindable var agent: AgentModel
     @FocusState private var focused: Bool
     @State private var photo: PhotosPickerItem?
+    @State private var contexto = false
+    @State private var ditado = Dictation()
 
     var vazio: Bool {
         agent.draft.trimmingCharacters(in: .whitespaces).isEmpty
@@ -34,6 +36,20 @@ struct Composer: View {
             caixa
         }
         .padding(.top, Metrics.s2)
+        .sheet(isPresented: $contexto) {
+            ContextSheet(agent: agent, photo: $photo, temPreview: ws.preview.url != nil)
+        }
+        .onChange(of: ditado.texto) { _, t in agent.draft = t }
+        .alert("Ditado", isPresented: Binding(
+            get: { ditado.error != nil },
+            set: {
+                if !$0 {
+                    ditado.error = nil
+                }
+            }
+        )) {
+            Button("OK") { ditado.error = nil }
+        } message: { Text(ditado.error ?? "") }
         .onChange(of: agent.focusRequest) { focused = true }
         .onChange(of: photo) { _, item in
             guard let item else { return }
@@ -72,7 +88,10 @@ struct Composer: View {
     }
 
     var caixa: some View {
-        VStack(spacing: 6) {
+        VStack(alignment: .leading, spacing: 6) {
+            // Faixa de contexto em cima, como a do repositório no Cursor: aqui é o modelo
+            // e o esforço, que numa coluna de 300 pt não cabem junto dos botões.
+            modeloMenu
             TextField(
                 agent.running ? "redirecionar o agente…" : "Peça algo à Odete…",
                 text: $agent.draft,
@@ -81,16 +100,18 @@ struct Composer: View {
             .font(.subheadline)
             .foregroundStyle(theme.fg)
             .textFieldStyle(.plain)
-            .lineLimit(1 ... 8)
+            .lineLimit(1 ... 14)
             .focused($focused)
-            .onSubmit { send() }
+            // Enter envia. Shift, Option ou Control com Enter quebram a linha: devolver
+            // .ignored deixa o próprio campo inserir a quebra, com o cursor no lugar.
+            // Não existe `onSubmit` aqui de propósito, era ele que mandava no shift+enter.
             .onKeyPress(.return, phases: .down) { press in
-                if press.modifiers.contains(.command) || press.modifiers.contains(.shift) == false && !press
-                    .modifiers.contains(.option)
-                {
-                    send(); return .handled
+                let mods = press.modifiers
+                if mods.contains(.shift) || mods.contains(.option) || mods.contains(.control) {
+                    return .ignored
                 }
-                return .ignored
+                send()
+                return .handled
             }
             .onKeyPress(.escape) {
                 if agent.running {
@@ -99,10 +120,16 @@ struct Composer: View {
             }
             .padding(.horizontal, 6)
             .padding(.top, 6)
-            HStack(spacing: 6) {
-                anexarMenu
+            HStack(spacing: 4) {
+                iconeBotao("plus", label: "Contexto") { contexto = true }
+                iconeBotao(
+                    ditado.running ? "mic.fill" : "mic",
+                    label: ditado.running ? "Parar ditado" : "Ditar",
+                    cor: ditado.running ? theme.accent : theme.fgMuted
+                ) { ditado.toggle(atual: agent.draft) }
+                // Prioridade nas cápsulas: sem isto o espaçador come a largura delas e
+                // "Build" vira "…".
                 modoMenu
-                permissaoMenu
                 Spacer(minLength: 4)
                 enviar
             }
@@ -114,29 +141,73 @@ struct Composer: View {
         .padding(.horizontal, 12)
     }
 
-    var anexarMenu: some View {
-        Menu {
-            PhotosPicker(selection: $photo, matching: .images) { Label("Foto", systemImage: "photo") }
-            Button { agent.attachPreview() } label: {
-                Label("Print do preview", systemImage: "camera.viewfinder")
-            }.disabled(ws.preview.url == nil)
-            Button { agent.draft += (agent.draft.isEmpty ? "" : " ") + "@" } label: { Label(
-                "Arquivo (@)",
-                systemImage: "at"
-            ) }
-            Button { agent.draft += (agent.draft.isEmpty ? "" : " ") + "/" } label: { Label(
-                "Skill (/)",
-                systemImage: "slash.circle"
-            ) }
-        } label: {
-            Image(systemName: "plus").font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(theme.fgMuted)
-                .frame(width: 30, height: 30)
+    func iconeBotao(
+        _ symbol: String,
+        label: String,
+        cor: Color? = nil,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol).font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(cor ?? theme.fgMuted)
+                .frame(width: 28, height: 28)
                 .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+    }
+
+    /// Modelo e esforço no canto, como na barra de digitação da Claude.
+    var modeloMenu: some View {
+        Menu {
+            if let acc = agent.account {
+                Section("Modelo · \(acc.kind.label)") {
+                    if agent.loadingModels {
+                        Text("carregando…")
+                    }
+                    ForEach(agent.models) { m in Button { agent.setModel(m.id) } label: { Label(
+                        m.label,
+                        systemImage: m.id == agent.model ? "checkmark" : ""
+                    ) } }
+                    if agent.models.isEmpty, !agent.loadingModels {
+                        Button("usar \(acc.kind.defaultModel)") { agent.setModel(acc.kind.defaultModel) }
+                    }
+                    Button("Recarregar modelos") { Task { await agent.loadModels() } }
+                }
+            }
+            if !agent.effortOptions.isEmpty {
+                Section("Esforço") {
+                    ForEach(agent.effortOptions, id: \.self) { e in Button { agent.setEffort(e) } label: { Label(
+                        Effort.labels[e] ?? e,
+                        systemImage: e == agent.effort ? "checkmark" : ""
+                    ) } }
+                }
+            }
+        } label: {
+            HStack(spacing: 5) {
+                Image(systemName: agent.account?.kind.symbol ?? "sparkles")
+                    .font(.system(size: 10, weight: .semibold))
+                Text(nomeModelo).font(.caption.weight(.medium)).lineLimit(1).truncationMode(.middle)
+                if !agent.effortOptions.isEmpty, let e = Effort.labels[agent.effort] {
+                    Text("· " + e).font(.caption).foregroundStyle(theme.fgSubtle).fixedSize()
+                }
+                Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold)).opacity(0.7)
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(theme.fgMuted)
+            .padding(.horizontal, 6)
+            .frame(height: 24)
+            .contentShape(Rectangle())
         }
         .menuIndicator(.hidden)
         .buttonStyle(.plain)
-        .accessibilityLabel("Anexar")
+        .accessibilityLabel("Modelo")
+    }
+
+    var nomeModelo: String {
+        guard agent.account != nil else { return "escolher conta e modelo" }
+        let cheio = agent.models.first { $0.id == agent.model }?.label ?? agent.model
+        return cheio.isEmpty ? "modelo" : cheio
     }
 
     var modoMenu: some View {
@@ -152,24 +223,11 @@ struct Composer: View {
         .accessibilityLabel("Modo: \(agent.mode.label)")
     }
 
-    var permissaoMenu: some View {
-        Menu {
-            Picker("Permissão", selection: Binding(get: { agent.permit }, set: { agent.setPermit($0) })) {
-                ForEach(PermitMode.allCases) { p in Label("\(p.label) · \(p.hint)", systemImage: p.symbol).tag(p) }
-            }
-        } label: {
-            capsula(agent.permit.label, symbol: agent.permit.symbol, destacada: agent.permit == .full)
-        }
-        .menuIndicator(.hidden)
-        .buttonStyle(.plain)
-        .accessibilityLabel("Permissão: \(agent.permit.label)")
-    }
-
     /// Cápsula de filtro do iOS: fundo tênue quando neutra, tinta de destaque quando ligada.
     func capsula(_ text: String, symbol: String, destacada: Bool) -> some View {
         HStack(spacing: 4) {
             Image(systemName: symbol).font(.system(size: 10, weight: .semibold))
-            Text(text).font(.caption.weight(.medium))
+            Text(text).font(.caption.weight(.medium)).fixedSize()
             Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold)).opacity(0.7)
         }
         .foregroundStyle(destacada ? theme.accent : theme.fgMuted)
@@ -188,7 +246,7 @@ struct Composer: View {
             Button { agent.stop() } label: {
                 Image(systemName: "stop.fill").font(.system(size: 12, weight: .bold))
                     .foregroundStyle(.white)
-                    .frame(width: 32, height: 32)
+                    .frame(width: 30, height: 30)
                     .background(theme.danger, in: Circle())
             }
             .buttonStyle(.plain)
@@ -198,7 +256,7 @@ struct Composer: View {
                 Image(systemName: agent.running ? "arrow.triangle.turn.up.right" : "arrow.up")
                     .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(vazio ? theme.fgSubtle : theme.accentFg)
-                    .frame(width: 32, height: 32)
+                    .frame(width: 30, height: 30)
                     .background(vazio ? theme.fg.opacity(0.08) : theme.accent, in: Circle())
             }
             .buttonStyle(.plain)

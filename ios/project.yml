@@ -75,6 +75,8 @@ targets:
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
         ITSAppUsesNonExemptEncryption: false
+        NSMicrophoneUsageDescription: A Odete usa o microfone para você ditar o pedido ao agente.
+        NSSpeechRecognitionUsageDescription: O reconhecimento de fala transforma o que você dita em texto, no próprio iPad quando possível.
         UIApplicationSupportsIndirectInputEvents: true
         # Client ID do OAuth App do GitHub (device flow). Preencha ao registrar o app.
         OdeteGitHubClientId: ""

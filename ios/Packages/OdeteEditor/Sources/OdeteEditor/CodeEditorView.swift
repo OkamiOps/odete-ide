@@ -77,7 +77,13 @@ public struct CodeEditorView: UIViewRepresentable {
         c.overlay.onTap = { [weak c] line in c?.parent.onGutterTap(line) }
         tv.addSubview(c.guides)
         tv.addSubview(c.overlay)
-        tv.floating = [c.guides, c.overlay, c.popup]
+        tv.addSubview(c.minimap)
+        tv.floating = [c.guides, c.overlay, c.minimap, c.popup]
+        c.minimap.aoNavegar = { [weak tv] f in
+            guard let tv else { return }
+            let maximo = max(0, tv.contentSize.height - tv.bounds.height)
+            tv.setContentOffset(CGPoint(x: tv.contentOffset.x, y: maximo * f), animated: false)
+        }
         c.popup.onPick = { [weak c] item in c?.accept(item) }
         c.offsetObservation = tv.observe(\.contentOffset, options: [.new]) { [weak c] _, _ in
             Task { @MainActor in c?.positionOverlay() }
@@ -98,6 +104,10 @@ public struct CodeEditorView: UIViewRepresentable {
         }
         c.parent = self
         applyPrefs(tv, context: context)
+        c.atualizarMinimapa(tv.text)
+        if docChanged {
+            DispatchQueue.main.async { c.positionOverlay() }
+        }
         (tv.inputAccessoryView as? KeyboardBar)?.onSave = onSave
         (tv.inputAccessoryView as? KeyboardBar)?.onFind = onFind
         if c.marks != marks || c.issues != issues || docChanged {
@@ -137,6 +147,18 @@ public struct CodeEditorView: UIViewRepresentable {
             c.tabWidth = prefs.tabWidth
             c.scheduleDecorations()
         }
+        if c.minimapSize != prefs.minimap {
+            c.minimapSize = prefs.minimap
+            c.minimap.tamanho = prefs.minimap
+            c.minimapTexto = ""
+            c.atualizarMinimapa(tv.text)
+            c.positionOverlay()
+        }
+        // O texto não pode correr por baixo do mapa.
+        let reservado = MinimapView.largura(prefs.minimap)
+        if tv.textContainerInset.right != reservado + 8 {
+            tv.textContainerInset.right = reservado + 8
+        }
     }
 
     static let pairs: [CharacterPair] = [
@@ -160,6 +182,10 @@ public struct CodeEditorView: UIViewRepresentable {
         c.overlay.addedColor = UIColor(hex: palette.ok)
         c.overlay.modifiedColor = UIColor(hex: palette.syntax.keyword)
         c.overlay.deletedColor = UIColor(hex: palette.danger)
+        c.minimap.corCodigo = UIColor(hex: palette.fg).withAlphaComponent(palette.dark ? 0.45 : 0.40)
+        c.minimap.corComentario = UIColor(hex: palette.fgSubtle).withAlphaComponent(0.45)
+        c.minimap.corJanela = UIColor(hex: palette.fg).withAlphaComponent(palette.dark ? 0.10 : 0.09)
+        c.minimap.corFundo = UIColor(hex: palette.bg).withAlphaComponent(0.6)
         c.guides.color = UIColor(hex: palette.fg).withAlphaComponent(palette.dark ? 0.09 : 0.12)
         c.guides.activeColor = UIColor(hex: palette.accent).withAlphaComponent(0.45)
         c.popup.fg = UIColor(hex: palette.fg)
@@ -196,6 +222,9 @@ public struct CodeEditorView: UIViewRepresentable {
         let overlay = GutterOverlay(frame: .zero)
         let guides = IndentGuides(frame: .zero)
         let popup = CompletionPopup(frame: .zero)
+        let minimap = MinimapView(frame: .zero)
+        var minimapSize: MinimapSize = .off
+        var minimapTexto = ""
         var lineHeight: Double = 0
         var guidesOn = true
         var tabWidth = 2
@@ -213,6 +242,13 @@ public struct CodeEditorView: UIViewRepresentable {
             isEditing = false
             scheduleDecorations()
             offerCompletions()
+            atualizarMinimapa(textView.text)
+        }
+
+        func atualizarMinimapa(_ texto: String) {
+            guard minimapSize != .off, texto != minimapTexto else { return }
+            minimapTexto = texto
+            minimap.linhas = MinimapView.medir(texto, tabWidth: tabWidth)
         }
 
         public func textViewDidChangeSelection(_ textView: TextView) {
@@ -391,6 +427,21 @@ public struct CodeEditorView: UIViewRepresentable {
                 height: max(tv.contentSize.height, tv.bounds.height)
             )
             tv.bringSubviewToFront(overlay)
+            let larguraMapa = MinimapView.largura(minimapSize)
+            minimap.isHidden = minimapSize == .off || tv.bounds.width < larguraMapa * 3
+            if !minimap.isHidden {
+                minimap.frame = CGRect(
+                    x: tv.contentOffset.x + tv.bounds.width - larguraMapa,
+                    y: tv.contentOffset.y,
+                    width: larguraMapa,
+                    height: tv.bounds.height
+                )
+                let rolavel = max(1, tv.contentSize.height - tv.bounds.height)
+                minimap.fracao = min(1, max(0, tv.contentOffset.y / rolavel))
+                minimap.visivel = min(1, tv.bounds.height / max(1, tv.contentSize.height))
+                minimap.setNeedsDisplay()
+                tv.bringSubviewToFront(minimap)
+            }
             if !popup.isHidden {
                 tv.bringSubviewToFront(popup)
             }

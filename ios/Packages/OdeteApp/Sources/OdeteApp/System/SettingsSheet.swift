@@ -194,6 +194,15 @@ struct SettingsContent: View {
                     CardRow("Números de linha", symbol: "list.number", color: .indigo, first: true) {
                         Toggle("", isOn: $chrome.snapshot.editor.lineNumbers).labelsHidden()
                     }
+                    CardRow("Minimapa", symbol: "map", color: .indigo) {
+                        Picker("", selection: $chrome.snapshot.editor.minimap) {
+                            Text("Desligado").tag(MinimapSize.off)
+                            Text("Pequeno").tag(MinimapSize.s)
+                            Text("Médio").tag(MinimapSize.m)
+                            Text("Grande").tag(MinimapSize.l)
+                        }
+                        .labelsHidden()
+                    }
                     CardRow(
                         "Destacar linha atual",
                         symbol: "text.line.first.and.arrowtriangle.forward",

@@ -4,6 +4,7 @@ import OdetePreview
 import OdeteSwift
 import OdeteUI
 import SwiftUI
+import UIKit
 
 /// Problemas: diagnósticos do esbuild (dev server) e erros do preview. Toque abre o arquivo na linha.
 struct ProblemsPane: View {
@@ -56,18 +57,23 @@ struct ProblemsPane: View {
                     if !diags.isEmpty {
                         Section {
                             ForEach(diags) { d in
+                                let alvo = arquivo(d.file)
                                 Button {
-                                    if let f = d.file {
-                                        ws.open(rel(f), line: d.line ?? 1)
+                                    if let alvo {
+                                        ws.open(alvo, line: d.line ?? 1)
                                     }
                                 } label: { row(
                                     d.kind == .error ? "xmark.octagon" : "exclamationmark.triangle",
                                     d.kind == .error ? theme.danger : theme.accent,
                                     d.text,
-                                    d.file.map { "\(rel($0)):\(d.line ?? 0)" },
+                                    alvo.map { "\($0):\(d.line ?? 0)" },
                                     d.lineText
                                 ) }
                                 .buttonStyle(.plain)
+                                .allowsHitTesting(alvo != nil)
+                                .contextMenu { Button("Copiar erro", systemImage: "doc.on.doc") {
+                                    UIPasteboard.general.string = d.text
+                                } }
                             }
                         } header: { label("Build · esbuild") }
                     }
@@ -88,18 +94,25 @@ struct ProblemsPane: View {
                     if !errors.isEmpty {
                         Section {
                             ForEach(errors) { e in
+                                let alvo = arquivo(e.file)
                                 Button {
-                                    if let f = e.file {
-                                        ws.open(rel(f), line: e.line ?? 1)
+                                    if let alvo {
+                                        ws.open(alvo, line: e.line ?? 1)
                                     }
                                 } label: { row(
                                     "xmark.octagon",
                                     theme.danger,
                                     e.text,
-                                    e.file.map { "\(rel($0)):\(e.line ?? 0)" },
+                                    alvo.map { "\($0):\(e.line ?? 0)" },
                                     nil
                                 ) }
                                 .buttonStyle(.plain)
+                                // Erro sem arquivo no projeto não leva a lugar nenhum; tocar
+                                // nele abria uma aba em branco.
+                                .allowsHitTesting(alvo != nil)
+                                .contextMenu { Button("Copiar erro", systemImage: "doc.on.doc") {
+                                    UIPasteboard.general.string = e.text
+                                } }
                             }
                         } header: { label("Preview · runtime") }
                     }
@@ -109,6 +122,19 @@ struct ProblemsPane: View {
             }
         }
         .background(theme.bgElevated)
+    }
+
+    /// Caminho dentro do projeto, ou nada quando o erro veio de um módulo remoto,
+    /// de um caminho vazio ou de um arquivo que não existe aqui.
+    func arquivo(_ f: String?) -> String? {
+        guard let f, !f.isEmpty else { return nil }
+        if f.hasPrefix("http://") || f.hasPrefix("https://"), !f.contains("/@odete/") {
+            return nil
+        }
+        let p = rel(f)
+        guard !p.isEmpty, !p.hasPrefix("http") else { return nil }
+        guard FileManager.default.fileExists(atPath: ws.root.appending(path: p).path) else { return nil }
+        return p
     }
 
     func rel(_ f: String) -> String {

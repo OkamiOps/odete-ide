@@ -25,9 +25,36 @@
     return `console.error(${JSON.stringify(msg)}); document.body.innerHTML = '<pre style="white-space:pre-wrap;padding:16px;color:#e25d5d;background:#111;font:13px ui-monospace,monospace;margin:0;min-height:100vh">' + ${JSON.stringify(msg.replace(/</g, "&lt;"))} + '</pre>';`;
   }
 
+  // Pacotes do package.json que não têm pasta em node_modules vão para o esm.sh.
+  // Sem isto o navegador recebe `import "react"` cru e responde
+  // "Module name, 'react' does not resolve to a valid URL".
   function importMap() {
-    const missing = globalThis.__odete_importMap ? globalThis.__odete_importMap() : "";
-    return missing ? `<script type="importmap">${missing}</script>` : "";
+    try {
+      const arq = path.join(state.root, "package.json");
+      if (!fs.existsSync(arq)) return "";
+      const pkg = JSON.parse(fs.readFileSync(arq, "utf8"));
+      const deps = Object.assign({}, pkg.dependencies || {}, pkg.devDependencies || {});
+      const faltando = {};
+      for (const nome of Object.keys(deps)) {
+        if (fs.existsSync(path.join(state.root, "node_modules", nome, "package.json"))) continue;
+        faltando[nome] = String(deps[nome]).replace(/^[\^~=v\s]+/, "") || "latest";
+      }
+      const nomes = Object.keys(faltando);
+      if (!nomes.length) return "";
+      // Tudo que depende de react precisa apontar para a mesma cópia, senão o esm.sh
+      // entrega duas e os hooks quebram.
+      const react = faltando.react ? `react@${faltando.react}` : "";
+      const imports = {};
+      for (const nome of nomes) {
+        const base = `https://esm.sh/${nome}@${faltando[nome]}`;
+        const extra = react && nome !== "react" ? `&deps=${react}` : "";
+        imports[nome] = `${base}?dev${extra}`;
+        imports[nome + "/"] = `${base}/`;
+      }
+      return `<script type="importmap">${JSON.stringify({ imports })}</script>`;
+    } catch (e) {
+      return "";
+    }
   }
 
   function html(file) {

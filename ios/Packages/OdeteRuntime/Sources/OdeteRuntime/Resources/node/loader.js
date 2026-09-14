@@ -50,6 +50,7 @@
   }
   globalThis.__odete_makeRequire = makeRequire;
   let mainModule = null;
+  globalThis.require = makeRequire(path.join(H.cwd, "__global__.js"));
   function loadFile(file) {
     if (fileCache[file]) return fileCache[file].exports;
     const module = { id: file, filename: file, path: path.dirname(file), exports: {}, loaded: false, children: [], paths: [], parent: null };

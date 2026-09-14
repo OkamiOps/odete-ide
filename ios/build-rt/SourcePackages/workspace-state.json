@@ -1,0 +1,27 @@
+{
+  "object" : {
+    "artifacts" : [
+
+    ],
+    "dependencies" : [
+      {
+        "basedOn" : null,
+        "packageRef" : {
+          "identity" : "odetecore",
+          "kind" : "fileSystem",
+          "location" : "/Users/marcos/Documents/Git/odete-ide/ios/Packages/OdeteCore",
+          "name" : "OdeteCore"
+        },
+        "state" : {
+          "name" : "fileSystem",
+          "path" : "/Users/marcos/Documents/Git/odete-ide/ios/Packages/OdeteCore"
+        },
+        "subpath" : "odetecore"
+      }
+    ],
+    "prebuilts" : [
+
+    ]
+  },
+  "version" : 7
+}

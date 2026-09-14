@@ -58,6 +58,13 @@ enum HostCore {
         }
         h.setObject(hash, forKeyedSubscript: "hash" as NSString)
 
+        let asyncDone: @convention(block) (Int, Bool, String) -> Void = { [unowned rt] id, ok, payload in
+            guard let cont = rt.asyncCalls.removeValue(forKey: id) else { return }
+            rt.endWork()
+            if ok { cont.resume(returning: payload) } else { cont.resume(throwing: RuntimeError(message: payload)) }
+        }
+        h.setObject(asyncDone, forKeyedSubscript: "asyncDone" as NSString)
+
         let log: @convention(block) (String) -> Void = { [unowned rt] s in rt.emit(.err, "[odete] \(s)") }
         h.setObject(log, forKeyedSubscript: "debug" as NSString)
     }

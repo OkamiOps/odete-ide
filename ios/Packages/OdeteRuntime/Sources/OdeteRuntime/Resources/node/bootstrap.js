@@ -85,21 +85,32 @@
     }
     return new Uint8Array(out);
   }
+  function toU8(v) {
+    if (v instanceof Uint8Array) return v;
+    if (v instanceof ArrayBuffer) return new Uint8Array(v);
+    if (ArrayBuffer.isView(v)) return new Uint8Array(v.buffer, v.byteOffset, v.byteLength); // DataView, outras typed arrays
+    if (v && v.buffer instanceof ArrayBuffer) return new Uint8Array(v.buffer);
+    return new Uint8Array(0);
+  }
   function utf8Decode(bytes) {
+    const b = toU8(bytes);
     let s = "", i = 0;
-    const b = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes.buffer || bytes);
-    while (i < b.length) {
+    const n = b.length;
+    while (i < n) {
       const c = b[i++];
-      if (c < 0x80) s += String.fromCharCode(c);
-      else if (c < 0xe0) s += String.fromCharCode(((c & 31) << 6) | (b[i++] & 63));
-      else if (c < 0xf0) s += String.fromCharCode(((c & 15) << 12) | ((b[i++] & 63) << 6) | (b[i++] & 63));
-      else { const cp = ((c & 7) << 18) | ((b[i++] & 63) << 12) | ((b[i++] & 63) << 6) | (b[i++] & 63); s += String.fromCodePoint(cp); }
+      if (c < 0x80) { s += String.fromCharCode(c); continue; }
+      if (c < 0xc2) { s += "\ufffd"; continue; }
+      if (c < 0xe0) { if (i >= n) { s += "\ufffd"; break; } s += String.fromCharCode(((c & 31) << 6) | (b[i++] & 63)); continue; }
+      if (c < 0xf0) { if (i + 1 >= n) { s += "\ufffd"; break; } s += String.fromCharCode(((c & 15) << 12) | ((b[i++] & 63) << 6) | (b[i++] & 63)); continue; }
+      if (i + 2 >= n) { s += "\ufffd"; break; }
+      const cp = ((c & 7) << 18) | ((b[i++] & 63) << 12) | ((b[i++] & 63) << 6) | (b[i++] & 63);
+      s += cp > 0x10ffff ? "\ufffd" : String.fromCodePoint(cp);
     }
     return s;
   }
   globalThis.__utf8 = { encode: utf8Encode, decode: utf8Decode };
   globalThis.TextEncoder = class TextEncoder { get encoding() { return "utf-8"; } encode(s = "") { return utf8Encode(String(s)); } encodeInto(s, dst) { const b = utf8Encode(s); dst.set(b.subarray(0, dst.length)); return { read: s.length, written: Math.min(b.length, dst.length) }; } };
-  globalThis.TextDecoder = class TextDecoder { constructor(enc = "utf-8") { this.encoding = enc; } decode(b) { if (!b) return ""; return utf8Decode(b instanceof ArrayBuffer ? new Uint8Array(b) : b); } };
+  globalThis.TextDecoder = class TextDecoder { constructor(enc = "utf-8", opts = {}) { this.encoding = String(enc).toLowerCase(); this.fatal = !!opts.fatal; this.ignoreBOM = !!opts.ignoreBOM; } decode(b) { if (!b) return ""; const u = toU8(b); if (this.encoding === "utf-16le" || this.encoding === "utf-16") { let s = ""; for (let i = 0; i + 1 < u.length; i += 2) s += String.fromCharCode(u[i] | (u[i + 1] << 8)); return s; } if (this.encoding === "latin1" || this.encoding === "iso-8859-1" || this.encoding === "ascii") { let s = ""; for (const x of u) s += String.fromCharCode(x); return s; } const t = utf8Decode(u); return !this.ignoreBOM && t.charCodeAt(0) === 0xfeff ? t.slice(1) : t; } };
 
   const B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
   function b64encBytes(bytes) {
@@ -183,6 +194,27 @@
     }
     globalThis.URL = URL; globalThis.URLSearchParams = URLSearchParams;
   }
+
+  // --- WebAssembly: o JSC do sistema não resolve as promessas do instantiate async; fazemos síncrono ---
+  if (typeof WebAssembly === "object") {
+    const toBytes = (src) => (src instanceof ArrayBuffer ? new Uint8Array(src) : ArrayBuffer.isView(src) ? new Uint8Array(src.buffer, src.byteOffset, src.byteLength) : src);
+    WebAssembly.compile = (src) => new Promise((res, rej) => { try { res(new WebAssembly.Module(toBytes(src))); } catch (e) { rej(e); } });
+    WebAssembly.instantiate = (src, imports = {}) => new Promise((res, rej) => { try {
+      if (src instanceof WebAssembly.Module) res(new WebAssembly.Instance(src, imports));
+      else { const m = new WebAssembly.Module(toBytes(src)); res({ module: m, instance: new WebAssembly.Instance(m, imports) }); }
+    } catch (e) { rej(e); } });
+    WebAssembly.compileStreaming = async (resp) => WebAssembly.compile(await (await resp).arrayBuffer());
+    WebAssembly.instantiateStreaming = async (resp, imports) => WebAssembly.instantiate(await (await resp).arrayBuffer(), imports);
+  }
+
+  // --- ponte de chamadas assíncronas vindas do Swift ---
+  globalThis.__odete_callAsync = (id, fn, argsJSON) => {
+    Promise.resolve().then(() => {
+      const f = typeof fn === "function" ? fn : globalThis[fn];
+      if (typeof f !== "function") throw new Error("função não encontrada: " + fn);
+      return f(...JSON.parse(argsJSON));
+    }).then((v) => H.asyncDone(id, true, JSON.stringify(v === undefined ? null : v)), (e) => H.asyncDone(id, false, globalThis.__formatError ? globalThis.__formatError(e) : String(e)));
+  };
 
   // --- crypto (subset) ---
   globalThis.crypto = globalThis.crypto || {};

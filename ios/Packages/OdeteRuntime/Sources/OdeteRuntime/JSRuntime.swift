@@ -19,6 +19,9 @@ final class JSRuntime: @unchecked Sendable {
     private(set) var exitCode: Int32 = 0
     var keepAlive = 0                     // servidores abertos
     var serversBox: ServersBox?
+    var asyncCalls: [Int: CheckedContinuation<String, Error>] = [:]
+    var lastError: RuntimeError?
+    var nextAsync = 1
     var transform: (@Sendable (String, String) throws -> String)?   // (código, caminho) → CJS
 
     init(cwd: URL, env: [String: String], argv: [String]) {
@@ -34,7 +37,9 @@ final class JSRuntime: @unchecked Sendable {
             guard let self, let exc else { return }
             let msg = exc.toString() ?? "erro"
             let stack = exc.objectForKeyedSubscript("stack")?.toString() ?? ""
-            self.emit(.err, stack.isEmpty ? msg : msg + "\n    " + stack.replacingOccurrences(of: "\n", with: "\n    "))
+            let text = stack.isEmpty ? msg : msg + "\n    " + stack.replacingOccurrences(of: "\n", with: "\n    ")
+            self.lastError = RuntimeError(message: text)
+            self.emit(.err, text)
         }
         installHost()
     }
@@ -59,19 +64,18 @@ final class JSRuntime: @unchecked Sendable {
         for name in order {
             let file = dir.appending(path: "\(name).js")
             guard let src = try? String(contentsOf: file, encoding: .utf8) else { continue }
+            lastError = nil
             context.evaluateScript(src, withSourceURL: URL(string: "odete://node/\(name).js"))
-            if let e = context.exception { context.exception = nil; throw RuntimeError(message: "bootstrap \(name): \(e.toString() ?? "")") }
+            if let e = lastError { lastError = nil; throw RuntimeError(message: "bootstrap \(name): \(e.message)") }
         }
     }
 
     /// Avalia código e lança se houver exceção.
     @discardableResult
     func evaluate(_ code: String, url: URL?) throws -> JSValue? {
+        lastError = nil
         let v = context.evaluateScript(code, withSourceURL: url)
-        if let e = context.exception {
-            context.exception = nil
-            throw RuntimeError(message: e.toString() ?? "erro", stack: e.objectForKeyedSubscript("stack")?.toString())
-        }
+        if let e = lastError { lastError = nil; throw e }
         return v
     }
 

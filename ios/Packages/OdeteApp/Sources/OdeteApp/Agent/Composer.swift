@@ -58,19 +58,20 @@ struct Composer: View {
                         systemImage: "slash.circle"
                     ) }
                 } label: {
-                    Image(systemName: "plus").font(.system(size: 14, weight: .semibold)).foregroundStyle(theme.fgMuted)
-                        .frame(
-                            width: 32,
-                            height: 32
-                        )
+                    Label("Anexar", systemImage: "plus")
                 }
-                .buttonStyle(.plain)
+                .menuStyle(.button)
+                .buttonStyle(.glass)
+                .labelStyle(.iconOnly)
+                .controlSize(.small)
+                .tint(theme.fgMuted)
+                .padding(.bottom, 4)
                 TextField(
                     agent.running ? "redirecionar o agente…" : "Peça algo à Odete…",
                     text: $agent.draft,
                     axis: .vertical
                 )
-                .font(OdeteFont.ui(13))
+                .font(.subheadline)
                 .foregroundStyle(theme.fg)
                 .textFieldStyle(.plain)
                 .lineLimit(1 ... 6)
@@ -91,33 +92,35 @@ struct Composer: View {
                 }
                 .padding(.vertical, 8)
                 if agent.running, agent.draft.trimmingCharacters(in: .whitespaces).isEmpty {
-                    Button { agent.stop() } label: { Image(systemName: "stop.fill").font(.system(
-                        size: 13,
-                        weight: .bold
-                    )).frame(width: 32, height: 32) }
-                        .buttonStyle(.glassProminent).tint(theme.danger).accessibilityLabel("Parar")
+                    Button("Parar", systemImage: "stop.fill") { agent.stop() }
+                        .labelStyle(.iconOnly)
+                        .buttonStyle(.glass)
+                        .controlSize(.small)
+                        .tint(theme.danger)
+                        .padding(.bottom, 4)
                 } else {
-                    Button { send() } label: {
-                        Image(systemName: agent.running ? "arrow.triangle.turn.up.right.circle.fill" : "arrow.up")
-                            .font(.system(
-                                size: 14,
-                                weight: .bold
-                            )).frame(width: 32, height: 32)
-                    }
-                    .buttonStyle(.glassProminent).disabled(agent.draft.trimmingCharacters(in: .whitespaces).isEmpty)
-                    .accessibilityLabel(agent.running ? "Redirecionar" : "Enviar")
+                    Button(
+                        agent.running ? "Redirecionar" : "Enviar",
+                        systemImage: agent.running ? "arrow.triangle.turn.up.right" : "arrow.up"
+                    ) { send() }
+                        .labelStyle(.iconOnly)
+                        .buttonStyle(.glassProminent)
+                        .controlSize(.small)
+                        .disabled(agent.draft.trimmingCharacters(in: .whitespaces).isEmpty)
+                        .padding(.bottom, 4)
                 }
             }
             .padding(.horizontal, 8)
-            .background(theme.bg, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
+            .padding(.vertical, 4)
+            .background(theme.bg, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .stroke(focused ? theme.accent.opacity(0.6) : theme.border))
             .padding(.horizontal, 10)
             HStack(spacing: 6) {
                 Picker("Modo", selection: Binding(get: { agent.mode }, set: { agent.setMode($0) })) {
                     ForEach(AgentMode.allCases) { m in Text(m.label).tag(m) }
                 }
-                .pickerStyle(.segmented).frame(maxWidth: 200)
+                .pickerStyle(.segmented).frame(maxWidth: 220).controlSize(.small)
                 Spacer()
                 Menu {
                     ForEach(PermitMode.allCases) { p in Button { agent.setPermit(p) } label: { Label(
@@ -125,16 +128,12 @@ struct Composer: View {
                         systemImage: p.symbol
                     ) } }
                 } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: agent.permit.symbol).font(.system(size: 11)); Text(agent.permit.label)
-                            .font(OdeteFont.ui(11))
-                    }
-                    .foregroundStyle(theme.fgMuted).padding(.horizontal, 8).frame(height: 26).background(
-                        theme.bgSubtle,
-                        in: Capsule()
-                    )
+                    Label(agent.permit.label, systemImage: agent.permit.symbol)
                 }
-                .buttonStyle(.plain)
+                .menuStyle(.button)
+                .buttonStyle(.glass)
+                .controlSize(.small)
+                .tint(theme.fgMuted)
             }
             .padding(.horizontal, 10).padding(.bottom, 6)
         }

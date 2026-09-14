@@ -82,6 +82,8 @@ public struct CardRow<Trailing: View>: View {
     var label: String
     var detail: String?
     var first: Bool
+    /// Quantas linhas o rótulo pode ocupar. Uma para linha de ajuste, duas para frase.
+    var lines: Int
     @ViewBuilder var trailing: Trailing
 
     public init(
@@ -90,6 +92,7 @@ public struct CardRow<Trailing: View>: View {
         color: Color? = nil,
         detail: String? = nil,
         first: Bool = false,
+        lines: Int = 1,
         @ViewBuilder trailing: () -> Trailing = { EmptyView() }
     ) {
         self.label = label
@@ -97,6 +100,7 @@ public struct CardRow<Trailing: View>: View {
         self.color = color
         self.detail = detail
         self.first = first
+        self.lines = lines
         self.trailing = trailing()
     }
 
@@ -108,7 +112,8 @@ public struct CardRow<Trailing: View>: View {
                 .frame(width: 22, height: 22)
                 .background(color ?? theme.accent, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
             VStack(alignment: .leading, spacing: 0) {
-                Text(label).font(.subheadline).foregroundStyle(theme.fg).lineLimit(1)
+                Text(label).font(.subheadline).foregroundStyle(theme.fg).lineLimit(lines)
+                    .fixedSize(horizontal: false, vertical: true)
                 if let detail {
                     Text(detail).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
                 }
@@ -117,6 +122,7 @@ public struct CardRow<Trailing: View>: View {
             trailing
         }
         .padding(.horizontal, 12)
+        .padding(.vertical, lines > 1 ? 8 : 0)
         .frame(minHeight: detail == nil ? 44 : 50)
         .overlay(alignment: .top) {
             if !first {

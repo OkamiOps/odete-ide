@@ -32,22 +32,30 @@ struct ChatList: View {
         }
     }
 
+    static let sugestoes: [(String, String)] = [
+        ("text.magnifyingglass", "Explica a estrutura deste projeto"),
+        ("play.circle", "Roda npm run dev e me diz se subiu"),
+        ("plus.square.on.square", "Cria um componente de header em src/"),
+        ("checkmark.seal", "/review no arquivo aberto"),
+    ]
+
     var starters: some View {
         VStack(alignment: .leading, spacing: 10) {
             Wordmark(height: 22).opacity(0.6)
             Text("Peça em português. O agente lê o projeto, roda no terminal e edita com patches que você aceita.")
-                .font(OdeteFont.ui(12)).foregroundStyle(theme.fgMuted)
-            ForEach(
-                ["Explica a estrutura deste projeto", "Roda npm run dev e me diz se subiu",
-                 "Cria um componente de header em src/",
-                 "/review no arquivo aberto"],
-                id: \.self
-            ) { s in
-                Button { agent.draft = s } label: {
-                    Text(s).font(OdeteFont.ui(12.5)).foregroundStyle(theme.fg).padding(.horizontal, 12)
-                        .frame(height: 34)
+                .font(.subheadline).foregroundStyle(theme.fgMuted)
+                .fixedSize(horizontal: false, vertical: true)
+            CardList {
+                ForEach(Array(Self.sugestoes.enumerated()), id: \.offset) { i, s in
+                    Button { agent.draft = s.1 } label: {
+                        CardRow(s.1, symbol: s.0, color: theme.accent, first: i == 0, lines: 2) {
+                            Image(systemName: "arrow.up.left").font(.caption2.bold())
+                                .foregroundStyle(theme.fgSubtle)
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.glass)
             }
         }
         .padding(.top, 8)
@@ -109,20 +117,36 @@ struct ChatRow: View {
         case let .assistant(_, text):
             MarkdownText(text: text).frame(maxWidth: .infinity, alignment: .leading)
         case let .think(_, text, live):
-            DisclosureGroup(isExpanded: $open) {
-                Text(text).font(OdeteFont.ui(11.5)).foregroundStyle(theme.fgMuted).textSelection(.enabled).padding(
-                    .top,
-                    4
-                )
-            } label: {
-                HStack(spacing: 6) {
-                    if live {
-                        ProgressView().controlSize(.mini)
+            // Nasce recolhido: o raciocínio é contexto, não a resposta.
+            VStack(alignment: .leading, spacing: 6) {
+                Button { withAnimation(.snappy(duration: 0.2)) { open.toggle() } } label: {
+                    HStack(spacing: 6) {
+                        if live {
+                            ProgressView().controlSize(.mini)
+                        } else {
+                            Image(systemName: "brain").font(.system(size: 11))
+                        }
+                        Text(live ? "pensando…" : "pensou").font(.caption)
+                        if !live {
+                            Image(systemName: "chevron.right").font(.system(size: 9, weight: .bold))
+                                .rotationEffect(.degrees(open ? 90 : 0))
+                        }
+                        Spacer(minLength: 0)
                     }
-                    Text(live ? "pensando…" : "pensou").font(OdeteFont.ui(11.5)).foregroundStyle(theme.fgSubtle)
+                    .foregroundStyle(theme.fgSubtle)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .disabled(live)
+                if open, !live {
+                    HStack(alignment: .top, spacing: 10) {
+                        Capsule().fill(theme.separator).frame(width: 2)
+                        Text(text).font(.caption).foregroundStyle(theme.fgMuted).textSelection(.enabled)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .fixedSize(horizontal: false, vertical: true)
                 }
             }
-            .tint(theme.fgSubtle)
         case let .permit(id, name, detail, status):
             PermitCard(name: name, detail: detail, status: status) { agent.approve(id, $0) }
         case let .tool(_, name, detail):
@@ -155,48 +179,76 @@ struct ChatRow: View {
     }
 }
 
-/// Linha de ferramentas agrupadas, expansível.
+/// Ferramentas usadas no turno. Nasce recolhida numa linha só; expandindo, mostra cada
+/// chamada com o nome e o alvo.
 struct ToolGroup: View {
     @Environment(\.theme) private var theme
     let items: [ChatItem]
     @State private var open = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Button { open.toggle() } label: {
-                HStack(spacing: 6) {
+        VStack(alignment: .leading, spacing: 0) {
+            Button { withAnimation(.snappy(duration: 0.2)) { open.toggle() } } label: {
+                HStack(spacing: 7) {
                     Image(systemName: "wrench.and.screwdriver").font(.system(size: 10))
-                    Text(summary).font(OdeteFont.mono(11)).lineLimit(open ? nil : 1)
-                    Spacer()
-                    if items.count > 1 {
-                        Image(systemName: open ? "chevron.up" : "chevron.down").font(.system(
-                            size: 9,
-                            weight: .bold
-                        ))
-                    }
+                    Text(summary).font(.caption).lineLimit(1)
+                    Spacer(minLength: 4)
+                    Image(systemName: "chevron.right").font(.system(size: 9, weight: .bold))
+                        .rotationEffect(.degrees(open ? 90 : 0))
                 }
                 .foregroundStyle(theme.fgSubtle)
+                .padding(.horizontal, 10)
+                .frame(height: 30)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            if open, items.count > 1 {
-                ForEach(items) { it in
-                    Text("· " + line(it)).font(OdeteFont.mono(11)).foregroundStyle(theme.fgMuted).lineLimit(1)
+            if open {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(Array(items.enumerated()), id: \.offset) { i, it in
+                        HStack(alignment: .top, spacing: 7) {
+                            Text(name(it)).font(OdeteFont.mono(10.5, weight: .medium))
+                                .foregroundStyle(theme.accent)
+                            Text(detail(it)).font(OdeteFont.mono(10.5)).foregroundStyle(theme.fgMuted)
+                                .textSelection(.enabled)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Spacer(minLength: 0)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .overlay(alignment: .top) {
+                            if i > 0 {
+                                Rectangle().fill(theme.separator).frame(height: 0.5)
+                            }
+                        }
+                    }
                 }
             }
         }
+        .background(theme.bg, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
-    func line(_ it: ChatItem) -> String {
+    func name(_ it: ChatItem) -> String {
         switch it {
-        case let .tool(_, n, d): "\(n) \(d)"
-        case let .permit(_, n, d, s): "\(n) \(d)\(s == .no ? " (recusado)" : "")"
+        case let .tool(_, n, _): n
+        case let .permit(_, n, _, _): n
+        default: ""
+        }
+    }
+
+    func detail(_ it: ChatItem) -> String {
+        switch it {
+        case let .tool(_, _, d): d
+        case let .permit(_, _, d, s): d + (s == .no ? " (recusado)" : "")
         default: ""
         }
     }
 
     var summary: String {
-        items.count == 1 ? line(items[0]) : "\(items.count) ferramentas: " + items
-            .map { line($0).split(separator: " ").first.map(String.init) ?? "" }.joined(separator: ", ")
+        if items.count == 1 {
+            return name(items[0]) + " " + detail(items[0])
+        }
+        let nomes = Set(items.map { name($0) }).sorted().prefix(3).joined(separator: ", ")
+        return "\(items.count) ferramentas · \(nomes)"
     }
 }
 
@@ -308,14 +360,24 @@ struct PatchCard: View {
 }
 
 /// Markdown simples: títulos, listas, blocos de código e inline.
+/// Markdown do agente. Além de parágrafo e bloco de código, entende título, lista com
+/// marcador, lista numerada, citação e régua. Texto corrido cansa de ler; a lista não.
 struct MarkdownText: View {
     @Environment(\.theme) private var theme
     let text: String
 
-    enum Block: Identifiable { case code(Int, String, String), para(Int, String), heading(Int, String)
+    enum Block: Identifiable {
+        case code(Int, String, String)
+        case para(Int, String)
+        case heading(Int, Int, String)
+        case list(Int, Bool, [String])
+        case quote(Int, String)
+        case rule(Int)
+
         var id: Int {
             switch self {
-            case let .code(i, _, _), let .para(i, _), let .heading(i, _): i
+            case let .code(i, _, _), let .para(i, _), let .heading(i, _, _),
+                 let .list(i, _, _), let .quote(i, _), let .rule(i): i
             }
         }
     }
@@ -323,82 +385,168 @@ struct MarkdownText: View {
     var blocks: [Block] {
         var out: [Block] = []
         var i = 0
-        var inCode = false, lang = "", code: [String] = [], para: [String] = []
-        func flush() {
+        var inCode = false
+        var lang = ""
+        var code: [String] = []
+        var para: [String] = []
+        var list: [String] = []
+        var ordered = false
+        var quote: [String] = []
+
+        func flushPara() {
             if !para.isEmpty {
                 out.append(.para(i, para.joined(separator: "\n"))); i += 1; para = []
             }
         }
+        func flushList() {
+            if !list.isEmpty {
+                out.append(.list(i, ordered, list)); i += 1; list = []
+            }
+        }
+        func flushQuote() {
+            if !quote.isEmpty {
+                out.append(.quote(i, quote.joined(separator: " "))); i += 1; quote = []
+            }
+        }
+        func flushAll() {
+            flushPara(); flushList(); flushQuote()
+        }
+
         for raw in text.split(separator: "\n", omittingEmptySubsequences: false) {
             let line = String(raw)
-            if line.hasPrefix("```") {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+
+            if trimmed.hasPrefix("```") {
                 if inCode {
                     out.append(.code(i, lang, code.joined(separator: "\n"))); i += 1; code = []; inCode = false
                 } else {
-                    flush(); inCode = true; lang = String(line.dropFirst(3)).trimmingCharacters(in: .whitespaces)
+                    flushAll(); inCode = true
+                    lang = String(trimmed.dropFirst(3)).trimmingCharacters(in: .whitespaces)
                 }
                 continue
             }
             if inCode {
                 code.append(line); continue
             }
-            if line.hasPrefix("#") {
-                flush(); out.append(.heading(
-                    i,
-                    line.drop { $0 == "#" }.trimmingCharacters(in: .whitespaces)
-                )); i += 1; continue
+            if trimmed == "---" || trimmed == "***" || trimmed == "___" {
+                flushAll(); out.append(.rule(i)); i += 1; continue
             }
-            if line.trimmingCharacters(in: .whitespaces).isEmpty {
-                flush(); continue
+            if trimmed.hasPrefix("#") {
+                flushAll()
+                let level = trimmed.prefix { $0 == "#" }.count
+                out.append(.heading(i, level, trimmed.drop { $0 == "#" }.trimmingCharacters(in: .whitespaces)))
+                i += 1
+                continue
             }
+            if trimmed.hasPrefix("> ") {
+                flushPara(); flushList()
+                quote.append(String(trimmed.dropFirst(2)))
+                continue
+            }
+            if let item = bullet(trimmed) {
+                flushPara(); flushQuote()
+                if !ordered, !list.isEmpty, item.ordered {
+                    flushList()
+                }
+                if ordered, !list.isEmpty, !item.ordered {
+                    flushList()
+                }
+                ordered = item.ordered
+                list.append(item.text)
+                continue
+            }
+            if trimmed.isEmpty {
+                flushAll(); continue
+            }
+            flushList(); flushQuote()
             para.append(line)
         }
         if inCode {
             out.append(.code(i, lang, code.joined(separator: "\n"))); i += 1
         }
-        flush()
+        flushAll()
         return out
     }
 
+    /// Reconhece "- item", "* item" e "1. item".
+    func bullet(_ line: String) -> (text: String, ordered: Bool)? {
+        if line.hasPrefix("- ") || line.hasPrefix("* ") {
+            return (String(line.dropFirst(2)), false)
+        }
+        guard let dot = line.firstIndex(of: "."), line[line.startIndex ..< dot].allSatisfy(\.isNumber),
+              line.index(after: dot) < line.endIndex, line[line.index(after: dot)] == " "
+        else { return nil }
+        return (String(line[line.index(dot, offsetBy: 2)...]), true)
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 10) {
             ForEach(blocks) { b in
                 switch b {
-                case let .heading(_, t): Text(t).font(OdeteFont.ui(13, weight: .semibold)).foregroundStyle(theme.fg)
-                    .padding(
-                        .top,
-                        4
-                    )
-                case let .para(_, t): Text(inline(t)).font(OdeteFont.ui(13)).foregroundStyle(theme.fg)
-                    .textSelection(.enabled).fixedSize(
-                        horizontal: false,
-                        vertical: true
-                    )
-                case let .code(_, lang, c):
-                    VStack(alignment: .leading, spacing: 0) {
-                        HStack {
-                            Text(lang.isEmpty ? "código" : lang).font(OdeteFont.mono(10))
-                                .foregroundStyle(theme.fgSubtle)
-                            Spacer()
-                            Button { UIPasteboard.general.string = c } label: {
-                                Image(systemName: "doc.on.doc").font(.system(size: 11))
-                            }.buttonStyle(.plain)
-                                .foregroundStyle(theme.fgSubtle)
-                        }
-                        .padding(.horizontal, 10).frame(height: 24)
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            Text(c).font(OdeteFont.mono(11.5)).foregroundStyle(theme.fg).textSelection(.enabled)
-                                .padding(
-                                    .horizontal,
-                                    10
-                                ).padding(.bottom, 8)
+                case let .heading(_, level, t):
+                    Text(t)
+                        .font(level <= 1 ? .headline : .subheadline.weight(.semibold))
+                        .foregroundStyle(theme.fg)
+                        .padding(.top, 2)
+                case let .para(_, t):
+                    Text(inline(t))
+                        .font(.subheadline)
+                        .lineSpacing(3)
+                        .foregroundStyle(theme.fg)
+                        .textSelection(.enabled)
+                        .fixedSize(horizontal: false, vertical: true)
+                case let .list(_, ordered, items):
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(Array(items.enumerated()), id: \.offset) { n, item in
+                            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                Text(ordered ? "\(n + 1)." : "•")
+                                    .font(.subheadline.weight(.medium))
+                                    .foregroundStyle(theme.accent)
+                                    .frame(minWidth: ordered ? 18 : 10, alignment: .leading)
+                                Text(inline(item))
+                                    .font(.subheadline)
+                                    .lineSpacing(3)
+                                    .foregroundStyle(theme.fg)
+                                    .textSelection(.enabled)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
                         }
                     }
-                    .background(theme.bg, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).stroke(theme.border))
+                case let .quote(_, t):
+                    HStack(alignment: .top, spacing: 10) {
+                        Capsule().fill(theme.accent.opacity(0.5)).frame(width: 3)
+                        Text(inline(t)).font(.subheadline).foregroundStyle(theme.fgMuted)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .fixedSize(horizontal: false, vertical: true)
+                case .rule:
+                    Rectangle().fill(theme.separator).frame(height: 0.5)
+                case let .code(_, lang, c):
+                    codeBlock(lang: lang, code: c)
                 }
             }
         }
+    }
+
+    func codeBlock(lang: String, code c: String) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text(lang.isEmpty ? "código" : lang).font(.caption2).foregroundStyle(.secondary)
+                Spacer()
+                Button("Copiar", systemImage: "doc.on.doc") { UIPasteboard.general.string = c }
+                    .labelStyle(.iconOnly)
+                    .buttonStyle(.borderless)
+                    .controlSize(.small)
+                    .tint(theme.fgMuted)
+            }
+            .padding(.leading, 12).padding(.trailing, 6).frame(height: 30)
+            Rectangle().fill(theme.separator).frame(height: 0.5)
+            ScrollView(.horizontal, showsIndicators: false) {
+                Text(c).font(OdeteFont.mono(11.5)).foregroundStyle(theme.fg).textSelection(.enabled)
+                    .padding(.horizontal, 12).padding(.vertical, 10)
+            }
+        }
+        .background(theme.bg, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
     func inline(_ t: String) -> AttributedString {

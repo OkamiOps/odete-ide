@@ -224,11 +224,17 @@ public final class GitModel {
     /// `stageFirst` manda tudo para o stage antes de commitar, numa operação só: chamar
     /// `stageAll()` e `commit()` em seguida não funciona porque a segunda cai no guarda de
     /// ocupado enquanto a primeira ainda roda.
+    /// `stageFirst` manda tudo para o stage antes de commitar. Havendo remoto, o push sai
+    /// logo em seguida, no mesmo bloco: são etapas de uma ação só do ponto de vista de quem
+    /// usa, e chamadas separadas cairiam no guarda de ocupado.
     public func commit(stagingEverything stageFirst: Bool = false) {
         let msg = commitMessage.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !msg.isEmpty else { error = "escreva a mensagem do commit"; return }
         let author = author
         let merging = mergeInProgress
+        let cred = credentials(for: origin)
+        // Sem conta conectada não dá para enviar; o commit sai e a mensagem diz o porquê.
+        let semConta = origin != nil && cred == nil
         run("commit…") { repo in
             if stageFirst {
                 try await repo.stageAll()
@@ -238,7 +244,20 @@ public final class GitModel {
             } else {
                 try await repo.commit(message: msg, author: author)
             }
-            return "commit feito"
+            guard let cred else {
+                return semConta ? "commit feito; conecte uma conta para enviar" : "commit feito"
+            }
+            do {
+                try await repo.push(credentials: cred)
+                return "commit e push feitos"
+            } catch {
+                // O commit já está no repositório; só o envio falhou, e é isso que se diz.
+                throw GitError(
+                    kind: .network,
+                    code: 0,
+                    message: "commit feito, mas o push falhou: \(error.localizedDescription)"
+                )
+            }
         }
         commitMessage = ""
     }

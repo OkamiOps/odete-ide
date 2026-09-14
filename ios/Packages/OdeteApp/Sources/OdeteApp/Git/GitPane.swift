@@ -131,6 +131,8 @@ struct HeroCard: View {
         }
         .alert("Remoto origin", isPresented: $askingRemote) {
             TextField("https://github.com/usuario/repo.git", text: $remoteURL)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
             Button("Adicionar") { git.addRemote(url: remoteURL.trimmingCharacters(in: .whitespaces)) }
             Button("Cancelar", role: .cancel) {}
         }
@@ -459,7 +461,8 @@ struct CommitBox: View {
             }
             HStack(spacing: 6) {
                 GitButton(
-                    title: git.mergeInProgress ? "Commit de merge" : "Commit",
+                    title: git.mergeInProgress ? "Commit de merge"
+                        : git.origin == nil ? "Commit" : "Commit e push",
                     symbol: "checkmark",
                     accent: true,
                     disabled: !canCommit
@@ -471,14 +474,22 @@ struct CommitBox: View {
                         git.commit()
                     }
                 }
+                // A ação principal leva a largura; desfazer fica como ícone ao lado, para o
+                // rótulo "Commit e push" nunca precisar truncar.
                 if git.mergeInProgress {
-                    GitButton(title: "Abortar", symbol: "xmark", disabled: git.busy) { git.abortMerge() }
+                    Button("Abortar merge", systemImage: "xmark") { git.abortMerge() }
+                        .labelStyle(.iconOnly)
+                        .buttonStyle(.glass)
+                        .controlSize(.small)
+                        .disabled(git.busy)
                 } else {
-                    GitButton(
-                        title: "Desfazer",
-                        symbol: "arrow.uturn.backward",
-                        disabled: git.busy || git.log.isEmpty
-                    ) { git.undoLastCommit() }
+                    Button("Desfazer último commit", systemImage: "arrow.uturn.backward") {
+                        git.undoLastCommit()
+                    }
+                    .labelStyle(.iconOnly)
+                    .buttonStyle(.glass)
+                    .controlSize(.small)
+                    .disabled(git.busy || git.log.isEmpty)
                 }
             }
             if !git.conflicts.isEmpty {
@@ -492,7 +503,10 @@ struct CommitBox: View {
             isPresented: $asking,
             titleVisibility: .visible
         ) {
-            Button("Commitar as \(git.unstaged.count) alterações") { git.commit(stagingEverything: true) }
+            Button(
+                git.unstaged.count == 1 ? "Commitar 1 alteração"
+                    : "Commitar \(git.unstaged.count) alterações"
+            ) { git.commit(stagingEverything: true) }
             Button("Cancelar", role: .cancel) {}
         } message: {
             Text("Quer mandar tudo para o stage e commitar?")

@@ -8,6 +8,12 @@ public struct GitError: LocalizedError, Sendable, Equatable {
     public var code: Int32
     public var message: String
 
+    public init(kind: Kind, code: Int32 = 0, message: String) {
+        self.kind = kind
+        self.code = code
+        self.message = message
+    }
+
     public var errorDescription: String? {
         message
     }

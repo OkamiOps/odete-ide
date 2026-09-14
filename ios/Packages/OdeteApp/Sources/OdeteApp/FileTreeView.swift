@@ -1,9 +1,15 @@
 import OdeteCore
+import OdeteGit
 import OdeteUI
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// Árvore de arquivos com expandir, menu de contexto e arrastar para mover.
+/// Aba de arquivos.
+///
+/// A pergunta que ela precisa responder de relance é "de onde é este arquivo". Por isso
+/// a trilha do arquivo aberto em cima, as guias de recuo ligando cada linha à pasta que
+/// a contém, a guia acesa no caminho do arquivo aberto, o filtro que mostra a pasta de
+/// cada resultado e a marca do git na direita de quem mudou.
 struct FileTreeView: View {
     @Environment(WorkspaceModel.self) private var ws
     @Environment(\.theme) private var theme
@@ -11,35 +17,23 @@ struct FileTreeView: View {
     @State private var newFolderAt: String?
     @State private var deleting: String?
     @State private var draft = ""
+    @State private var busca = ""
+    /// Sobe de um em um quando alguém pede para revelar o arquivo aberto.
+    @State private var pedido = 0
 
     var body: some View {
         VStack(spacing: 0) {
             PaneHeader("Arquivos", detail: ws.project.name) {
                 HeaderButton("doc.badge.plus", label: "Novo arquivo") { ws.createFile(near: ws.selected) }
                 HeaderButton("folder.badge.plus", label: "Nova pasta") { draft = ""; newFolderAt = ws.selected ?? "" }
-                HeaderButton("arrow.clockwise", label: "Recarregar") { ws.reload() }
+                mais
             }
-            ScrollPane {
-                LazyVStack(spacing: 0) {
-                    ForEach(ws.tree.children ?? []) { node in
-                        FileRow(
-                            node: node,
-                            depth: 0,
-                            renaming: $renaming,
-                            deleting: $deleting,
-                            newFolderAt: $newFolderAt,
-                            draft: $draft
-                        )
-                    }
-                }
-                .padding(.vertical, 4)
+            filtro
+            if busca.isEmpty, let ativo = ws.active {
+                trilha(ativo)
             }
-            .dropDestination(for: String.self) { items, _ in
-                for p in items {
-                    ws.move(p, into: "")
-                }
-                return true
-            }
+            Rectangle().fill(theme.separator).frame(height: 0.5)
+            arvore
         }
         .alert("Renomear", isPresented: Binding(get: { renaming != nil }, set: {
             if !$0 {
@@ -84,115 +78,457 @@ struct FileTreeView: View {
             Button("Cancelar", role: .cancel) { deleting = nil }
         }
     }
+
+    /// O que não é de uso constante mora aqui, para o cabeçalho continuar legível numa
+    /// coluna de 200 pt.
+    var mais: some View {
+        Menu {
+            Button("Revelar arquivo aberto", systemImage: "scope") { pedido += 1 }
+                .disabled(ws.active == nil)
+            Button("Recolher tudo", systemImage: "arrow.down.right.and.arrow.up.left") { recolherTudo() }
+            Divider()
+            Button("Recarregar", systemImage: "arrow.clockwise") { ws.reload() }
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(theme.fgMuted)
+                .frame(width: 32, height: 32)
+                .contentShape(Rectangle())
+        }
+        .menuIndicator(.hidden)
+        .accessibilityLabel("Mais")
+    }
+
+    var filtro: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 12, weight: .semibold)).foregroundStyle(theme.fgSubtle)
+            TextField("Filtrar arquivos", text: $busca)
+                .textFieldStyle(.plain)
+                .font(OdeteFont.ui(12.5))
+                .foregroundStyle(theme.fg)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
+            if !busca.isEmpty {
+                Button { busca = "" } label: {
+                    Image(systemName: "xmark.circle.fill").font(.system(size: 12))
+                        .foregroundStyle(theme.fgSubtle)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 8)
+        .frame(height: 30)
+        .background(theme.fg.opacity(0.06), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .padding(.horizontal, 10)
+        .padding(.bottom, 6)
+    }
+
+    /// Caminho do arquivo aberto em pedaços tocáveis. Cada pedaço abre a pasta dele na
+    /// árvore, que é o caminho mais curto entre "estou vendo este arquivo" e "ele mora ali".
+    func trilha(_ path: String) -> some View {
+        let partes = path.split(separator: "/").map(String.init)
+        return ScrollPane(.horizontal, showsIndicators: false) {
+            HStack(spacing: 3) {
+                Image(systemName: "shippingbox")
+                    .font(.system(size: 10, weight: .semibold)).foregroundStyle(theme.fgSubtle)
+                Text(ws.project.name).font(OdeteFont.ui(11.5)).foregroundStyle(theme.fgSubtle).lineLimit(1)
+                ForEach(Array(partes.enumerated()), id: \.offset) { i, parte in
+                    let ultimo = i == partes.count - 1
+                    Image(systemName: "chevron.compact.right")
+                        .font(.system(size: 9, weight: .semibold)).foregroundStyle(theme.fgSubtle)
+                    Button {
+                        let alvo = partes.prefix(i + 1).joined(separator: "/")
+                        if ultimo {
+                            ws.selected = alvo
+                        } else {
+                            abrirPasta(alvo)
+                        }
+                        pedido += 1
+                    } label: {
+                        Text(parte)
+                            .font(OdeteFont.ui(11.5, weight: ultimo ? .semibold : .regular))
+                            .foregroundStyle(ultimo ? theme.fg : theme.fgMuted)
+                            .lineLimit(1)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 12)
+            .frame(height: 24)
+        }
+        .frame(height: 24)
+        .padding(.bottom, 6)
+    }
+
+    var arvore: some View {
+        let marcas = decoracoes()
+        let aceso = acesas(ws.active)
+        let itens = linhas
+        return ScrollViewReader { proxy in
+            ScrollPane {
+                // Uma lista só para a árvore e para o filtro. Com um `if` trocando duas
+                // listas diferentes aqui dentro, a `LazyVStack` reaproveitava as linhas da
+                // árvore para mostrar os resultados do filtro.
+                LazyVStack(spacing: 0) {
+                    ForEach(itens) { l in
+                        FileRow(
+                            node: l.node,
+                            depth: l.depth,
+                            pasta: l.pasta,
+                            mudanca: marcas[l.node.path],
+                            acesas: aceso,
+                            renaming: $renaming,
+                            deleting: $deleting,
+                            newFolderAt: $newFolderAt,
+                            draft: $draft
+                        )
+                        .id(l.node.path)
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+            .onChange(of: ws.active) { _, novo in revelar(novo, proxy) }
+            .onChange(of: pedido) { _, _ in revelar(ws.active, proxy, centro: true) }
+        }
+        .overlay {
+            if itens.isEmpty {
+                vazio
+            }
+        }
+        .dropDestination(for: String.self) { items, _ in
+            for p in items {
+                ws.move(p, into: "")
+            }
+            return true
+        }
+    }
+
+    var vazio: some View {
+        VStack(spacing: 8) {
+            Image(systemName: busca.isEmpty ? "folder" : "magnifyingglass")
+                .font(.system(size: 26)).foregroundStyle(theme.fgSubtle)
+            Text(busca.isEmpty ? "Pasta vazia" : "Nada com \"\(busca)\"")
+                .font(OdeteFont.ui(13, weight: .medium)).foregroundStyle(theme.fgMuted)
+            if busca.isEmpty {
+                Text("O botão de novo arquivo fica aqui em cima.")
+                    .font(OdeteFont.ui(11.5)).foregroundStyle(theme.fgSubtle).multilineTextAlignment(.center)
+            }
+        }
+        .padding(24)
+        .frame(maxWidth: .infinity)
+    }
+
+    // MARK: dados da árvore
+
+    struct Linha: Identifiable {
+        var node: FileNode
+        var depth: Int
+        /// Pasta do arquivo, preenchida só no filtro: fora da árvore o nome sozinho não
+        /// diz nada, metade dos projetos tem três `index.ts`.
+        var pasta: String?
+        var id: String {
+            node.path
+        }
+    }
+
+    /// A árvore visível vira uma lista plana: a `LazyVStack` só monta o que aparece e
+    /// cada linha sabe o próprio nível, que é o que as guias de recuo desenham. Com o
+    /// filtro ligado a lista passa a ser a dos arquivos que casam, cada um com a pasta.
+    var linhas: [Linha] {
+        if !busca.isEmpty {
+            let alvo = busca.lowercased()
+            return ws.tree.allFiles()
+                .filter { $0.path.lowercased().contains(alvo) }
+                .prefix(200)
+                .map { Linha(node: $0, depth: 0, pasta: pastaDe($0.path)) }
+        }
+        var out: [Linha] = []
+        achatar(ws.tree.children ?? [], 0, &out)
+        return out
+    }
+
+    func achatar(_ nodes: [FileNode], _ nivel: Int, _ out: inout [Linha]) {
+        for n in nodes {
+            out.append(Linha(node: n, depth: nivel))
+            if n.isDirectory, ws.expanded.contains(n.path) {
+                achatar(n.children ?? [], nivel + 1, &out)
+            }
+        }
+    }
+
+    /// Estado do git por caminho. As pastas herdam a mudança mais grave do que têm
+    /// dentro, senão só o arquivo lá no fundo dá sinal e a pasta fechada não conta nada.
+    func decoracoes() -> [String: Change] {
+        var m: [String: Change] = [:]
+        for e in ws.git.status {
+            let c = e.unstaged ?? e.staged ?? .modified
+            m[e.path] = c
+            var partes = e.path.split(separator: "/").dropLast()
+            while !partes.isEmpty {
+                let dir = partes.joined(separator: "/")
+                m[dir] = pior(m[dir], c)
+                partes = partes.dropLast()
+            }
+        }
+        return m
+    }
+
+    func pior(_ a: Change?, _ b: Change) -> Change {
+        guard let a else { return b }
+        return gravidade(a) >= gravidade(b) ? a : b
+    }
+
+    func gravidade(_ c: Change) -> Int {
+        switch c {
+        case .conflicted: 4
+        case .deleted: 3
+        case .modified, .typeChange, .renamed: 2
+        case .added, .untracked: 1
+        case .ignored: 0
+        }
+    }
+
+    /// Pastas no caminho do arquivo aberto: são as guias que ficam acesas.
+    func acesas(_ path: String?) -> Set<String> {
+        guard let path else { return [] }
+        var out: Set<String> = []
+        var partes = path.split(separator: "/").dropLast()
+        while !partes.isEmpty {
+            out.insert(partes.joined(separator: "/"))
+            partes = partes.dropLast()
+        }
+        return out
+    }
+
+    func pastaDe(_ path: String) -> String {
+        let partes = path.split(separator: "/").dropLast()
+        return partes.isEmpty ? ws.project.name : partes.joined(separator: "/")
+    }
+
+    // MARK: ações
+
+    func abrirPasta(_ path: String) {
+        if !ws.expanded.contains(path) {
+            ws.toggle(path)
+        }
+        ws.selected = path
+    }
+
+    /// Abre o caminho todo até o arquivo e rola até ele. Quando o arquivo só mudou de
+    /// aba, a rolagem é a mínima para ele aparecer; quem pediu para revelar leva ele
+    /// para o meio da lista.
+    func revelar(_ path: String?, _ proxy: ScrollViewProxy, centro: Bool = false) {
+        guard let path, busca.isEmpty else { return }
+        for pasta in acesas(path) where !ws.expanded.contains(pasta) {
+            ws.toggle(pasta)
+        }
+        Task { @MainActor in
+            withAnimation(.snappy(duration: 0.2)) { proxy.scrollTo(path, anchor: centro ? .center : nil) }
+        }
+    }
+
+    func recolherTudo() {
+        for p in ws.expanded {
+            ws.toggle(p)
+        }
+    }
 }
 
+/// Linha da árvore: guias de recuo, seta, ícone do tipo, nome e a marca do git.
 struct FileRow: View {
     @Environment(WorkspaceModel.self) private var ws
     @Environment(\.theme) private var theme
+    /// Altura fixa: as guias de recuo precisam encostar de uma linha na outra, senão a
+    /// linha vertical vira tracejado e deixa de ligar o arquivo à pasta.
+    static let altura: CGFloat = 32
     var node: FileNode
     var depth: Int
+    /// Fora da árvore (no filtro) a linha troca as guias de recuo pela pasta do arquivo.
+    var pasta: String?
+    var mudanca: Change?
+    var acesas: Set<String>
     @Binding var renaming: String?
     @Binding var deleting: String?
     @Binding var newFolderAt: String?
     @Binding var draft: String
     @State private var over = false
 
-    var open: Bool {
+    var aberta: Bool {
         ws.expanded.contains(node.path)
     }
 
-    var selected: Bool {
+    var ativo: Bool {
+        ws.active == node.path
+    }
+
+    var selecionado: Bool {
         ws.selected == node.path
     }
 
+    var sujo: Bool {
+        ws.tabs.first { $0.path == node.path }?.isDirty == true
+    }
+
     var body: some View {
-        VStack(spacing: 0) {
-            Button {
-                if node.isDirectory {
-                    ws.toggle(node.path); ws.selected = node.path
-                } else {
-                    ws.openFile(node.path)
-                }
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(theme.fgSubtle)
-                        .rotationEffect(.degrees(open ? 90 : 0))
-                        .opacity(node.isDirectory ? 1 : 0)
-                        .frame(width: 12)
-                    FileGlyph(path: node.path, isDirectory: node.isDirectory, expanded: open)
-                    Text(node.name)
-                        .font(OdeteFont.ui(13))
-                        .foregroundStyle(selected ? theme.fg : theme.fg.opacity(0.88))
-                        .lineLimit(1)
-                    Spacer(minLength: 0)
-                    if ws.tabs.first(where: { $0.path == node.path })?.isDirty == true {
-                        Circle().fill(theme.accent).frame(width: 6, height: 6).padding(.trailing, 10)
-                    }
-                }
-                .padding(.leading, 10 + CGFloat(depth) * 16)
-                .frame(height: Metrics.row - 4)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(
-                    selected ? theme.glassTint : (over ? theme.accent.opacity(0.12) : .clear),
-                    in: RoundedRectangle(cornerRadius: Metrics.rControl, style: .continuous)
-                )
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .contentShape(Rectangle())
+        Button {
+            if node.isDirectory {
+                ws.toggle(node.path); ws.selected = node.path
+            } else {
+                ws.openFile(node.path)
             }
-            .buttonStyle(.plain)
-            .draggable(node.path) {
-                HStack(spacing: 6) {
-                    FileGlyph(path: node.path, isDirectory: node.isDirectory); Text(node.name).font(OdeteFont.ui(13))
-                }
-                .padding(8)
-                .background(theme.bgElevated, in: RoundedRectangle(cornerRadius: 8))
+        } label: {
+            linha
+        }
+        .buttonStyle(.plain)
+        .draggable(node.path) {
+            HStack(spacing: 6) {
+                FileGlyph(path: node.path, isDirectory: node.isDirectory)
+                Text(node.name).font(OdeteFont.ui(13))
             }
-            .dropDestination(for: String.self) { items, _ in
-                guard node.isDirectory else { return false }
-                for p in items {
-                    ws.move(p, into: node.path)
-                }
-                return true
-            } isTargeted: { over = $0 && node.isDirectory }
-            .contextMenu {
-                if node.isDirectory {
-                    Button("Novo arquivo", systemImage: "doc.badge.plus") { ws.createFile(near: node.path) }
-                    Button("Nova pasta", systemImage: "folder.badge.plus") { draft = ""; newFolderAt = node.path }
-                    Divider()
-                } else {
-                    Button("Abrir", systemImage: "doc.text") { ws.openFile(node.path) }
-                }
-                Button("Renomear", systemImage: "pencil") { draft = node.name; renaming = node.path }
-                Button("Copiar caminho", systemImage: "doc.on.doc") { UIPasteboard.general.string = node.path }
-                if !node.isDirectory {
-                    ShareLink(item: ws.root.appending(path: node.path)) { Label(
-                        "Compartilhar",
-                        systemImage: "square.and.arrow.up"
-                    ) }
-                }
-                if !node.isDirectory, ws.git.isRepo {
-                    Divider()
-                    Button("Histórico", systemImage: "clock.arrow.circlepath") { ws.historyPath = node.path }
-                    Button("Blame", systemImage: "person.text.rectangle") { ws.blamePath = node.path }
-                }
+            .padding(8)
+            .background(theme.bgElevated, in: RoundedRectangle(cornerRadius: 8))
+        }
+        .dropDestination(for: String.self) { items, _ in
+            guard node.isDirectory else { return false }
+            for p in items {
+                ws.move(p, into: node.path)
+            }
+            return true
+        } isTargeted: { over = $0 && node.isDirectory }
+        .contextMenu {
+            if node.isDirectory {
+                Button("Novo arquivo", systemImage: "doc.badge.plus") { ws.createFile(near: node.path) }
+                Button("Nova pasta", systemImage: "folder.badge.plus") { draft = ""; newFolderAt = node.path }
                 Divider()
-                Button("Apagar", systemImage: "trash", role: .destructive) { deleting = node.path }
+            } else {
+                Button("Abrir", systemImage: "doc.text") { ws.openFile(node.path) }
             }
-            if node.isDirectory, open {
-                ForEach(node.children ?? []) { child in
-                    FileRow(
-                        node: child,
-                        depth: depth + 1,
-                        renaming: $renaming,
-                        deleting: $deleting,
-                        newFolderAt: $newFolderAt,
-                        draft: $draft
-                    )
+            Button("Renomear", systemImage: "pencil") { draft = node.name; renaming = node.path }
+            Button("Copiar caminho", systemImage: "doc.on.doc") { UIPasteboard.general.string = node.path }
+            if !node.isDirectory {
+                ShareLink(item: ws.root.appending(path: node.path)) { Label(
+                    "Compartilhar",
+                    systemImage: "square.and.arrow.up"
+                ) }
+            }
+            if !node.isDirectory, ws.git.isRepo {
+                Divider()
+                Button("Histórico", systemImage: "clock.arrow.circlepath") { ws.historyPath = node.path }
+                Button("Blame", systemImage: "person.text.rectangle") { ws.blamePath = node.path }
+            }
+            Divider()
+            Button("Apagar", systemImage: "trash", role: .destructive) { deleting = node.path }
+        }
+    }
+
+    var linha: some View {
+        HStack(spacing: 0) {
+            if pasta == nil {
+                ForEach(Array(0 ..< depth), id: \.self) { k in guia(k) }
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(theme.fgSubtle)
+                    .rotationEffect(.degrees(aberta ? 90 : 0))
+                    .opacity(node.isDirectory ? 1 : 0)
+                    .frame(width: 14)
+            }
+            FileGlyph(path: node.path, isDirectory: node.isDirectory, expanded: aberta, size: 13)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(node.name)
+                    .font(OdeteFont.ui(13, weight: ativo ? .semibold : .regular))
+                    .foregroundStyle(corNome)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                if let pasta {
+                    Text(pasta)
+                        .font(OdeteFont.ui(10.5))
+                        .foregroundStyle(theme.fgSubtle)
+                        .lineLimit(1)
+                        .truncationMode(.head)
                 }
+            }
+            .padding(.leading, 5)
+            Spacer(minLength: 4)
+            if sujo {
+                Circle().fill(theme.accent).frame(width: 6, height: 6)
+            }
+            marca
+        }
+        .padding(.leading, pasta == nil ? 8 : 12)
+        .padding(.trailing, 10)
+        .frame(height: pasta == nil ? Self.altura : 44)
+        .background(fundo, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+        .padding(.horizontal, 5)
+        .contentShape(Rectangle())
+    }
+
+    /// Uma guia por nível ancestral, acesa quando aquela pasta está no caminho do
+    /// arquivo aberto.
+    func guia(_ k: Int) -> some View {
+        let dono = node.path.split(separator: "/").prefix(k + 1).joined(separator: "/")
+        return Rectangle()
+            .fill(acesas.contains(dono) ? theme.accent.opacity(0.5) : theme.fg.opacity(0.11))
+            .frame(width: 1, height: Self.altura)
+            .frame(width: 14)
+    }
+
+    @ViewBuilder var marca: some View {
+        if let mudanca {
+            if node.isDirectory {
+                Circle().fill(corGit(mudanca, theme)).frame(width: 6, height: 6)
+            } else {
+                Text(letraGit(mudanca))
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundStyle(corGit(mudanca, theme))
+                    .frame(width: 12)
             }
         }
+    }
+
+    var fundo: Color {
+        if over {
+            return theme.accent.opacity(0.2)
+        }
+        if ativo {
+            return theme.accent.opacity(0.16)
+        }
+        if selecionado {
+            return theme.fg.opacity(0.07)
+        }
+        return .clear
+    }
+
+    var corNome: Color {
+        if let mudanca, !node.isDirectory {
+            return corGit(mudanca, theme)
+        }
+        if ativo || node.isDirectory {
+            return theme.fg
+        }
+        return theme.fg.opacity(0.84)
+    }
+}
+
+/// Mesma convenção de cor do painel do git, para a árvore e o painel contarem a mesma
+/// história sobre o mesmo arquivo.
+func corGit(_ c: Change, _ theme: Theme) -> Color {
+    switch c {
+    case .added, .untracked: theme.ok
+    case .deleted, .conflicted: theme.danger
+    case .renamed: .purple
+    default: theme.accent
+    }
+}
+
+func letraGit(_ c: Change) -> String {
+    switch c {
+    case .untracked: "U"
+    case .added: "A"
+    case .modified, .typeChange: "M"
+    case .deleted: "D"
+    case .renamed: "R"
+    case .conflicted: "!"
+    case .ignored: "·"
     }
 }

@@ -71,7 +71,10 @@ public struct TokenUse: Codable, Sendable, Hashable {
         input == 0 && output == 0 && cache == 0 && reasoning == 0
     }
 
-    public static func += (a: inout TokenUse, b: TokenUse) { a = a + b }
+    public static func += (a: inout TokenUse, b: TokenUse) {
+        a = a + b
+    }
+
     public static func + (a: TokenUse, b: TokenUse) -> TokenUse {
         .init(
             input: a.input + b.input,

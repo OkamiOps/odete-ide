@@ -6,6 +6,7 @@ import OdeteCore
 import OdeteFiles
 import OdeteGit
 import OdetePreview
+import OdeteSwift
 
 /// Estado de um projeto aberto: árvore, abas, buffers e salvamento.
 @MainActor
@@ -24,6 +25,9 @@ public final class WorkspaceModel {
     public var stack: Stack = .html
     public var externalChange = false
     public var reveal: (line: Int, token: Int)?
+    /// Incrementa a cada reload da árvore (salvar, watcher); o preview Swift recompila.
+    public private(set) var reloadTick = 0
+    public var swiftDiagnostics: [SwiftDiagnostic] = []
     public var paletteOpen = false
     public var paletteQuery = ""
     public let git: GitModel
@@ -93,6 +97,7 @@ public final class WorkspaceModel {
             tree = try FileTreeBuilder.build(at: root)
             let pkg = try? Data(contentsOf: root.appending(path: "package.json"))
             stack = Stack.detect(paths: tree.allFiles().map(\.path), packageJSON: pkg)
+            reloadTick += 1
         } catch {
             self.error = error.localizedDescription
         }

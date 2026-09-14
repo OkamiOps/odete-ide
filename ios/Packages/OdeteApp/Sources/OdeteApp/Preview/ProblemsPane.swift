@@ -1,6 +1,7 @@
 import OdeteBundler
 import OdeteCore
 import OdetePreview
+import OdeteSwift
 import OdeteUI
 import SwiftUI
 
@@ -12,15 +13,16 @@ struct ProblemsPane: View {
 
     var body: some View {
         let diags = ws.run.diagnostics
+        let swift = ws.swiftDiagnostics
         let errors = ws.preview.console.filter { $0.level == .error }
         VStack(spacing: 0) {
             PaneHeader(
                 "Problemas",
-                detail: diags.isEmpty && errors.isEmpty ? "tudo limpo" : "\(diags.count + errors.count)"
+                detail: diags.isEmpty && errors.isEmpty && swift.isEmpty ? "tudo limpo" : "\(diags.count + errors.count + swift.count)"
             ) {
                 HeaderButton("arrow.clockwise", label: "Rebuild") { ws.run.active?.shell.devServer?.invalidate() }
             }
-            if diags.isEmpty, errors.isEmpty {
+            if diags.isEmpty, errors.isEmpty, swift.isEmpty {
                 VStack(spacing: 10) {
                     Image(systemName: "checkmark.seal").font(.system(size: 30)).foregroundStyle(theme.ok)
                     Text("Nenhum problema").font(OdeteFont.ui(13, weight: .medium)).foregroundStyle(theme.fg)
@@ -50,6 +52,20 @@ struct ProblemsPane: View {
                                 .buttonStyle(.plain)
                             }
                         } header: { label("Build · esbuild") }
+                    }
+                    if !swift.isEmpty {
+                        Section {
+                            ForEach(swift) { d in
+                                Button { ws.open(d.file, line: d.line) } label: { row(
+                                    d.kind == .error ? "xmark.octagon" : "exclamationmark.triangle",
+                                    d.kind == .error ? theme.danger : theme.accent,
+                                    d.message,
+                                    "\(d.file):\(d.line)",
+                                    nil
+                                ) }
+                                .buttonStyle(.plain)
+                            }
+                        } header: { label("Swift · preview") }
                     }
                     if !errors.isEmpty {
                         Section {

@@ -39,6 +39,28 @@ struct WorkspaceView: View {
     }
 
     var padLayout: some View {
+        GeometryReader { geo in
+            // Retrato ou janela estreita: o agente vira uma camada sobre o centro em vez de coluna.
+            let narrow = geo.size.width < 1000
+            let sideW = narrow ? min(chrome.snapshot.sideWidth, 240) : chrome.snapshot.sideWidth
+            let agentW = narrow ? min(chrome.snapshot.agentWidth, geo.size.width * 0.62) : chrome.snapshot.agentWidth
+            columns(narrow: narrow, sideW: sideW, agentW: agentW)
+                .overlay(alignment: .trailing) {
+                    if narrow, chrome.snapshot.agentVisible {
+                        AgentPane()
+                            .frame(width: agentW)
+                            .shadow(color: .black.opacity(0.35), radius: 24, x: -6, y: 0)
+                            .transition(.move(edge: .trailing))
+                    }
+                }
+        }
+        .background(theme.bg)
+        .animation(.snappy(duration: 0.2), value: chrome.snapshot.sideOpen)
+        .animation(.snappy(duration: 0.2), value: chrome.snapshot.agentVisible)
+        .animation(.snappy(duration: 0.2), value: chrome.snapshot.termVisible)
+    }
+
+    func columns(narrow: Bool, sideW: Double, agentW: Double) -> some View {
         @Bindable var chrome = chrome
         return HStack(spacing: 0) {
             Rail(
@@ -50,7 +72,7 @@ struct WorkspaceView: View {
             )
             if chrome.snapshot.sideOpen {
                 SidebarView()
-                    .frame(width: chrome.snapshot.sideWidth)
+                    .frame(width: sideW)
                     .background(theme.bgElevated)
                 Splitter(
                     value: $chrome.snapshot.sideWidth,
@@ -72,7 +94,8 @@ struct WorkspaceView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            if chrome.snapshot.agentVisible {
+            .clipped()
+            if chrome.snapshot.agentVisible, !narrow {
                 Splitter(
                     value: $chrome.snapshot.agentWidth,
                     axis: .horizontal,
@@ -80,13 +103,9 @@ struct WorkspaceView: View {
                     direction: -1
                 )
                 AgentPane()
-                    .frame(width: chrome.snapshot.agentWidth)
+                    .frame(width: agentW)
             }
         }
-        .background(theme.bg)
-        .animation(.snappy(duration: 0.2), value: chrome.snapshot.sideOpen)
-        .animation(.snappy(duration: 0.2), value: chrome.snapshot.agentVisible)
-        .animation(.snappy(duration: 0.2), value: chrome.snapshot.termVisible)
     }
 }
 

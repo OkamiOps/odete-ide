@@ -1,6 +1,6 @@
 # Odete iOS Fase 5 — Swift — Plano de implementação
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Projetos `.swiftpm` editados na Odete, com preview nativo do subconjunto de SwiftUI e abertura no Swift Playgrounds.
 
@@ -28,8 +28,8 @@
 - `struct ViewStruct { name, conforms: [String], props: [Stmt], body: [Stmt], funcs, isMain }`.
 - `Parser.parse(file: String, source: String) -> (structs: [ViewStruct], diagnostics: [SwiftDiagnostic])`.
 
-- [ ] Testes: literais/interpolação, chamada com rótulos e trailing closure, modificadores encadeados em várias linhas, `@State private var n = 0`, `if/else` no body, `ForEach(0..<3) { i in … }`, duas structs, erro com linha.
-- [ ] Implementar. Commit: `swift: lexer e parser do subconjunto`.
+- [x] Testes: literais/interpolação, chamada com rótulos e trailing closure, modificadores encadeados em várias linhas, `@State private var n = 0`, `if/else` no body, `ForEach(0..<3) { i in … }`, duas structs, erro com linha.
+- [x] Implementar. Commit: `swift: lexer e parser do subconjunto`.
 
 ### Task 2: Interpretador e render (Marco 2)
 
@@ -42,16 +42,16 @@
 - `Program { structs; func instance(of name: String) -> ViewInstance }`.
 - `struct SwiftView: View { let node: ViewNode; let instance: ViewInstance }`.
 
-- [ ] Testes: contador (`Button { n += 1 }` + `Text("\(n)")`), toggle bind, ForEach range, TextField binding, modificadores cor/fonte/padding aplicados, fora do subconjunto vira placeholder com aviso, `ImageRenderer` do template não vazio.
-- [ ] Implementar. Commit: `swift: interpretador e render nativo do subconjunto de SwiftUI`.
+- [x] Testes: contador (`Button { n += 1 }` + `Text("\(n)")`), toggle bind, ForEach range, TextField binding, modificadores cor/fonte/padding aplicados, fora do subconjunto vira placeholder com aviso, `ImageRenderer` do template não vazio.
+- [x] Implementar. Commit: `swift: interpretador e render nativo do subconjunto de SwiftUI`.
 
 ### Task 3: Pacote, Playgrounds e app (Marco 3)
 
 **Files:** `Sources/OdeteSwift/Package/{PlaygroundPackage,PlaygroundLauncher}.swift`; app: `OdeteApp/Sources/OdeteApp/Preview/SwiftPreviewPane.swift`, `PreviewPane.swift` (delegar quando stack Swift), `ProblemsPane.swift` (fonte swift), `RunModel`/`WorkspaceModel` (`swiftProgram` recompila no reload), `OdeteShell` (`swift` explica), `Templates.swift` (template melhor + `swiftUIComponent`), skills embutida.
 
-- [ ] Testes: `PlaygroundPackage` do template (nome, main, arquivos); `WorkspaceModel` com template Swift produz programa e preview sem diagnósticos.
-- [ ] Implementar; verificar no simulador (editar `ContentView`, salvar, ver preview; botão Playgrounds abre folha). Commit: `swift: preview no app, abrir no Playgrounds, templates`.
+- [x] Testes: `PlaygroundPackage` do template (nome, main, arquivos); `WorkspaceModel` com template Swift produz programa e preview sem diagnósticos.
+- [x] Implementar; verificar no simulador (editar `ContentView`, salvar, ver preview; botão Playgrounds abre folha). Commit: `swift: preview no app, abrir no Playgrounds, templates`.
 
 ### Task 4: Fechamento
 
-- [ ] `make lint`, `make unit`, `make test`; README (seção Swift); memória; commit `ios: fase 5 concluída`.
+- [x] `make lint`, `make unit`, `make test`; README (seção Swift); memória; commit `ios: fase 5 concluída`.

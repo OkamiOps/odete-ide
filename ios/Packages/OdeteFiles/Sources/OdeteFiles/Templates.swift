@@ -3,7 +3,7 @@ import Foundation
 
 /// Modelos de projeto novo. `files` devolve caminho relativo → conteúdo.
 public enum Template: String, CaseIterable, Identifiable, Sendable {
-    case blank, viteReact, astro, swiftPlayground
+    case blank, viteReact, astro, swiftPlayground, swiftView
 
     public var id: String {
         rawValue
@@ -13,6 +13,7 @@ public enum Template: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .blank: "Em branco"
         case .viteReact: "Vite + React"
+        case .swiftView: "SwiftUI (uma view)"
         case .astro: "Astro"
         case .swiftPlayground: "Swift Playground"
         }
@@ -22,6 +23,7 @@ public enum Template: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .blank: "index.html, CSS e JS. Sem build."
         case .viteReact: "React 19 com TypeScript e Vite."
+        case .swiftView: "Um ContentView.swift para brincar no preview nativo."
         case .astro: "Site estático com Astro."
         case .swiftPlayground: "Pacote .swiftpm que abre no Swift Playgrounds."
         }
@@ -31,6 +33,7 @@ public enum Template: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .blank: "doc"
         case .viteReact: "bolt"
+        case .swiftView: "swift"
         case .astro: "sparkle"
         case .swiftPlayground: "swift"
         }
@@ -40,6 +43,7 @@ public enum Template: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .blank: Self.blank(projectName)
         case .viteReact: Self.viteReact(projectName)
+        case .swiftView: Self.swiftView(projectName)
         case .astro: Self.astro(projectName)
         case .swiftPlayground: Self.swiftPlayground(projectName)
         }
@@ -147,6 +151,57 @@ public enum Template: String, CaseIterable, Identifiable, Sendable {
         ]
     }
 
+    static func contentView(_ name: String) -> String {
+        """
+        import SwiftUI
+
+        struct ContentView: View {
+            @State private var count = 0
+            @State private var nome = ""
+            @State private var escuro = false
+            let frutas = ["Maçã", "Banana", "Uva"]
+
+            var body: some View {
+                NavigationStack {
+                    List {
+                        Section("Contador") {
+                            Text("\\(count) toques").font(.title2)
+                            Button("Mais um") { count += 1 }
+                                .buttonStyle(.borderedProminent)
+                        }
+                        Section("Você") {
+                            TextField("Seu nome", text: $nome)
+                            Toggle("Modo escuro", isOn: $escuro)
+                            if !nome.isEmpty {
+                                Text("Olá, \\(nome)!").foregroundStyle(.green)
+                            }
+                        }
+                        Section("Frutas") {
+                            ForEach(frutas, id: \\.self) { fruta in
+                                NavigationLink(fruta) {
+                                    Text(fruta).font(.largeTitle).padding()
+                                }
+                            }
+                        }
+                    }
+                    .navigationTitle("\(name)")
+                }
+            }
+        }
+
+        """
+    }
+
+    static func swiftView(_ name: String) -> [String: String] {
+        [
+            "README.md": readme(
+                name,
+                "Um arquivo SwiftUI. O Preview mostra a view na hora; para rodar de verdade, crie um pacote de app."
+            ),
+            "ContentView.swift": contentView(name),
+        ]
+    }
+
     static func swiftPlayground(_ name: String) -> [String: String] {
         let ident = name.replacingOccurrences(of: " ", with: "")
         return [
@@ -182,7 +237,7 @@ public enum Template: String, CaseIterable, Identifiable, Sendable {
             )
             """,
             "\(ident).swiftpm/MyApp.swift": "import SwiftUI\n\n@main\nstruct MyApp: App {\n    var body: some Scene {\n        WindowGroup {\n            ContentView()\n        }\n    }\n}\n",
-            "\(ident).swiftpm/ContentView.swift": "import SwiftUI\n\nstruct ContentView: View {\n    @State private var count = 0\n\n    var body: some View {\n        VStack(spacing: 16) {\n            Text(\"\(name)\").font(.largeTitle)\n            Text(\"Swift no iPad.\")\n            Button(\"\\(count) toques\") { count += 1 }\n        }\n        .padding()\n    }\n}\n",
+            "\(ident).swiftpm/ContentView.swift": Self.contentView(name),
         ]
     }
 }

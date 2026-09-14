@@ -47,12 +47,14 @@ Packages/
   OdeteAgent           agente: contas (Claude OAuth, Codex e Grok por device code, chaves
                        OpenAI/Anthropic-compatíveis), streaming dos três formatos, loop com
                        sete ferramentas, patches, checkpoints, conversas, regras e skills
+  OdeteSwift           Swift no iPad: parser e interpretador do subconjunto de SwiftUI,
+                       render nativo, pacote .swiftpm e abertura no Swift Playgrounds
   OdeteUI              design system: Theme, Rail, PaneHeader, EditorTabs, ModePicker, Splitter, FileGlyph
   OdeteApp             telas: RootView, HubView, WorkspaceView, PhoneShell, FileTreeView,
                        CenterPane, SearchPane, CommandPalette, SettingsShell, Commands,
                        Git/ (GitModel, GitPane, DiffView, ConflictView, CloneSheet,
                        AccountsSettings, GhSheet), Terminal/ (RunModel, TerminalPane),
-                       Preview/ (PreviewPane, ProblemsPane), Agent/ (AgentModel, AgentPane,
+                       Preview/ (PreviewPane, SwiftPreviewPane, ProblemsPane), Agent/ (AgentModel, AgentPane,
                        ChatList, Composer, AIAccountsSettings, AppToolHost)
 Vendor/libgit2         build-libgit2.sh + libgit2.xcframework (1.9.7, SecureTransport, sem SSH)
 Tests/OdeteUITests     XCUITest de fumaça
@@ -60,7 +62,7 @@ Tests/OdeteUITests     XCUITest de fumaça
 
 Dependências entre pacotes: `OdeteApp → {OdeteUI, OdeteGit, OdeteAccounts, OdeteShell, OdetePreview, OdeteAgent}`,
 `OdeteShell → {OdeteGit, OdeteNpm, OdeteRuntime, OdeteBundler}`, `OdeteBundler → OdeteRuntime`,
-tudo sobre `OdeteCore`. A fase 5 entra como `OdeteSwift`.
+`OdeteApp → OdeteSwift`, tudo sobre `OdeteCore`.
 
 ## Fontes
 
@@ -113,9 +115,25 @@ IBM Plex Sans e Mono em `Odete/Fonts/` (licença OFL em `LICENSE-IBM-Plex.txt`).
 - Spec e plano: `../docs/superpowers/specs/2026-09-14-odete-ios-fase4-agente-design.md`,
   `../docs/superpowers/plans/2026-09-14-odete-ios-fase4-agente.md`.
 
+## Swift (Fase 5)
+
+- Templates "Swift Playground" (pacote `.swiftpm` que o Swift Playgrounds abre e compila) e
+  "SwiftUI (uma view)" (um `ContentView.swift` para brincar).
+- Sem compilador no iPad. O Preview interpreta um subconjunto de SwiftUI e renderiza como
+  SwiftUI de verdade: stacks, List/Form/Section, ScrollView, NavigationStack/Link, Text,
+  Button, Toggle, TextField, Slider, Stepper, Image(systemName:), Label, ForEach, if/else,
+  `@State`/`@Binding`, funcs, strings com interpolação e os modificadores comuns. O estado
+  sobrevive ao salvar; "zerar" reinicia. Fora do subconjunto vira um placeholder tracejado e
+  um aviso em Problemas com a linha.
+- Botão "Playgrounds" abre a folha do sistema com o pacote (Swift Playgrounds, Arquivos…).
+- Layout: em retrato ou janela estreita o agente vira uma camada sobre o centro.
+- Spec e plano: `../docs/superpowers/specs/2026-09-14-odete-ios-fase5-swift-design.md`,
+  `../docs/superpowers/plans/2026-09-14-odete-ios-fase5-swift.md`.
+
 ## Pendências conhecidas
 
 - Dois agentes em paralelo, MCP e voz ficam para depois.
+- SourceKit/autocompletar Swift e GeometryReader/Canvas no preview não existem; use o Playgrounds.
 - `astro build` e `next build` ainda não rodam; Next e Astro só como SPA de desenvolvimento.
 - Marcas de git na margem do editor ainda não existem (o Diff cobre isso por enquanto).
 - `GitHubDeviceFlow.defaultClientId` vazio até registrar o OAuth App; por ora, token.

@@ -44,6 +44,8 @@ packages:
     path: Packages/OdetePreview
   OdeteAgent:
     path: Packages/OdeteAgent
+  OdeteSwift:
+    path: Packages/OdeteSwift
   OdeteApp:
     path: Packages/OdeteApp
 targets:

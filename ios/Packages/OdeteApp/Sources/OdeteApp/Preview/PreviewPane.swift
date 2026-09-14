@@ -11,8 +11,16 @@ struct PreviewPane: View {
     @State private var urlText = ""
 
     var body: some View {
+        if ws.stack.kind == .swift {
+            SwiftPreviewPane()
+        } else {
+            web
+        }
+    }
+
+    var web: some View {
         @Bindable var pv = ws.preview
-        VStack(spacing: 0) {
+        return VStack(spacing: 0) {
             HStack(spacing: 6) {
                 HeaderButton("chevron.left", label: "Voltar") { pv.back() }.disabled(!pv.canGoBack)
                 HeaderButton(pv.loading ? "xmark" : "arrow.clockwise", label: "Recarregar") { pv.reload() }

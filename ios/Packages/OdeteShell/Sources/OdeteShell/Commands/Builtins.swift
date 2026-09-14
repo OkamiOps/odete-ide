@@ -401,6 +401,14 @@ enum Builtins {
                 ctx.io.out("\(String(i + 1).leftPad(4))  \(h)")
             }; return 0
         },
+        Simple(name: "swift", help: "explica como rodar Swift no iPad") { _, ctx in
+            ctx.io.out("Não há compilador Swift no iPad. O Preview mostra o subconjunto de SwiftUI na hora;")
+            ctx.io
+                .out(
+                    "para compilar e rodar de verdade, abra o pacote .swiftpm no Swift Playgrounds (botão no Preview)."
+                )
+            return 1
+        },
         Simple(name: "date", help: "data e hora") { _, ctx in ctx.io.out(Date().formatted(
             date: .complete,
             time: .standard

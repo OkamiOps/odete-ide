@@ -2,6 +2,10 @@ import OdeteCore
 import OdeteUI
 import SwiftUI
 
+func clamp(_ v: Double, _ menor: Double, _ maior: Double) -> Double {
+    min(max(v, menor), max(menor, maior))
+}
+
 /// Layout de iPad: rail, sidebar, centro, agente e a gaveta do terminal.
 struct WorkspaceView: View {
     @Environment(ChromeState.self) private var chrome
@@ -52,14 +56,15 @@ struct WorkspaceView: View {
             PhoneShell(showAgentTab: !chrome.snapshot.agentVisible)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             if chrome.snapshot.agentVisible {
+                let maior = max(Metrics.minAgent, width - Metrics.minCenter)
                 Splitter(
-                    value: $chrome.snapshot.agentWidth,
+                    value: preso($chrome.snapshot.agentWidth, Metrics.minAgent, maior),
                     axis: .horizontal,
-                    range: Metrics.minAgent ... max(Metrics.minAgent, width * 0.5),
+                    range: Metrics.minAgent ... maior,
                     direction: -1
                 )
                 AgentPane()
-                    .frame(width: min(chrome.snapshot.agentWidth, width * 0.5))
+                    .frame(width: clamp(chrome.snapshot.agentWidth, Metrics.minAgent, maior))
             }
         }
         .background(theme.bg)
@@ -68,11 +73,22 @@ struct WorkspaceView: View {
 
     var padLayout: some View {
         GeometryReader { geo in
-            // O centro precisa de ~470 pt; o agente cede antes da sidebar.
-            let sideW = chrome.snapshot.sideOpen ? min(chrome.snapshot.sideWidth, geo.size.width * 0.26) : 0
-            let free = geo.size.width - Metrics.railWidth - 24 - sideW - 470
-            let agentW = chrome.snapshot.agentVisible ? min(chrome.snapshot.agentWidth, max(Metrics.minAgent, free)) : 0
-            columns(narrow: false, sideW: sideW, agentW: agentW)
+            // Os máximos saem da tela, não de constantes. Antes a largura desenhada
+            // era cortada por um segundo limite e a alça continuava andando sozinha
+            // depois que o painel já tinha parado.
+            let livre = geo.size.width - Metrics.railWidth - 24
+            let agenteAberto = chrome.snapshot.agentVisible
+            let sideMax = max(Metrics.minSide, livre - Metrics.minCenter - (agenteAberto ? Metrics.minAgent : 0))
+            let sideW = chrome.snapshot.sideOpen ? clamp(chrome.snapshot.sideWidth, Metrics.minSide, sideMax) : 0
+            let agentMax = max(Metrics.minAgent, livre - sideW - Metrics.minCenter)
+            let agentW = agenteAberto ? clamp(chrome.snapshot.agentWidth, Metrics.minAgent, agentMax) : 0
+            columns(narrow: false, medidas: Medidas(
+                side: sideW,
+                sideMax: sideMax,
+                agent: agentW,
+                agentMax: agentMax,
+                termMax: max(Metrics.minTerm, geo.size.height - Metrics.minCenter)
+            ))
         }
         // Sem isto sobra uma faixa preta na altura do relógio, acima das abas.
         .background(theme.surface.ignoresSafeArea())
@@ -81,7 +97,26 @@ struct WorkspaceView: View {
         .animation(.snappy(duration: 0.2), value: chrome.snapshot.termVisible)
     }
 
-    func columns(narrow: Bool, sideW: Double, agentW: Double) -> some View {
+    /// Ligação que já entrega e guarda o valor dentro dos limites desta tela: sem isso
+    /// o valor guardado passa do máximo visível e o arrasto de volta não faz nada até
+    /// ele cair de novo abaixo do corte.
+    func preso(_ valor: Binding<Double>, _ menor: Double, _ maior: Double) -> Binding<Double> {
+        Binding(
+            get: { clamp(valor.wrappedValue, menor, maior) },
+            set: { valor.wrappedValue = clamp($0, menor, maior) }
+        )
+    }
+
+    /// Larguras já resolvidas para esta tela, com os máximos que valem agora.
+    struct Medidas {
+        var side: Double
+        var sideMax: Double
+        var agent: Double
+        var agentMax: Double
+        var termMax: Double
+    }
+
+    func columns(narrow: Bool, medidas m: Medidas) -> some View {
         @Bindable var chrome = chrome
         return HStack(spacing: 0) {
             Rail(
@@ -102,12 +137,12 @@ struct WorkspaceView: View {
             )
             if chrome.snapshot.sideOpen {
                 SidebarView()
-                    .frame(width: sideW)
+                    .frame(width: m.side)
                     .background(theme.surface)
                 Splitter(
-                    value: $chrome.snapshot.sideWidth,
+                    value: preso($chrome.snapshot.sideWidth, Metrics.minSide, m.sideMax),
                     axis: .horizontal,
-                    range: Metrics.minSide ... Metrics.maxSide
+                    range: Metrics.minSide ... m.sideMax
                 )
             }
             VStack(spacing: 0) {
@@ -116,26 +151,26 @@ struct WorkspaceView: View {
                 StatusBar()
                 if chrome.snapshot.termVisible {
                     Splitter(
-                        value: $chrome.snapshot.termHeight,
+                        value: preso($chrome.snapshot.termHeight, Metrics.minTerm, m.termMax),
                         axis: .vertical,
-                        range: Metrics.minTerm ... Metrics.maxTerm,
+                        range: Metrics.minTerm ... m.termMax,
                         direction: -1
                     )
                     TerminalPane()
-                        .frame(height: chrome.snapshot.termHeight)
+                        .frame(height: clamp(chrome.snapshot.termHeight, Metrics.minTerm, m.termMax))
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .clipped()
             if chrome.snapshot.agentVisible, !narrow {
                 Splitter(
-                    value: $chrome.snapshot.agentWidth,
+                    value: preso($chrome.snapshot.agentWidth, Metrics.minAgent, m.agentMax),
                     axis: .horizontal,
-                    range: Metrics.minAgent ... Metrics.maxAgent,
+                    range: Metrics.minAgent ... m.agentMax,
                     direction: -1
                 )
                 AgentPane()
-                    .frame(width: agentW)
+                    .frame(width: m.agent)
             }
         }
     }

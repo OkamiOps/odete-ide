@@ -54,10 +54,11 @@ public enum Metrics {
     public static let row: CGFloat = 40
     public static let paneHeader: CGFloat = 40
     public static let tab: CGFloat = 44
-    public static let minSide: CGFloat = 280
-    public static let maxSide: CGFloat = 520
-    public static let minAgent: CGFloat = 300
-    public static let maxAgent: CGFloat = 640
-    public static let minTerm: CGFloat = 120
-    public static let maxTerm: CGFloat = 600
+    /// Mínimos por painel. Os máximos não são constantes: dependem do que sobra na
+    /// tela e são calculados no layout, senão a alça continua andando depois que o
+    /// painel já parou de crescer.
+    public static let minSide: CGFloat = 200
+    public static let minAgent: CGFloat = 260
+    public static let minCenter: CGFloat = 320
+    public static let minTerm: CGFloat = 80
 }

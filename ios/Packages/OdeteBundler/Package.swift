@@ -9,7 +9,10 @@ let package = Package(
     targets: [
         .target(
             name: "OdeteBundler",
-            dependencies: [.product(name: "OdeteCore", package: "OdeteCore"), .product(name: "OdeteRuntime", package: "OdeteRuntime")],
+            dependencies: [
+                .product(name: "OdeteCore", package: "OdeteCore"),
+                .product(name: "OdeteRuntime", package: "OdeteRuntime"),
+            ],
             resources: [.copy("Resources/esbuild"), .copy("Resources/js")],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),

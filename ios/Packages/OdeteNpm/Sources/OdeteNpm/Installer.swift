@@ -338,6 +338,11 @@ public struct Installer: Sendable {
             }
             results += fetched
         }
+        // pais antes dos aninhados: apagar node_modules/c não pode levar node_modules/c/node_modules/b junto
+        results.sort { a, b in
+            let da = a.0.split(separator: "/").count, db = b.0.split(separator: "/").count
+            return da != db ? da < db : a.0 < b.0
+        }
         for (key, node, r) in results {
             switch r {
             case let .success(data):

@@ -1,18 +1,34 @@
 import Foundation
+@testable import OdeteRuntime
 import Synchronization
 import Testing
-@testable import OdeteRuntime
 
 final class Capture: Sendable {
     let out = Mutex<[String]>([])
     let err = Mutex<[String]>([])
-    var handler: @Sendable (OutputKind, String) -> Void { { kind, text in if kind == .out { self.out.withLock { $0.append(text) } } else { self.err.withLock { $0.append(text) } } } }
-    var stdout: String { out.withLock { $0.joined(separator: "\n") } }
-    var stderr: String { err.withLock { $0.joined(separator: "\n") } }
+    var handler: @Sendable (OutputKind, String) -> Void {
+        { kind, text in
+            if kind == .out {
+                self.out.withLock { $0.append(text) }
+            } else {
+                self.err.withLock { $0.append(text) }
+            } }
+    }
+
+    var stdout: String {
+        out.withLock { $0.joined(separator: "\n") }
+    }
+
+    var stderr: String {
+        err.withLock { $0.joined(separator: "\n") }
+    }
 }
 
 func tmp() throws -> URL {
-    let u = FileManager.default.temporaryDirectory.appending(path: "odete-rt-\(UUID().uuidString)", directoryHint: .isDirectory)
+    let u = FileManager.default.temporaryDirectory.appending(
+        path: "odete-rt-\(UUID().uuidString)",
+        directoryHint: .isDirectory
+    )
     try FileManager.default.createDirectory(at: u, withIntermediateDirectories: true)
     return u
 }
@@ -28,7 +44,7 @@ func run(_ code: String, cwd: URL? = nil, argv: [String] = []) async throws -> (
     return (code, cap)
 }
 
-@Suite struct RuntimeTests {
+struct RuntimeTests {
     @Test func consoleAndBasics() async throws {
         let (code, c) = try await run("""
         console.log("olá", 1 + 1, { a: [1, 2] });
@@ -89,15 +105,44 @@ func run(_ code: String, cwd: URL? = nil, argv: [String] = []) async throws -> (
         let dir = try tmp()
         let pkg = dir.appending(path: "node_modules/@acme/util")
         try FileManager.default.createDirectory(at: pkg.appending(path: "dist"), withIntermediateDirectories: true)
-        try #"{"name":"@acme/util","exports":{".":{"require":"./dist/index.cjs","import":"./dist/index.mjs"},"./extra":"./dist/extra.js"}}"#.write(to: pkg.appending(path: "package.json"), atomically: true, encoding: .utf8)
-        try "module.exports = { v: 'cjs' };".write(to: pkg.appending(path: "dist/index.cjs"), atomically: true, encoding: .utf8)
-        try "export const v = 'esm';".write(to: pkg.appending(path: "dist/index.mjs"), atomically: true, encoding: .utf8)
-        try "module.exports = 'extra';".write(to: pkg.appending(path: "dist/extra.js"), atomically: true, encoding: .utf8)
+        try #"{"name":"@acme/util","exports":{".":{"require":"./dist/index.cjs","import":"./dist/index.mjs"},"./extra":"./dist/extra.js"}}"#
+            .write(
+                to: pkg.appending(path: "package.json"),
+                atomically: true,
+                encoding: .utf8
+            )
+        try "module.exports = { v: 'cjs' };".write(
+            to: pkg.appending(path: "dist/index.cjs"),
+            atomically: true,
+            encoding: .utf8
+        )
+        try "export const v = 'esm';".write(
+            to: pkg.appending(path: "dist/index.mjs"),
+            atomically: true,
+            encoding: .utf8
+        )
+        try "module.exports = 'extra';".write(
+            to: pkg.appending(path: "dist/extra.js"),
+            atomically: true,
+            encoding: .utf8
+        )
         let simple = dir.appending(path: "node_modules/simple")
         try FileManager.default.createDirectory(at: simple, withIntermediateDirectories: true)
-        try #"{"name":"simple","main":"lib.js"}"#.write(to: simple.appending(path: "package.json"), atomically: true, encoding: .utf8)
-        try "module.exports = require('@acme/util/extra') + '!';".write(to: simple.appending(path: "lib.js"), atomically: true, encoding: .utf8)
-        try "console.log(require('@acme/util').v, require('simple'), require('node:events').EventEmitter.name);".write(to: dir.appending(path: "main.js"), atomically: true, encoding: .utf8)
+        try #"{"name":"simple","main":"lib.js"}"#.write(
+            to: simple.appending(path: "package.json"),
+            atomically: true,
+            encoding: .utf8
+        )
+        try "module.exports = require('@acme/util/extra') + '!';".write(
+            to: simple.appending(path: "lib.js"),
+            atomically: true,
+            encoding: .utf8
+        )
+        try "console.log(require('@acme/util').v, require('simple'), require('node:events').EventEmitter.name);".write(
+            to: dir.appending(path: "main.js"),
+            atomically: true,
+            encoding: .utf8
+        )
         let cap = Capture()
         let p = JSProcess(cwd: dir, argv: ["main.js"], output: cap.handler)
         let code = await p.run(file: dir.appending(path: "main.js"))
@@ -107,7 +152,11 @@ func run(_ code: String, cwd: URL? = nil, argv: [String] = []) async throws -> (
 
     @Test func esmNeedsTransformUntilBundler() async throws {
         let dir = try tmp()
-        try "import x from './y.js'; console.log(x);".write(to: dir.appending(path: "m.js"), atomically: true, encoding: .utf8)
+        try "import x from './y.js'; console.log(x);".write(
+            to: dir.appending(path: "m.js"),
+            atomically: true,
+            encoding: .utf8
+        )
         let cap = Capture()
         let p = JSProcess(cwd: dir, output: cap.handler)
         let code = await p.run(file: dir.appending(path: "m.js"))
@@ -116,8 +165,15 @@ func run(_ code: String, cwd: URL? = nil, argv: [String] = []) async throws -> (
         // com transformador injetado (finge um esbuild trivial)
         let cap2 = Capture()
         let p2 = JSProcess(cwd: dir, output: cap2.handler)
-        p2.setTransform { src, _ in src.replacingOccurrences(of: "import x from './y.js';", with: "const x = require('./y.js');") }
-        try "module.exports = 'via transform';".write(to: dir.appending(path: "y.js"), atomically: true, encoding: .utf8)
+        p2.setTransform { src, _ in src.replacingOccurrences(
+            of: "import x from './y.js';",
+            with: "const x = require('./y.js');"
+        ) }
+        try "module.exports = 'via transform';".write(
+            to: dir.appending(path: "y.js"),
+            atomically: true,
+            encoding: .utf8
+        )
         let code2 = await p2.run(file: dir.appending(path: "m.js"))
         #expect(code2 == 0 && cap2.stdout == "via transform")
     }
@@ -129,7 +185,13 @@ func run(_ code: String, cwd: URL? = nil, argv: [String] = []) async throws -> (
         #expect(b == 7 && cb.stdout == "antes")
         let (c, cc) = try await run("setTimeout(() => { throw new Error('boom'); }, 1);")
         #expect(c == 1 && cc.stderr.contains("boom"))
-        let (d, cd) = try await run("process.on('uncaughtException', e => { console.log('pego', e.message); }); setTimeout(() => { throw new Error('x'); }, 1); setTimeout(() => console.log('segue'), 20);")
+        let (
+            d,
+            cd
+        ) =
+            try await run(
+                "process.on('uncaughtException', e => { console.log('pego', e.message); }); setTimeout(() => { throw new Error('x'); }, 1); setTimeout(() => console.log('segue'), 20);"
+            )
         #expect(d == 0 && cd.stdout.contains("pego x") && cd.stdout.contains("segue"))
     }
 
@@ -186,7 +248,10 @@ func run(_ code: String, cwd: URL? = nil, argv: [String] = []) async throws -> (
         let dir = try tmp()
         let cap = Capture()
         let p = JSProcess(cwd: dir, output: cap.handler)
-        let task = Task { await p.run(code: "require('http').createServer((q, s) => s.end('x')).listen(4321, () => console.log('up'));") }
+        let task = Task {
+            await p
+                .run(code: "require('http').createServer((q, s) => s.end('x')).listen(4321, () => console.log('up'));")
+        }
         try await Task.sleep(for: .milliseconds(300))
         #expect(p.ports == [4321])
         p.kill()

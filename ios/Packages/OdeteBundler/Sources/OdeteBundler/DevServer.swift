@@ -16,12 +16,17 @@ public final class DevServer: @unchecked Sendable {
         esbuild = Esbuild(root: root, output: output)
     }
 
-    public var url: URL { URL(string: "http://127.0.0.1:\(port)/")! }
+    public var url: URL {
+        URL(string: "http://127.0.0.1:\(port)/")!
+    }
 
     public func start(port: Int = 5173, preset: Preset = .vite) async throws {
         _ = try await esbuild.ready()
         let js = Bundle.module.url(forResource: "js", withExtension: nil)!
-        try await esbuild.engine.evaluate(try String(contentsOf: js.appending(path: "devserver.js"), encoding: .utf8), name: "devserver.js")
+        try await esbuild.engine.evaluate(
+            String(contentsOf: js.appending(path: "devserver.js"), encoding: .utf8),
+            name: "devserver.js"
+        )
         let json = try await esbuild.engine.call("__devStart", [root.path, port, preset.rawValue])
         let obj = try JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any]
         self.port = (obj?["port"] as? Int) ?? port
@@ -36,16 +41,28 @@ public final class DevServer: @unchecked Sendable {
 
     public func invalidateNow() async {
         _ = try? await esbuild.engine.call("__devInvalidate")
-        if let d = try? await esbuild.engine.call("__devDiagnostics"), let list = try? Self.parseDiagnostics(d) { onDiagnostics?(list) }
+        if let d = try? await esbuild.engine.call("__devDiagnostics"),
+           let list = try? Self.parseDiagnostics(d)
+        {
+            onDiagnostics?(list)
+        }
     }
 
     public func diagnostics() async -> [Diagnostic] {
-        (try? await esbuild.engine.call("__devDiagnostics")).flatMap { try? Self.parseDiagnostics($0) } ?? []
+        await (try? esbuild.engine.call("__devDiagnostics")).flatMap { try? Self.parseDiagnostics($0) } ?? []
     }
 
     static func parseDiagnostics(_ json: String) throws -> [Diagnostic] {
-        let arr = (try JSONSerialization.jsonObject(with: Data(json.utf8)) as? [[String: Any]]) ?? []
-        return arr.map { Diagnostic(kind: ($0["kind"] as? String) == "warning" ? .warning : .error, text: ($0["text"] as? String) ?? "", file: $0["file"] as? String, line: $0["line"] as? Int, column: $0["column"] as? Int, lineText: $0["lineText"] as? String, source: "esbuild") }
+        let arr = try (JSONSerialization.jsonObject(with: Data(json.utf8)) as? [[String: Any]]) ?? []
+        return arr.map { Diagnostic(
+            kind: ($0["kind"] as? String) == "warning" ? .warning : .error,
+            text: ($0["text"] as? String) ?? "",
+            file: $0["file"] as? String,
+            line: $0["line"] as? Int,
+            column: $0["column"] as? Int,
+            lineText: $0["lineText"] as? String,
+            source: "esbuild"
+        ) }
     }
 
     public func stop() {
@@ -63,7 +80,9 @@ final class DirectoryWatcherLite: @unchecked Sendable {
     private var last = 0
     private let queue = DispatchQueue(label: "odete.devwatch")
 
-    init(url: URL, onChange: @escaping @Sendable () -> Void) { self.url = url; self.onChange = onChange }
+    init(url: URL, onChange: @escaping @Sendable () -> Void) {
+        self.url = url; self.onChange = onChange
+    }
 
     func start() {
         last = signature()
@@ -72,21 +91,33 @@ final class DirectoryWatcherLite: @unchecked Sendable {
         t.setEventHandler { [weak self] in
             guard let self else { return }
             let s = signature()
-            if s != last { last = s; onChange() }
+            if s != last {
+                last = s; onChange()
+            }
         }
         t.resume()
         timer = t
     }
 
-    func stop() { timer?.cancel(); timer = nil }
+    func stop() {
+        timer?.cancel(); timer = nil
+    }
 
     private func signature() -> Int {
         var h = Hasher()
-        guard let e = FileManager.default.enumerator(at: url, includingPropertiesForKeys: [.contentModificationDateKey, .isDirectoryKey], options: [.skipsHiddenFiles]) else { return 0 }
+        guard let e = FileManager.default.enumerator(
+            at: url,
+            includingPropertiesForKeys: [.contentModificationDateKey, .isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        ) else { return 0 }
         for case let item as URL in e {
             let name = item.lastPathComponent
-            if name == "node_modules" || name == "dist" || name == ".git" { e.skipDescendants(); continue }
-            if let v = try? item.resourceValues(forKeys: [.contentModificationDateKey, .isDirectoryKey]), v.isDirectory != true {
+            if name == "node_modules" || name == "dist" || name == ".git" {
+                e.skipDescendants(); continue
+            }
+            if let v = try? item.resourceValues(forKeys: [.contentModificationDateKey, .isDirectoryKey]),
+               v.isDirectory != true
+            {
                 h.combine(item.path); h.combine(v.contentModificationDate?.timeIntervalSince1970 ?? 0)
             }
         }

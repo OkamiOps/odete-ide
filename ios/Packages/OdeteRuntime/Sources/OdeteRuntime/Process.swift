@@ -7,7 +7,12 @@ public final class JSProcess: @unchecked Sendable {
     public let cwd: URL
     private var exitContinuation: CheckedContinuation<Int32, Never>?
 
-    public init(cwd: URL, env: [String: String] = [:], argv: [String] = [], output: @escaping @Sendable (OutputKind, String) -> Void) {
+    public init(
+        cwd: URL,
+        env: [String: String] = [:],
+        argv: [String] = [],
+        output: @escaping @Sendable (OutputKind, String) -> Void
+    ) {
         self.cwd = cwd
         var e = env
         e["HOME"] = cwd.path
@@ -63,7 +68,9 @@ public final class JSProcess: @unchecked Sendable {
                     finish()
                     return
                 }
-                if rt.exited { finish(); return }
+                if rt.exited {
+                    finish(); return
+                }
                 if rt.pending <= 0, rt.keepAlive <= 0 {
                     rt.exit(rt.scriptExitCode)
                     finish()
@@ -90,8 +97,14 @@ public final class JSProcess: @unchecked Sendable {
     /// Manda um evento de reload para todos os clientes WebSocket (dev server).
     public func broadcast(_ text: String) {
         rt.queue.async { [rt] in
-            for s in Array(rt.serversBox?.servers.values ?? [:].values) { for (rid, _) in s.wsClients { s.wsSend(rid, text: text) } }
+            for s in Array(rt.serversBox?.servers.values ?? [:].values) {
+                for (rid, _) in s.wsClients {
+                    s.wsSend(
+                        rid,
+                        text: text
+                    )
+                }
+            }
         }
     }
 }
-

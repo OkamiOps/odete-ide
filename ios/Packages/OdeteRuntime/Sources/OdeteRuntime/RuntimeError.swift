@@ -5,7 +5,10 @@ public struct RuntimeError: LocalizedError, Sendable, Equatable {
     public var stack: String?
     public var file: String?
     public var line: Int?
-    public var errorDescription: String? { message }
+    public var errorDescription: String? {
+        message
+    }
+
     public init(message: String, stack: String? = nil, file: String? = nil, line: Int? = nil) {
         self.message = message
         self.stack = stack

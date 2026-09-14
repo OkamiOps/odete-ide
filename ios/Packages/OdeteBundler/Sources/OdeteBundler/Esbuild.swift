@@ -11,9 +11,21 @@ public struct Diagnostic: Sendable, Hashable, Codable, Identifiable {
     public var column: Int?
     public var lineText: String?
     public var source: String
-    public var id: String { "\(source):\(file ?? ""):\(line ?? 0):\(column ?? 0):\(text)" }
-    public init(kind: Kind, text: String, file: String? = nil, line: Int? = nil, column: Int? = nil, lineText: String? = nil, source: String) {
-        self.kind = kind; self.text = text; self.file = file; self.line = line; self.column = column; self.lineText = lineText; self.source = source
+    public var id: String {
+        "\(source):\(file ?? ""):\(line ?? 0):\(column ?? 0):\(text)"
+    }
+
+    public init(
+        kind: Kind,
+        text: String,
+        file: String? = nil,
+        line: Int? = nil,
+        column: Int? = nil,
+        lineText: String? = nil,
+        source: String
+    ) {
+        self.kind = kind; self.text = text; self.file = file; self.line = line; self.column = column; self
+            .lineText = lineText; self.source = source
     }
 }
 
@@ -43,12 +55,20 @@ public final class Esbuild: @unchecked Sendable {
 
     /// Carrega o esbuild (uma vez; ~1-2 s).
     public func ready() async throws -> String {
-        if let t = initialized { return try await t.value }
+        if let t = initialized {
+            return try await t.value
+        }
         let t = Task<String, Error> { [engine] in
             let res = Bundle.module.url(forResource: "esbuild", withExtension: nil)!
             let js = Bundle.module.url(forResource: "js", withExtension: nil)!
-            try await engine.evaluate(try String(contentsOf: js.appending(path: "bundler.js"), encoding: .utf8), name: "bundler.js")
-            let v = try await engine.call("__esbuildInit", [res.appending(path: "browser.js").path, res.appending(path: "esbuild.wasm").path])
+            try await engine.evaluate(
+                String(contentsOf: js.appending(path: "bundler.js"), encoding: .utf8),
+                name: "bundler.js"
+            )
+            let v = try await engine.call(
+                "__esbuildInit",
+                [res.appending(path: "browser.js").path, res.appending(path: "esbuild.wasm").path]
+            )
             return v.trimmingCharacters(in: CharacterSet(charactersIn: "\""))
         }
         initialized = t
@@ -70,19 +90,54 @@ public final class Esbuild: @unchecked Sendable {
         return try (JSONSerialization.jsonObject(with: Data(json.utf8), options: [.fragmentsAllowed]) as? String) ?? ""
     }
 
-    public func build(entries: [String], platform: String = "browser", format: String = "esm", dev: Bool = true, minify: Bool = false, define: [String: String] = [:]) async throws -> BuildResult {
+    public func build(
+        entries: [String],
+        platform: String = "browser",
+        format: String = "esm",
+        dev: Bool = true,
+        minify: Bool = false,
+        define: [String: String] = [:]
+    ) async throws -> BuildResult {
         _ = try await ready()
-        let json = try await engine.call("__build", [["root": root.path, "entries": entries, "platform": platform, "format": format, "dev": dev, "minify": minify, "define": define, "outdir": "dist"] as [String: Any]])
+        let json = try await engine.call(
+            "__build",
+            [[
+                "root": root.path,
+                "entries": entries,
+                "platform": platform,
+                "format": format,
+                "dev": dev,
+                "minify": minify,
+                "define": define,
+                "outdir": "dist",
+            ] as [String: Any]]
+        )
         return try Self.parseBuild(json)
     }
 
     static func parseBuild(_ json: String) throws -> BuildResult {
-        guard let obj = try JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any] else { throw RuntimeError(message: "build: resposta inválida") }
-        let files = ((obj["files"] as? [[String: Any]]) ?? []).map { (path: ($0["path"] as? String) ?? "", text: ($0["text"] as? String) ?? "") }
+        guard let obj = try JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any]
+        else { throw RuntimeError(message: "build: resposta inválida") }
+        let files = ((obj["files"] as? [[String: Any]]) ?? []).map { (
+            path: ($0["path"] as? String) ?? "",
+            text: ($0["text"] as? String) ?? ""
+        ) }
         func diags(_ key: String, _ kind: Diagnostic.Kind) -> [Diagnostic] {
-            ((obj[key] as? [[String: Any]]) ?? []).map { Diagnostic(kind: kind, text: ($0["text"] as? String) ?? "", file: $0["file"] as? String, line: $0["line"] as? Int, column: $0["column"] as? Int, lineText: $0["lineText"] as? String, source: "esbuild") }
+            ((obj[key] as? [[String: Any]]) ?? []).map { Diagnostic(
+                kind: kind,
+                text: ($0["text"] as? String) ?? "",
+                file: $0["file"] as? String,
+                line: $0["line"] as? Int,
+                column: $0["column"] as? Int,
+                lineText: $0["lineText"] as? String,
+                source: "esbuild"
+            ) }
         }
-        return BuildResult(ok: (obj["ok"] as? Bool) ?? false, files: files, diagnostics: diags("errors", .error) + diags("warnings", .warning))
+        return BuildResult(
+            ok: (obj["ok"] as? Bool) ?? false,
+            files: files,
+            diagnostics: diags("errors", .error) + diags("warnings", .warning)
+        )
     }
 
     /// Transformador para injetar num `JSProcess`.

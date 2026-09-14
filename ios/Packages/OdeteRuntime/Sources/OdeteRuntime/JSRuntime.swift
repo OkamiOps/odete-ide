@@ -12,17 +12,17 @@ final class JSRuntime: @unchecked Sendable {
     let argv: [String]
     var output: (@Sendable (OutputKind, String) -> Void)?
     var onExit: (@Sendable (Int32) -> Void)?
-    private(set) var pending = 0          // trabalho assíncrono vivo (timers, fetch, servidores)
+    private(set) var pending = 0 // trabalho assíncrono vivo (timers, fetch, servidores)
     private var timers: [Int: DispatchSourceTimer] = [:]
     private var nextTimer = 1
     private(set) var exited = false
     private(set) var exitCode: Int32 = 0
-    var keepAlive = 0                     // servidores abertos
+    var keepAlive = 0 // servidores abertos
     var serversBox: ServersBox?
     var asyncCalls: [Int: CheckedContinuation<String, Error>] = [:]
     var lastError: RuntimeError?
     var nextAsync = 1
-    var transform: (@Sendable (String, String) throws -> String)?   // (código, caminho) → CJS
+    var transform: (@Sendable (String, String) throws -> String)? // (código, caminho) → CJS
 
     init(cwd: URL, env: [String: String], argv: [String]) {
         queue = DispatchQueue(label: "odete.js.\(UUID().uuidString.prefix(6))", qos: .userInitiated)
@@ -38,15 +38,17 @@ final class JSRuntime: @unchecked Sendable {
             let msg = exc.toString() ?? "erro"
             let stack = exc.objectForKeyedSubscript("stack")?.toString() ?? ""
             let text = stack.isEmpty ? msg : msg + "\n    " + stack.replacingOccurrences(of: "\n", with: "\n    ")
-            self.lastError = RuntimeError(message: text)
-            self.emit(.err, text)
+            lastError = RuntimeError(message: text)
+            emit(.err, text)
         }
         installHost()
     }
 
     // MARK: saída
 
-    func emit(_ kind: OutputKind, _ text: String) { output?(kind, text) }
+    func emit(_ kind: OutputKind, _ text: String) {
+        output?(kind, text)
+    }
 
     // MARK: host base
 
@@ -60,13 +62,33 @@ final class JSRuntime: @unchecked Sendable {
     /// Avalia o bootstrap (globals + módulos) e devolve.
     func boot() throws {
         let dir = Bundle.module.url(forResource: "node", withExtension: nil)!
-        let order = ["bootstrap", "events", "buffer", "path", "util", "stream", "fs", "os", "url", "querystring", "string_decoder", "assert", "zlib", "child_process", "http", "process", "loader"]
+        let order = [
+            "bootstrap",
+            "events",
+            "buffer",
+            "path",
+            "util",
+            "stream",
+            "fs",
+            "os",
+            "url",
+            "querystring",
+            "string_decoder",
+            "assert",
+            "zlib",
+            "child_process",
+            "http",
+            "process",
+            "loader",
+        ]
         for name in order {
             let file = dir.appending(path: "\(name).js")
             guard let src = try? String(contentsOf: file, encoding: .utf8) else { continue }
             lastError = nil
             context.evaluateScript(src, withSourceURL: URL(string: "odete://node/\(name).js"))
-            if let e = lastError { lastError = nil; throw RuntimeError(message: "bootstrap \(name): \(e.message)") }
+            if let e = lastError {
+                lastError = nil; throw RuntimeError(message: "bootstrap \(name): \(e.message)")
+            }
         }
     }
 
@@ -75,7 +97,9 @@ final class JSRuntime: @unchecked Sendable {
     func evaluate(_ code: String, url: URL?) throws -> JSValue? {
         lastError = nil
         let v = context.evaluateScript(code, withSourceURL: url)
-        if let e = lastError { lastError = nil; throw e }
+        if let e = lastError {
+            lastError = nil; throw e
+        }
         return v
     }
 
@@ -86,8 +110,13 @@ final class JSRuntime: @unchecked Sendable {
 
     // MARK: event loop
 
-    func beginWork() { pending += 1 }
-    func endWork() { pending -= 1; checkIdle() }
+    func beginWork() {
+        pending += 1
+    }
+
+    func endWork() {
+        pending -= 1; checkIdle()
+    }
 
     var idleWaiters: [() -> Void] = []
     func checkIdle() {
@@ -103,11 +132,17 @@ final class JSRuntime: @unchecked Sendable {
         nextTimer += 1
         let t = DispatchSource.makeTimerSource(queue: queue)
         let interval = DispatchTimeInterval.milliseconds(max(Int(ms), 0))
-        if repeats { t.schedule(deadline: .now() + interval, repeating: interval) } else { t.schedule(deadline: .now() + interval) }
+        if repeats {
+            t.schedule(deadline: .now() + interval, repeating: interval)
+        } else {
+            t.schedule(deadline: .now() + interval)
+        }
         t.setEventHandler { [weak self] in
             guard let self, !exited else { return }
             call("__odete_fireTimer", [id])
-            if !repeats { clearTimer(id) }
+            if !repeats {
+                clearTimer(id)
+            }
         }
         timers[id] = t
         beginWork()
@@ -123,7 +158,8 @@ final class JSRuntime: @unchecked Sendable {
 
     /// `process.exitCode` definido pelo script, se houver.
     var scriptExitCode: Int32 {
-        guard let v = context.evaluateScript("(globalThis.process && globalThis.process.exitCode) || 0"), v.isNumber else { return 0 }
+        guard let v = context.evaluateScript("(globalThis.process && globalThis.process.exitCode) || 0"),
+              v.isNumber else { return 0 }
         return v.toInt32()
     }
 
@@ -131,7 +167,9 @@ final class JSRuntime: @unchecked Sendable {
         guard !exited else { return }
         exited = true
         exitCode = code
-        for (_, t) in timers { t.cancel() }
+        for (_, t) in timers {
+            t.cancel()
+        }
         timers.removeAll()
         pending = 0
         keepAlive = 0

@@ -27,7 +27,9 @@ public final class JSEngine: @unchecked Sendable {
         try await withCheckedThrowingContinuation { cont in
             rt.queue.async { [rt] in
                 do {
-                    if !self.booted { try rt.boot(); self.booted = true }
+                    if !self.booted {
+                        try rt.boot(); self.booted = true
+                    }
                     let v = try rt.evaluate(code, url: URL(string: "odete://engine/\(name)"))
                     cont.resume(returning: v?.toString() ?? "")
                 } catch { cont.resume(throwing: error) }
@@ -37,7 +39,10 @@ public final class JSEngine: @unchecked Sendable {
 
     /// Chama `globalThis[fn](...args)`; a função pode devolver uma promessa. Resultado vem como JSON.
     public func call(_ fn: String, _ args: [Any] = []) async throws -> String {
-        let argsJSON = String(decoding: try JSONSerialization.data(withJSONObject: args, options: [.fragmentsAllowed]), as: UTF8.self)
+        let argsJSON = try String(
+            decoding: JSONSerialization.data(withJSONObject: args, options: [.fragmentsAllowed]),
+            as: UTF8.self
+        )
         return try await callJSON(fn, argsJSON: argsJSON)
     }
 
@@ -45,7 +50,9 @@ public final class JSEngine: @unchecked Sendable {
         try await withCheckedThrowingContinuation { cont in
             rt.queue.async { [rt] in
                 do {
-                    if !self.booted { try rt.boot(); self.booted = true }
+                    if !self.booted {
+                        try rt.boot(); self.booted = true
+                    }
                     let id = rt.nextAsync
                     rt.nextAsync += 1
                     rt.asyncCalls[id] = cont
@@ -61,9 +68,14 @@ public final class JSEngine: @unchecked Sendable {
         let sem = DispatchSemaphore(value: 0)
         let box = ResultBox()
         let engine = self
-        let argsJSON = String(decoding: try JSONSerialization.data(withJSONObject: args, options: [.fragmentsAllowed]), as: UTF8.self)
+        let argsJSON = try String(
+            decoding: JSONSerialization.data(withJSONObject: args, options: [.fragmentsAllowed]),
+            as: UTF8.self
+        )
         Task.detached {
-            do { box.set(.success(try await engine.callJSON(fn, argsJSON: argsJSON))) } catch { box.set(.failure(error)) }
+            do { try await box.set(.success(engine.callJSON(fn, argsJSON: argsJSON))) } catch {
+                box.set(.failure(error))
+            }
             sem.signal()
         }
         sem.wait()
@@ -73,11 +85,20 @@ public final class JSEngine: @unchecked Sendable {
     /// Manda um evento a todos os clientes WebSocket dos servidores deste engine.
     public func broadcast(_ text: String) {
         rt.queue.async { [rt] in
-            for s in Array(rt.serversBox?.servers.values ?? [:].values) { for (rid, _) in s.wsClients { s.wsSend(rid, text: text) } }
+            for s in Array(rt.serversBox?.servers.values ?? [:].values) {
+                for (rid, _) in s.wsClients {
+                    s.wsSend(
+                        rid,
+                        text: text
+                    )
+                }
+            }
         }
     }
 
-    public var ports: [Int] { rt.queue.sync { rt.serversBox?.servers.values.map { Int($0.actualPort) } ?? [] } }
+    public var ports: [Int] {
+        rt.queue.sync { rt.serversBox?.servers.values.map { Int($0.actualPort) } ?? [] }
+    }
 
     public func stop() {
         rt.queue.async { [rt] in
@@ -90,6 +111,11 @@ public final class JSEngine: @unchecked Sendable {
 final class ResultBox: @unchecked Sendable {
     private var value: Result<String, Error>?
     private let lock = NSLock()
-    func set(_ v: Result<String, Error>) { lock.lock(); value = v; lock.unlock() }
-    func get() throws -> String { lock.lock(); defer { lock.unlock() }; return try value!.get() }
+    func set(_ v: Result<String, Error>) {
+        lock.lock(); value = v; lock.unlock()
+    }
+
+    func get() throws -> String {
+        lock.lock(); defer { lock.unlock() }; return try value!.get()
+    }
 }

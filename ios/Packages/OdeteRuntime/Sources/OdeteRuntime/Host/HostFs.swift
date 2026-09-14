@@ -3,7 +3,13 @@ import JavaScriptCore
 
 /// Sistema de arquivos síncrono. Caminhos absolutos; o JS resolve relativos contra cwd.
 enum HostFs {
-    static func err(_ code: String, _ path: String, _ msg: String) -> [String: Any] { ["error": code, "path": path, "message": msg] }
+    static func err(_ code: String, _ path: String, _ msg: String) -> [String: Any] {
+        [
+            "error": code,
+            "path": path,
+            "message": msg,
+        ]
+    }
 
     static func install(_ rt: JSRuntime) {
         let h = rt.host
@@ -48,7 +54,11 @@ enum HostFs {
 
         let stat: @convention(block) (String) -> Any = { p in
             var isDir: ObjCBool = false
-            guard fm.fileExists(atPath: p, isDirectory: &isDir) else { return err("ENOENT", p, "no such file or directory") }
+            guard fm.fileExists(atPath: p, isDirectory: &isDir) else { return err(
+                "ENOENT",
+                p,
+                "no such file or directory"
+            ) }
             let attrs = (try? fm.attributesOfItem(atPath: p)) ?? [:]
             let size = (attrs[.size] as? NSNumber)?.intValue ?? 0
             let mtime = ((attrs[.modificationDate] as? Date) ?? .now).timeIntervalSince1970 * 1000
@@ -62,27 +72,53 @@ enum HostFs {
         h.setObject(exists, forKeyedSubscript: "exists" as NSString)
 
         let readdir: @convention(block) (String) -> Any = { p in
-            do { return try fm.contentsOfDirectory(atPath: p).sorted() } catch { return err("ENOENT", p, "no such file or directory") }
+            do { return try fm.contentsOfDirectory(atPath: p).sorted() } catch { return err(
+                "ENOENT",
+                p,
+                "no such file or directory"
+            ) }
         }
         h.setObject(readdir, forKeyedSubscript: "readdir" as NSString)
 
         let mkdir: @convention(block) (String, Bool) -> Any = { p, recursive in
-            if fm.fileExists(atPath: p) { return recursive ? true : err("EEXIST", p, "file already exists") }
-            do { try fm.createDirectory(atPath: p, withIntermediateDirectories: recursive); return true } catch { return err("ENOENT", p, error.localizedDescription) }
+            if fm.fileExists(atPath: p) {
+                return recursive ? true : err("EEXIST", p, "file already exists")
+            }
+            do { try fm.createDirectory(atPath: p, withIntermediateDirectories: recursive); return true } catch {
+                return err(
+                    "ENOENT",
+                    p,
+                    error.localizedDescription
+                )
+            }
         }
         h.setObject(mkdir, forKeyedSubscript: "mkdir" as NSString)
 
         let rm: @convention(block) (String, Bool, Bool) -> Any = { p, recursive, force in
             var isDir: ObjCBool = false
-            guard fm.fileExists(atPath: p, isDirectory: &isDir) else { return force ? true : err("ENOENT", p, "no such file or directory") }
-            if isDir.boolValue, !recursive, !((try? fm.contentsOfDirectory(atPath: p))?.isEmpty ?? true) { return err("ENOTEMPTY", p, "directory not empty") }
-            do { try fm.removeItem(atPath: p); return true } catch { return err("EACCES", p, error.localizedDescription) }
+            guard fm.fileExists(atPath: p, isDirectory: &isDir) else { return force ? true : err(
+                "ENOENT",
+                p,
+                "no such file or directory"
+            ) }
+            if isDir.boolValue, !recursive, !((try? fm.contentsOfDirectory(atPath: p))?.isEmpty ?? true) {
+                return err(
+                    "ENOTEMPTY",
+                    p,
+                    "directory not empty"
+                )
+            }
+            do { try fm.removeItem(atPath: p); return true } catch {
+                return err("EACCES", p, error.localizedDescription)
+            }
         }
         h.setObject(rm, forKeyedSubscript: "rm" as NSString)
 
         let rename: @convention(block) (String, String) -> Any = { a, b in
             do {
-                if fm.fileExists(atPath: b) { try fm.removeItem(atPath: b) }
+                if fm.fileExists(atPath: b) {
+                    try fm.removeItem(atPath: b)
+                }
                 try fm.moveItem(atPath: a, toPath: b); return true
             } catch { return err("ENOENT", a, error.localizedDescription) }
         }
@@ -90,17 +126,24 @@ enum HostFs {
 
         let copy: @convention(block) (String, String) -> Any = { a, b in
             do {
-                if fm.fileExists(atPath: b) { try fm.removeItem(atPath: b) }
+                if fm.fileExists(atPath: b) {
+                    try fm.removeItem(atPath: b)
+                }
                 try fm.copyItem(atPath: a, toPath: b); return true
             } catch { return err("ENOENT", a, error.localizedDescription) }
         }
         h.setObject(copy, forKeyedSubscript: "copy" as NSString)
 
-        let realpath: @convention(block) (String) -> String = { URL(fileURLWithPath: $0).resolvingSymlinksInPath().path }
+        let realpath: @convention(block) (String)
+            -> String = { URL(fileURLWithPath: $0).resolvingSymlinksInPath().path }
         h.setObject(realpath, forKeyedSubscript: "realpath" as NSString)
 
         let symlink: @convention(block) (String, String) -> Any = { target, path in
-            do { try fm.createSymbolicLink(atPath: path, withDestinationPath: target); return true } catch { return err("EEXIST", path, error.localizedDescription) }
+            do { try fm.createSymbolicLink(atPath: path, withDestinationPath: target); return true } catch { return err(
+                "EEXIST",
+                path,
+                error.localizedDescription
+            ) }
         }
         h.setObject(symlink, forKeyedSubscript: "symlink" as NSString)
         let readlink: @convention(block) (String) -> Any = { p in
@@ -108,7 +151,11 @@ enum HostFs {
         }
         h.setObject(readlink, forKeyedSubscript: "readlink" as NSString)
         let chmod: @convention(block) (String, Int) -> Any = { p, mode in
-            do { try fm.setAttributes([.posixPermissions: mode], ofItemAtPath: p); return true } catch { return err("ENOENT", p, error.localizedDescription) }
+            do { try fm.setAttributes([.posixPermissions: mode], ofItemAtPath: p); return true } catch { return err(
+                "ENOENT",
+                p,
+                error.localizedDescription
+            ) }
         }
         h.setObject(chmod, forKeyedSubscript: "chmod" as NSString)
     }

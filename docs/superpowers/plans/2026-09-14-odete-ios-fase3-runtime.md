@@ -39,17 +39,17 @@
 
 ### Task 4: OdeteShell e TerminalPane (Marco 4)
 **Files:** `Packages/OdeteShell/**`, `OdeteApp/TerminalPane.swift`, `RunModel.swift`.
-- [ ] Parser com testes; builtins; `git` (subcomandos sobre `OdeteGit`); `npm/npx/pnpm`; `node`; `.bin`; `npm run` com scripts; jobs (`&`, Ctrl+C, botão), histórico, `Tab` completa caminhos; abas.
-- [ ] `TerminalPane`: linhas coloridas (in/out/err/ok), input com barra de teclado (Tab, ↑, Ctrl+C, `|`, `>`), job em execução com "parar", abas `+`.
-- [ ] Commit: `shell: terminal com pipes, git, npm, node e jobs`.
+- [x] Parser com testes; builtins; `git` (subcomandos sobre `OdeteGit`); `npm/npx/pnpm`; `node`; `.bin`; `npm run` com scripts; jobs (`&`, Ctrl+C, botão), histórico, `Tab` completa caminhos; abas.
+- [x] `TerminalPane`: linhas coloridas (in/out/err/ok), input com barra de teclado (Tab, ↑, Ctrl+C, `|`, `>`), job em execução com "parar", abas `+`.
+- [x] Commit: `shell: terminal com pipes, git, npm, node e jobs`.
 
 ### Task 5: http real, preview e problemas (Marco 5)
 **Files:** `OdeteRuntime/Host/HttpServer.swift`, `Resources/node/http.js`, `Packages/OdetePreview/**`, `OdeteApp/{PreviewPane,ProblemsPane}.swift`.
-- [ ] `http.createServer` → `NWListener`; `req/res` compatíveis com Express/Nest; `https` cliente; `net` mínimo.
-- [ ] `PreviewView` (WKWebView) com barra, viewport, reload, Safari, `odete://` estático, console bridge.
-- [ ] `ProblemsPane` com diagnósticos do esbuild, runtime e preview; toque abre `ws.open(path, line)`.
-- [ ] Verificar no simulador: Vite (`npm install`, `npm run dev`, preview), Nest exemplo (`npm start`, `curl` no terminal), HTML puro.
-- [ ] Commit: `preview: WKWebView, servidor http real e painel de problemas`.
+- [x] `http.createServer` → `NWListener`; `req/res` compatíveis com Express/Nest; `https` cliente; `net` mínimo.
+- [x] `PreviewView` (WKWebView) com barra, viewport, reload, Safari, `odete://` estático, console bridge.
+- [x] `ProblemsPane` com diagnósticos do esbuild, runtime e preview; toque abre `ws.open(path, line)`.
+- [x] Verificar no simulador: Vite (`npm install`, `npm run dev`, preview), Nest exemplo (`npm start`, `curl` no terminal), HTML puro.
+- [x] Commit: `preview: WKWebView, servidor http real e painel de problemas`.
 
 ### Task 6: Fechamento
-- [ ] `make unit`, `make test`, lint; README; commit `ios: fase 3 concluída`.
+- [x] `make unit`, `make test`, lint; README; commit `ios: fase 3 concluída`.

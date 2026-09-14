@@ -20,12 +20,17 @@ final class HttpServer: @unchecked Sendable {
         self.rt = rt
         let params = NWParameters.tcp
         params.allowLocalEndpointReuse = true
-        params.requiredLocalEndpoint = NWEndpoint.hostPort(host: "127.0.0.1", port: NWEndpoint.Port(rawValue: port) ?? .any)
+        params.requiredLocalEndpoint = NWEndpoint.hostPort(
+            host: "127.0.0.1",
+            port: NWEndpoint.Port(rawValue: port) ?? .any
+        )
         listener = try NWListener(using: params)
         self.port = port
     }
 
-    var actualPort: UInt16 { listener.port?.rawValue ?? port }
+    var actualPort: UInt16 {
+        listener.port?.rawValue ?? port
+    }
 
     func start() {
         listener.newConnectionHandler = { [weak self] conn in self?.accept(conn) }
@@ -34,7 +39,9 @@ final class HttpServer: @unchecked Sendable {
 
     func stop() {
         listener.cancel()
-        for (_, c) in connections { c.cancel() }
+        for (_, c) in connections {
+            c.cancel()
+        }
         connections.removeAll()
         wsClients.removeAll()
     }
@@ -48,8 +55,12 @@ final class HttpServer: @unchecked Sendable {
         conn.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] data, _, isComplete, error in
             guard let self else { return }
             var buf = buffer
-            if let data { buf.append(data) }
-            if error != nil || (isComplete && buf.isEmpty) { conn.cancel(); return }
+            if let data {
+                buf.append(data)
+            }
+            if error != nil || (isComplete && buf.isEmpty) {
+                conn.cancel(); return
+            }
             if let (req, rest) = HttpParser.parse(buf) {
                 handle(req, conn: conn)
                 readRequest(conn, buffer: rest)
@@ -65,7 +76,8 @@ final class HttpServer: @unchecked Sendable {
         let reqId = nextReq
         nextReq += 1
         connections[reqId] = conn
-        let keepAlive = (req.headers["connection"] ?? (req.version == "HTTP/1.1" ? "keep-alive" : "close")).lowercased() != "close"
+        let keepAlive = (req.headers["connection"] ?? (req.version == "HTTP/1.1" ? "keep-alive" : "close"))
+            .lowercased() != "close"
         pendingBodies[reqId] = (conn, keepAlive, false, false)
         if req.headers["upgrade"]?.lowercased() == "websocket", let key = req.headers["sec-websocket-key"] {
             // handshake WebSocket (só para o reload do dev server)
@@ -98,10 +110,14 @@ final class HttpServer: @unchecked Sendable {
         guard let conn = wsClients[reqId] else { return }
         let payload = Data(text.utf8)
         var frame = Data([0x81])
-        if payload.count < 126 { frame.append(UInt8(payload.count)) } else if payload.count < 65536 {
+        if payload.count < 126 {
+            frame.append(UInt8(payload.count))
+        } else if payload.count < 65536 {
             frame.append(126); frame.append(UInt8(payload.count >> 8)); frame.append(UInt8(payload.count & 0xFF))
         } else {
-            frame.append(127); for i in (0 ..< 8).reversed() { frame.append(UInt8((payload.count >> (i * 8)) & 0xFF)) }
+            frame.append(127); for i in (0 ..< 8).reversed() {
+                frame.append(UInt8((payload.count >> (i * 8)) & 0xFF))
+            }
         }
         frame.append(payload)
         conn.send(content: frame, completion: .contentProcessed { _ in })
@@ -111,11 +127,22 @@ final class HttpServer: @unchecked Sendable {
         guard var p = pendingBodies[reqId], !p.headersSent else { return }
         var hdrs = headers
         var lower = Set(hdrs.keys.map { $0.lowercased() })
-        if !lower.contains("content-length"), !lower.contains("transfer-encoding") { hdrs["Transfer-Encoding"] = "chunked"; p.chunked = true; lower.insert("transfer-encoding") }
-        if !lower.contains("connection") { hdrs["Connection"] = p.keepAlive ? "keep-alive" : "close" }
-        if !lower.contains("date") { hdrs["Date"] = HttpParser.httpDate() }
+        if !lower.contains("content-length"),
+           !lower
+           .contains("transfer-encoding")
+        {
+            hdrs["Transfer-Encoding"] = "chunked"; p.chunked = true; lower.insert("transfer-encoding")
+        }
+        if !lower.contains("connection") {
+            hdrs["Connection"] = p.keepAlive ? "keep-alive" : "close"
+        }
+        if !lower.contains("date") {
+            hdrs["Date"] = HttpParser.httpDate()
+        }
         var head = "HTTP/1.1 \(status) \(HttpParser.reason(status))\r\n"
-        for (k, v) in hdrs { head += "\(k): \(v)\r\n" }
+        for (k, v) in hdrs {
+            head += "\(k): \(v)\r\n"
+        }
         head += "\r\n"
         p.headersSent = true
         pendingBodies[reqId] = p
@@ -126,8 +153,15 @@ final class HttpServer: @unchecked Sendable {
         guard let p = pendingBodies[reqId] else { return }
         var out = Data()
         if p.chunked {
-            if !chunk.isEmpty { out.append(Data(String(chunk.count, radix: 16).utf8)); out.append(Data("\r\n".utf8)); out.append(chunk); out.append(Data("\r\n".utf8)) }
-            if end { out.append(Data("0\r\n\r\n".utf8)) }
+            if !chunk
+                .isEmpty
+            {
+                out.append(Data(String(chunk.count, radix: 16).utf8)); out.append(Data("\r\n".utf8)); out
+                    .append(chunk); out.append(Data("\r\n".utf8))
+            }
+            if end {
+                out.append(Data("0\r\n\r\n".utf8))
+            }
         } else {
             out.append(chunk)
         }
@@ -135,13 +169,17 @@ final class HttpServer: @unchecked Sendable {
             guard let self, end else { return }
             pendingBodies[reqId] = nil
             connections[reqId] = nil
-            if !p.keepAlive { p.conn.cancel() }
+            if !p.keepAlive {
+                p.conn.cancel()
+            }
         })
     }
 }
 
 enum HttpParser {
-    struct Request { var method: String; var url: String; var version: String; var headers: [String: String]; var body: Data }
+    struct Request {
+        var method: String; var url: String; var version: String; var headers: [String: String]; var body: Data
+    }
 
     static func parse(_ data: Data) -> (Request, Data)? {
         guard let headEnd = data.range(of: Data("\r\n\r\n".utf8)) else { return nil }
@@ -161,7 +199,16 @@ enum HttpParser {
         guard data.count - bodyStart >= len else { return nil }
         let body = data.subdata(in: bodyStart ..< bodyStart + len)
         let rest = data.subdata(in: bodyStart + len ..< data.count)
-        return (Request(method: String(parts[0]), url: String(parts[1]), version: parts.count > 2 ? String(parts[2]) : "HTTP/1.1", headers: headers, body: body), rest)
+        return (
+            Request(
+                method: String(parts[0]),
+                url: String(parts[1]),
+                version: parts.count > 2 ? String(parts[2]) : "HTTP/1.1",
+                headers: headers,
+                body: body
+            ),
+            rest
+        )
     }
 
     static func reason(_ s: Int) -> String {
@@ -182,8 +229,11 @@ enum HttpParser {
 }
 
 import CryptoKit
+
 enum SHA1Digest {
-    static func digest(_ s: String) -> [UInt8] { Array(Insecure.SHA1.hash(data: Data(s.utf8))) }
+    static func digest(_ s: String) -> [UInt8] {
+        Array(Insecure.SHA1.hash(data: Data(s.utf8)))
+    }
 }
 
 enum HostHttp {
@@ -251,5 +301,9 @@ enum HostHttp {
 
 final class ServersBox: @unchecked Sendable {
     var servers: [Int: HttpServer] = [:]
-    func stopAll() { for (_, s) in servers { s.stop() }; servers.removeAll() }
+    func stopAll() {
+        for (_, s) in servers {
+            s.stop()
+        }; servers.removeAll()
+    }
 }

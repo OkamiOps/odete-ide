@@ -29,6 +29,23 @@ struct ChatList: View {
                 anchor: .bottom
             ) } }
             .onChange(of: agent.items.last) { proxy.scrollTo("end", anchor: .bottom) }
+            // Ao abrir o app, ou ao trocar de conversa, a lista nascia no topo e a
+            // pessoa tinha que rolar até o fim para ver a última resposta.
+            .task(id: agent.thread.id) { await irParaOFim(proxy) }
+        }
+    }
+
+    /// A lista é preguiçosa: no primeiro quadro o fim ainda não existe, então vale
+    /// insistir algumas vezes enquanto o conteúdo termina de nascer.
+    @MainActor
+    func irParaOFim(_ proxy: ScrollViewProxy) async {
+        guard !agent.items.isEmpty else { return }
+        for espera in [0, 50, 200, 500] {
+            if espera > 0 {
+                try? await Task.sleep(for: .milliseconds(espera))
+            }
+            guard !Task.isCancelled else { return }
+            proxy.scrollTo("end", anchor: .bottom)
         }
     }
 

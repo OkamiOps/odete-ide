@@ -257,7 +257,7 @@ struct CenterPane: View {
                         )
                     },
                     changes: ws.patchChanges[path] ?? [],
-                    completion: CompletionSource(files: ws.tree.allFiles().map(\.path), path: path),
+                    completion: CompletionSource(files: ws.filePaths, path: path),
                     onSave: { ws.save(path) },
                     onFind: { chrome.snapshot.side = .search; chrome.snapshot.sideOpen = true },
                     onGutterLongPress: { hunkAt = HunkRef(path: path, line: $0) },

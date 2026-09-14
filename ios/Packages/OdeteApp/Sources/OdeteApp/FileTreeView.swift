@@ -238,10 +238,10 @@ struct FileTreeView: View {
     var linhas: [Linha] {
         if !busca.isEmpty {
             let alvo = busca.lowercased()
-            return ws.tree.allFiles()
-                .filter { $0.path.lowercased().contains(alvo) }
+            return ws.filePaths
+                .filter { $0.lowercased().contains(alvo) }
                 .prefix(200)
-                .map { Linha(node: $0, depth: 0, pasta: pastaDe($0.path)) }
+                .map { Linha(node: FileNode(path: $0, isDirectory: false), depth: 0, pasta: pastaDe($0)) }
         }
         var out: [Linha] = []
         achatar(ws.tree.children ?? [], 0, &out)

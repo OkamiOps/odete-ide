@@ -125,8 +125,15 @@ struct CommandPalette: View {
     }
 
     var files: [PaletteItem] {
-        ws.tree.allFiles().map {
-            PaletteItem(id: $0.path, kind: .file, title: $0.name, detail: $0.path, symbol: "doc", shortcut: nil)
+        ws.filePaths.map { caminho in
+            PaletteItem(
+                id: caminho,
+                kind: .file,
+                title: caminho.split(separator: "/").last.map(String.init) ?? caminho,
+                detail: caminho,
+                symbol: "doc",
+                shortcut: nil
+            )
         }
     }
 

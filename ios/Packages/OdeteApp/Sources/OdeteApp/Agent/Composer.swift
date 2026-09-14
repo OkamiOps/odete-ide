@@ -28,7 +28,7 @@ struct Composer: View {
                 MentionMenu(
                     kind: menu.kind,
                     query: menu.query,
-                    files: ws.tree.allFiles().map(\.path),
+                    files: ws.filePaths,
                     skills: Skills.all(host: agent.host)
                 ) { pick($0, menu) }
             }

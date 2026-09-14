@@ -18,6 +18,12 @@ public final class WorkspaceModel {
     public let root: URL
     public let ops: FileOps
     public var tree = FileNode(path: "", isDirectory: true, children: [])
+    /// Caminho de todo arquivo do projeto, refeito junto com a árvore.
+    ///
+    /// O autocompletar, a paleta e o filtro da árvore liam isto com `allFiles()`, que
+    /// percorre a árvore inteira e aloca um nó por arquivo. Como o editor se redesenha a
+    /// cada tecla, essa varredura acontecia a cada tecla.
+    public private(set) var filePaths: [String] = []
     public var tabs: [EditorTab] = []
     public var active: String?
     public var buffers: [String: String] = [:]
@@ -122,8 +128,9 @@ public final class WorkspaceModel {
     public func reload() {
         do {
             tree = try FileTreeBuilder.build(at: root)
+            filePaths = tree.allFiles().map(\.path)
             let pkg = try? Data(contentsOf: root.appending(path: "package.json"))
-            stack = Stack.detect(paths: tree.allFiles().map(\.path), packageJSON: pkg)
+            stack = Stack.detect(paths: filePaths, packageJSON: pkg)
             reloadTick += 1
         } catch {
             self.error = error.localizedDescription

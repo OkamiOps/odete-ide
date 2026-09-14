@@ -11,9 +11,14 @@ struct WorkspaceView: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
 
     var body: some View {
-        Group {
+        GeometryReader { geo in
+            // iPhone, ou iPad em retrato/janela estreita: abas embaixo como um iPhone grande,
+            // no máximo dividindo a tela com o agente. Paisagem: colunas.
+            let portrait = geo.size.width < geo.size.height || geo.size.width < 1000
             if sizeClass == .compact {
                 PhoneShell()
+            } else if portrait {
+                portraitLayout(width: geo.size.width)
             } else {
                 padLayout
             }
@@ -38,21 +43,30 @@ struct WorkspaceView: View {
         } message: { Text(ws.error ?? "") }
     }
 
+    func portraitLayout(width: CGFloat) -> some View {
+        @Bindable var chrome = chrome
+        return HStack(spacing: 0) {
+            PhoneShell(showAgentTab: !chrome.snapshot.agentVisible)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            if chrome.snapshot.agentVisible {
+                Splitter(
+                    value: $chrome.snapshot.agentWidth,
+                    axis: .horizontal,
+                    range: Metrics.minAgent ... max(Metrics.minAgent, width * 0.5),
+                    direction: -1
+                )
+                AgentPane()
+                    .frame(width: min(chrome.snapshot.agentWidth, width * 0.5))
+            }
+        }
+        .background(theme.bg)
+        .animation(.snappy(duration: 0.2), value: chrome.snapshot.agentVisible)
+    }
+
     var padLayout: some View {
         GeometryReader { geo in
-            // Retrato ou janela estreita: o agente vira uma camada sobre o centro em vez de coluna.
-            let narrow = geo.size.width < 1000
-            let sideW = narrow ? min(chrome.snapshot.sideWidth, 240) : chrome.snapshot.sideWidth
-            let agentW = narrow ? min(chrome.snapshot.agentWidth, geo.size.width * 0.62) : chrome.snapshot.agentWidth
-            columns(narrow: narrow, sideW: sideW, agentW: agentW)
-                .overlay(alignment: .trailing) {
-                    if narrow, chrome.snapshot.agentVisible {
-                        AgentPane()
-                            .frame(width: agentW)
-                            .shadow(color: .black.opacity(0.35), radius: 24, x: -6, y: 0)
-                            .transition(.move(edge: .trailing))
-                    }
-                }
+            let sideW = min(chrome.snapshot.sideWidth, geo.size.width * 0.3)
+            columns(narrow: false, sideW: sideW, agentW: chrome.snapshot.agentWidth)
         }
         .background(theme.bg)
         .animation(.snappy(duration: 0.2), value: chrome.snapshot.sideOpen)

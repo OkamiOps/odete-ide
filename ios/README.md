@@ -126,7 +126,8 @@ IBM Plex Sans e Mono em `Odete/Fonts/` (licença OFL em `LICENSE-IBM-Plex.txt`).
   sobrevive ao salvar; "zerar" reinicia. Fora do subconjunto vira um placeholder tracejado e
   um aviso em Problemas com a linha.
 - Botão "Playgrounds" abre a folha do sistema com o pacote (Swift Playgrounds, Arquivos…).
-- Layout: em retrato ou janela estreita o agente vira uma camada sobre o centro.
+- Layout: iPad em retrato (ou janela estreita) vira "iPhone grande": abas embaixo (Arquivos com
+  Busca/Git/Problemas, Editar, Terminal, Preview, Ajustes) e, no máximo, o agente dividindo a tela.
 - Spec e plano: `../docs/superpowers/specs/2026-09-14-odete-ios-fase5-swift-design.md`,
   `../docs/superpowers/plans/2026-09-14-odete-ios-fase5-swift.md`.
 

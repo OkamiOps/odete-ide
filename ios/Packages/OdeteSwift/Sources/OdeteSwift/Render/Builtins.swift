@@ -152,17 +152,15 @@ enum Builtins {
     static func alignment(_ v: Value?) -> Alignment {
         guard case let .token(t)? = v else { return .center }
         switch t {
-            switch t {
-            case "leading": return .leading
-            case "trailing": return .trailing
-            case "top": return .top
-            case "bottom": return .bottom
-            case "topLeading": return .topLeading
-            case "topTrailing": return .topTrailing
-            case "bottomLeading": return .bottomLeading
-            case "bottomTrailing": return .bottomTrailing
-            default: return .center
-            }
+        case "leading": return .leading
+        case "trailing": return .trailing
+        case "top": return .top
+        case "bottom": return .bottom
+        case "topLeading": return .topLeading
+        case "topTrailing": return .topTrailing
+        case "bottomLeading": return .bottomLeading
+        case "bottomTrailing": return .bottomTrailing
+        default: return .center
         }
     }
 

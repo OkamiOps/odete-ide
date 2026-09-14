@@ -179,19 +179,44 @@ struct CenterPane: View {
                             message: $0.message
                         )
                     },
+                    changes: ws.patchChanges[path] ?? [],
                     completion: CompletionSource(files: ws.tree.allFiles().map(\.path), path: path),
                     onSave: { ws.save(path) },
                     onFind: { chrome.snapshot.side = .search; chrome.snapshot.sideOpen = true },
-                    onGutterTap: { hunkAt = HunkRef(path: path, line: $0) },
+                    onGutterLongPress: { hunkAt = HunkRef(path: path, line: $0) },
                     onCursor: {
                         if path == ws.active {
                             ws.cursorOffset = $0
                         }
                     }
                 )
-                .popover(item: $hunkAt) { ref in
-                    HunkPopover(ref: ref)
+                // Folha de ação, não popover: o popover reaparecia sozinho a cada
+                // redesenho e engolia o toque seguinte, que era o toque que devia levar
+                // o cursor para a linha — daí a sensação de editor travado.
+                .confirmationDialog(
+                    ws.hunk(at: hunkAt?.line ?? 0, in: hunkAt?.path ?? "")?.1.header ?? "Trecho alterado",
+                    isPresented: Binding(get: { hunkAt != nil }, set: {
+                        if !$0 {
+                            hunkAt = nil
+                        }
+                    }),
+                    titleVisibility: .visible
+                ) {
+                    if let ref = hunkAt {
+                        Button("Descartar este trecho", role: .destructive) {
+                            ws.discardHunk(at: ref.line, in: ref.path)
+                            hunkAt = nil
+                        }
+                        Button("Ver diff do arquivo") {
+                            ws.git.setDiff(.workdir, path: ref.path)
+                            chrome.snapshot.center = .diff
+                            hunkAt = nil
+                        }
+                    }
+                    Button("Cancelar", role: .cancel) { hunkAt = nil }
                 }
+                .onChange(of: ws.agent.pendingPatches) { _, _ in ws.refreshPatchMarks(path) }
+                .onAppear { ws.refreshPatchMarks(path) }
             }
         } else {
             EmptyEditor()

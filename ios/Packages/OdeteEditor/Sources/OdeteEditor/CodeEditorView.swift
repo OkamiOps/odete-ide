@@ -15,10 +15,12 @@ public struct CodeEditorView: UIViewRepresentable {
     public var reveal: (line: Int, token: Int)?
     public var marks: [EditorGutterMark]
     public var issues: [EditorIssue]
+    /// Linhas do patch pendente do agente, para ele aparecer dentro do código.
+    public var changes: [EditorLineChange]
     public var completion: CompletionSource?
     public var onSave: () -> Void
     public var onFind: () -> Void
-    public var onGutterTap: (Int) -> Void
+    public var onGutterLongPress: (Int) -> Void
     public var onCursor: (Int) -> Void
 
     public init(
@@ -30,10 +32,11 @@ public struct CodeEditorView: UIViewRepresentable {
         reveal: (line: Int, token: Int)? = nil,
         marks: [EditorGutterMark] = [],
         issues: [EditorIssue] = [],
+        changes: [EditorLineChange] = [],
         completion: CompletionSource? = nil,
         onSave: @escaping () -> Void = {},
         onFind: @escaping () -> Void = {},
-        onGutterTap: @escaping (Int) -> Void = { _ in },
+        onGutterLongPress: @escaping (Int) -> Void = { _ in },
         onCursor: @escaping (Int) -> Void = { _ in }
     ) {
         _text = text
@@ -44,10 +47,11 @@ public struct CodeEditorView: UIViewRepresentable {
         self.reveal = reveal
         self.marks = marks
         self.issues = issues
+        self.changes = changes
         self.completion = completion
         self.onSave = onSave
         self.onFind = onFind
-        self.onGutterTap = onGutterTap
+        self.onGutterLongPress = onGutterLongPress
         self.onCursor = onCursor
     }
 
@@ -74,11 +78,12 @@ public struct CodeEditorView: UIViewRepresentable {
         tv.inputAccessoryView = KeyboardBar(textView: tv, onSave: onSave, onFind: onFind)
         let c = context.coordinator
         c.textView = tv
-        c.overlay.onTap = { [weak c] line in c?.parent.onGutterTap(line) }
+        c.overlay.onLongPress = { [weak c] line in c?.parent.onGutterLongPress(line) }
         tv.addSubview(c.guides)
+        tv.addSubview(c.changeMarks)
         tv.addSubview(c.overlay)
         tv.addSubview(c.minimap)
-        tv.floating = [c.guides, c.overlay, c.minimap, c.popup]
+        tv.floating = [c.guides, c.changeMarks, c.overlay, c.minimap, c.popup]
         tv.aoLayout = { [weak c] in c?.positionOverlay() }
         c.minimap.aoNavegar = { [weak tv] f in
             guard let tv else { return }
@@ -111,9 +116,10 @@ public struct CodeEditorView: UIViewRepresentable {
         }
         (tv.inputAccessoryView as? KeyboardBar)?.onSave = onSave
         (tv.inputAccessoryView as? KeyboardBar)?.onFind = onFind
-        if c.marks != marks || c.issues != issues || docChanged {
+        if c.marks != marks || c.issues != issues || c.changes != changes || docChanged {
             c.marks = marks
             c.issues = issues
+            c.changes = changes
             c.scheduleDecorations()
         }
         if let reveal, c.revealToken != reveal.token {
@@ -220,8 +226,10 @@ public struct CodeEditorView: UIViewRepresentable {
         var revealToken = -1
         var marks: [EditorGutterMark] = []
         var issues: [EditorIssue] = []
+        var changes: [EditorLineChange] = []
         let overlay = GutterOverlay(frame: .zero)
         let guides = IndentGuides(frame: .zero)
+        let changeMarks = ChangeMarks(frame: .zero)
         let popup = CompletionPopup(frame: .zero)
         let minimap = MinimapView(frame: .zero)
         var minimapSize: MinimapSize = .off
@@ -230,7 +238,7 @@ public struct CodeEditorView: UIViewRepresentable {
         var guidesOn = true
         var tabWidth = 2
         var offsetObservation: NSKeyValueObservation?
-        private var decorationTask: Task<Void, Never>?
+        var decorationTask: Task<Void, Never>?
         private var popupContext: CompletionContext?
 
         init(parent: CodeEditorView) {
@@ -286,181 +294,6 @@ public struct CodeEditorView: UIViewRepresentable {
 
         public func textViewDidEndEditing(_: TextView) {
             hidePopup()
-        }
-
-        // MARK: - Decorações
-
-        func scheduleDecorations() {
-            decorationTask?.cancel()
-            decorationTask = Task { @MainActor [weak self] in
-                try? await Task.sleep(for: .milliseconds(60))
-                guard !Task.isCancelled else { return }
-                self?.layoutDecorations()
-            }
-        }
-
-        func layoutDecorations() {
-            guard let tv = textView else { return }
-            let ns = tv.text as NSString
-            let starts = lineStarts(ns)
-            var placed: [GutterOverlay.Placed] = []
-            for m in marks where m.line >= 1 && m.line <= starts.count {
-                guard let pos = tv.position(from: tv.beginningOfDocument, offset: starts[m.line - 1]) else { continue }
-                let r = tv.caretRect(for: pos)
-                placed.append(.init(y: r.minY, h: r.height, mark: m))
-            }
-            overlay.placed = placed
-            positionOverlay()
-            overlay.setNeedsDisplay()
-            layoutGuides(tv, ns: ns, starts: starts)
-
-            var ranges: [HighlightedRange] = []
-            for i in issues where i.line >= 1 && i.line <= starts.count {
-                let lineStart = starts[i.line - 1]
-                let lineEnd = i.line < starts.count ? starts[i.line] - 1 : ns.length
-                let loc = min(lineStart + max(i.column - 1, 0), lineEnd)
-                let len = max(min(i.length, lineEnd - loc), 1)
-                let color: UIColor = switch i.severity {
-                case .error: overlay.deletedColor
-                case .warning: UIColor.systemOrange
-                case .info: overlay.modifiedColor
-                }
-                ranges.append(HighlightedRange(
-                    id: i.id,
-                    range: NSRange(location: loc, length: len),
-                    color: color.withAlphaComponent(0.22),
-                    cornerRadius: 3
-                ))
-            }
-            tv.highlightedRanges = ranges
-        }
-
-        /// Guias de indentação: uma linha vertical por nível, na coluna do recuo.
-        func layoutGuides(_ tv: TextView, ns: NSString, starts: [Int]) {
-            guides.frame = CGRect(
-                x: 0,
-                y: 0,
-                width: max(tv.contentSize.width, tv.bounds.width),
-                height: max(tv.contentSize.height, tv.bounds.height)
-            )
-            guard guidesOn, starts.count <= 4000 else {
-                guides.segments = []
-                guides.setNeedsDisplay()
-                return
-            }
-            let width = max(tabWidth, 1)
-            var levels: [Int] = []
-            for (i, start) in starts.enumerated() {
-                let end = i + 1 < starts.count ? starts[i + 1] : ns.length
-                var spaces = 0
-                var p = start
-                var blank = true
-                while p < end {
-                    let ch = ns.character(at: p)
-                    if ch == 32 {
-                        spaces += 1
-                    } else if ch == 9 {
-                        spaces += width
-                    } else if ch == 10 || ch == 13 {
-                        break
-                    } else {
-                        blank = false
-                        break
-                    }
-                    p += 1
-                }
-                levels.append(blank ? -1 : spaces / width)
-            }
-            // linhas em branco herdam o nível da próxima linha não vazia
-            var next = 0
-            for i in stride(from: levels.count - 1, through: 0, by: -1) {
-                if levels[i] < 0 {
-                    levels[i] = next
-                } else {
-                    next = levels[i]
-                }
-            }
-            let cursorLine = lineIndex(of: tv.selectedRange.location, starts: starts)
-            let cursorLevel = cursorLine < levels.count ? levels[cursorLine] : 0
-            let charW = charWidth(tv)
-            var segs: [IndentGuides.Segment] = []
-            for (i, start) in starts.enumerated() where levels[i] > 0 {
-                guard let pos = tv.position(from: tv.beginningOfDocument, offset: start) else { continue }
-                let r = tv.caretRect(for: pos)
-                for level in 0 ..< levels[i] {
-                    segs.append(.init(
-                        x: r.minX + CGFloat(level * width) * charW,
-                        y: r.minY,
-                        h: r.height,
-                        active: level == cursorLevel - 1
-                    ))
-                }
-            }
-            guides.segments = segs
-            guides.setNeedsDisplay()
-        }
-
-        /// Largura de um caractere da fonte mono (mede o avanço de "0").
-        private func charWidth(_ tv: TextView) -> CGFloat {
-            let font = tv.theme.font
-            return ("0" as NSString).size(withAttributes: [.font: font]).width
-        }
-
-        private func lineIndex(of offset: Int, starts: [Int]) -> Int {
-            var lo = 0, hi = starts.count - 1
-            while lo < hi {
-                let mid = (lo + hi + 1) / 2
-                if starts[mid] <= offset {
-                    lo = mid
-                } else {
-                    hi = mid - 1
-                }
-            }
-            return max(lo, 0)
-        }
-
-        func positionOverlay() {
-            guard let tv = textView else { return }
-            overlay.frame = CGRect(
-                x: tv.contentOffset.x,
-                y: 0,
-                width: tv.gutterWidth,
-                height: max(tv.contentSize.height, tv.bounds.height)
-            )
-            // Sem `bringSubviewToFront` aqui: esta função agora roda dentro do
-            // layoutSubviews da TextView, e reordenar subviews ali pede novo layout.
-            // A ordem das camadas já é garantida no próprio layoutSubviews.
-            let larguraMapa = MinimapView.largura(minimapSize)
-            minimap.isHidden = minimapSize == .off || tv.bounds.width < larguraMapa * 3
-            if !minimap.isHidden {
-                minimap.frame = CGRect(
-                    x: tv.contentOffset.x + tv.bounds.width - larguraMapa,
-                    y: tv.contentOffset.y,
-                    width: larguraMapa,
-                    height: tv.bounds.height
-                )
-                let rolavel = max(1, tv.contentSize.height - tv.bounds.height)
-                minimap.fracao = min(1, max(0, tv.contentOffset.y / rolavel))
-                minimap.visivel = min(1, tv.bounds.height / max(1, tv.contentSize.height))
-                minimap.setNeedsDisplay()
-            }
-        }
-
-        private func lineStarts(_ ns: NSString) -> [Int] {
-            var out = [0]
-            var i = 0
-            let n = ns.length
-            while i < n {
-                let r = ns.lineRange(for: NSRange(location: i, length: 0))
-                i = r.location + r.length
-                if i < n || (i == n && ns.character(at: n - 1) == 10) {
-                    out.append(i)
-                }
-                if r.length == 0 {
-                    break
-                }
-            }
-            return out
         }
 
         // MARK: - Autocompletar

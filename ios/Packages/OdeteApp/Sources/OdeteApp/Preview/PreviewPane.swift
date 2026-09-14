@@ -85,28 +85,10 @@ struct PreviewPane: View {
     @ViewBuilder var content: some View {
         let pv = ws.preview
         if pv.url == nil {
-            VStack(spacing: 12) {
-                Image(systemName: "play.rectangle").font(.system(size: 34)).foregroundStyle(theme.fgSubtle)
-                Text("Nada rodando ainda").font(OdeteFont.ui(14, weight: .medium)).foregroundStyle(theme.fg)
-                Text("Rode `npm run dev` no terminal, ou abra um index.html estático.")
-                    .font(OdeteFont.ui(12)).foregroundStyle(theme.fgMuted).multilineTextAlignment(.center)
-                HStack(spacing: 8) {
-                    Button { ws.run.run("npm run dev"); ws.showTerminal() } label: { Label(
-                        "npm run dev",
-                        systemImage: "play.fill"
-                    ) }
-                    .buttonStyle(.glassProminent)
-                    if pv.hasIndex {
-                        Button { pv.go(pv.staticURL()) } label: { Label(
-                            "index.html estático",
-                            systemImage: "doc.richtext"
-                        ) }
-                        .buttonStyle(.glass)
-                    }
-                }
-            }
-            .padding(24)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            PreviewEmpty(
+                onDev: { ws.run.run("npm run dev"); ws.showTerminal() },
+                onStatic: pv.hasIndex ? { pv.go(pv.staticURL()) } : nil
+            )
         } else {
             GeometryReader { geo in
                 // Formatos com altura própria (16:9) são desenhados no tamanho real e

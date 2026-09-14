@@ -4,6 +4,7 @@ import OdeteAccounts
 import OdeteAgent
 import OdeteBundler
 import OdeteCore
+import OdeteEditor
 import OdeteFiles
 import OdeteGit
 import OdetePreview
@@ -39,6 +40,8 @@ public final class WorkspaceModel {
     public var forceTextEdit: Set<String> = []
     /// Análise do editor por arquivo aberto: esboço, lint e marcas do git.
     public var outlines: [String: [OutlineItem]] = [:]
+    /// Linhas que o patch pendente do agente mexeu, por arquivo aberto.
+    public var patchChanges: [String: [EditorLineChange]] = [:]
     public var lint: [String: [LintIssue]] = [:]
     public var syntax: [String: [Diagnostic]] = [:]
     public var gutter: [String: [GutterMark]] = [:]

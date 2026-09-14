@@ -17,6 +17,22 @@ public struct EditorGutterMark: Sendable, Hashable, Identifiable {
     }
 }
 
+/// Linha que o agente mexeu, para o patch pendente aparecer dentro do código.
+/// `.added` é uma linha que está no texto; `.removed` é o lugar onde linhas sumiram.
+public struct EditorLineChange: Sendable, Hashable, Identifiable {
+    public enum Kind: Sendable, Hashable { case added, removed }
+    public var line: Int
+    public var kind: Kind
+    public var id: String {
+        "\(line):\(kind)"
+    }
+
+    public init(line: Int, kind: Kind) {
+        self.line = line
+        self.kind = kind
+    }
+}
+
 /// Problema a sublinhar (linha/coluna 1-based, em Characters).
 public struct EditorIssue: Sendable, Hashable, Identifiable {
     public enum Severity: Sendable, Hashable { case error, warning, info }
@@ -54,7 +70,9 @@ public struct CompletionSource: Sendable, Hashable {
 final class GutterOverlay: UIView {
     struct Placed { let y: CGFloat; let h: CGFloat; let mark: EditorGutterMark }
     var placed: [Placed] = []
-    var onTap: ((Int) -> Void)?
+    /// Toque longo, não toque simples: com marca em quase toda linha, o toque simples
+    /// roubava o toque que devia levar o cursor para a linha e o editor parecia travado.
+    var onLongPress: ((Int) -> Void)?
     var addedColor = UIColor.systemGreen
     var modifiedColor = UIColor.systemBlue
     var deletedColor = UIColor.systemRed
@@ -63,7 +81,9 @@ final class GutterOverlay: UIView {
         super.init(frame: frame)
         backgroundColor = .clear
         isOpaque = false
-        addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(tapped(_:))))
+        let g = UILongPressGestureRecognizer(target: self, action: #selector(pressionado(_:)))
+        g.minimumPressDuration = 0.45
+        addGestureRecognizer(g)
     }
 
     @available(*, unavailable) required init?(coder _: NSCoder) {
@@ -71,14 +91,16 @@ final class GutterOverlay: UIView {
     }
 
     override func point(inside point: CGPoint, with _: UIEvent?) -> Bool {
-        // Só engole toques em cima de uma marca; o resto passa para o editor.
-        placed.contains { point.y >= $0.y - 2 && point.y <= $0.y + $0.h + 2 } && point.x >= bounds.width - 14
+        // Só a tira das marcas, e só em cima de uma marca. O resto do gutter, incluindo a
+        // folga antes do código, passa direto para o editor.
+        placed.contains { point.y >= $0.y && point.y <= $0.y + $0.h } && point.x >= bounds.width - 10
     }
 
-    @objc private func tapped(_ g: UITapGestureRecognizer) {
+    @objc private func pressionado(_ g: UILongPressGestureRecognizer) {
+        guard g.state == .began else { return }
         let p = g.location(in: self)
         if let hit = placed.first(where: { p.y >= $0.y - 2 && p.y <= $0.y + $0.h + 2 }) {
-            onTap?(hit.mark.line)
+            onLongPress?(hit.mark.line)
         }
     }
 
@@ -133,6 +155,39 @@ final class IndentGuides: UIView {
             ctx.move(to: CGPoint(x: s.x + 0.5, y: s.y))
             ctx.addLine(to: CGPoint(x: s.x + 0.5, y: s.y + s.h))
             ctx.strokePath()
+        }
+    }
+}
+
+/// Marca de linha apagada pelo agente: um fio vermelho na altura em que o texto sumiu.
+/// A linha adicionada é pintada pelo próprio `highlightedRanges` do Runestone, mas a que
+/// foi embora não está no texto e não tem onde ser pintada.
+@MainActor
+final class ChangeMarks: UIView {
+    var ys: [CGFloat] = []
+    var cor = UIColor.systemRed
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        backgroundColor = .clear
+        isOpaque = false
+        isUserInteractionEnabled = false
+    }
+
+    @available(*, unavailable) required init?(coder _: NSCoder) {
+        nil
+    }
+
+    override func draw(_: CGRect) {
+        guard let ctx = UIGraphicsGetCurrentContext() else { return }
+        ctx.setFillColor(cor.withAlphaComponent(0.55).cgColor)
+        for y in ys {
+            ctx.fill(CGRect(x: 0, y: y - 1, width: bounds.width, height: 2))
+            ctx.move(to: CGPoint(x: 0, y: y - 5))
+            ctx.addLine(to: CGPoint(x: 8, y: y))
+            ctx.addLine(to: CGPoint(x: 0, y: y + 5))
+            ctx.closePath()
+            ctx.fillPath()
         }
     }
 }

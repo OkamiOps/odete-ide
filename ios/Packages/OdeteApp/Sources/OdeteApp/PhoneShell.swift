@@ -113,6 +113,7 @@ struct PhoneShell: View {
                         palette: theme.palette,
                         prefs: chrome.snapshot.editor,
                         reveal: ws.reveal,
+                        changes: ws.patchChanges[path] ?? [],
                         onSave: { ws.save(path) }
                     )
                 } else {

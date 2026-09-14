@@ -1,6 +1,8 @@
 import Foundation
+import OdeteAgent
 import OdeteBundler
 import OdeteCore
+import OdeteEditor
 import OdeteGit
 
 /// Esboço, lint e gutter do git para os arquivos abertos.
@@ -21,6 +23,7 @@ extension WorkspaceModel {
         let lang = Language.detect(path: path)
         outlines[path] = Outline.items(text: text, language: lang)
         lint[path] = Lint.rules(text: text, language: lang)
+        refreshPatchMarks(path)
         switch lang {
         case .javascript, .jsx, .typescript, .tsx:
             let engine = run.active?.shell.bundler ?? lintEngine ?? {
@@ -35,6 +38,40 @@ extension WorkspaceModel {
             }
         default:
             syntax[path] = nil
+        }
+    }
+
+    /// Linhas do patch pendente deste arquivo, em cima do texto que está na tela agora.
+    ///
+    /// A comparação é com o texto de antes do agente, não com o que ele escreveu: assim a
+    /// marcação continua certa depois de a pessoa editar por cima da alteração, que é o
+    /// que ela faz na prática quando quer ajustar uma linha que o agente escreveu.
+    func refreshPatchMarks(_ path: String) {
+        guard let p = agent.pendingPatches.first(where: { $0.path == path }), let texto = buffers[path] else {
+            if patchChanges[path] != nil {
+                patchChanges[path] = nil
+            }
+            return
+        }
+        var out: [EditorLineChange] = []
+        for h in LineDiff.hunks(p.before, texto, context: 0) {
+            var linha = h.afterStart
+            for l in h.lines {
+                switch l {
+                case .context:
+                    linha += 1
+                case .added:
+                    out.append(EditorLineChange(line: linha, kind: .added))
+                    linha += 1
+                case .removed:
+                    if out.last != EditorLineChange(line: linha, kind: .removed) {
+                        out.append(EditorLineChange(line: linha, kind: .removed))
+                    }
+                }
+            }
+        }
+        if patchChanges[path] != out {
+            patchChanges[path] = out
         }
     }
 
@@ -80,7 +117,7 @@ extension WorkspaceModel {
     }
 
     /// Hunk do git que contém a linha (para o popover do gutter).
-    func hunk(at line: Int, in path: String) -> (FileDiff, Hunk)? {
+    func hunk(at line: Int, in path: String) -> (FileDiff, OdeteGit.Hunk)? {
         guard let f = gutterFiles[path], let m = gutter[path]?.first(where: { $0.line == line }),
               f.hunks.indices.contains(m.hunk)
         else {

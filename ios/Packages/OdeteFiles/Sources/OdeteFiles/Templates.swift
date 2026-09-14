@@ -96,6 +96,7 @@ public enum Template: String, CaseIterable, Identifiable, Sendable {
     static func viteReact(_ name: String) -> [String: String] {
         [
             "README.md": readme(name, "`npm run dev` sobe o Vite. Edite `src/App.tsx`."),
+            ".gitignore": "node_modules/\ndist/\n.DS_Store\n",
             "package.json": """
             {
               "name": "\(name.lowercased().replacingOccurrences(of: " ", with: "-"))",
@@ -131,6 +132,7 @@ public enum Template: String, CaseIterable, Identifiable, Sendable {
     static func astro(_ name: String) -> [String: String] {
         [
             "README.md": readme(name, "`npm run dev` sobe o Astro. Páginas em `src/pages`."),
+            ".gitignore": "node_modules/\ndist/\n.astro/\n.DS_Store\n",
             "package.json": """
             {
               "name": "\(name.lowercased().replacingOccurrences(of: " ", with: "-"))",

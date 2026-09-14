@@ -3,7 +3,9 @@ import OdeteCore
 
 /// Leitor e escritor tar (ustar + GNU longname) em memória.
 public enum Tar {
-    public struct Entry: Sendable { public var path: String; public var data: Data; public var isDir: Bool; public var mode: Int; public var link: String? }
+    public struct Entry: Sendable {
+        public var path: String; public var data: Data; public var isDir: Bool; public var mode: Int; public var link: String?
+    }
 
     public static func read(_ data: Data) throws -> [Entry] {
         let d = Data(data)
@@ -12,22 +14,50 @@ public enum Tar {
         var pendingLong: String?
         while off + 512 <= d.count {
             let h = d.subdata(in: off ..< off + 512)
-            if h.allSatisfy({ $0 == 0 }) { break }
-            func str(_ r: Range<Int>) -> String { String(decoding: h[r].prefix { $0 != 0 }, as: UTF8.self) }
-            func oct(_ r: Range<Int>) -> Int { Int(str(r).trimmingCharacters(in: .whitespaces), radix: 8) ?? 0 }
+            if h.allSatisfy({ $0 == 0 }) {
+                break
+            }
+            func str(_ r: Range<Int>) -> String {
+                String(decoding: h[r].prefix { $0 != 0 }, as: UTF8.self)
+            }
+            func oct(_ r: Range<Int>) -> Int {
+                Int(str(r).trimmingCharacters(in: .whitespaces), radix: 8) ?? 0
+            }
             var name = str(0 ..< 100)
             let size = oct(124 ..< 136)
             let type = h[156]
             let prefix = str(345 ..< 500)
-            if !prefix.isEmpty { name = prefix + "/" + name }
-            if let l = pendingLong { name = l; pendingLong = nil }
+            if !prefix.isEmpty {
+                name = prefix + "/" + name
+            }
+            if let l = pendingLong {
+                name = l; pendingLong = nil
+            }
             let body = d.subdata(in: (off + 512) ..< min(off + 512 + size, d.count))
             off += 512 + ((size + 511) / 512) * 512
             switch type {
             case UInt8(ascii: "L"): pendingLong = String(decoding: body.prefix { $0 != 0 }, as: UTF8.self); continue
-            case UInt8(ascii: "5"): out.append(Entry(path: name, data: Data(), isDir: true, mode: oct(100 ..< 108), link: nil))
-            case UInt8(ascii: "0"), 0: out.append(Entry(path: name, data: body, isDir: false, mode: oct(100 ..< 108), link: nil))
-            case UInt8(ascii: "2"): out.append(Entry(path: name, data: Data(), isDir: false, mode: oct(100 ..< 108), link: str(157 ..< 257)))
+            case UInt8(ascii: "5"): out.append(Entry(
+                    path: name,
+                    data: Data(),
+                    isDir: true,
+                    mode: oct(100 ..< 108),
+                    link: nil
+                ))
+            case UInt8(ascii: "0"), 0: out.append(Entry(
+                    path: name,
+                    data: body,
+                    isDir: false,
+                    mode: oct(100 ..< 108),
+                    link: nil
+                ))
+            case UInt8(ascii: "2"): out.append(Entry(
+                    path: name,
+                    data: Data(),
+                    isDir: false,
+                    mode: oct(100 ..< 108),
+                    link: str(157 ..< 257)
+                ))
             default: continue // pax headers etc.
             }
         }
@@ -44,18 +74,32 @@ public enum Tar {
                 out.append(padded(l))
             }
             name = String(name.utf8.prefix(99))!
-            out.append(header(name: name, size: e.isDir ? 0 : e.data.count, type: e.isDir ? UInt8(ascii: "5") : UInt8(ascii: "0"), mode: e.mode))
-            if !e.isDir { out.append(padded(e.data)) }
+            out.append(header(
+                name: name,
+                size: e.isDir ? 0 : e.data.count,
+                type: e.isDir ? UInt8(ascii: "5") : UInt8(ascii: "0"),
+                mode: e.mode
+            ))
+            if !e.isDir {
+                out.append(padded(e.data))
+            }
         }
         out.append(Data(count: 1024))
         return out
     }
 
-    static func padded(_ d: Data) -> Data { d + Data(count: (512 - d.count % 512) % 512) }
+    static func padded(_ d: Data) -> Data {
+        d + Data(count: (512 - d.count % 512) % 512)
+    }
 
     static func header(name: String, size: Int, type: UInt8, mode: Int) -> Data {
         var h = Data(count: 512)
-        func put(_ s: String, at: Int, len: Int) { let b = Array(s.utf8.prefix(len)); h.replaceSubrange(at ..< at + b.count, with: b) }
+        func put(_ s: String, at: Int, len: Int) {
+            let b = Array(s.utf8.prefix(len)); h.replaceSubrange(
+                at ..< at + b.count,
+                with: b
+            )
+        }
         put(name, at: 0, len: 100)
         put(String(format: "%07o", mode), at: 100, len: 8)
         put("0000000", at: 108, len: 8); put("0000000", at: 116, len: 8)
@@ -76,14 +120,27 @@ public enum Tar {
         try fm.createDirectory(at: dir, withIntermediateDirectories: true)
         for e in try read(tar) {
             var rel = e.path
-            if let i = rel.firstIndex(of: "/") { rel = String(rel[rel.index(after: i)...]) } else { continue }
+            if let i = rel.firstIndex(of: "/") {
+                rel = String(rel[rel.index(after: i)...])
+            } else {
+                continue
+            }
             guard !rel.isEmpty, !rel.contains("..") else { continue }
             let dest = dir.appending(path: rel)
-            if e.isDir { try fm.createDirectory(at: dest, withIntermediateDirectories: true); continue }
+            if e.isDir {
+                try fm.createDirectory(at: dest, withIntermediateDirectories: true); continue
+            }
             try fm.createDirectory(at: dest.deletingLastPathComponent(), withIntermediateDirectories: true)
-            if let link = e.link { try? fm.removeItem(at: dest); try? fm.createSymbolicLink(atPath: dest.path, withDestinationPath: link); continue }
+            if let link = e.link {
+                try? fm.removeItem(at: dest); try? fm.createSymbolicLink(
+                    atPath: dest.path,
+                    withDestinationPath: link
+                ); continue
+            }
             try e.data.write(to: dest, options: .atomic)
-            if e.mode & 0o111 != 0 { try? fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: dest.path) }
+            if e.mode & 0o111 != 0 {
+                try? fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: dest.path)
+            }
         }
     }
 }

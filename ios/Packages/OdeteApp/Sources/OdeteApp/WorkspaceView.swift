@@ -98,12 +98,7 @@ struct SidebarView: View {
         case .files: FileTreeView()
         case .search: SearchPane()
         case .git: GitPane()
-        case .problems: ShellPanel(
-                "Problemas",
-                symbol: "exclamationmark.circle",
-                phase: 3,
-                blurb: "Diagnósticos do lint e do build."
-            )
+        case .problems: ProblemsPane()
         case .settings: SettingsShell()
         }
     }

@@ -40,6 +40,8 @@ packages:
     path: Packages/OdeteBundler
   OdeteShell:
     path: Packages/OdeteShell
+  OdetePreview:
+    path: Packages/OdetePreview
   OdeteApp:
     path: Packages/OdeteApp
 targets:

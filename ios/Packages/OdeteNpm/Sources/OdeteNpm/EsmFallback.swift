@@ -10,7 +10,10 @@ public enum EsmFallback {
             imports[name] = base
             imports[name + "/"] = "https://esm.sh/\(name)@\(v.isEmpty ? "latest" : v)/"
         }
-        let data = try! JSONSerialization.data(withJSONObject: ["imports": imports], options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
+        let data = try! JSONSerialization.data(
+            withJSONObject: ["imports": imports],
+            options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        )
         return String(decoding: data, as: UTF8.self)
     }
 
@@ -18,7 +21,12 @@ public enum EsmFallback {
     public static func missing(project: URL) -> [String: String] {
         let pkg = PackageJSON(url: project.appending(path: "package.json"))
         var out: [String: String] = [:]
-        for (n, r) in pkg.dependencies where !FileManager.default.fileExists(atPath: project.appending(path: "node_modules/\(n)/package.json").path) { out[n] = r }
+        for (n, r) in pkg.dependencies
+            where !FileManager.default
+            .fileExists(atPath: project.appending(path: "node_modules/\(n)/package.json").path)
+        {
+            out[n] = r
+        }
         return out
     }
 }

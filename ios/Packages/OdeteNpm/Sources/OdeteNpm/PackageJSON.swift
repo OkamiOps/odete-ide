@@ -7,14 +7,29 @@ public struct PackageJSON: @unchecked Sendable {
 
     public init(url: URL) {
         self.url = url
-        raw = (try? Data(contentsOf: url)).flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] } ?? [:]
+        raw = (try? Data(contentsOf: url))
+            .flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] } ?? [:]
     }
 
-    public var name: String { (raw["name"] as? String) ?? url.deletingLastPathComponent().lastPathComponent }
-    public var dependencies: [String: String] { (raw["dependencies"] as? [String: String]) ?? [:] }
-    public var devDependencies: [String: String] { (raw["devDependencies"] as? [String: String]) ?? [:] }
-    public var scripts: [String: String] { (raw["scripts"] as? [String: String]) ?? [:] }
-    public var allDependencies: [String: String] { dependencies.merging(devDependencies) { a, _ in a } }
+    public var name: String {
+        (raw["name"] as? String) ?? url.deletingLastPathComponent().lastPathComponent
+    }
+
+    public var dependencies: [String: String] {
+        (raw["dependencies"] as? [String: String]) ?? [:]
+    }
+
+    public var devDependencies: [String: String] {
+        (raw["devDependencies"] as? [String: String]) ?? [:]
+    }
+
+    public var scripts: [String: String] {
+        (raw["scripts"] as? [String: String]) ?? [:]
+    }
+
+    public var allDependencies: [String: String] {
+        dependencies.merging(devDependencies) { a, _ in a }
+    }
 
     public mutating func set(_ name: String, range: String, dev: Bool) {
         var deps = (raw[dev ? "devDependencies" : "dependencies"] as? [String: String]) ?? [:]
@@ -36,7 +51,10 @@ public struct PackageJSON: @unchecked Sendable {
     public func save() throws {
         var ordered: [String: Any] = raw
         ordered = ordered.compactMapValues { $0 }
-        let data = try JSONSerialization.data(withJSONObject: ordered, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
+        let data = try JSONSerialization.data(
+            withJSONObject: ordered,
+            options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        )
         try data.write(to: url, options: .atomic)
     }
 }

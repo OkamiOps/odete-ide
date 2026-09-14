@@ -4,6 +4,7 @@ import OdeteAccounts
 import OdeteCore
 import OdeteFiles
 import OdeteGit
+import OdetePreview
 
 /// Estado de um projeto aberto: árvore, abas, buffers e salvamento.
 @MainActor
@@ -26,6 +27,7 @@ public final class WorkspaceModel {
     public var paletteQuery = ""
     public let git: GitModel
     public let run: RunModel
+    public let preview: PreviewModel
     /// Arquivos em conflito que o usuário quer editar como texto puro.
     public var forceTextEdit: Set<String> = []
 
@@ -40,6 +42,7 @@ public final class WorkspaceModel {
         ops = FileOps(root: root)
         git = GitModel(root: root, accounts: accounts)
         run = RunModel(root: root, git: git)
+        preview = PreviewModel(root: root)
         tabs = chrome.tabs(for: project.id).filter { ops.exists($0.path) }.map { EditorTab(path: $0.path) }
         active = chrome.activeTab(for: project.id).flatMap { p in tabs.contains { $0.path == p } ? p : nil } ?? tabs
             .first?.path
@@ -53,6 +56,13 @@ public final class WorkspaceModel {
         }
         w.start()
         watcher = w
+    }
+
+    /// Mostra a gaveta do terminal (iPad) sem mexer no resto do layout.
+    public func showTerminal() {
+        if !chrome.snapshot.termVisible {
+            chrome.toggleTerm()
+        }
     }
 
     func stop() {

@@ -3,6 +3,24 @@ import OdeteNpm
 
 /// `npm install|i|add|uninstall|remove|ls|run|start|dev|build|test|init|exec` (+ `npx`, `pnpm`, `yarn` como aliases).
 struct NpmCommand: ShellCommand {
+    /// Sem .gitignore, node_modules viraria 500 arquivos no painel do git.
+    static func ensureGitignore(_ root: URL, io: CommandIO) {
+        let u = root.appending(path: ".gitignore")
+        if let s = try? String(contentsOf: u, encoding: .utf8) {
+            if s.contains("node_modules") {
+                return
+            }
+            try? (s + (s.hasSuffix("\n") || s.isEmpty ? "" : "\n") + "node_modules/\n").write(
+                to: u,
+                atomically: true,
+                encoding: .utf8
+            )
+        } else {
+            try? "node_modules/\ndist/\n.DS_Store\n".write(to: u, atomically: true, encoding: .utf8)
+        }
+        io.out(".gitignore: node_modules/ adicionado")
+    }
+
     let name = "npm"
     let help = "install, uninstall, ls, run <script>, start, dev, build, init"
 
@@ -26,6 +44,7 @@ struct NpmCommand: ShellCommand {
                         )
                     io.out("package.json criado")
                 }
+                Self.ensureGitignore(ctx.root, io: io)
                 let rep = try await installer.install(add: specs, dev: dev)
                 for a in rep.added {
                     io.out("+ \(a)")

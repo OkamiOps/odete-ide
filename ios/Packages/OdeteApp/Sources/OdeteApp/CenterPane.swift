@@ -71,19 +71,9 @@ struct CenterPane: View {
             HStack(spacing: 0) {
                 editor(ws.active)
                 Rectangle().fill(theme.border).frame(width: 1)
-                ShellPanel(
-                    "Preview",
-                    symbol: "play.rectangle",
-                    phase: 3,
-                    blurb: "O app do usuário rodando no dispositivo."
-                )
+                PreviewPane()
             }
-        case .preview: ShellPanel(
-                "Preview",
-                symbol: "play.rectangle",
-                phase: 3,
-                blurb: "O app do usuário rodando no dispositivo."
-            )
+        case .preview: PreviewPane()
         }
     }
 

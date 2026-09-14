@@ -2,16 +2,16 @@
 import PackageDescription
 
 let package = Package(
-    name: "OdeteNpm",
+    name: "OdetePreview",
     platforms: [.iOS(.v26)],
-    products: [.library(name: "OdeteNpm", targets: ["OdeteNpm"])],
+    products: [.library(name: "OdetePreview", targets: ["OdetePreview"])],
     dependencies: [.package(path: "../OdeteCore")],
     targets: [
         .target(
-            name: "OdeteNpm",
+            name: "OdetePreview",
             dependencies: [.product(name: "OdeteCore", package: "OdeteCore")],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
-        .testTarget(name: "OdeteNpmTests", dependencies: ["OdeteNpm"]),
+        .testTarget(name: "OdetePreviewTests", dependencies: ["OdetePreview"]),
     ]
 )

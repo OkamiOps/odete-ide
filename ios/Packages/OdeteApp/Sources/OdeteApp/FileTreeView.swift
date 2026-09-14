@@ -167,6 +167,11 @@ struct FileRow: View {
                 }
                 Button("Renomear", systemImage: "pencil") { draft = node.name; renaming = node.path }
                 Button("Copiar caminho", systemImage: "doc.on.doc") { UIPasteboard.general.string = node.path }
+                if !node.isDirectory, ws.git.isRepo {
+                    Divider()
+                    Button("Histórico", systemImage: "clock.arrow.circlepath") { ws.historyPath = node.path }
+                    Button("Blame", systemImage: "person.text.rectangle") { ws.blamePath = node.path }
+                }
                 Divider()
                 Button("Apagar", systemImage: "trash", role: .destructive) { deleting = node.path }
             }

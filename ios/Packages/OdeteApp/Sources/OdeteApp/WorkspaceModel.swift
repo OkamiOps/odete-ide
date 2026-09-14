@@ -44,6 +44,9 @@ public final class WorkspaceModel {
     public var gutter: [String: [GutterMark]] = [:]
     public var gutterFiles: [String: FileDiff] = [:]
     public var cursorOffset = 0
+    /// Folhas de histórico/blame por arquivo (nil = fechadas).
+    public var historyPath: String?
+    public var blamePath: String?
     var analysisTasks: [String: Task<Void, Never>] = [:]
     var lintEngine: Esbuild?
 

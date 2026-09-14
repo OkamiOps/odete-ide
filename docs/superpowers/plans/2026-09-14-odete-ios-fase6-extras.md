@@ -28,10 +28,10 @@
 - [x] Commit `editor: gutter git, esboço, lint e autocompletar`.
 
 ### Marco 3: Git
-- [ ] `GitHubAPI` PRs (lista, detalhe, arquivos, comentários, checks, merge, criar) + `PullRequestsPane`.
-- [ ] Commit por IA (`CommitAI`) no card Commit.
-- [ ] Histórico por arquivo e blame (OdeteGit) + `FileHistorySheet`/`BlameView`.
-- [ ] Commit `git: PRs, commit por IA, histórico e blame`.
+- [x] `GitHubAPI` PRs (lista, detalhe, arquivos, comentários, checks, merge, criar) + `PullRequestsPane`.
+- [x] Commit por IA (`CommitAI`) no card Commit.
+- [x] Histórico por arquivo e blame (OdeteGit) + `FileHistorySheet`/`BlameView`.
+- [x] Commit `git: PRs, commit por IA, histórico e blame`.
 
 ### Marco 4: Sistema
 - [ ] Pasta externa com bookmark; selo no hub.

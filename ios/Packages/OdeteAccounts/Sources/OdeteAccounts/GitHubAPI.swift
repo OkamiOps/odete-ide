@@ -99,6 +99,15 @@ public struct GitHubComment: Codable, Sendable, Identifiable, Equatable {
     enum CodingKeys: String, CodingKey { case id, body, user, createdAt = "created_at" }
 }
 
+public struct GitHubCheckRun: Codable, Sendable, Identifiable, Equatable {
+    public var id: Int
+    public var name: String
+    public var status: String
+    public var conclusion: String?
+    public var htmlUrl: String?
+    enum CodingKeys: String, CodingKey { case id, name, status, conclusion, htmlUrl = "html_url" }
+}
+
 /// Cliente REST do GitHub. `token` opcional para leitura pública.
 public struct GitHubAPI: Sendable {
     public var token: String?
@@ -175,6 +184,19 @@ public struct GitHubAPI: Sendable {
 
     public func pullFiles(_ slug: String, number: Int) async throws -> [GitHubPullFile] {
         try await get("/repos/\(slug)/pulls/\(number)/files", query: ["per_page": "100"])
+    }
+
+    public func pull(_ slug: String, number: Int) async throws -> GitHubPull {
+        try await get("/repos/\(slug)/pulls/\(number)")
+    }
+
+    /// Checks do commit (Actions e apps) — `ref` é um sha ou branch.
+    public func checkRuns(_ slug: String, ref: String) async throws -> [GitHubCheckRun] {
+        struct Wrap: Decodable { var checkRuns: [GitHubCheckRun]; enum CodingKeys: String,
+                                     CodingKey { case checkRuns = "check_runs" }
+        }
+        let w: Wrap = try await get("/repos/\(slug)/commits/\(ref)/check-runs", query: ["per_page": "50"])
+        return w.checkRuns
     }
 
     public func pullComments(_ slug: String, number: Int) async throws -> [GitHubComment] {

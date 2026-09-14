@@ -2,6 +2,13 @@ import OdeteGit
 import OdeteUI
 import SwiftUI
 
+struct PathRef: Identifiable, Hashable {
+    var path: String
+    var id: String {
+        path
+    }
+}
+
 struct HunkRef: Identifiable, Hashable {
     var path: String
     var line: Int

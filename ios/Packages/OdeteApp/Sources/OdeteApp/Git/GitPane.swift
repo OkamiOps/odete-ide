@@ -34,6 +34,9 @@ struct GitPane: View {
                         }
                         ChangesCard()
                         CommitCard()
+                        if git.githubSlug != nil {
+                            PullRequestsCard()
+                        }
                         HistoryCard()
                         BranchesCard()
                     }
@@ -244,6 +247,7 @@ struct ChangesCard: View {
 struct CommitCard: View {
     @Environment(WorkspaceModel.self) private var ws
     @Environment(\.theme) private var theme
+    @State private var suggesting = false
     var git: GitModel {
         ws.git
     }
@@ -261,14 +265,31 @@ struct CommitCard: View {
                     .padding(.trailing, 36)
                     .background(theme.bgElevated, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                     .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(theme.border))
-                Button {} label: {
-                    Image(systemName: "sparkles").font(.system(size: 14)).foregroundStyle(theme.fgMuted)
-                        .frame(width: 32, height: 32).background(theme.bgSubtle, in: RoundedRectangle(cornerRadius: 9))
+                Button {
+                    suggesting = true
+                    Task {
+                        do {
+                            let m = try await ws.agent.suggestCommitMessage()
+                            if !m.isEmpty {
+                                git.commitMessage = m
+                            }
+                        } catch { git.error = error.localizedDescription }
+                        suggesting = false
+                    }
+                } label: {
+                    Group {
+                        if suggesting {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Image(systemName: "sparkles").font(.system(size: 14))
+                        }
+                    }
+                    .foregroundStyle(git.staged.isEmpty ? theme.fgSubtle : theme.accent)
+                    .frame(width: 32, height: 32)
                 }
-                .buttonStyle(.plain)
-                .disabled(true)
-                .opacity(0.4)
-                .help("Gerar mensagem com o agente (Fase 4)")
+                .buttonStyle(.glass)
+                .disabled(git.staged.isEmpty || suggesting)
+                .help("Gerar mensagem com o agente a partir do diff staged")
                 .padding(4)
             }
             HStack(spacing: 6) {

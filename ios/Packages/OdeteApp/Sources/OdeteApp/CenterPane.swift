@@ -71,6 +71,15 @@ struct CenterPane: View {
             content
         }
         .background(theme.bg)
+        .sheet(item: Binding(
+            get: { ws.historyPath.map { PathRef(path: $0) } },
+            set: { ws.historyPath = $0?.path }
+        )) { r in
+            FileHistorySheet(path: r.path)
+        }
+        .sheet(item: Binding(get: { ws.blamePath.map { PathRef(path: $0) } }, set: { ws.blamePath = $0?.path })) { r in
+            BlameSheet(path: r.path)
+        }
     }
 
     var actions: some View {
@@ -172,6 +181,8 @@ struct CenterPane: View {
 
 struct Crumbs: View {
     @Environment(\.theme) private var theme
+    @Environment(WorkspaceModel.self) private var ws
+    @Environment(ChromeState.self) private var chrome
     var path: String
     var body: some View {
         HStack(spacing: 4) {
@@ -186,6 +197,21 @@ struct Crumbs: View {
                     .foregroundStyle(i == path.split(separator: "/").count - 1 ? theme.fgMuted : theme.fgSubtle)
             }
             Spacer()
+            if ws.git.isRepo {
+                Menu {
+                    Button("Histórico do arquivo", systemImage: "clock.arrow.circlepath") { ws.historyPath = path }
+                    Button("Blame", systemImage: "person.text.rectangle") { ws.blamePath = path }
+                    Button("Diff deste arquivo", systemImage: "plus.forwardslash.minus") {
+                        ws.git.setDiff(.headToWorkdir, path: path)
+                        chrome.snapshot.center = .diff
+                    }
+                } label: {
+                    Image(systemName: "clock.arrow.circlepath").font(.system(size: 11)).foregroundStyle(theme.fgSubtle)
+                        .frame(width: 22, height: 22).contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .menuIndicator(.hidden)
+            }
             Text(Language.detect(path: path).label).font(OdeteFont.mono(10)).foregroundStyle(theme.fgSubtle)
         }
         .padding(.horizontal, 12)

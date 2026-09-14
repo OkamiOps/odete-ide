@@ -38,6 +38,25 @@ struct WorkspaceModelTests {
         #expect(ws.active == nil && ws.tabs.isEmpty)
     }
 
+    /// Arquivo aberto reescrito por fora (git, terminal, agente) volta para a tela; com
+    /// alteração não salva na aba, o que a pessoa digitou fica.
+    @Test func mudancaPorForaVoltaParaOBuffer() throws {
+        let (ws, chrome, root) = try make()
+        chrome.snapshot.editor.autoSave = false
+        ws.openFile("index.html")
+        let arquivo = root.appending(path: "index.html")
+
+        try "<h1>de fora</h1>\n".write(to: arquivo, atomically: true, encoding: .utf8)
+        ws.conferirDisco()
+        #expect(ws.text(for: "index.html") == "<h1>de fora</h1>\n")
+        #expect(ws.activeTab?.isDirty == false)
+
+        ws.setText("<h1>meu texto</h1>\n", for: "index.html")
+        try "<h1>de fora de novo</h1>\n".write(to: arquivo, atomically: true, encoding: .utf8)
+        ws.conferirDisco()
+        #expect(ws.text(for: "index.html") == "<h1>meu texto</h1>\n")
+    }
+
     @Test func dirtyAndSave() throws {
         let (ws, chrome, root) = try make()
         chrome.snapshot.editor.autoSave = false

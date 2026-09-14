@@ -53,25 +53,9 @@ extension WorkspaceModel {
             }
             return
         }
-        var out: [EditorLineChange] = []
-        for h in LineDiff.hunks(p.before, texto, context: 0) {
-            var linha = h.afterStart
-            for l in h.lines {
-                switch l {
-                case .context:
-                    linha += 1
-                case .added:
-                    out.append(EditorLineChange(line: linha, kind: .added))
-                    linha += 1
-                case .removed:
-                    if out.last != EditorLineChange(line: linha, kind: .removed) {
-                        out.append(EditorLineChange(line: linha, kind: .removed))
-                    }
-                }
-            }
-        }
-        if patchChanges[path] != out {
-            patchChanges[path] = out
+        let novas = PatchMarks.linhas(antes: p.before, agora: texto)
+        if patchChanges[path] != novas {
+            patchChanges[path] = novas
         }
     }
 

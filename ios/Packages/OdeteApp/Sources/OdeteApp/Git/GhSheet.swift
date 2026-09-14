@@ -106,7 +106,11 @@ struct PullRequestsCard: View {
             }
         }
         .task(id: ws.git.githubSlug) { await load() }
-        .sheet(item: $sheet, onDismiss: { Task { await load() } }) { t in GhSheet(tab: t.tab, pull: t.pull) }
+        .sheet(
+            item: $sheet,
+            onDismiss: { Task { await load() } },
+            content: { t in GhSheet(tab: t.tab, pull: t.pull) }
+        )
     }
 
     /// Recado no lugar do erro cru da API.

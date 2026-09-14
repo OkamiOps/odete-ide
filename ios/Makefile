@@ -4,7 +4,7 @@ DEST = platform=iOS Simulator,name=$(SIM),OS=$(OS)
 DERIVED = build
 BUNDLE = com.okamiops.odete
 
-.PHONY: gen build test unit run lint format clean
+.PHONY: gen build test unit run lint format check clean
 
 gen:
 	xcodegen generate --spec project.yml
@@ -25,6 +25,9 @@ run: build
 	open -a Simulator
 	xcrun simctl install "$(SIM)" $(DERIVED)/Build/Products/Debug-iphonesimulator/Odete.app
 	xcrun simctl launch "$(SIM)" $(BUNDLE)
+
+# Tudo que a CI roda, de uma vez, antes de commitar.
+check: lint build unit
 
 lint:
 	swiftformat --lint .

@@ -1,0 +1,40 @@
+name: CI
+
+# Precisa de um runner com Xcode 26 ou mais novo: o projeto compila contra o SDK do
+# iOS 26 e os pacotes declaram `platforms: [.iOS(.v26)]`. Enquanto a imagem do GitHub
+# não tiver esse Xcode, o passo de setup falha aqui mesmo, dizendo o que falta, em vez
+# de quebrar no meio da compilação.
+on:
+  push:
+    branches: [main, iOS]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ios:
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Ferramentas
+        run: brew install xcodegen swiftformat swiftlint
+
+      - name: Formato e lint
+        working-directory: ios
+        run: make lint
+
+      - name: Build
+        working-directory: ios
+        run: make build DEST='generic/platform=iOS Simulator'
+
+      - name: Testes dos pacotes
+        working-directory: ios
+        run: make unit DEST='platform=iOS Simulator,name=iPhone 17'

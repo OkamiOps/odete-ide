@@ -2,7 +2,11 @@ excluded:
   - build
   - Odete.xcodeproj
   - "**/.build"
+# Regras desligadas porque brigam com o que o SwiftFormat escreve: com elas ligadas o
+# `make lint` nascia com 130+ avisos e parava de servir de portão para qualquer coisa.
 disabled_rules:
+  - switch_case_alignment
+  - statement_position
   - trailing_comma
   - todo
   - opening_brace
@@ -16,6 +20,10 @@ disabled_rules:
 identifier_name:
   min_length: 1
   excluded: [workflow_runs, html_url, created_at]
+type_name:
+  min_length: 2
+nesting:
+  type_level: 2
 type_body_length:
   warning: 400
 file_length:

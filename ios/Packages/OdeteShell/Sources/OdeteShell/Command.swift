@@ -26,7 +26,11 @@ public final class CommandIO: @unchecked Sendable {
     }
 
     public func err(_ text: String) {
-        stderrToStdout ? out(text) : outSink(.err, text)
+        if stderrToStdout {
+            out(text)
+        } else {
+            outSink(.err, text)
+        }
     }
 
     public var captured: String {

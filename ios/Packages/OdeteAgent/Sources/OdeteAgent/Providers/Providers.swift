@@ -64,7 +64,8 @@ public struct HTTPProvider: Provider {
                     let events: AsyncThrowingStream<StreamEvent, Error> = switch kind {
                     case .apple, .claude, .anthropicCompat: MessagesStream.events(lines)
                     case .grok: ResponsesStream.events(lines)
-                    case .codex, .openaiCompat: ChatCompletionsStream.events(lines)
+                    case .codex: ResponsesStream.events(lines)
+                    case .openaiCompat: ChatCompletionsStream.events(lines)
                     }
                     for try await e in events {
                         if Task.isCancelled {
@@ -88,10 +89,15 @@ public struct HTTPProvider: Provider {
         case .grok:
             url = URL(string: base + "/responses")!; body = ResponsesStream.body(turn)
             h["x-grok-model-override"] = turn.model
-        case .codex: url = URL(string: base + "/v1/chat/completions")!; body = ChatCompletionsStream.body(
-                turn,
-                maxTokensKey: "max_completion_tokens"
-            )
+        case .codex:
+            // O backend do Codex só atende a API de Responses. Em /chat/completions ele
+            // devolve 404 com {"detail":"Not Found"}, que era o erro que aparecia.
+            url = URL(string: base + "/responses")!
+            var b = ResponsesStream.body(turn)
+            b["include"] = ["reasoning.encrypted_content"]
+            // Esse backend recusa max_output_tokens com 400; quem manda no limite é ele.
+            b.removeValue(forKey: "max_output_tokens")
+            body = b
         case .openaiCompat: url = URL(string: base + "/chat/completions")!; body = ChatCompletionsStream.body(
                 turn,
                 maxTokensKey: "max_tokens"

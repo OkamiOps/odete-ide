@@ -168,7 +168,11 @@ final class IndentGuides: UIView {
 /// foi embora não está no texto e não tem onde ser pintada.
 @MainActor
 final class ChangeMarks: UIView {
+    /// Onde linhas foram apagadas pelo agente.
     var ys: [CGFloat] = []
+    /// Sublinhado ondulado de problema: começo, largura, base e cor.
+    struct Onda { let x: CGFloat; let w: CGFloat; let y: CGFloat; let cor: UIColor }
+    var ondas: [Onda] = []
     var cor = UIColor.systemRed
 
     override init(frame: CGRect) {
@@ -192,6 +196,22 @@ final class ChangeMarks: UIView {
             ctx.addLine(to: CGPoint(x: 0, y: y + 5))
             ctx.closePath()
             ctx.fillPath()
+        }
+        // Onda embaixo do trecho com problema. Um fundo colorido de um caractere só,
+        // que era o que existia, não se vê no meio do código.
+        ctx.setLineWidth(1.6)
+        ctx.setLineJoin(.round)
+        for o in ondas {
+            ctx.setStrokeColor(o.cor.cgColor)
+            var x = o.x
+            var cima = true
+            ctx.move(to: CGPoint(x: x, y: o.y))
+            while x < o.x + o.w {
+                x += 2.5
+                ctx.addLine(to: CGPoint(x: min(x, o.x + o.w), y: o.y + (cima ? -2 : 2)))
+                cima.toggle()
+            }
+            ctx.strokePath()
         }
     }
 }

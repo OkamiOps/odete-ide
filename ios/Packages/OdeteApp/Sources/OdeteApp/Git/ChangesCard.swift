@@ -78,7 +78,9 @@ struct ChangeRow: View {
             git.setDiff(staged ? .index : .workdir, path: entry.path)
             chrome.snapshot.center = .diff
         } label: {
-            HStack(spacing: 10) {
+            // Alinhado pelo topo quando a linha tem duas alturas: centralizado, o ícone
+            // ficava um degrau abaixo do nome e a lista parecia desalinhada.
+            HStack(alignment: compacto ? .top : .center, spacing: 10) {
                 Image(systemName: glyph)
                     .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(.white)
@@ -113,7 +115,8 @@ struct ChangeRow: View {
                 }
             }
             .padding(.horizontal, 12)
-            .frame(height: compacto ? 46 : (dir == nil ? 40 : 46))
+            .padding(.vertical, compacto ? 8 : 0)
+            .frame(minHeight: compacto ? 46 : (dir == nil ? 40 : 46))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

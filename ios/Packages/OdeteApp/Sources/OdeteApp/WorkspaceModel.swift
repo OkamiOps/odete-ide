@@ -171,7 +171,16 @@ public final class WorkspaceModel {
                     analyze(t.path)
                 }
             } else {
-                closeTab(t.path, force: true)
+                // Ferramenta que reescreve o arquivo gravando um temporário e renomeando
+                // por cima deixa uma fresta em que ele não existe. Fechar a aba nessa
+                // fresta some com o arquivo aberto sem ninguém ter pedido, então confere
+                // de novo antes.
+                let alvo = t.path
+                Task { @MainActor [weak self] in
+                    try? await Task.sleep(for: .milliseconds(400))
+                    guard let self, !ops.exists(alvo) else { return }
+                    closeTab(alvo, force: true)
+                }
             }
         }
     }

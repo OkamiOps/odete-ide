@@ -32,24 +32,56 @@ extension CodeEditorView.Coordinator {
 
         var ranges: [HighlightedRange] = []
         marcarMudancas(tv, ns: ns, starts: starts, into: &ranges)
+        marcarProblemas(tv, ns: ns, starts: starts, into: &ranges)
+        tv.highlightedRanges = ranges
+    }
+
+    /// Problema no código: onda embaixo do trecho, fundo de leve na linha e a marca no
+    /// minimapa, para dar para achar onde quebrou sem rolar o arquivo atrás.
+    func marcarProblemas(_ tv: TextView, ns: NSString, starts: [Int], into ranges: inout [HighlightedRange]) {
+        let cores = palette ?? parent.palette
+        var ondas: [ChangeMarks.Onda] = []
         for i in issues where i.line >= 1 && i.line <= starts.count {
-            let lineStart = starts[i.line - 1]
-            let lineEnd = i.line < starts.count ? starts[i.line] - 1 : ns.length
-            let loc = min(lineStart + max(i.column - 1, 0), lineEnd)
-            let len = max(min(i.length, lineEnd - loc), 1)
-            let color: UIColor = switch i.severity {
-            case .error: overlay.deletedColor
-            case .warning: UIColor.systemOrange
-            case .info: overlay.modifiedColor
+            let inicioLinha = starts[i.line - 1]
+            let fimLinha = i.line < starts.count ? starts[i.line] - 1 : ns.length
+            let de = min(inicioLinha + max(i.column - 1, 0), fimLinha)
+            // esbuild costuma apontar um caractere só; a onda vai desse ponto até o fim
+            // da linha, senão fica um risco de 6 pt que ninguém vê.
+            let ate = max(min(de + max(i.length, 1), fimLinha), de + 1)
+            let cor = switch i.severity {
+            case .error: UIColor(hex: cores.danger)
+            case .warning: UIColor(hex: cores.syntax.keyword)
+            case .info: UIColor(hex: cores.fgMuted)
             }
             ranges.append(HighlightedRange(
                 id: i.id,
-                range: NSRange(location: loc, length: len),
-                color: color.withAlphaComponent(0.22),
+                range: NSRange(location: de, length: max(ate - de, 1)),
+                color: cor.withAlphaComponent(0.18),
                 cornerRadius: 3
             ))
+            if let p1 = tv.position(from: tv.beginningOfDocument, offset: de),
+               let p2 = tv.position(from: tv.beginningOfDocument, offset: max(ate, fimLinha))
+            {
+                let r1 = tv.caretRect(for: p1)
+                let r2 = tv.caretRect(for: p2)
+                // A onda fica logo abaixo do texto, não no pé do retângulo do cursor: com
+                // entrelinha aumentada esse pé cai dentro da linha de baixo, e a onda
+                // aparecia sublinhando a linha errada.
+                let base = min(r1.minY + fontSize * 1.35, r1.maxY - 1)
+                // Linha quebrada: o fim dela está numa altura diferente, então a onda vai
+                // só até a borda do texto visível.
+                let mesmaLinha = abs(r2.minY - r1.minY) < 1
+                let largura = mesmaLinha ? max(r2.minX - r1.minX, 12) : max(tv.bounds.width - r1.minX - 40, 12)
+                ondas.append(.init(x: r1.minX, w: largura, y: base, cor: cor))
+            }
         }
-        tv.highlightedRanges = ranges
+        changeMarks.ondas = ondas
+        changeMarks.isHidden = changeMarks.ys.isEmpty && ondas.isEmpty
+        changeMarks.setNeedsDisplay()
+        minimap.corErro = UIColor(hex: cores.danger)
+        minimap.corAviso = UIColor(hex: cores.syntax.keyword)
+        minimap.erros = issues.filter { $0.severity == .error }.map(\.line)
+        minimap.avisos = issues.filter { $0.severity == .warning }.map(\.line)
     }
 
     /// O patch pendente dentro do código: linha que entrou pintada de verde, e um fio
@@ -85,8 +117,6 @@ extension CodeEditorView.Coordinator {
         }
         changeMarks.cor = UIColor(hex: cores.danger)
         changeMarks.ys = ys
-        changeMarks.isHidden = ys.isEmpty
-        changeMarks.setNeedsDisplay()
     }
 
     /// Guias de indentação: uma linha vertical por nível, na coluna do recuo.

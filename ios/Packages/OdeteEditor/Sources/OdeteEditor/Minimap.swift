@@ -25,6 +25,24 @@ final class MinimapView: UIView {
         didSet { setNeedsDisplay() }
     }
 
+    /// Linhas (1-based) com erro e com aviso. É o que responde "onde foi que quebrou"
+    /// sem precisar rolar o arquivo inteiro atrás da linha vermelha.
+    var erros: [Int] = [] {
+        didSet { setNeedsDisplay() }
+    }
+
+    var avisos: [Int] = [] {
+        didSet { setNeedsDisplay() }
+    }
+
+    var corErro: UIColor = .systemRed {
+        didSet { setNeedsDisplay() }
+    }
+
+    var corAviso: UIColor = .systemOrange {
+        didSet { setNeedsDisplay() }
+    }
+
     var corJanela: UIColor = .white {
         didSet { setNeedsDisplay() }
     }
@@ -105,6 +123,16 @@ final class MinimapView: UIView {
             guard w > 0 else { continue }
             (l.comentario ? corComentario : corCodigo).setFill()
             ctx.fill(CGRect(x: x, y: CGFloat(i) * h - desl, width: w, height: max(0.8, h - 0.6)))
+        }
+        // Problemas por cima do código, da borda à borda, para aparecerem mesmo numa
+        // linha curta.
+        for (linhas, cor) in [(avisos, corAviso), (erros, corErro)] {
+            cor.withAlphaComponent(0.85).setFill()
+            for n in linhas where n >= 1 && n <= self.linhas.count {
+                let y = CGFloat(n - 1) * h - desl
+                guard y > -4, y < bounds.height + 4 else { continue }
+                ctx.fill(CGRect(x: 0, y: y - 0.5, width: bounds.width, height: max(1.5, h)))
+            }
         }
         // Janela visível. Quando o arquivo inteiro cabe na tela ela cobriria tudo, então
         // não vale a pena desenhar.

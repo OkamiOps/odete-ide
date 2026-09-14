@@ -33,6 +33,9 @@ struct WorkspaceView: View {
             }
         }
         .animation(.snappy(duration: 0.15), value: ws.paletteOpen)
+        // A faixa na altura do relógio é área de segurança: pintada aqui, fora do
+        // GeometryReader, ela some e a barra de abas encosta no topo.
+        .background(theme.surface.ignoresSafeArea())
         .focusedSceneValue(\.workspaceActions, WorkspaceActions(ws: ws, chrome: chrome, app: app))
         .alert("Erro", isPresented: Binding(get: { ws.error != nil }, set: {
             if !$0 {
@@ -71,7 +74,8 @@ struct WorkspaceView: View {
             let agentW = chrome.snapshot.agentVisible ? min(chrome.snapshot.agentWidth, max(Metrics.minAgent, free)) : 0
             columns(narrow: false, sideW: sideW, agentW: agentW)
         }
-        .background(theme.bg)
+        // Sem isto sobra uma faixa preta na altura do relógio, acima das abas.
+        .background(theme.surface.ignoresSafeArea())
         .animation(.snappy(duration: 0.2), value: chrome.snapshot.sideOpen)
         .animation(.snappy(duration: 0.2), value: chrome.snapshot.agentVisible)
         .animation(.snappy(duration: 0.2), value: chrome.snapshot.termVisible)
@@ -108,6 +112,8 @@ struct WorkspaceView: View {
             }
             VStack(spacing: 0) {
                 CenterPane()
+                // As informações do arquivo ficam colados no pé do editor, não no pé da janela.
+                StatusBar()
                 if chrome.snapshot.termVisible {
                     Splitter(
                         value: $chrome.snapshot.termHeight,

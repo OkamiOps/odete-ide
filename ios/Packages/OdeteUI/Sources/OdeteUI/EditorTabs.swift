@@ -35,8 +35,8 @@ public struct EditorTabs: View {
                         .id(tab.path)
                     }
                 }
-                .padding(.horizontal, 6)
-                .padding(.top, 6)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
             }
             .onChange(of: active) { _, new in
                 if let new {
@@ -90,21 +90,12 @@ struct TabItem: View {
             .accessibilityLabel(tab.isDirty ? "Fechar (não salvo)" : "Fechar")
             .padding(.trailing, 4)
         }
+        // Aba ativa é uma cápsula preenchida. O traço no topo ficava solto, começando e
+        // terminando fora da aba.
         .background(
-            on ? theme.bg : (hover ? theme.fg.opacity(0.05) : .clear),
-            in: UnevenRoundedRectangle(
-                topLeadingRadius: 9,
-                bottomLeadingRadius: 0,
-                bottomTrailingRadius: 0,
-                topTrailingRadius: 9,
-                style: .continuous
-            )
+            on ? theme.fg.opacity(theme.dark ? 0.12 : 0.08) : (hover ? theme.fg.opacity(0.05) : .clear),
+            in: Capsule()
         )
-        .overlay(alignment: .top) {
-            if on {
-                Capsule().fill(theme.accent).frame(height: 2).padding(.horizontal, 10)
-            }
-        }
         .onHover { hover = $0 }
         .accessibilityElement(children: .contain)
         .accessibilityAddTraits(on ? .isSelected : [])

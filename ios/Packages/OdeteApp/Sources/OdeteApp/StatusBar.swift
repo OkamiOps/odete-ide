@@ -1,0 +1,179 @@
+import OdeteCore
+import OdeteUI
+import SwiftUI
+
+/// Barra de status do workspace: branch, problemas, posição do cursor, indentação, codificação, linguagem.
+struct StatusBar: View {
+    @Environment(WorkspaceModel.self) private var ws
+    @Environment(ChromeState.self) private var chrome
+    @Environment(\.theme) private var theme
+    @State private var width: CGFloat = 800
+
+    /// Abaixo disso os itens de detalhe somem, em vez de virarem reticências.
+    var roomy: Bool {
+        width >= 520
+    }
+
+    var body: some View {
+        @Bindable var chrome = chrome
+        let errors = problemCounts()
+        HStack(spacing: 2) {
+            if ws.git.isRepo {
+                item(symbol: "arrow.triangle.branch", text: branchText, tint: theme.accent) {
+                    chrome.snapshot.side = .git
+                    chrome.snapshot.sideOpen = true
+                }
+                .help("Git · abrir painel")
+            }
+            item(
+                symbol: errors.errors > 0 ? "xmark.octagon" : errors
+                    .warnings > 0 ? "exclamationmark.triangle" : "checkmark.circle",
+                text: errors.errors == 0 && errors
+                    .warnings == 0 ? (roomy ? "sem problemas" : nil) : "\(errors.errors) ⊗ \(errors.warnings) △",
+                tint: errors.errors > 0 ? theme.danger : errors.warnings > 0 ? theme.accent : theme.ok
+            ) {
+                chrome.snapshot.side = .problems
+                chrome.snapshot.sideOpen = true
+            }
+            .help("Problemas")
+            if ws.agent.running {
+                item(symbol: "sparkles", text: "agente trabalhando", tint: theme.accent) {
+                    chrome.snapshot.agentVisible = true
+                }
+                .symbolEffect(.pulse)
+            }
+            if !ws.run.servers.isEmpty {
+                item(
+                    symbol: "bolt.horizontal.circle",
+                    text: ws.run.servers.map { ":\($0.port)" }.joined(separator: " "),
+                    tint: theme.ok
+                ) {
+                    chrome.snapshot.center = .preview
+                }
+                .help("Servidores no ar · abrir preview")
+            }
+            Spacer(minLength: Metrics.s2)
+            if let path = ws.active {
+                let (line, col) = cursor(in: path)
+                item(text: "Ln \(line), Col \(col)") { ws.paletteOpen = true; ws.paletteQuery = "@" }
+                    .help("Ir para símbolo")
+                Menu {
+                    ForEach([2, 4, 8], id: \.self) { w in
+                        Button { chrome.snapshot.editor.tabWidth = w } label: {
+                            Label("\(w) espaços", systemImage: w == chrome.snapshot.editor.tabWidth ? "checkmark" : "")
+                        }
+                    }
+                    Divider()
+                    Toggle("Mostrar espaços", isOn: $chrome.snapshot.editor.showWhitespace)
+                    Toggle("Guias de indentação", isOn: $chrome.snapshot.editor.indentGuides)
+                } label: {
+                    label(text: roomy ? "Espaços: \(chrome.snapshot.editor.tabWidth)"
+                        : "⇥\(chrome.snapshot.editor.tabWidth)")
+                }
+                .buttonStyle(.plain)
+                .menuIndicator(.hidden)
+                if roomy {
+                    item(text: "UTF-8") {}
+                    item(text: eol(in: path)) {}
+                }
+                Button {
+                    chrome.snapshot.side = .outline
+                    chrome.snapshot.sideOpen = true
+                } label: {
+                    HStack(spacing: 5) {
+                        FileGlyph(path: path, size: 10)
+                        Text(Language.detect(path: path).label).foregroundStyle(theme.fgMuted)
+                    }
+                    .padding(.horizontal, 8).frame(height: 22).contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .hoverEffect(.highlight)
+            }
+            item(symbol: "gearshape", text: nil) { chrome.settingsOpen = true }
+                .help("Ajustes")
+        }
+        .padding(.horizontal, Metrics.s2)
+        .frame(height: 26)
+        .font(OdeteFont.mono(11))
+        .lineLimit(1)
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
+    }
+
+    var branchText: String {
+        var s = ws.git.current?.name ?? ws.git.headName ?? "sem branch"
+        if !ws.git.isClean {
+            s += "*"
+        }
+        if let ab = ws.git.aheadBehind, ab.ahead > 0 || ab.behind > 0 {
+            s += "  \(ab.ahead)↑ \(ab.behind)↓"
+        }
+        return s
+    }
+
+    func problemCounts() -> (errors: Int, warnings: Int) {
+        var e = 0, w = 0
+        for d in ws.run.diagnostics {
+            if d.kind == .error {
+                e += 1
+            } else {
+                w += 1
+            }
+        }
+        for d in ws.swiftDiagnostics {
+            if d.kind == .error {
+                e += 1
+            } else {
+                w += 1
+            }
+        }
+        for item in ws.allLint {
+            if item.issue.severity == .error {
+                e += 1
+            } else {
+                w += 1
+            }
+        }
+        e += ws.preview.console.filter { $0.level == .error }.count
+        return (e, w)
+    }
+
+    func cursor(in path: String) -> (Int, Int) {
+        let ns = ws.text(for: path) as NSString
+        let off = min(max(ws.cursorOffset, 0), ns.length)
+        var line = 1, last = 0
+        var i = 0
+        while i < off {
+            if ns.character(at: i) == 10 {
+                line += 1
+                last = i + 1
+            }
+            i += 1
+        }
+        return (line, off - last + 1)
+    }
+
+    func eol(in path: String) -> String {
+        ws.text(for: path).contains("\r\n") ? "CRLF" : "LF"
+    }
+
+    func label(symbol: String? = nil, text: String?, tint: Color? = nil) -> some View {
+        HStack(spacing: 5) {
+            if let symbol {
+                Image(systemName: symbol).font(.system(size: 10.5, weight: .semibold))
+                    .foregroundStyle(tint ?? theme.fgMuted)
+            }
+            if let text {
+                Text(text).foregroundStyle(theme.fgMuted).lineLimit(1)
+            }
+        }
+        .padding(.horizontal, 8)
+        .frame(height: 22)
+        .contentShape(Capsule())
+    }
+
+    func item(symbol: String? = nil, text: String?, tint: Color? = nil, action: @escaping () -> Void) -> some View {
+        Button(action: action) { label(symbol: symbol, text: text, tint: tint) }
+            .buttonStyle(.plain)
+            .hoverEffect(.highlight)
+    }
+}

@@ -38,9 +38,6 @@ struct CenterPane: View {
                 if toolbarWidth >= 560 {
                     ModePicker(mode: $chrome.snapshot.center)
                     Spacer(minLength: Metrics.s2)
-                    if toolbarWidth >= 640, let t = ws.activeTab {
-                        Pill(t.isDirty ? "não salvo" : "salvo", on: t.isDirty)
-                    }
                     actions
                 } else {
                     Menu {
@@ -82,14 +79,37 @@ struct CenterPane: View {
         }
     }
 
+    /// Sidebar, terminal e agente já têm botão no rail; repetir aqui só enche a barra.
+    /// Ficam a paleta, salvar e o menu do arquivo aberto.
     var actions: some View {
-        GlassBar {
-            HeaderButton("command", label: "Paleta") { ws.paletteOpen = true }
-            HeaderButton("square.and.arrow.down", label: "Salvar") { ws.save() }
-            HeaderButton("sidebar.left", label: "Sidebar") { chrome.toggleSide() }
-            HeaderButton("terminal", label: "Terminal") { chrome.toggleTerm() }
-            HeaderButton("sidebar.right", label: "Agente") { chrome.toggleAgent() }
+        HStack(spacing: 6) {
+            Button("Paleta", systemImage: "command") { ws.paletteOpen = true }
+            Button("Salvar", systemImage: "square.and.arrow.down") { ws.save() }
+                .disabled(ws.activeTab?.isDirty != true)
+            Menu {
+                if let path = ws.active {
+                    Section(path.split(separator: "/").last.map(String.init) ?? path) {
+                        Button("Histórico do arquivo", systemImage: "clock.arrow.circlepath") {
+                            ws.historyPath = path
+                        }
+                        Button("Blame", systemImage: "person.text.rectangle") { ws.blamePath = path }
+                        Button("Copiar caminho", systemImage: "doc.on.doc") { UIPasteboard.general.string = path }
+                    }
+                    Section {
+                        Button("Fechar aba", systemImage: "xmark") { ws.closeTab(path) }
+                    }
+                }
+            } label: {
+                Label("Mais", systemImage: "ellipsis")
+            }
+            .menuStyle(.button)
+            .menuIndicator(.hidden)
+            .disabled(ws.active == nil)
         }
+        .controlSize(.small)
+        .labelStyle(.iconOnly)
+        .buttonStyle(.glass)
+        .tint(theme.fgMuted)
     }
 
     @ViewBuilder var content: some View {

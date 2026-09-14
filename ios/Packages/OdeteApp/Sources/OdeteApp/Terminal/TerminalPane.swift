@@ -157,7 +157,6 @@ struct TerminalView: View {
             .padding(.horizontal, Metrics.s3).frame(height: 42)
             .background(theme.bg)
             .overlay(alignment: .top) { Rectangle().fill(theme.separator).frame(height: 0.5) }
-            TermKeys(session: session)
         }
         .onAppear { focused = true }
     }
@@ -170,44 +169,5 @@ struct TerminalView: View {
         case .ok: theme.ok
         case .system: theme.fgSubtle
         }
-    }
-}
-
-/// Atalhos de toque: Tab, ↑, ↓, ^C, símbolos e os comandos mais comuns.
-struct TermKeys: View {
-    @Environment(\.theme) private var theme
-    let session: TerminalSession
-    var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 6) {
-                key("Tab") { session.tab() }
-                key("↑") { session.historyUp() }
-                key("↓") { session.historyDown() }
-                key("^C") { session.cancel() }
-                Divider().frame(height: 18)
-                ForEach(["|", ">", "&&", "~/", "-", "."], id: \.self) { t in key(t) { session.input += t } }
-                Divider().frame(height: 18)
-                ForEach(["ls", "git status", "npm install", "npm run dev", "node "], id: \.self) { t in
-                    key(t) {
-                        session.input = t; if !t.hasSuffix(" ") {
-                            session.submit()
-                        }
-                    }
-                }
-            }
-            .padding(.horizontal, 10)
-        }
-        .frame(height: 40)
-        .background(theme.surface)
-        .overlay(alignment: .top) { Rectangle().fill(theme.separator).frame(height: 0.5) }
-    }
-
-    func key(_ t: String, _ action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(t).font(OdeteFont.mono(11.5, weight: .medium)).foregroundStyle(theme.fg)
-                .padding(.horizontal, 10).frame(height: 28)
-        }
-        .buttonStyle(.glass)
-        .controlSize(.small)
     }
 }

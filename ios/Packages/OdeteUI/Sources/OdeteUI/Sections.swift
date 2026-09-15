@@ -27,20 +27,34 @@ public struct SectionTitle<MenuContent: View>: View {
     }
 
     public var body: some View {
+        // `ViewThatFits` em vez de largura medida: o título e o par +/− são rígidos, e
+        // somados ao menu passavam de 230 pt. Numa coluna de 200 o cartão não conseguia
+        // encolher, empurrava a barra lateral inteira e ela acabava em cima do rail. Aqui
+        // a decisão é tomada contra a largura que o pai oferece, não contra a que sobrou.
+        ViewThatFits(in: .horizontal) {
+            linha(detalhe: true, numeros: true)
+            linha(detalhe: false, numeros: true)
+            linha(detalhe: false, numeros: false)
+            linha(detalhe: false, numeros: false, tituloFixo: false)
+        }
+        .padding(.horizontal, 4)
+    }
+
+    func linha(detalhe: Bool, numeros: Bool, tituloFixo: Bool = true) -> some View {
         HStack(spacing: 8) {
-            // O título nunca quebra: era ele que virava "Pull\nrequests" na coluna estreita.
+            // O título não quebra em duas linhas: era ele que virava "Pull\nrequests" na
+            // coluna estreita. Na última tentativa ele corta, que é melhor que estourar.
             Text(title).font(.headline).foregroundStyle(theme.fg)
-                .lineLimit(1).fixedSize()
-            // Abaixo disto o detalhe só caberia cortado ("0 abe…"), então sai de cena.
-            if let detail, paneWidth >= 240 {
+                .lineLimit(1)
+                .fixedSize(horizontal: tituloFixo, vertical: false)
+            if let detail, detalhe {
                 Text(detail).font(.footnote).foregroundStyle(.secondary)
                     .lineLimit(1)
+                    .fixedSize()
                     .contentTransition(.numericText())
             }
             Spacer(minLength: 0)
-            // O par +/− nunca quebra: sem `fixedSize` ele virava três linhas de dígitos
-            // soltos numa coluna estreita. Abaixo de 230 pt some de vez.
-            if let stat, paneWidth >= 230 {
+            if let stat, numeros {
                 HStack(spacing: 6) {
                     Text("+\(stat.added)").foregroundStyle(theme.ok)
                     Text("−\(stat.removed)").foregroundStyle(theme.danger)
@@ -61,9 +75,9 @@ public struct SectionTitle<MenuContent: View>: View {
                         .contentShape(Rectangle())
                 }
                 .menuIndicator(.hidden)
+                .fixedSize()
             }
         }
-        .padding(.horizontal, 4)
     }
 }
 

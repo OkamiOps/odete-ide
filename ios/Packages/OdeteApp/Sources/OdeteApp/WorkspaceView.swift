@@ -138,6 +138,9 @@ struct WorkspaceView: View {
             if chrome.snapshot.sideOpen {
                 SidebarView()
                     .frame(width: m.side)
+                    // Cinto de segurança: conteúdo que não consiga encolher fica cortado
+                    // dentro da coluna, em vez de empurrar o rail para fora da tela.
+                    .clipped()
                     .background(theme.surface)
                 Splitter(
                     value: preso($chrome.snapshot.sideWidth, Metrics.minSide, m.sideMax),

@@ -80,21 +80,30 @@ struct AgentPane: View {
         .overlay(alignment: .bottom) { Rectangle().fill(theme.separator).frame(height: 0.5) }
     }
 
+    /// Numa coluna de 300 pt os dois botões comiam o rótulo e sobrava "1 patch p…".
+    /// Como na barra de status, quem decide é o `ViewThatFits`, não um limiar de largura.
     func patchBar(_ ag: AgentModel) -> some View {
         let n = ag.pendingPatches.count
-        return HStack(spacing: 10) {
-            Image(systemName: "doc.badge.gearshape").font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(theme.accent)
-            Text(n == 1 ? "1 patch pendente" : "\(n) patches pendentes")
-                .font(.subheadline).foregroundStyle(theme.fg).lineLimit(1)
-            Spacer(minLength: 8)
-            Button("Rejeitar") { ag.rejectAll() }.buttonStyle(.glass)
-            Button("Aceitar") { ag.acceptAll() }.buttonStyle(.glassProminent)
+        return ViewThatFits(in: .horizontal) {
+            linhaDoPatch(ag, n == 1 ? "1 patch pendente" : "\(n) patches pendentes")
+            linhaDoPatch(ag, n == 1 ? "1 pendente" : "\(n) pendentes")
+            linhaDoPatch(ag, "\(n)")
         }
         .controlSize(.small)
         .padding(.horizontal, 12).frame(height: 48)
         .background(theme.bg)
         .overlay(alignment: .top) { Rectangle().fill(theme.separator).frame(height: 0.5) }
+    }
+
+    func linhaDoPatch(_ ag: AgentModel, _ texto: String) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "doc.badge.gearshape").font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(theme.accent)
+            Text(texto).font(.subheadline).foregroundStyle(theme.fg).lineLimit(1).fixedSize()
+            Spacer(minLength: 8)
+            Button("Rejeitar") { ag.rejectAll() }.buttonStyle(.glass).fixedSize()
+            Button("Aceitar") { ag.acceptAll() }.buttonStyle(.glassProminent).fixedSize()
+        }
     }
 }
 

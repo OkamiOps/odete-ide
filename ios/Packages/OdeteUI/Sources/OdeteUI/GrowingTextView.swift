@@ -48,6 +48,16 @@ public struct GrowingTextView: UIViewRepresentable {
         v.isScrollEnabled = false
         v.adjustsFontForContentSizeCategory = true
         v.keyboardDismissMode = .interactive
+        // Aqui se digita caminho e identificador no meio da frase, e a correção do iOS
+        // troca em silêncio: "src/dados.ts" virou "sic/dados.ts" e o pedido foi para o
+        // agente com o caminho errado. As aspas e os travessões espertos estragam código
+        // e flag de linha de comando do mesmo jeito. O corretor ortográfico fica: ele
+        // sublinha e não mexe.
+        v.autocorrectionType = .no
+        v.smartQuotesType = .no
+        v.smartDashesType = .no
+        v.smartInsertDeleteType = .no
+        v.spellCheckingType = .yes
         v.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         v.dica.translatesAutoresizingMaskIntoConstraints = false
         v.addSubview(v.dica)

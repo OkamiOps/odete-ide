@@ -13,6 +13,13 @@ public final class AgentModel {
     public let accounts: AIAccountStore
     public let chats: ChatStore
     public let patches: PatchStore
+    /// Espelho observável do estado de cada patch.
+    ///
+    /// O `PatchStore` roda fora do ator principal e não é `@Observable`: quem lia dele
+    /// direto nunca era redesenhado. O cartão na conversa continuava oferecendo aceitar
+    /// e rejeitar depois de a pessoa já ter aceitado — a barra de baixo sumia, o cartão
+    /// não, e os dois falavam de estados diferentes do mesmo patch.
+    public private(set) var porId: [String: Patch] = [:]
     public let checkpoints: CheckpointStore
     let host: AppToolHost
 
@@ -50,7 +57,14 @@ public final class AgentModel {
         }
         items = thread.items
         pendingPatches = patches.pending
-        patches.onChange = { [weak self] in Task { @MainActor in self?.pendingPatches = self?.patches.pending ?? [] } }
+        porId = Self.indexar(patches.all)
+        patches.onChange = { [weak self] in
+            Task { @MainActor in
+                guard let self else { return }
+                self.pendingPatches = self.patches.pending
+                self.porId = Self.indexar(self.patches.all)
+            }
+        }
         if prefs.accountId == nil, let first = accounts.accounts.first {
             setAccount(first)
         }
@@ -322,6 +336,10 @@ public final class AgentModel {
 
     public func approve(_ id: String, _ ok: Bool) {
         loop?.approve(id, ok); pendingPermit = nil
+    }
+
+    nonisolated static func indexar(_ lista: [Patch]) -> [String: Patch] {
+        Dictionary(lista.map { ($0.id, $0) }, uniquingKeysWith: { _, b in b })
     }
 
     // MARK: patches e checkpoints

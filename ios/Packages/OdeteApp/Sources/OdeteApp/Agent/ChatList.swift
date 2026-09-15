@@ -237,10 +237,22 @@ struct ChatRow: View {
                 in: RoundedRectangle(cornerRadius: 12, style: .continuous)
             )
         case let .patch(_, patchId, path):
-            if let p = agent.patches.get(patchId) {
+            if let p = agent.porId[patchId] {
                 PatchCard(agent: agent, patch: p)
             } else {
-                Text("patch \(path)").font(OdeteFont.mono(11)).foregroundStyle(theme.fgSubtle)
+                // Patch resolvido some do armazenamento quando o app reabre: fica o
+                // registro na conversa, sem o diff. Em vez de uma linha cinza solta,
+                // vale pelo menos abrir o arquivo.
+                Button { ws.openFile(path) } label: {
+                    HStack(spacing: 6) {
+                        FileGlyph(path: path, size: 11)
+                        Text(path).font(OdeteFont.mono(11)).foregroundStyle(theme.fgMuted)
+                            .lineLimit(1).truncationMode(.middle)
+                        Text("patch já resolvido").font(.caption2).foregroundStyle(theme.fgSubtle)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
         }
     }

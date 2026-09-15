@@ -4,6 +4,25 @@ import OdeteGit
 import OdeteUI
 import SwiftUI
 
+/// Erro da API do GitHub traduzido para o que a pessoa pode fazer. "GitHub 404: Not
+/// Found" no meio da lista não diz nada — e, sem conta conectada, 404 é o que a API
+/// responde para todo repositório privado.
+enum GhRecado {
+    static func texto(_ erro: String?, semConta: Bool, assunto: String) -> String? {
+        if semConta {
+            return "Conecte uma conta do GitHub nos Ajustes para ver \(assunto)."
+        }
+        guard let erro else { return nil }
+        if erro.contains("404") {
+            return "Não achei este repositório no GitHub. Confira o remoto e se a conta tem acesso a ele."
+        }
+        if erro.contains("401") || erro.contains("403") {
+            return "A conta do GitHub não tem acesso a este repositório."
+        }
+        return erro
+    }
+}
+
 /// Folha GitHub: PRs, Criar PR, Issues, Actions.
 struct GhSheet: View {
     @Environment(WorkspaceModel.self) private var ws
@@ -25,6 +44,14 @@ struct GhSheet: View {
     }
 
     var body: some View {
+        if slug.isEmpty {
+            GhStart()
+        } else {
+            comRepositorio
+        }
+    }
+
+    var comRepositorio: some View {
         NavigationStack {
             VStack(spacing: 0) {
                 Picker("", selection: $tab) {
@@ -115,17 +142,7 @@ struct PullRequestsCard: View {
 
     /// Recado no lugar do erro cru da API.
     var recado: String? {
-        if ws.git.githubToken == nil {
-            return "Conecte uma conta do GitHub nos Ajustes para ver e abrir pull requests."
-        }
-        guard let error else { return nil }
-        if error.contains("404") {
-            return "Não achei este repositório no GitHub. Confira o remoto e se a conta tem acesso a ele."
-        }
-        if error.contains("401") || error.contains("403") {
-            return "A conta do GitHub não tem acesso a este repositório."
-        }
-        return error
+        GhRecado.texto(error, semConta: ws.git.githubToken == nil, assunto: "e abrir pull requests")
     }
 
     func load() async {
@@ -151,10 +168,10 @@ struct PullsList: View {
             if loading {
                 ProgressView()
             }
-            if let error {
-                Text(error).foregroundStyle(.red)
+            if let r = GhRecado.texto(error, semConta: api.token == nil, assunto: "os pull requests") {
+                Text(r).foregroundStyle(api.token == nil ? Color.secondary : Color.red)
             }
-            if !loading, pulls.isEmpty, error == nil {
+            if !loading, pulls.isEmpty, error == nil, api.token != nil {
                 Text("nenhum PR aberto").foregroundStyle(.secondary)
             }
             ForEach(pulls) { p in
@@ -435,8 +452,8 @@ struct IssuesList: View {
             if loading {
                 ProgressView()
             }
-            if let error {
-                Text(error).foregroundStyle(.red)
+            if let r = GhRecado.texto(error, semConta: api.token == nil, assunto: "as issues") {
+                Text(r).foregroundStyle(api.token == nil ? Color.secondary : Color.red)
             }
             Button { creating = true } label: { Label("Nova issue", systemImage: "plus") }
             ForEach(issues) { i in
@@ -482,10 +499,10 @@ struct RunsList: View {
             if loading {
                 ProgressView()
             }
-            if let error {
-                Text(error).foregroundStyle(.red)
+            if let r = GhRecado.texto(error, semConta: api.token == nil, assunto: "o Actions") {
+                Text(r).foregroundStyle(api.token == nil ? Color.secondary : Color.red)
             }
-            if !loading, runs.isEmpty, error == nil {
+            if !loading, runs.isEmpty, error == nil, api.token != nil {
                 Text("nenhuma execução").foregroundStyle(.secondary)
             }
             ForEach(runs) { r in

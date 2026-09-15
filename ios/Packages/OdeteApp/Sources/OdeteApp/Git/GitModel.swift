@@ -352,4 +352,17 @@ public final class GitModel {
         let cred = credentials(for: origin)
         run("push…") { try await $0.push(credentials: cred); return "push ok" }
     }
+
+    /// Cria o `origin` e sobe a branch atual numa tacada só. Em duas chamadas a segunda
+    /// esbarraria no `busy` da primeira e o push não sairia.
+    public func publish(url: String) {
+        let cred = accounts.account(forRemote: url).flatMap { acc in
+            accounts.token(for: acc).map { Credentials(username: acc.kind.gitUsername, token: $0) }
+        }
+        run("publicando…") { repo in
+            try await repo.addRemote(name: "origin", url: url)
+            try await repo.push(credentials: cred)
+            return "publicado no GitHub"
+        }
+    }
 }

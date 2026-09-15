@@ -27,6 +27,9 @@ public struct Installer: Sendable {
         public var skipped: [String] = []
         public var failed: [String: String] = [:]
         public var added: [String] = []
+        /// Coisas que não impedem a instalação mas mudam o resultado, como um atalho de
+        /// `.bin` que não deu para criar — é ele que faz `vite` responder pelo nome.
+        public var avisos: [String] = []
     }
 
     public var project: URL
@@ -79,7 +82,7 @@ public struct Installer: Sendable {
             root["devDependencies"] = pkg.devDependencies
         }
         try newLock.save(to: lockURL, root: root)
-        try writeBins(tree)
+        try writeBins(tree, &report)
         try pruneExtraneous(tree)
         return report
     }
@@ -367,7 +370,7 @@ public struct Installer: Sendable {
         report.native = Array(Set(report.native)).sorted()
     }
 
-    func writeBins(_ tree: [String: Node]) throws {
+    func writeBins(_ tree: [String: Node], _ report: inout Report) throws {
         let fm = FileManager.default
         for (key, node) in tree {
             let binDir = URL(fileURLWithPath: key, relativeTo: project).deletingLastPathComponent()
@@ -380,7 +383,13 @@ public struct Installer: Sendable {
                 let link = binDirURL.appending(path: bname)
                 try? fm.removeItem(at: link)
                 let target = "../\(node.name)/\(bpath)"
-                try? fm.createSymbolicLink(atPath: link.path, withDestinationPath: target)
+                do {
+                    try fm.createSymbolicLink(atPath: link.path, withDestinationPath: target)
+                } catch {
+                    // Sem o atalho, o comando existe no disco mas não responde pelo nome,
+                    // e o terminal diz só "comando não encontrado". Melhor dizer agora.
+                    report.avisos.append("não deu para criar o atalho de \(bname): \(error.localizedDescription)")
+                }
             }
         }
     }

@@ -63,6 +63,9 @@ struct NpmCommand: ShellCommand {
                 for s in rep.skipped {
                     io.err("ignorado: \(s)")
                 }
+                for a in rep.avisos {
+                    io.err("aviso: \(a)")
+                }
                 for (n, e) in rep.failed {
                     io.err("falhou: \(n): \(e)")
                 }

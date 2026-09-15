@@ -54,6 +54,20 @@ public struct EditorIssue: Sendable, Hashable, Identifiable {
     }
 }
 
+/// Caminho de import que aponta para um arquivo do projeto: o editor sublinha e abre
+/// com um toque.
+public struct EditorLink: Sendable, Hashable {
+    /// Posição do caminho no texto, em caracteres, sem as aspas.
+    public var range: Range<Int>
+    /// Arquivo do projeto para onde ele aponta.
+    public var destino: String
+
+    public init(range: Range<Int>, destino: String) {
+        self.range = range
+        self.destino = destino
+    }
+}
+
 /// Fonte do autocompletar: caminhos do projeto e o arquivo aberto.
 public struct CompletionSource: Sendable, Hashable {
     public var files: [String]
@@ -176,6 +190,11 @@ final class ChangeMarks: UIView {
     /// Sublinhado ondulado de problema: começo, largura, base e cor.
     struct Onda { let x: CGFloat; let w: CGFloat; let y: CGFloat; let cor: UIColor }
     var ondas: [Onda] = []
+    /// Sublinhado reto dos caminhos de import que apontam para um arquivo do projeto:
+    /// é o que avisa que aquilo ali abre com um toque.
+    struct Elo { let rect: CGRect; let destino: String }
+    var elos: [Elo] = []
+    var corElo = UIColor.systemBlue
     var cor = UIColor.systemRed
 
     override init(frame: CGRect) {
@@ -215,6 +234,11 @@ final class ChangeMarks: UIView {
                 cima.toggle()
             }
             ctx.strokePath()
+        }
+        // Sublinhado reto no caminho do import que abre.
+        ctx.setFillColor(corElo.withAlphaComponent(0.6).cgColor)
+        for e in elos {
+            ctx.fill(CGRect(x: e.rect.minX, y: e.rect.maxY - 1, width: e.rect.width, height: 1))
         }
     }
 }

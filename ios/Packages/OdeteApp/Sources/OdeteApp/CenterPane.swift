@@ -257,6 +257,7 @@ struct CenterPane: View {
                         )
                     },
                     changes: ws.patchChanges[path] ?? [],
+                    links: ws.links[path] ?? [],
                     completion: CompletionSource(files: ws.filePaths, packages: ws.packages, path: path),
                     onSave: { ws.save(path) },
                     onFind: { chrome.snapshot.side = .search; chrome.snapshot.sideOpen = true },
@@ -265,7 +266,8 @@ struct CenterPane: View {
                         if path == ws.active {
                             ws.cursorOffset = $0
                         }
-                    }
+                    },
+                    onOpenLink: { ws.openFile($0) }
                 )
                 // Folha de ação, não popover: o popover reaparecia sozinho a cada
                 // redesenho e engolia o toque seguinte, que era o toque que devia levar

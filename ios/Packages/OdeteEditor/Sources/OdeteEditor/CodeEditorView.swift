@@ -17,11 +17,15 @@ public struct CodeEditorView: UIViewRepresentable {
     public var issues: [EditorIssue]
     /// Linhas do patch pendente do agente, para ele aparecer dentro do código.
     public var changes: [EditorLineChange]
+    /// Caminhos de import que apontam para arquivos do projeto.
+    public var links: [EditorLink]
     public var completion: CompletionSource?
     public var onSave: () -> Void
     public var onFind: () -> Void
     public var onGutterLongPress: (Int) -> Void
     public var onCursor: (Int) -> Void
+    /// Tocou num caminho de import sublinhado.
+    public var onOpenLink: (String) -> Void
 
     public init(
         text: Binding<String>,
@@ -33,11 +37,13 @@ public struct CodeEditorView: UIViewRepresentable {
         marks: [EditorGutterMark] = [],
         issues: [EditorIssue] = [],
         changes: [EditorLineChange] = [],
+        links: [EditorLink] = [],
         completion: CompletionSource? = nil,
         onSave: @escaping () -> Void = {},
         onFind: @escaping () -> Void = {},
         onGutterLongPress: @escaping (Int) -> Void = { _ in },
-        onCursor: @escaping (Int) -> Void = { _ in }
+        onCursor: @escaping (Int) -> Void = { _ in },
+        onOpenLink: @escaping (String) -> Void = { _ in }
     ) {
         _text = text
         self.documentId = documentId
@@ -48,11 +54,13 @@ public struct CodeEditorView: UIViewRepresentable {
         self.marks = marks
         self.issues = issues
         self.changes = changes
+        self.links = links
         self.completion = completion
         self.onSave = onSave
         self.onFind = onFind
         self.onGutterLongPress = onGutterLongPress
         self.onCursor = onCursor
+        self.onOpenLink = onOpenLink
     }
 
     public func makeUIView(context: Context) -> TextView {
@@ -91,6 +99,13 @@ public struct CodeEditorView: UIViewRepresentable {
             tv.setContentOffset(CGPoint(x: tv.contentOffset.x, y: maximo * f), animated: false)
         }
         c.popup.onPick = { [weak c] item in c?.accept(item) }
+        // Toque no caminho do import. Não cancela o toque original: o cursor continua
+        // indo para onde a pessoa tocou, e só quando o ponto cai dentro do sublinhado é
+        // que o arquivo abre.
+        let toque = UITapGestureRecognizer(target: c, action: #selector(Coordinator.tocouNoTexto(_:)))
+        toque.cancelsTouchesInView = false
+        toque.delegate = c
+        tv.addGestureRecognizer(toque)
         c.offsetObservation = tv.observe(\.contentOffset, options: [.new]) { [weak c] _, _ in
             Task { @MainActor in c?.positionOverlay() }
         }
@@ -116,10 +131,11 @@ public struct CodeEditorView: UIViewRepresentable {
         }
         (tv.inputAccessoryView as? KeyboardBar)?.onSave = onSave
         (tv.inputAccessoryView as? KeyboardBar)?.onFind = onFind
-        if c.marks != marks || c.issues != issues || c.changes != changes || docChanged {
+        if c.marks != marks || c.issues != issues || c.changes != changes || c.links != links || docChanged {
             c.marks = marks
             c.issues = issues
             c.changes = changes
+            c.links = links
             c.scheduleDecorations()
         }
         if let reveal, c.revealToken != reveal.token {
@@ -216,7 +232,9 @@ public struct CodeEditorView: UIViewRepresentable {
     }
 
     @MainActor
-    public final class Coordinator: NSObject, @preconcurrency TextViewDelegate {
+    public final class Coordinator: NSObject, @preconcurrency TextViewDelegate,
+        @preconcurrency UIGestureRecognizerDelegate
+    {
         var parent: CodeEditorView
         weak var textView: TextView?
         var documentId = ""
@@ -227,6 +245,7 @@ public struct CodeEditorView: UIViewRepresentable {
         var marks: [EditorGutterMark] = []
         var issues: [EditorIssue] = []
         var changes: [EditorLineChange] = []
+        var links: [EditorLink] = []
         let overlay = GutterOverlay(frame: .zero)
         let guides = IndentGuides(frame: .zero)
         let changeMarks = ChangeMarks(frame: .zero)

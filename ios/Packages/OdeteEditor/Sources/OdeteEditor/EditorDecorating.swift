@@ -33,6 +33,7 @@ extension CodeEditorView.Coordinator {
         var ranges: [HighlightedRange] = []
         marcarMudancas(tv, ns: ns, starts: starts, into: &ranges)
         marcarProblemas(tv, ns: ns, starts: starts, into: &ranges)
+        marcarElos(tv, ns: ns)
         tv.highlightedRanges = ranges
     }
 
@@ -76,12 +77,59 @@ extension CodeEditorView.Coordinator {
             }
         }
         changeMarks.ondas = ondas
-        changeMarks.isHidden = changeMarks.ys.isEmpty && ondas.isEmpty
         changeMarks.setNeedsDisplay()
         minimap.corErro = UIColor(hex: cores.danger)
         minimap.corAviso = UIColor(hex: cores.syntax.keyword)
         minimap.erros = issues.filter { $0.severity == .error }.map(\.line)
         minimap.avisos = issues.filter { $0.severity == .warning }.map(\.line)
+    }
+
+    /// O toque caiu em cima de um caminho de import? Então abre o arquivo.
+    @objc func tocouNoTexto(_ g: UITapGestureRecognizer) {
+        guard !changeMarks.elos.isEmpty, let tv = textView else { return }
+        let p = g.location(in: tv)
+        // Uma folga vertical pequena: o retângulo do cursor é mais baixo que a linha e
+        // acertar o sublinhado com o dedo pede alguma margem.
+        guard let elo = changeMarks.elos.first(where: { $0.rect.insetBy(dx: -2, dy: -4).contains(p) })
+        else { return }
+        parent.onOpenLink(elo.destino)
+    }
+
+    /// Convive com o reconhecedor do próprio Runestone: o toque precisa continuar levando
+    /// o cursor, senão volta o editor que "não deixa editar".
+    public func gestureRecognizer(
+        _: UIGestureRecognizer,
+        shouldRecognizeSimultaneouslyWith _: UIGestureRecognizer
+    ) -> Bool {
+        true
+    }
+
+    /// Sublinha os caminhos de import que apontam para um arquivo do projeto.
+    ///
+    /// O sublinhado é o que avisa que aquilo abre; o retângulo guardado é o que o toque
+    /// consulta depois, para não abrir arquivo quando a pessoa toca no vazio à direita da
+    /// linha — `closestPosition` devolveria o fim do import ali também.
+    func marcarElos(_ tv: TextView, ns: NSString) {
+        var elos: [ChangeMarks.Elo] = []
+        for l in links {
+            let de = l.range.lowerBound, ate = l.range.upperBound
+            guard de >= 0, ate <= ns.length, de < ate,
+                  let p1 = tv.position(from: tv.beginningOfDocument, offset: de),
+                  let p2 = tv.position(from: tv.beginningOfDocument, offset: ate) else { continue }
+            let r1 = tv.caretRect(for: p1), r2 = tv.caretRect(for: p2)
+            // Caminho quebrado em duas linhas não recebe sublinhado: seria um risco
+            // atravessando o editor inteiro.
+            guard abs(r2.minY - r1.minY) < 1, r2.minX > r1.minX else { continue }
+            let altura = min(r1.height, fontSize * 1.5)
+            elos.append(.init(
+                rect: CGRect(x: r1.minX, y: r1.minY, width: r2.minX - r1.minX, height: altura),
+                destino: l.destino
+            ))
+        }
+        changeMarks.corElo = UIColor(hex: (palette ?? parent.palette).accent)
+        changeMarks.elos = elos
+        changeMarks.isHidden = changeMarks.ys.isEmpty && changeMarks.ondas.isEmpty && elos.isEmpty
+        changeMarks.setNeedsDisplay()
     }
 
     /// O patch pendente dentro do código: linha que entrou pintada de verde, e um fio

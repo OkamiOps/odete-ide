@@ -60,6 +60,10 @@ public final class WorkspaceModel {
     public var forceTextEdit: Set<String> = []
     /// Análise do editor por arquivo aberto: esboço, lint e marcas do git.
     public var outlines: [String: [OutlineItem]] = [:]
+    /// Caminhos de import que apontam para arquivos do projeto, por arquivo aberto.
+    public var links: [String: [EditorLink]] = [:]
+    /// Apelidos de caminho do `tsconfig.json` (`@/` → `src/`).
+    public var tsAliases: [String: String] = [:]
     /// Linhas que o patch pendente do agente mexeu, por arquivo aberto.
     public var patchChanges: [String: [EditorLineChange]] = [:]
     public var lint: [String: [LintIssue]] = [:]
@@ -144,6 +148,7 @@ public final class WorkspaceModel {
             stack = Stack.detect(paths: filePaths, packageJSON: pkg)
             scripts = Self.lerScripts(pkg)
             packages = Self.lerPacotes(pkg, root: root)
+            tsAliases = ImportLinks.aliases(tsconfig: try? Data(contentsOf: root.appending(path: "tsconfig.json")))
             preencherAbertas()
             lixeira = ops.tamanhoDaLixeira()
             reloadTick += 1
@@ -374,6 +379,7 @@ public final class WorkspaceModel {
         }
         buffers[path] = nil
         outlines[path] = nil
+        links[path] = nil
         lint[path] = nil
         syntax[path] = nil
         gutter[path] = nil

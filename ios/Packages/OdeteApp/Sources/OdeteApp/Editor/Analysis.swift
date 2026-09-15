@@ -21,16 +21,39 @@ extension WorkspaceModel {
     ///
     /// Esboço e lint leem o arquivo inteiro e rodavam aqui mesmo, no ator principal, a
     /// cada pausa na digitação. Em arquivo grande isso é engasgo na tecla seguinte.
+    /// Quais caminhos de import deste arquivo apontam para outro arquivo do projeto.
+    /// Fora do ator principal, como o resto da análise: é uma varredura por regex no
+    /// arquivo inteiro a cada pausa na digitação.
+    nonisolated static func elos(
+        text: String,
+        language: Language,
+        path: String,
+        model: WorkspaceModel?
+    ) async -> [EditorLink] {
+        let links = ImportLinks.find(text: text, language: language)
+        guard !links.isEmpty else { return [] }
+        let (arquivos, apelidos) = await MainActor.run { [weak model] in
+            (Set(model?.filePaths ?? []), model?.tsAliases ?? [:])
+        }
+        return links.compactMap { l in
+            guard let destino = ImportLinks.resolve(l.spec, de: path, arquivos: arquivos, aliases: apelidos)
+            else { return nil }
+            return EditorLink(range: l.range, destino: destino)
+        }
+    }
+
     func analyze(_ path: String) {
         guard let text = buffers[path] else { return }
         let lang = Language.detect(path: path)
         Task.detached(priority: .utility) { [weak self] in
             let esboco = Outline.items(text: text, language: lang)
             let regras = Lint.rules(text: text, language: lang)
+            let elos = await Self.elos(text: text, language: lang, path: path, model: self)
             await MainActor.run {
                 guard let self, self.buffers[path] == text else { return }
                 self.outlines[path] = esboco
                 self.lint[path] = regras
+                self.links[path] = elos
                 self.refreshPatchMarks(path)
             }
         }

@@ -1,5 +1,4 @@
 import Foundation
-import OdeteI18n
 
 /// Os idiomas que a Odete fala. `sistema` é o padrão: segue o aparelho, e é o que
 /// a pessoa nunca precisa escolher.

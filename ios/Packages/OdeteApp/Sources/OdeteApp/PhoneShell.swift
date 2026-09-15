@@ -12,6 +12,7 @@ struct PhoneShell: View {
     @Environment(AppModel.self) private var app
     @Environment(\.theme) private var theme
     @Environment(\.horizontalSizeClass) private var sizeClass
+    @Environment(\.emJanela) private var emJanela
 
     var tabs: [PhoneTab] {
         PhoneTab.allCases.filter { showAgentTab || $0 != .agent }
@@ -82,8 +83,11 @@ struct PhoneShell: View {
                     .pickerStyle(.segmented)
                     .frame(maxWidth: 220)
                     Spacer()
-                    Text(ws.project.name).font(OdeteFont.ui(13, weight: .semibold)).foregroundStyle(theme.fg)
-                        .lineLimit(1)
+                    // Numa janela o nome já está na faixa de título, logo acima.
+                    if !emJanela {
+                        Text(ws.project.name).font(OdeteFont.ui(13, weight: .semibold)).foregroundStyle(theme.fg)
+                            .lineLimit(1)
+                    }
                 }
                 .padding(10)
                 SidebarView()
@@ -102,7 +106,12 @@ struct PhoneShell: View {
                     onSelect: { ws.openFile($0) },
                     onClose: { ws.closeTab($0) }
                 )
-                if let path = ws.active {
+                if let path = ws.active, ws.naoEhTexto.contains(path) {
+                    // O mesmo desvio do layout largo: imagem, PDF e banco vão para o
+                    // visualizador. Sem ele, aqui um `.sqlite` abria como uma página em
+                    // branco com a linha 1 — nem o arquivo, nem um aviso.
+                    FileViewer(path: path)
+                } else if let path = ws.active {
                     if let p = ws.agent.pendingPatches.first(where: { $0.path == path }) {
                         PatchBanner(patch: p)
                     }

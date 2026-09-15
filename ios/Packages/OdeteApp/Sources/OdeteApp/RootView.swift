@@ -12,6 +12,9 @@ public struct RootView: View {
     @Environment(\.dynamicTypeSize) private var tamanhoDoSistema
     /// O servidor de dev não sobrevive ao app sair de cena; ver `BackgroundServers`.
     @Environment(\.scenePhase) private var fase
+    /// A janela tem controles do sistema por cima do canto? Vem da geometria, e é
+    /// reavaliado a cada mudança de tamanho, que é quando pode mudar.
+    @State private var emJanela = false
     private let store: StateStore
 
     public init() {
@@ -32,15 +35,26 @@ public struct RootView: View {
     }
 
     public var body: some View {
-        Group {
-            if let ws = app.workspace {
-                WorkspaceView()
-                    .environment(ws)
-                    .id(ws.project.id)
-            } else {
-                HubView()
+        // `VStack` e não `safeAreaInset`: o `TabView` do layout estreito desenhava a
+        // própria barra por baixo da faixa, e aqui a divisão é dura para qualquer layout.
+        VStack(spacing: 0) {
+            if emJanela {
+                BarraDaJanela(titulo: app.workspace?.project.name ?? "Odete")
+                    .odeteTheme(Theme(chrome.palette))
+            }
+            Group {
+                if let ws = app.workspace {
+                    WorkspaceView()
+                        .environment(ws)
+                        .id(ws.project.id)
+                } else {
+                    HubView()
+                }
             }
         }
+        .environment(\.emJanela, emJanela)
+        .onGeometryChange(for: CGSize.self) { $0.size } action: { _ in emJanela = Janela.temControles }
+        .task { emJanela = Janela.temControles }
         // Duas `.sheet` no mesmo nível competem; esta fica um degrau abaixo da de boas-vindas.
         .sheet(isPresented: Binding(get: { chrome.settingsOpen }, set: { chrome.settingsOpen = $0 })) {
             SettingsSheet()

@@ -22,6 +22,14 @@ struct ParserTests {
     @Test func errors() throws {
         #expect(throws: ParseError.unterminatedQuote) { try Parser.parse("echo \"x") }
         #expect(throws: ParseError.emptyCommand) { try Parser.parse("| x") }
+        // O que não existe precisa falhar alto: passando como texto, um
+        // `git commit -m "$(cat <<'EOF' … EOF)"` virava commit com a sopa na mensagem.
+        #expect(throws: ParseError.semSubstituicao) { try Parser.parse("echo $(date)") }
+        #expect(throws: ParseError.semSubstituicao) { try Parser.parse("echo \"hoje: $(date)\"") }
+        #expect(throws: ParseError.semSubstituicao) { try Parser.parse("echo `date`") }
+        #expect(throws: ParseError.semHeredoc) { try Parser.parse("cat <<'EOF'") }
+        // Dentro de aspas simples continua sendo texto, como em qualquer shell.
+        #expect(try Parser.parse("echo '$(date)'").items[0].pipeline.commands[0].argv == ["echo", "$(date)"])
         let empty = try Parser.parse("   # só comentário")
         #expect(empty.items.isEmpty)
     }

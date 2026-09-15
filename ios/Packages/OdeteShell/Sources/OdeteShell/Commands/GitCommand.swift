@@ -74,7 +74,12 @@ struct GitCommand: ShellCommand {
                     try await repo.stage(rest)
                 }
             case "reset", "restore":
-                if rest.first == "--staged" {
+                // `git reset --soft HEAD~1` é como se desfaz o último commit mantendo o
+                // que ele tinha no índice; sem isso o comando não fazia nada.
+                if sub == "reset", rest.first == "--soft" {
+                    try await repo.undoLastCommit()
+                    io.out("desfeito o último commit; o conteúdo ficou no stage")
+                } else if rest.first == "--staged" {
                     try await repo.unstage(Array(rest.dropFirst()))
                 } else if sub == "restore" {
                     try await repo.discard(rest)
@@ -84,15 +89,22 @@ struct GitCommand: ShellCommand {
                     try await repo.unstage(rest)
                 }
             case "commit":
-                var msg = ""
-                if let i = rest.firstIndex(of: "-m"), i + 1 < rest.count {
-                    msg = rest[i + 1]
+                // Um `-m` por parágrafo, como no git de verdade: era só o primeiro que
+                // valia, e o agente não tinha como escrever mensagem com corpo.
+                var partes: [String] = []
+                for (i, a) in rest.enumerated() where a == "-m" || a == "-am" {
+                    if i + 1 < rest.count {
+                        partes.append(rest[i + 1])
+                    }
                 }
                 if rest.contains("-a") || rest.contains("-am") {
                     try await repo.stageAll()
                 }
-                if rest.contains("-am"), let i = rest.firstIndex(of: "-am"), i + 1 < rest.count {
-                    msg = rest[i + 1]
+                let msg = partes.joined(separator: "\n\n")
+                if rest.contains("--amend") {
+                    let c = try await repo.amendLastCommit(message: msg.isEmpty ? nil : msg, author: author)
+                    try await io.out("[\(repo.currentBranch()?.name ?? "main") \(c.short)] \(c.summary)")
+                    return 0
                 }
                 guard !msg.isEmpty else { io.err("use git commit -m \"mensagem\""); return 1 }
                 let c = try await repo.commit(message: msg, author: author)
@@ -107,32 +119,24 @@ struct GitCommand: ShellCommand {
                     if oneline {
                         io.out("\(c.short) \(c.summary)")
                     } else {
-                        io
-                            .out(
-                                "commit \(c.id)\nAutor: \(c.author.name) <\(c.author.email)>\nData:  \(c.date.formatted())\n\n    \(c.summary)\n"
-                            )
+                        io.out(cabecalho(c))
                     }
                 }
             case "diff":
                 let src: Repository.DiffSource = rest.contains("--staged") || rest
                     .contains("--cached") ? .index : .workdir
                 let path = rest.first { !$0.hasPrefix("-") }
-                let d = try await repo.diff(src, path: path)
-                if d.files.isEmpty {
-                    io.out("sem diferenças")
-                }
-                for f in d.files {
-                    io.out("--- a/\(f.oldPath ?? f.path)\n+++ b/\(f.path)")
-                    for h in f
-                        .hunks
-                    {
-                        io.out(h.header); for l in h
-                            .lines
-                        {
-                            io.out((l.kind == .addition ? "+" : l.kind == .deletion ? "-" : " ") + l.text)
-                        }
-                    }
-                }
+                try await imprimir(repo.diff(src, path: path), io)
+            // `git show` é como o agente confere o que acabou de commitar; sem ele,
+            // tentava `cat-file`, não entendia a resposta e ia escrever arquivo de
+            // recado em `.odete/` para contornar.
+            case "show":
+                let ref = rest.first { !$0.hasPrefix("-") }
+                let head = try await repo.headSha() ?? ""
+                let sha = (ref == nil || ref == "HEAD") ? head : ref!
+                let c = try await repo.lookupCommit(sha)
+                io.out(cabecalho(c))
+                try await imprimir(repo.diff(.commit(sha), path: nil), io)
             case "branch":
                 if rest.contains("-d") || rest.contains("-D"),
                    let n = rest.last
@@ -225,9 +229,48 @@ struct GitCommand: ShellCommand {
                 try await io
                     .out(rest
                         .contains("--abbrev-ref") ? (repo.currentBranch()?.name ?? "HEAD") : (repo.headSha() ?? ""))
-            default: io.err("git: subcomando não suportado: \(sub)"); return 1
+            default:
+                io.err("git: subcomando não suportado: \(sub)")
+                io.err("tenho: " + Self.suportados.joined(separator: ", "))
+                return 1
             }
             return 0
         } catch { io.err("git: \(error.localizedDescription)"); return 1 }
+    }
+
+    static let suportados = [
+        "status", "add", "reset", "restore", "commit", "log", "show", "diff", "branch",
+        "checkout", "switch", "merge", "stash", "remote", "fetch", "pull", "push", "rev-parse",
+    ]
+
+    /// Cabeçalho de commit no formato do `git log`, com o corpo — que faltava, e sem ele
+    /// o agente não conseguia confirmar a mensagem que tinha acabado de escrever.
+    func cabecalho(_ c: Commit) -> String {
+        var s = "commit \(c.id)\nAutor: \(c.author.name) <\(c.author.email)>\n"
+        s += "Data:  \(c.date.formatted())\n\n    \(c.summary)\n"
+        if !c.body.isEmpty {
+            s += c.body.split(separator: "\n", omittingEmptySubsequences: false)
+                .map { "    " + $0 }.joined(separator: "\n") + "\n"
+        }
+        return s
+    }
+
+    func imprimir(_ d: Diff, _ io: CommandIO) {
+        if d.files.isEmpty {
+            io.out("sem diferenças")
+        }
+        for f in d.files {
+            io.out("--- a/\(f.oldPath ?? f.path)\n+++ b/\(f.path)")
+            if f.isBinary {
+                io.out("arquivo binário")
+                continue
+            }
+            for h in f.hunks {
+                io.out(h.header)
+                for l in h.lines {
+                    io.out((l.kind == .addition ? "+" : l.kind == .deletion ? "-" : " ") + l.text)
+                }
+            }
+        }
     }
 }

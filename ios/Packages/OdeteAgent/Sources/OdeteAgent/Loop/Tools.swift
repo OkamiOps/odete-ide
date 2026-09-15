@@ -73,7 +73,8 @@ public enum Tools {
             name: "run_shell",
             description: "Terminal do projeto no iPad: ls, cat, mkdir, git, npm install, "
                 + "npm run dev/build, node arquivo.js. Vite, Next, Astro e Nest sobem no Preview. "
-                + "Chat só lê. Plan: mkdir/touch só em .odete/.",
+                + "Não tem substituição de comando ($(…), crase) nem heredoc (<<): para mensagem de "
+                + "commit com corpo, use um -m por parágrafo. Chat só lê. Plan: mkdir/touch só em .odete/.",
             parameters: obj(["command": str], required: ["command"])
         ),
     ]

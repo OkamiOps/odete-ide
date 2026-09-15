@@ -257,12 +257,30 @@ public actor Repository {
 
     // MARK: commit
 
+    /// `permitirVazio` só para quem realmente quer um commit sem mudança nenhuma.
+    ///
+    /// Sem a guarda, `git commit` no shell criava commit vazio quando não havia nada no
+    /// stage — foi o que aconteceu quando o agente errou a mensagem, commitou de novo e
+    /// deixou um commit sem arquivo nenhum no histórico.
     @discardableResult
-    public func commit(message: String, author: Signature) throws -> Commit {
+    public func commit(message: String, author: Signature, permitirVazio: Bool = false) throws -> Commit {
         let tree = try withIndex { idx -> git_oid in
             var oid = git_oid()
             try check(git_index_write_tree(&oid, idx), "árvore")
             return oid
+        }
+        if !permitirVazio, !isUnborn() {
+            var head = git_oid()
+            var anterior: OpaquePointer?
+            if git_reference_name_to_id(&head, repo, "HEAD") == 0,
+               git_commit_lookup(&anterior, repo, &head) == 0
+            {
+                defer { git_commit_free(anterior) }
+                var t = tree
+                if git_oid_cmp(git_commit_tree_id(anterior), &t) == 0 {
+                    throw GitError(kind: .invalid, code: -1, message: "nada no stage para commitar")
+                }
+            }
         }
         var treeObj: OpaquePointer?
         var treeOid = tree
@@ -296,6 +314,18 @@ public actor Repository {
         try check(git_revparse_single(&head, repo, "HEAD~1"), "commit anterior")
         defer { git_object_free(head) }
         try check(git_reset(repo, head, GIT_RESET_SOFT, nil), "desfazer commit")
+    }
+
+    /// `git commit --amend`: desfaz o último e refaz com o que estiver no índice.
+    ///
+    /// O agente tenta `--amend` toda vez que erra a mensagem; sem isso ele ficava dando
+    /// voltas e queimava as rodadas de ferramenta sem corrigir nada.
+    public func amendLastCommit(message: String?, author: Signature) throws -> Commit {
+        let anterior = try log(limit: 1).first
+        try undoLastCommit()
+        let antiga = anterior.map { $0.body.isEmpty ? $0.summary : $0.summary + "\n\n" + $0.body }
+        let texto = message ?? antiga ?? ""
+        return try commit(message: texto, author: author, permitirVazio: true)
     }
 
     public func lookupCommit(_ sha: String) throws -> Commit {

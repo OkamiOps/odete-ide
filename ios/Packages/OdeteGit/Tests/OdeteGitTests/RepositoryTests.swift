@@ -51,6 +51,20 @@ struct RepositoryTests {
         #expect(try String(contentsOf: url.appending(path: "a.txt"), encoding: .utf8) == "olá\n")
     }
 
+    @Test func commitVazioNaoEntraNoHistorico() async throws {
+        let (repo, url) = try tempRepo()
+        try write(url, "a.txt", "olá\n")
+        try await repo.stage(["a.txt"])
+        _ = try await repo.commit(message: "primeiro", author: me)
+        // Sem nada no stage, `git commit` criava um commit sem arquivo nenhum — foi o
+        // que o agente deixou no histórico ao tentar corrigir a mensagem.
+        await #expect(throws: GitError.self) { try await repo.commit(message: "de novo", author: me) }
+        #expect(try await repo.log().count == 1)
+        // Quem realmente quiser um commit vazio ainda pode.
+        _ = try await repo.commit(message: "marco", author: me, permitirVazio: true)
+        #expect(try await repo.log().count == 2)
+    }
+
     @Test func gitignoreAndUndo() async throws {
         let (repo, url) = try tempRepo()
         try write(url, ".gitignore", "node_modules/\n")

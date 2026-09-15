@@ -34,10 +34,24 @@ public struct CommandLine: Equatable, Sendable {
     }
 }
 
-public enum ParseError: LocalizedError, Equatable { case unterminatedQuote, unexpected(String), emptyCommand
+public enum ParseError: LocalizedError, Equatable {
+    case unterminatedQuote, unexpected(String), emptyCommand
+    /// `$(…)` e crases. Antes o `$(` passava como texto: um `git commit -m "$(cat
+    /// <<'EOF' … EOF)"` — que é como todo agente escreve mensagem de várias linhas —
+    /// virava um commit com essa sopa de caracteres na mensagem, sem um aviso sequer.
+    case semSubstituicao
+    /// `<<'EOF'`, pelo mesmo motivo.
+    case semHeredoc
+
     public var errorDescription: String? {
         switch self {
-        case .unterminatedQuote: "aspas sem fechar"; case let .unexpected(t): "inesperado: \(t)"; case .emptyCommand: "comando vazio"
+        case .unterminatedQuote: "aspas sem fechar"
+        case let .unexpected(t): "inesperado: \(t)"
+        case .emptyCommand: "comando vazio"
+        case .semSubstituicao: "não tenho substituição de comando ($(…) nem crase): "
+            + "rode o comando antes e passe a saída na mão"
+        case .semHeredoc: "não tenho heredoc (<<): para mensagem de várias linhas, "
+            + "repita -m uma vez por parágrafo"
         }
     }
 }
@@ -56,8 +70,11 @@ public enum Parser {
                 out.append(.word(cur)); cur = ""; hasWord = false
             }
         }
-        func expand(_ from: inout String.Index) -> String {
+        func expand(_ from: inout String.Index) throws -> String {
             var j = line.index(after: from)
+            if j < line.endIndex, line[j] == "(" {
+                throw ParseError.semSubstituicao
+            }
             if j < line.endIndex, line[j] == "{" {
                 if let close = line[j...]
                     .firstIndex(of: "}")
@@ -93,7 +110,7 @@ public enum Parser {
                     if d == "\\", line.index(after: j) < line.endIndex {
                         j = line.index(after: j); cur.append(line[j])
                     } else if d == "$" {
-                        cur += expand(&j)
+                        cur += try expand(&j)
                     } else if d == "\"" {
                         closed = true; break
                     } else {
@@ -108,12 +125,16 @@ public enum Parser {
                 if n < line.endIndex {
                     cur.append(line[n]); hasWord = true; i = n
                 }
-            case "$": cur += expand(&i); hasWord = true
+            case "$": cur += try expand(&i); hasWord = true
+            case "`": throw ParseError.semSubstituicao
             case " ", "\t": flush()
             case "#" where !hasWord: i = line.endIndex; continue
             case "|", "&", ";", ">", "<":
                 flush()
                 let n = line.index(after: i)
+                if c == "<", n < line.endIndex, line[n] == "<" {
+                    throw ParseError.semHeredoc
+                }
                 if n < line.endIndex, line[n] == c,
                    c == "|" || c == "&" || c == ">"
                 {

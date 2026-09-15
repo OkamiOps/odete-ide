@@ -36,6 +36,8 @@ struct DBView: View {
     @State private var editando: Celula?
     @State private var rascunho = ""
     @State private var novaColuna = false
+    /// Largura do próprio painel: decide entre a coluna de tabelas e a fila de fichas.
+    @State private var largura: CGFloat = 0
     @State private var nomeDaColuna = ""
     /// Sem foco programático o campo aparecia aberto e o teclado escrevia em outro lugar.
     @FocusState private var focoNaCelula: Bool
@@ -59,6 +61,15 @@ struct DBView: View {
                 EmptyState("exclamationmark.triangle", title: "Não deu para ler o banco", text: erro)
             } else if tabelas.isEmpty {
                 EmptyState("tablecells", title: "Banco sem tabelas", text: "\(nome) abriu, mas não tem nenhuma tabela.")
+            } else if largura > 0, largura < 520 {
+                // Numa janela estreita a coluna de 190 pt comia metade da largura e
+                // sobravam duas colunas de dados. As tabelas viram uma fila de fichas em
+                // cima, que rola sozinha e devolve a largura inteira para os dados.
+                VStack(spacing: 0) {
+                    fichas
+                    Rectangle().fill(theme.separator).frame(height: 0.5)
+                    grade.overlay(alignment: .top) { tarja }
+                }
             } else {
                 HStack(spacing: 0) {
                     lista.frame(width: 190)
@@ -67,6 +78,7 @@ struct DBView: View {
                 }
             }
         }
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { largura = $0 }
         .task(id: url) { abrir() }
         .alert("Nova coluna", isPresented: $novaColuna) {
             TextField("nome", text: $nomeDaColuna)
@@ -80,6 +92,31 @@ struct DBView: View {
     }
 
     // MARK: tabelas
+
+    /// A lista de tabelas quando não cabe uma coluna ao lado.
+    var fichas: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                ForEach(tabelas) { t in
+                    let atual = escolhida == t.nome
+                    Button { escolher(t.nome) } label: {
+                        HStack(spacing: 6) {
+                            Text(t.nome).font(.subheadline).foregroundStyle(atual ? theme.accent : theme.fg)
+                            Text("\(t.linhas)").font(.caption2).monospacedDigit()
+                                .foregroundStyle(atual ? theme.accent.opacity(0.8) : theme.fgSubtle)
+                        }
+                        .lineLimit(1)
+                        .padding(.horizontal, 11).frame(height: 30)
+                        .background(atual ? theme.accent.opacity(0.16) : theme.bgSubtle, in: Capsule())
+                        .contentShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 10).padding(.vertical, 7)
+        }
+        .background(theme.surface)
+    }
 
     var lista: some View {
         ScrollPane {

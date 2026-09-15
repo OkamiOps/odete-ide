@@ -4,6 +4,7 @@ import OdeteBundler
 import OdeteGit
 import OdeteNpm
 import OdeteShell
+import UIKit
 
 /// Um shell por projeto, com as abas de terminal, os servidores abertos e os diagnósticos do build.
 @MainActor
@@ -17,6 +18,8 @@ public final class RunModel {
     public var diagnostics: [Diagnostic] = []
     /// Última porta aberta; o preview segue essa URL.
     public var previewURL: URL?
+    /// Tarefa que segura o app acordado enquanto ele está no fundo com servidor de pé.
+    var tarefaDeFundo: UIBackgroundTaskIdentifier = .invalid
     private let authorBox: SendBox<Void, Signature>
     private let credBox: SendBox<String, Credentials?>
 

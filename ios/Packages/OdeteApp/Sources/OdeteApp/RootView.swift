@@ -10,6 +10,8 @@ public struct RootView: View {
     /// Só para reagir: `OdeteFont` calcula o tamanho na hora, e sem alguém observando
     /// isto a tela não se refaz quando a pessoa muda o tamanho de texto do iPad.
     @Environment(\.dynamicTypeSize) private var tamanhoDoSistema
+    /// O servidor de dev não sobrevive ao app sair de cena; ver `BackgroundServers`.
+    @Environment(\.scenePhase) private var fase
     private let store: StateStore
 
     public init() {
@@ -36,6 +38,14 @@ public struct RootView: View {
             SettingsSheet()
                 .environment(chrome).environment(app).environment(app.accounts).environment(app.aiAccounts)
                 .odeteTheme(Theme(chrome.palette))
+        }
+        .onChange(of: fase) { _, nova in
+            guard let ws = app.workspace else { return }
+            switch nova {
+            case .background: ws.run.aoSairDeCena()
+            case .active: ws.run.aoVoltarParaCena()
+            default: break
+            }
         }
         .id(tamanhoDoSistema)
         .environment(chrome)

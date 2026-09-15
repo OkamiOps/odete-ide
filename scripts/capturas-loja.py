@@ -31,8 +31,17 @@ def fonte(nome: str, tam: int) -> ImageFont.FreeTypeFont:
     return ImageFont.truetype(str(FONTES / nome), tam)
 
 
+# Placa de fundo gerada no Higgsfield: preto profundo, brasa em cima à esquerda,
+# ciano embaixo à direita, centro vazio. A tela nunca é gerada — ela é o print de
+# verdade, porque a Apple recusa captura que não mostra o app (2.3.3), e porque uma
+# interface inventada não é a Odete.
+PLACA = RAIZ / 'docs/store/fundo.png'
+
+
 def fundo() -> Image.Image:
-    """Preto da marca com dois halos, um brasa e um ciano, bem abertos."""
+    if PLACA.exists():
+        return Image.open(PLACA).convert('RGB')
+    # Sem a placa, o degradê desenhado à mão — mesma paleta, menos atmosfera.
     im = Image.new('RGB', (LARG, ALT), FUNDO)
     halo = Image.new('RGB', (LARG // 8, ALT // 8), FUNDO)
     d = ImageDraw.Draw(halo)

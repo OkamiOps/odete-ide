@@ -52,14 +52,26 @@ struct NpmCommand: ShellCommand {
                 io
                     .out("\(rep.installed.count) pacote(s) instalado(s)" +
                         (rep.installed.isEmpty ? " (já estava tudo lá)" : ""))
-                for n in rep
-                    .native
-                {
-                    io
-                        .err(
-                            "aviso: \(n) tem código nativo e não roda no iPad (o esbuild e o swc têm equivalentes embutidos)"
-                        )
+                if !rep.nativosCobertos.isEmpty {
+                    io.out("\(rep.nativosCobertos.count) ferramenta(s) nativa(s) com equivalente embutido na Odete")
                 }
+                for n in rep.native {
+                    io.err("aviso: \(n) tem código nativo e não roda no iPad")
+                }
+                // Pacote de outra plataforma não é problema: é o rollup e o esbuild
+                // trazendo um binário por sistema. Uma linha vermelha para cada um fazia
+                // uma instalação certa parecer que tinha dado errado dez vezes.
+                if !rep.plataforma.isEmpty {
+                    let nomes = rep.plataforma.prefix(2)
+                        .map { $0.split(separator: " ").first.map(String.init) ?? $0 }
+                        .joined(separator: ", ")
+                    let resto = rep.plataforma.count - min(2, rep.plataforma.count)
+                    io.out(
+                        "\(rep.plataforma.count) pacote(s) de outros sistemas ignorado(s): "
+                            + nomes + (resto > 0 ? " e mais \(resto)" : "")
+                    )
+                }
+                // Estes são de verdade: a dependência não vai estar lá.
                 for s in rep.skipped {
                     io.err("ignorado: \(s)")
                 }

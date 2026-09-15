@@ -7,16 +7,33 @@ struct StatusBar: View {
     @Environment(WorkspaceModel.self) private var ws
     @Environment(ChromeState.self) private var chrome
     @Environment(\.theme) private var theme
-    @State private var width: CGFloat = 800
+    /// Quanto detalhe cabe. Não é medida: é o `ViewThatFits` escolhendo a maior versão
+    /// que couber, porque um limiar fixo de largura mantinha tudo e deixava cada rótulo
+    /// virar reticências — "maste…", "sem pr…", "Ln 1, Co…".
+    enum Nivel { case completo, medio, minimo
 
-    /// Abaixo disso os itens de detalhe somem, em vez de virarem reticências.
-    var roomy: Bool {
-        width >= 520
+        var roomy: Bool {
+            self == .completo
+        }
     }
 
     var body: some View {
+        ViewThatFits(in: .horizontal) {
+            conteudo(.completo)
+            conteudo(.medio)
+            conteudo(.minimo)
+        }
+        .padding(.horizontal, Metrics.s2)
+        .frame(height: 26)
+        .font(OdeteFont.mono(11))
+        .lineLimit(1)
+    }
+
+    @ViewBuilder
+    func conteudo(_ nivel: Nivel) -> some View {
         @Bindable var chrome = chrome
         let errors = ws.problemCounts
+        let roomy = nivel.roomy
         HStack(spacing: 2) {
             if ws.git.isRepo {
                 item(symbol: "arrow.triangle.branch", text: branchText, tint: theme.accent) {
@@ -57,21 +74,26 @@ struct StatusBar: View {
                 let (line, col) = cursor(in: path)
                 item(text: "Ln \(line), Col \(col)") { ws.paletteOpen = true; ws.paletteQuery = "@" }
                     .help("Ir para símbolo")
-                Menu {
-                    ForEach([2, 4, 8], id: \.self) { w in
-                        Button { chrome.snapshot.editor.tabWidth = w } label: {
-                            Label("\(w) espaços", systemImage: w == chrome.snapshot.editor.tabWidth ? "checkmark" : "")
+                if nivel != .minimo {
+                    Menu {
+                        ForEach([2, 4, 8], id: \.self) { w in
+                            Button { chrome.snapshot.editor.tabWidth = w } label: {
+                                Label(
+                                    "\(w) espaços",
+                                    systemImage: w == chrome.snapshot.editor.tabWidth ? "checkmark" : ""
+                                )
+                            }
                         }
+                        Divider()
+                        Toggle("Mostrar espaços", isOn: $chrome.snapshot.editor.showWhitespace)
+                        Toggle("Guias de indentação", isOn: $chrome.snapshot.editor.indentGuides)
+                    } label: {
+                        label(text: roomy ? "Espaços: \(chrome.snapshot.editor.tabWidth)"
+                            : "⇥\(chrome.snapshot.editor.tabWidth)")
                     }
-                    Divider()
-                    Toggle("Mostrar espaços", isOn: $chrome.snapshot.editor.showWhitespace)
-                    Toggle("Guias de indentação", isOn: $chrome.snapshot.editor.indentGuides)
-                } label: {
-                    label(text: roomy ? "Espaços: \(chrome.snapshot.editor.tabWidth)"
-                        : "⇥\(chrome.snapshot.editor.tabWidth)")
+                    .buttonStyle(.plain)
+                    .menuIndicator(.hidden)
                 }
-                .buttonStyle(.plain)
-                .menuIndicator(.hidden)
                 if roomy {
                     item(text: "UTF-8") {}
                     item(text: eol(in: path)) {}
@@ -92,11 +114,7 @@ struct StatusBar: View {
             item(symbol: "gearshape", text: nil) { chrome.settingsOpen = true }
                 .help("Ajustes")
         }
-        .padding(.horizontal, Metrics.s2)
-        .frame(height: 26)
-        .font(OdeteFont.mono(11))
-        .lineLimit(1)
-        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
+        .fixedSize(horizontal: true, vertical: false)
     }
 
     var branchText: String {

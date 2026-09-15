@@ -24,7 +24,15 @@ public struct Installer: Sendable {
     public struct Report: Sendable {
         public var installed: [(name: String, version: String)] = []
         public var native: [String] = []
+        /// Nativos que a Odete já cobre por dentro (o próprio esbuild, o rollup do vite,
+        /// o fsevents). Avisar sobre cada um deles a cada instalação é ruído: não falta
+        /// nada e não há o que a pessoa fazer.
+        public var nativosCobertos: [String] = []
         public var skipped: [String] = []
+        /// Pacotes de outro sistema ou outra arquitetura. São rotina — rollup e esbuild
+        /// publicam um binário por plataforma — e não merecem o mesmo alarde de um
+        /// `file:` que não dá para resolver.
+        public var plataforma: [String] = []
         public var failed: [String: String] = [:]
         public var added: [String] = []
         /// Coisas que não impedem a instalação mas mudam o resultado, como um atalho de
@@ -204,13 +212,13 @@ public struct Installer: Sendable {
                    !pv.os
                    .contains("any")
                 {
-                    report.skipped.append("\(w.name) (só \(pv.os.joined(separator: ",")))"); continue
+                    report.plataforma.append("\(w.name) (só \(pv.os.joined(separator: ",")))"); continue
                 }
                 if !pv.cpu.isEmpty,
                    !pv.cpu
                    .contains("arm64")
                 {
-                    report.skipped.append("\(w.name) (só \(pv.cpu.joined(separator: ",")))"); continue
+                    report.plataforma.append("\(w.name) (só \(pv.cpu.joined(separator: ",")))"); continue
                 }
                 let native = pv.hasInstallScript || w.name.hasSuffix("-darwin-arm64") || w.name
                     .hasSuffix("-darwin-64") || w.name.contains("/darwin-") || w.name.hasPrefix("@esbuild/") || w.name
@@ -248,7 +256,7 @@ public struct Installer: Sendable {
             )
             tree[key] = Node(name: w.name, pv: nil, entry: entry, parentKey: w.from)
             if c.native {
-                report.native.append("\(w.name)@\(c.version)")
+                report.anotarNativo(w.name, c.version)
             }
             for (dn, dr) in c.deps.sorted(by: { $0.key < $1.key }) {
                 queue.append(Want(
@@ -356,7 +364,7 @@ public struct Installer: Sendable {
                     if node.entry.native || fm
                         .fileExists(atPath: dir.appending(path: "binding.gyp").path)
                     {
-                        report.native.append("\(node.name)@\(node.entry.version)")
+                        report.anotarNativo(node.name, node.entry.version)
                     }
                     report.installed.append((node.name, node.entry.version))
                 } catch { report.failed[node.name] = error.localizedDescription }
@@ -368,6 +376,7 @@ public struct Installer: Sendable {
             }
         }
         report.native = Array(Set(report.native)).sorted()
+        report.nativosCobertos = Array(Set(report.nativosCobertos)).sorted()
     }
 
     func writeBins(_ tree: [String: Node], _ report: inout Report) throws {
@@ -423,5 +432,27 @@ public struct Installer: Sendable {
             }
         }
         walk(nodeModules)
+    }
+}
+
+extension Installer {
+    /// Ferramentas de build cujo equivalente já roda dentro da Odete. Um `sharp` ou um
+    /// `better-sqlite3` continuam sendo aviso de verdade: aí falta mesmo.
+    static func cobertoPorDentro(_ nome: String) -> Bool {
+        if nome == "esbuild" || nome == "rollup" || nome == "fsevents" {
+            return true
+        }
+        return nome.hasPrefix("@esbuild/") || nome.hasPrefix("@rollup/rollup-") || nome.hasPrefix("@swc/")
+    }
+}
+
+extension Installer.Report {
+    /// Nativo com equivalente embutido vai para a lista silenciosa; o resto vira aviso.
+    mutating func anotarNativo(_ nome: String, _ versao: String) {
+        if Installer.cobertoPorDentro(nome) {
+            nativosCobertos.append("\(nome)@\(versao)")
+        } else {
+            native.append("\(nome)@\(versao)")
+        }
     }
 }

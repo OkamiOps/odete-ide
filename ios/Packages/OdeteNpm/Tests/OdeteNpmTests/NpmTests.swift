@@ -196,8 +196,21 @@ struct InstallerTests {
         #expect(PackageJSON(url: dir.appending(path: "package.json")).dependencies == ["b": "^2.0.0"])
         let rep2 = try await Installer(project: project(["sowin": "1.0.0", "inexistente": "1"]), registry: reg)
             .install()
-        #expect(rep2.skipped.first?.hasPrefix("sowin") == true)
+        // Pacote de outro sistema não é "pulado por problema": sai em `plataforma`,
+        // que a shell resume numa linha só em vez de um erro vermelho por pacote.
+        #expect(rep2.plataforma.first?.hasPrefix("sowin") == true)
+        #expect(rep2.skipped.isEmpty)
         #expect(rep2.failed["inexistente"] != nil)
+    }
+
+    @Test func nativoComEquivalenteEmbutidoNaoViraAviso() {
+        for n in ["esbuild", "@esbuild/linux-x64", "@rollup/rollup-darwin-arm64", "fsevents", "@swc/core"] {
+            #expect(Installer.cobertoPorDentro(n))
+        }
+        // Estes faltam de verdade: o aviso vermelho continua valendo.
+        for n in ["sharp", "better-sqlite3", "node-sass", "rollup-plugin-x"] {
+            #expect(!Installer.cobertoPorDentro(n))
+        }
     }
 
     @Test func tarRoundTripAndLongNames() throws {

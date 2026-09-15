@@ -1,5 +1,8 @@
 excluded:
   - build
+  - build-acc
+  - build-rt
+  - build-device
   - Odete.xcodeproj
   - "**/.build"
 # Regras desligadas porque brigam com o que o SwiftFormat escreve: com elas ligadas o

@@ -4,4 +4,4 @@
 --wraparguments before-first
 --wrapparameters before-first
 --stripunusedargs closure-only
---exclude build,Odete.xcodeproj,**/.build
+--exclude build,build-acc,build-rt,build-device,Odete.xcodeproj,**/.build

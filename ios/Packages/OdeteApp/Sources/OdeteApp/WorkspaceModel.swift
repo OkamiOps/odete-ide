@@ -24,6 +24,9 @@ public final class WorkspaceModel {
     /// percorre a árvore inteira e aloca um nó por arquivo. Como o editor se redesenha a
     /// cada tecla, essa varredura acontecia a cada tecla.
     public private(set) var filePaths: [String] = []
+    /// Scripts do package.json, na ordem em que estão escritos. Antes só existiam para
+    /// quem lembrasse de digitar `npm run` no terminal.
+    public private(set) var scripts: [(nome: String, comando: String)] = []
     public var tabs: [EditorTab] = []
     public var active: String?
     public var buffers: [String: String] = [:]
@@ -133,6 +136,7 @@ public final class WorkspaceModel {
             filePaths = tree.allFiles().map(\.path)
             let pkg = try? Data(contentsOf: root.appending(path: "package.json"))
             stack = Stack.detect(paths: filePaths, packageJSON: pkg)
+            scripts = Self.lerScripts(pkg)
             reloadTick += 1
         } catch {
             self.error = error.localizedDescription
@@ -164,7 +168,10 @@ public final class WorkspaceModel {
     }
 
     private func externalReload() {
-        reload()
+        // Mudança vinda de fora não tem ninguém esperando na tela, então a árvore é
+        // remontada fora do ator principal: percorrer o projeto inteiro aqui travava a
+        // digitação toda vez que o agente ou um script mexesse em arquivo.
+        recarregarArvoreEmSegundoPlano()
         git.scheduleRefresh()
         for t in tabs where !t.isDirty {
             if ops.exists(t.path) {
@@ -202,6 +209,42 @@ public final class WorkspaceModel {
         }
         e += preview.console.filter { $0.level == .error }.count
         return (e, w)
+    }
+
+    /// Lê `scripts` do package.json preservando a ordem do arquivo, que é a ordem em que
+    /// a pessoa pensa neles (dev, build, test…).
+    nonisolated static func lerScripts(_ pkg: Data?) -> [(nome: String, comando: String)] {
+        guard let pkg, let obj = try? JSONSerialization.jsonObject(with: pkg) as? [String: Any],
+              let scripts = obj["scripts"] as? [String: String]
+        else { return [] }
+        let texto = String(decoding: pkg, as: UTF8.self)
+        return scripts.map { ($0.key, $0.value) }.sorted {
+            let a = texto.range(of: "\"\($0.nome)\"")?.lowerBound
+            let b = texto.range(of: "\"\($1.nome)\"")?.lowerBound
+            guard let a, let b else { return $0.nome < $1.nome }
+            return a < b
+        }
+    }
+
+    /// Igual a `reload()`, mas a varredura do disco acontece fora do ator principal.
+    private func recarregarArvoreEmSegundoPlano() {
+        let raiz = root
+        Task.detached(priority: .utility) { [weak self] in
+            let arvore = try? FileTreeBuilder.build(at: raiz)
+            let pkg = try? Data(contentsOf: raiz.appending(path: "package.json"))
+            guard let arvore else { return }
+            let caminhos = arvore.allFiles().map(\.path)
+            let stack = Stack.detect(paths: caminhos, packageJSON: pkg)
+            let scripts = Self.lerScripts(pkg)
+            await MainActor.run {
+                guard let self else { return }
+                self.tree = arvore
+                self.filePaths = caminhos
+                self.stack = stack
+                self.scripts = scripts
+                self.reloadTick += 1
+            }
+        }
     }
 
     public func toggle(_ path: String) {

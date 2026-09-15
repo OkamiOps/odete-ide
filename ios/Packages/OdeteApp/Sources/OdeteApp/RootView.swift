@@ -7,6 +7,9 @@ import SwiftUI
 public struct RootView: View {
     @State private var chrome: ChromeState
     @State private var app = AppModel()
+    /// Só para reagir: `OdeteFont` calcula o tamanho na hora, e sem alguém observando
+    /// isto a tela não se refaz quando a pessoa muda o tamanho de texto do iPad.
+    @Environment(\.dynamicTypeSize) private var tamanhoDoSistema
     private let store: StateStore
 
     public init() {
@@ -34,6 +37,7 @@ public struct RootView: View {
                 .environment(chrome).environment(app).environment(app.accounts).environment(app.aiAccounts)
                 .odeteTheme(Theme(chrome.palette))
         }
+        .id(tamanhoDoSistema)
         .environment(chrome)
         .environment(app)
         .environment(app.accounts)

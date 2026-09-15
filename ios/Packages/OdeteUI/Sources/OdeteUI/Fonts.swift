@@ -17,18 +17,33 @@ public enum OdeteFont {
         }
     }
 
+    /// Tamanho ajustado ao que a pessoa escolheu nos Ajustes do iPad, com teto.
+    ///
+    /// Sem isto nada no app respeitava o tamanho de texto do sistema: tudo era ponto
+    /// fixo. O teto existe porque isto aqui é um editor de código com colunas estreitas —
+    /// acompanhar os tamanhos de acessibilidade inteiros quebraria a grade. Quem precisa
+    /// de código maior tem o ajuste de fonte do editor, que é separado.
+    public static func escalado(_ size: CGFloat) -> CGFloat {
+        let ajustado = UIFontMetrics(forTextStyle: .body).scaledValue(for: size)
+        return min(max(ajustado, size * 0.9), size * 1.3)
+    }
+
     public static func ui(_ size: CGFloat = 13, weight: Font.Weight = .regular) -> Font {
-        if UIFont(name: sansName(weight), size: size) != nil {
-            return .custom(sansName(weight), size: size)
+        let s = escalado(size)
+        if UIFont(name: sansName(weight), size: s) != nil {
+            // `fixedSize` porque a conta do tamanho já foi feita acima, com teto; o
+            // `relativeTo` escalaria de novo e sem limite.
+            return .custom(sansName(weight), fixedSize: s)
         }
-        return .system(size: size, weight: weight, design: .default)
+        return .system(size: s, weight: weight, design: .default)
     }
 
     public static func mono(_ size: CGFloat = 13, weight: Font.Weight = .regular) -> Font {
-        if UIFont(name: monoName(weight), size: size) != nil {
-            return .custom(monoName(weight), size: size)
+        let s = escalado(size)
+        if UIFont(name: monoName(weight), size: s) != nil {
+            return .custom(monoName(weight), fixedSize: s)
         }
-        return .system(size: size, weight: weight, design: .monospaced)
+        return .system(size: s, weight: weight, design: .monospaced)
     }
 
     /// Rótulo de painel: 11 pt, caixa alta, espaçado.

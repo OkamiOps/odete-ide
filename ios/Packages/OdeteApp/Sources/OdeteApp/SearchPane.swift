@@ -13,6 +13,10 @@ struct SearchPane: View {
     @State private var hits: [SearchHit] = []
     @State private var searching = false
     @State private var task: Task<Void, Never>?
+    @State private var trocarAberto = false
+    @State private var troca = ""
+    @State private var confirmandoTroca = false
+    @State private var recado: String?
     @FocusState private var focused: Bool
 
     var grouped: [(path: String, hits: [SearchHit])] {
@@ -52,13 +56,37 @@ struct SearchPane: View {
                 .background(theme.bg, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .stroke(focused ? theme.accent : theme.border))
+                if trocarAberto {
+                    HStack(spacing: 8) {
+                        Image(systemName: "arrow.2.squarepath").foregroundStyle(theme.fgSubtle)
+                        TextField("trocar por", text: $troca)
+                            .textFieldStyle(.plain)
+                            .font(OdeteFont.mono(13))
+                            .autocorrectionDisabled()
+                            .textInputAutocapitalization(.never)
+                    }
+                    .padding(.horizontal, 10)
+                    .frame(height: 38)
+                    .background(theme.bg, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(theme.border))
+                }
                 HStack(spacing: 6) {
                     chip("Aa", on: $caseSensitive, label: "Distinguir maiúsculas")
                     chip(".*", on: $regex, label: "Expressão regular")
+                    chip("↔", on: $trocarAberto, label: "Substituir")
                     Spacer()
                     if searching {
                         ProgressView().controlSize(.small)
+                    } else if trocarAberto, !hits.isEmpty {
+                        Button("Trocar tudo") { confirmandoTroca = true }
+                            .font(.caption.weight(.medium))
+                            .buttonStyle(.glass)
+                            .controlSize(.small)
                     }
+                }
+                if let recado {
+                    Text(recado).font(.caption).foregroundStyle(theme.ok)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
             .padding(10)
@@ -80,6 +108,14 @@ struct SearchPane: View {
                             .padding(.horizontal, 12)
                             .frame(height: 30)
                             .background(theme.bgSubtle.opacity(0.5))
+                            .contextMenu {
+                                Button("Abrir", systemImage: "doc.text") { ws.open(g.path, line: g.hits[0].line) }
+                                if trocarAberto {
+                                    Button("Trocar só neste arquivo", systemImage: "arrow.2.squarepath") {
+                                        trocar(em: [g.path])
+                                    }
+                                }
+                            }
                             ForEach(g.hits) { h in
                                 Button { ws.open(h.path, line: h.line) } label: {
                                     HStack(alignment: .top, spacing: 8) {
@@ -102,10 +138,45 @@ struct SearchPane: View {
                 }
             }
         }
+        .confirmationDialog(
+            "Trocar \(hits.count) ocorrência(s) em \(grouped.count) arquivo(s)?",
+            isPresented: $confirmandoTroca,
+            titleVisibility: .visible
+        ) {
+            Button("Trocar tudo", role: .destructive) { trocar(em: grouped.map(\.path)) }
+            Button("Cancelar", role: .cancel) {}
+        } message: {
+            Text("Isto grava nos arquivos. O desfazer da árvore não cobre troca em massa: confira no git depois.")
+        }
         .onChange(of: query) { _, _ in schedule() }
         .onChange(of: regex) { _, _ in run() }
         .onChange(of: caseSensitive) { _, _ in run() }
         .onAppear { focused = true }
+    }
+
+    /// Grava a troca nos arquivos escolhidos e refaz a busca.
+    func trocar(em paths: [String]) {
+        do {
+            let r = try TextSearch.replace(
+                root: ws.root,
+                query: query,
+                with: troca,
+                regex: regex,
+                caseSensitive: caseSensitive,
+                in: paths
+            )
+            for p in paths {
+                ws.reloadBuffer(p)
+            }
+            ws.reload()
+            ws.git.scheduleRefresh()
+            recado = r.trocas == 0
+                ? "nada foi trocado"
+                : "\(r.trocas) troca(s) em \(r.arquivos) arquivo(s)"
+            run()
+        } catch {
+            ws.error = error.localizedDescription
+        }
     }
 
     func chip(_ text: String, on: Binding<Bool>, label: String) -> some View {

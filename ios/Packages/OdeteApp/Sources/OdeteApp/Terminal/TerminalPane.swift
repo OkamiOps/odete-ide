@@ -10,6 +10,17 @@ struct TerminalPane: View {
     @Environment(\.theme) private var theme
     @Environment(\.horizontalSizeClass) private var sizeClass
 
+    /// Ícone por convenção de nome, para a lista não ser seis vezes o mesmo desenho.
+    func simbolo(_ nome: String) -> String {
+        switch nome {
+        case "dev", "start", "serve": "play.fill"
+        case "build": "hammer"
+        case "test", "tests": "checkmark.circle"
+        case "lint", "format", "fmt": "text.badge.checkmark"
+        default: "terminal"
+        }
+    }
+
     var body: some View {
         let run = ws.run
         VStack(spacing: 0) {
@@ -52,6 +63,26 @@ struct TerminalPane: View {
                 }
                 if let s = run.active, s.running != nil {
                     HeaderButton("stop.fill", label: "Interromper (Ctrl+C)") { s.cancel() }
+                }
+                if !ws.scripts.isEmpty {
+                    Menu {
+                        ForEach(ws.scripts, id: \.nome) { s in
+                            Button {
+                                run.run("npm run \(s.nome)")
+                            } label: {
+                                Label(s.nome, systemImage: simbolo(s.nome))
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "play.rectangle")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(theme.fgMuted)
+                            .frame(width: 32, height: 32)
+                            .contentShape(Rectangle())
+                    }
+                    .menuIndicator(.hidden)
+                    .accessibilityLabel("Scripts do projeto")
+                    .help("Scripts do package.json")
                 }
                 HeaderButton("trash", label: "Limpar") { run.active?.clear() }
                 if sizeClass != .compact {

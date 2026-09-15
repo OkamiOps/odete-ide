@@ -17,13 +17,23 @@ extension WorkspaceModel {
         }
     }
 
-    /// Esboço e regras são síncronos e baratos; a sintaxe (esbuild) roda em segundo plano.
+    /// Esboço, regras e sintaxe, todos fora do ator principal.
+    ///
+    /// Esboço e lint leem o arquivo inteiro e rodavam aqui mesmo, no ator principal, a
+    /// cada pausa na digitação. Em arquivo grande isso é engasgo na tecla seguinte.
     func analyze(_ path: String) {
         guard let text = buffers[path] else { return }
         let lang = Language.detect(path: path)
-        outlines[path] = Outline.items(text: text, language: lang)
-        lint[path] = Lint.rules(text: text, language: lang)
-        refreshPatchMarks(path)
+        Task.detached(priority: .utility) { [weak self] in
+            let esboco = Outline.items(text: text, language: lang)
+            let regras = Lint.rules(text: text, language: lang)
+            await MainActor.run {
+                guard let self, self.buffers[path] == text else { return }
+                self.outlines[path] = esboco
+                self.lint[path] = regras
+                self.refreshPatchMarks(path)
+            }
+        }
         switch lang {
         case .javascript, .jsx, .typescript, .tsx:
             let engine = run.active?.shell.bundler ?? lintEngine ?? {

@@ -66,6 +66,10 @@ struct HubView: View {
                                         }
                                     }
                             }
+                            // Fecha a grade em vez de deixar a fila pela metade, e é o
+                            // segundo caminho para criar — o botão do cabeçalho fica no
+                            // canto oposto da tela.
+                            CartaoNovo { creating = true }
                         }
                     }
                 }
@@ -212,6 +216,40 @@ struct WelcomeView: View {
     }
 }
 
+/// O último cartão da grade: criar um projeto.
+struct CartaoNovo: View {
+    @Environment(\.theme) private var theme
+    var acao: () -> Void
+
+    var body: some View {
+        Button(action: acao) {
+            VStack(spacing: 8) {
+                Image(systemName: "plus")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(theme.accent)
+                    .frame(width: 40, height: 40)
+                    .background(theme.accent.opacity(0.14), in: RoundedRectangle(
+                        cornerRadius: 12,
+                        style: .continuous
+                    ))
+                Text("Novo projeto").font(OdeteFont.ui(14, weight: .medium)).foregroundStyle(theme.fgMuted)
+            }
+            .frame(maxWidth: .infinity, minHeight: 150, maxHeight: .infinity)
+            .background(theme.surface.opacity(0.4), in: RoundedRectangle(
+                cornerRadius: Metrics.rCard,
+                style: .continuous
+            ))
+            .overlay(
+                RoundedRectangle(cornerRadius: Metrics.rCard, style: .continuous)
+                    .strokeBorder(theme.separator, style: StrokeStyle(lineWidth: 1, dash: [6, 5]))
+            )
+            .contentShape(RoundedRectangle(cornerRadius: Metrics.rCard, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .hoverEffect(.lift)
+    }
+}
+
 struct ProjectCard: View {
     @Environment(\.theme) private var theme
     var project: Project
@@ -246,13 +284,15 @@ struct ProjectCard: View {
                     vertical: true
                 )
             }
+            // Empurra a data para o rodapé: sem isto, um projeto sem descrição ficava
+            // com o cartão mais baixo que o vizinho e a grade saía dentada.
+            Spacer(minLength: 6)
             Text(when)
                 .font(OdeteFont.ui(11))
                 .foregroundStyle(theme.fgSubtle)
-                .padding(.top, 2)
         }
         .padding(Metrics.s4)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: 150, maxHeight: .infinity, alignment: .topLeading)
         .background(theme.surface, in: RoundedRectangle(cornerRadius: Metrics.rCard, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: Metrics.rCard, style: .continuous).stroke(
             theme.separator,

@@ -13,6 +13,9 @@ struct OnboardingView: View {
         var title: String
         var text: String
         var points: [String]
+        /// A primeira tela mostra a marca, não um símbolo do sistema: é onde a pessoa
+        /// aprende o nome e a cara do app.
+        var marca = false
     }
 
     let pages = [
@@ -24,7 +27,8 @@ struct OnboardingView: View {
                 "Projetos web (Vite, Astro, HTML) e Swift Playgrounds",
                 "Terminal com pipes, jobs e dev server",
                 "Preview ao vivo com console",
-            ]
+            ],
+            marca: true
         ),
         Page(
             symbol: "lock.doc",
@@ -54,9 +58,16 @@ struct OnboardingView: View {
                 ForEach(Array(pages.enumerated()), id: \.offset) { i, p in
                     VStack(spacing: 18) {
                         Spacer(minLength: 0)
-                        Image(systemName: p.symbol).font(.system(size: 56, weight: .light))
-                            .foregroundStyle(theme.accent)
-                            .symbolRenderingMode(.hierarchical)
+                        if p.marca {
+                            VStack(spacing: 12) {
+                                BrandIcon(size: 76)
+                                Wordmark(height: 26)
+                            }
+                        } else {
+                            Image(systemName: p.symbol).font(.system(size: 56, weight: .light))
+                                .foregroundStyle(theme.accent)
+                                .symbolRenderingMode(.hierarchical)
+                        }
                         Text(p.title).font(OdeteFont.ui(26, weight: .semibold)).foregroundStyle(theme.fg)
                             .multilineTextAlignment(.center)
                         Text(p.text).font(OdeteFont.ui(15)).foregroundStyle(theme.fgMuted)

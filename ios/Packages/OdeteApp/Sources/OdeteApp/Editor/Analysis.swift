@@ -45,6 +45,17 @@ extension WorkspaceModel {
     func analyze(_ path: String) {
         guard let text = buffers[path] else { return }
         let lang = Language.detect(path: path)
+        // Bundle e minificado: o esboço vira uma lista de mil entradas inúteis, o lint
+        // vira uma enxurrada sobre código de terceiro e o esbuild engole um megabyte a
+        // cada pausa na digitação. Nada disso ajuda quem só abriu o arquivo para ler.
+        guard text.utf8.count <= Limites.arquivoGrande else {
+            outlines[path] = []
+            lint[path] = []
+            links[path] = []
+            syntax[path] = nil
+            refreshPatchMarks(path)
+            return
+        }
         Task.detached(priority: .utility) { [weak self] in
             let esboco = Outline.items(text: text, language: lang)
             let regras = Lint.rules(text: text, language: lang)

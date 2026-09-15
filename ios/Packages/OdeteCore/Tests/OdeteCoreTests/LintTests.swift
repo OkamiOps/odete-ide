@@ -25,4 +25,22 @@ struct LintTests {
         let issues = Lint.rules(text: "let x = try! foo()\nprint(x) // TODO: remover\n", language: .swift)
         #expect(issues.map(\.rule) == ["no-force-try", "no-print", "todo"])
     }
+
+    @Test func arquivoGrandeNaoEVarrido() {
+        let grande = String(repeating: "var x = 1\n", count: 60000)
+        #expect(grande.utf8.count > Limites.arquivoGrande)
+        #expect(Lint.rules(text: grande, language: .javascript).isEmpty)
+        // JSON passa mesmo grande: uma análise só, e um erro é o que se quer ver num
+        // `package-lock.json` que alguém quebrou.
+        let json = "[" + String(repeating: "1,", count: 250_000) + "1"
+        #expect(Lint.rules(text: json, language: .json).count == 1)
+    }
+
+    @Test func avisoDemaisVemCortadoComOTotal() {
+        let issues = Lint.rules(text: String(repeating: "var x = 1\n", count: 250), language: .javascript)
+        #expect(issues.count == Lint.tetoDeAvisos + 1)
+        #expect(issues.last?.rule == "teto")
+        #expect(issues.last?.message == "mais 150 aviso(s) neste arquivo")
+        #expect(issues.last?.line == 101)
+    }
 }

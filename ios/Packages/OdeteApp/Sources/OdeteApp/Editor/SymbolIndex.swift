@@ -8,7 +8,7 @@ import OdeteCore
 extension WorkspaceModel {
     /// Arquivos grandes demais não entram: o índice é para navegar, e um bundle de 2 MB
     /// só faria a varredura demorar.
-    nonisolated static let limiteDoArquivo = 400_000
+    nonisolated static let limiteDoArquivo = Limites.arquivoGrande
     /// Teto de arquivos varridos, para projeto grande não travar o iPad.
     nonisolated static let limiteDeArquivos = 600
 

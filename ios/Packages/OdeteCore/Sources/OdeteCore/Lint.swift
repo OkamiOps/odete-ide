@@ -26,14 +26,36 @@ public struct LintIssue: Sendable, Hashable, Identifiable {
 /// Regras simples por linguagem, sem parser. Erros de sintaxe vêm de fora
 /// (esbuild para JS/TS, o parser Swift da Odete para Swift) e são somados a estes.
 public enum Lint {
+    /// Mesmo num arquivo pequeno, passar disso não informa mais nada.
+    public static let tetoDeAvisos = 100
+
     public static func rules(text: String, language: Language) -> [LintIssue] {
-        switch language {
+        // O JSON escapa do teto de tamanho: é uma análise só e o resultado é no máximo
+        // um erro — justamente o que se quer saber de um `package-lock.json` enorme.
+        if language != .json, text.utf8.count > Limites.arquivoGrande {
+            return []
+        }
+        let achados: [LintIssue] = switch language {
         case .javascript, .jsx, .typescript, .tsx: js(text)
         case .json: json(text)
         case .css: css(text)
         case .swift: swift(text)
         default: []
         }
+        return cortar(achados)
+    }
+
+    /// Guarda os primeiros e diz quantos ficaram de fora, em vez de mentir o total.
+    private static func cortar(_ itens: [LintIssue]) -> [LintIssue] {
+        guard itens.count > tetoDeAvisos else { return itens }
+        return Array(itens.prefix(tetoDeAvisos)) + [LintIssue(
+            rule: "teto",
+            message: "mais \(itens.count - tetoDeAvisos) aviso(s) neste arquivo",
+            severity: .info,
+            line: itens[tetoDeAvisos].line,
+            column: 1,
+            length: 1
+        )]
     }
 
     private struct Rule {

@@ -35,6 +35,10 @@ public final class RunModel {
         s.onServer = { [weak self] port, cmd in Task { @MainActor in self?.serverOpened(port, cmd) } }
         s.onDiagnostics = { [weak self] d in Task { @MainActor in self?.diagnostics = d } }
         s.onKillAll = { [weak self] in Task { @MainActor in self?.stopAll() } }
+        let box = SendBox { [weak self] (_: Void) -> (porta: Int, comando: String)? in
+            self?.servers.first.map { (porta: $0.port, comando: $0.command) }
+        }
+        s.servidorAtivo = { box.value(()) }
         return s
     }
 

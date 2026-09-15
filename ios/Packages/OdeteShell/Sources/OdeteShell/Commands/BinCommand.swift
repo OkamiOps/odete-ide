@@ -93,13 +93,19 @@ struct BinCommand: ShellCommand {
 
     func devServer(_ ctx: CommandContext, preset: DevServer.Preset, port: Int, label: String) async -> Int32 {
         let io = ctx.io
-        if let existing = ctx.shell
-            .devServer
-        {
-            io.out("dev server já está em http://127.0.0.1:\(existing.port)"); ctx.shell.services.onServer(
-                existing.port,
-                label
-            ); return 0
+        if let existing = ctx.shell.devServer {
+            io.out("dev server já está em http://127.0.0.1:\(existing.port)")
+            ctx.shell.services.onServer(existing.port, label)
+            return 0
+        }
+        // Outra aba pode ter subido o servidor. Antes cada aba só enxergava o seu, e o
+        // segundo `npm run dev` subia um servidor inteiro numa porta vizinha — dois
+        // esbuild na memória e um preview apontando para o que não recarrega.
+        if let jaTem = ctx.shell.services.servidorAtivo?() {
+            io.out("dev server já está em http://127.0.0.1:\(jaTem.porta) (\(jaTem.comando))")
+            io.out("  kill all para derrubar antes de subir outro")
+            ctx.shell.services.onServer(jaTem.porta, jaTem.comando)
+            return 0
         }
         let dev = DevServer(root: ctx.root) { kind, text in kind == .out ? io.out(text) : io.err(text) }
         dev.onDiagnostics = ctx.shell.services.onDiagnostics

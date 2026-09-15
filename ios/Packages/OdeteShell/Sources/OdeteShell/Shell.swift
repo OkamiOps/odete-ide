@@ -15,6 +15,8 @@ public struct ShellServices: Sendable {
     /// Para tudo do projeto, não só desta aba. O servidor sobe numa aba e a pessoa
     /// tenta pará-lo de outra; sem isto o `kill` de lá não achava job nenhum.
     public var onKillAll: (@Sendable () -> Void)?
+    /// Servidor de dev já no ar neste projeto, venha da aba que vier.
+    public var servidorAtivo: (@Sendable () -> (porta: Int, comando: String)?)?
 
     public init(
         author: @escaping @Sendable () -> Signature = { Signature(name: "Odete", email: "odete@local") },
@@ -22,11 +24,13 @@ public struct ShellServices: Sendable {
         registry: any RegistryClient = HTTPRegistry(),
         onServer: @escaping @Sendable (Int, String) -> Void = { _, _ in },
         onDiagnostics: @escaping @Sendable ([Diagnostic]) -> Void = { _ in },
-        onKillAll: (@Sendable () -> Void)? = nil
+        onKillAll: (@Sendable () -> Void)? = nil,
+        servidorAtivo: (@Sendable () -> (porta: Int, comando: String)?)? = nil
     ) {
         self.author = author; self.credentials = credentials; self.registry = registry; self.onServer = onServer; self
             .onDiagnostics = onDiagnostics
         self.onKillAll = onKillAll
+        self.servidorAtivo = servidorAtivo
     }
 }
 

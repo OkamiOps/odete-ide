@@ -234,7 +234,14 @@ struct RuntimeTests {
           console.log(r.status, r.headers.get("x-odete"), JSON.stringify(await r.json()));
           const r2 = await fetch(`http://127.0.0.1:${port}/x`);
           console.log(r2.status, await r2.text());
-          http.get(`http://127.0.0.1:${port}/json`, (res) => { let d = ""; res.on("data", (x) => d += x); res.on("end", () => { console.log("client", res.statusCode, d); srv.close(() => console.log("fechou")); }); });
+          http.get(`http://127.0.0.1:${port}/json`, (res) => {
+            let d = "";
+            res.on("data", (x) => d += x);
+            res.on("end", () => {
+              console.log("client", res.statusCode, d);
+              srv.close(() => console.log("fechou"));
+            });
+          });
         } catch (e) { console.log("ERR", e.message, e.cause && e.cause.message); srv.close(); } });
         """)
         #expect(code == 0, Comment(rawValue: c.stderr))

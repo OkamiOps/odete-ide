@@ -71,7 +71,9 @@ public enum Tools {
         ),
         ToolSpec(
             name: "run_shell",
-            description: "Terminal do projeto no iPad: ls, cat, mkdir, git, npm install, npm run dev/build, node arquivo.js. Vite, Next, Astro e Nest sobem no Preview. Chat só lê. Plan: mkdir/touch só em .odete/.",
+            description: "Terminal do projeto no iPad: ls, cat, mkdir, git, npm install, "
+                + "npm run dev/build, node arquivo.js. Vite, Next, Astro e Nest sobem no Preview. "
+                + "Chat só lê. Plan: mkdir/touch só em .odete/.",
             parameters: obj(["command": str], required: ["command"])
         ),
     ]

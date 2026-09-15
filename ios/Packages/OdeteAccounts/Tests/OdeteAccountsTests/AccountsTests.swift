@@ -37,7 +37,9 @@ struct HostAccountTests {
 
 struct GitHubAPITests {
     @Test func decodesPullsAndRuns() throws {
-        let pulls = #"[{"id":1,"number":7,"title":"t","state":"open","html_url":"u","head":{"ref":"f","sha":"a"},"base":{"ref":"main","sha":"b"},"user":{"login":"me"},"created_at":"2026-09-14T00:00:00Z"}]"#
+        let pulls = #"[{"id":1,"number":7,"title":"t","state":"open","html_url":"u","#
+            + #""head":{"ref":"f","sha":"a"},"base":{"ref":"main","sha":"b"},"#
+            + #""user":{"login":"me"},"created_at":"2026-09-14T00:00:00Z"}]"#
         let p = try GitHubAPI.decoder.decode([GitHubPull].self, from: Data(pulls.utf8))
         #expect(p[0].number == 7 && p[0].head.ref == "f" && p[0].user?.login == "me")
         let runs = #"{"workflow_runs":[{"id":3,"name":"CI","status":"completed","conclusion":"success","head_branch":"main","html_url":"u"}]}"#

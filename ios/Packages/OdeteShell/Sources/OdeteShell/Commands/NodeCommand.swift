@@ -33,24 +33,27 @@ struct NodeCommand: ShellCommand {
                   .fileExists(atPath: file.path + ".js") else { io.err("node: não achei \(f)"); return 1 }
         }
         return await Self.runProcess(
-            code: code,
-            file: file,
-            argv: argv,
+            Alvo(code: code, file: file, argv: argv, label: "node " + args.joined(separator: " ")),
             ctx: ctx,
-            esbuild: esbuild,
-            label: "node " + args.joined(separator: " ")
+            esbuild: esbuild
         )
+    }
+
+    /// O que rodar: código solto ou arquivo, com os argumentos dele.
+    struct Alvo {
+        var code: String?
+        var file: URL?
+        var argv: [String]
+        var label: String
     }
 
     /// Roda um processo JS; se abrir servidor, vira job e o prompt volta.
     static func runProcess(
-        code: String?,
-        file: URL?,
-        argv: [String],
+        _ alvo: Alvo,
         ctx: CommandContext,
-        esbuild: OdeteBundlerEsbuild,
-        label: String
+        esbuild: OdeteBundlerEsbuild
     ) async -> Int32 {
+        let (code, file, argv, label) = (alvo.code, alvo.file, alvo.argv, alvo.label)
         let io = ctx.io
         let p = JSProcess(
             cwd: ctx.cwd,

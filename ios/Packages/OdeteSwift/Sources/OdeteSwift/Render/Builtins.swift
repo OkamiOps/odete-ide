@@ -108,7 +108,15 @@ enum Builtins {
     static func weight(_ v: Value) -> Font.Weight {
         guard case let .token(t) = v else { return .regular }
         switch t {
-        case "bold": return .bold; case "semibold": return .semibold; case "medium": return .medium; case "light": return .light; case "thin": return .thin; case "heavy": return .heavy; case "black": return .black; case "ultraLight": return .ultraLight; default: return .regular
+        case "bold": return .bold
+        case "semibold": return .semibold
+        case "medium": return .medium
+        case "light": return .light
+        case "thin": return .thin
+        case "heavy": return .heavy
+        case "black": return .black
+        case "ultraLight": return .ultraLight
+        default: return .regular
         }
     }
 
@@ -138,7 +146,17 @@ enum Builtins {
 
     static func style(_ t: String) -> Font.TextStyle {
         switch t {
-        case "largeTitle": .largeTitle; case "title": .title; case "title2": .title2; case "title3": .title3; case "headline": .headline; case "subheadline": .subheadline; case "callout": .callout; case "footnote": .footnote; case "caption": .caption; case "caption2": .caption2; default: .body
+        case "largeTitle": .largeTitle
+        case "title": .title
+        case "title2": .title2
+        case "title3": .title3
+        case "headline": .headline
+        case "subheadline": .subheadline
+        case "callout": .callout
+        case "footnote": .footnote
+        case "caption": .caption
+        case "caption2": .caption2
+        default: .body
         }
     }
 
@@ -182,7 +200,13 @@ enum Builtins {
         }
         guard case let .token(t) = v else { return .all }
         switch t {
-        case "horizontal": return .horizontal; case "vertical": return .vertical; case "top": return .top; case "bottom": return .bottom; case "leading": return .leading; case "trailing": return .trailing; default: return .all
+        case "horizontal": return .horizontal
+        case "vertical": return .vertical
+        case "top": return .top
+        case "bottom": return .bottom
+        case "leading": return .leading
+        case "trailing": return .trailing
+        default: return .all
         }
     }
 

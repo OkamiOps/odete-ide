@@ -244,14 +244,20 @@ enum HostHttp {
     /// servidor morria com "NWError 48 - Address already in use" e uma pilha apontando
     /// para dentro do runtime. Deixar um servidor de pé e mandar subir outro virava um
     /// erro ilegível em vez de uma porta nova, que é o que o vite faz.
+    /// Qual porta tentar e quantas ainda dá para tentar depois dela.
+    struct Tentativa {
+        var id: Int
+        var porta: UInt16
+        var restantes: Int
+    }
+
     static func abrir(
         rt: JSRuntime,
         box: ServersBox,
-        id: Int,
-        porta: UInt16,
-        restantes: Int,
+        _ t: Tentativa,
         avisar: @escaping @Sendable (String) -> Void
     ) {
+        let (id, porta, restantes) = (t.id, t.porta, t.restantes)
         guard let server = try? HttpServer(id: id, port: porta, rt: rt) else {
             avisar("não consegui abrir a porta \(porta)")
             return
@@ -270,7 +276,12 @@ enum HostHttp {
                 if ocupada, porta != 0, restantes > 0 {
                     server.stop()
                     box.servers.removeValue(forKey: id)
-                    abrir(rt: rt, box: box, id: id, porta: porta + 1, restantes: restantes - 1, avisar: avisar)
+                    abrir(
+                        rt: rt,
+                        box: box,
+                        Tentativa(id: id, porta: porta + 1, restantes: restantes - 1),
+                        avisar: avisar
+                    )
                 } else if ocupada {
                     avisar("porta \(porta) ocupada, e as \(21 - restantes) seguintes também")
                 } else {
@@ -291,7 +302,7 @@ enum HostHttp {
             let id = nextId
             nextId += 1
             rt.keepAlive += 1
-            abrir(rt: rt, box: box, id: id, porta: UInt16(clamping: port), restantes: 20) { msg in
+            abrir(rt: rt, box: box, Tentativa(id: id, porta: UInt16(clamping: port), restantes: 20)) { msg in
                 rt.keepAlive = max(rt.keepAlive - 1, 0)
                 rt.call("__odete_httpError", [id, msg])
             }

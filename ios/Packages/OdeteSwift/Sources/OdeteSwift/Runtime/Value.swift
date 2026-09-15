@@ -21,7 +21,14 @@ public indirect enum Value {
         switch self {
         case let .string(s): s
         case let .int(i): String(i)
-        case let .double(d): d == d.rounded() && abs(d) < 1e15 ? String(format: "%.1f", d) : String(d)
+        // `if` e não ternário: o SwiftLint lê `String(format:)` dentro de um ternário
+        // como chamada de função Void, e aqui a forma longa é igualmente clara.
+        case let .double(d):
+            if d == d.rounded(), abs(d) < 1e15 {
+                String(format: "%.1f", d)
+            } else {
+                String(d)
+            }
         case let .bool(b): b ? "true" : "false"
         case let .array(a): "[" + a.map(\.asString).joined(separator: ", ") + "]"
         case let .token(t): "." + t

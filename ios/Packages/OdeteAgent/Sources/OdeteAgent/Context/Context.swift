@@ -29,7 +29,11 @@ public enum Skills {
             id: "commit",
             name: "Commit",
             description: "Mensagens curtas no padrão convencional, em PT-BR.",
-            body: "Mensagens: tipo(escopo): o que mudou\nTipos: feat, fix, chore, docs, refactor, style, test.\nUma linha, sem ponto final, verbo no infinitivo. Ex: feat(editor): destacar seleção pelo tema."
+            body: """
+            Mensagens: tipo(escopo): o que mudou
+            Tipos: feat, fix, chore, docs, refactor, style, test.
+            Uma linha, sem ponto final, verbo no infinitivo. Ex: feat(editor): destacar seleção pelo tema.
+            """
         ),
         Skill(
             id: "swiftui",

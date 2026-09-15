@@ -72,12 +72,9 @@ struct BinCommand: ShellCommand {
                 io.err("\(bin) é um binário nativo e não roda no iPad"); return 126
             }
             return await NodeCommand.runProcess(
-                code: nil,
-                file: file,
-                argv: rest,
+                NodeCommand.Alvo(code: nil, file: file, argv: rest, label: ([bin] + rest).joined(separator: " ")),
                 ctx: ctx,
-                esbuild: ctx.shell.esbuildEngine(),
-                label: ([bin] + rest).joined(separator: " ")
+                esbuild: ctx.shell.esbuildEngine()
             )
         }
     }

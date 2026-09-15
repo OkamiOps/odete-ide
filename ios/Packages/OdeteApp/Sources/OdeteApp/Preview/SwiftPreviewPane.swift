@@ -76,7 +76,9 @@ struct SwiftPreviewPane: View {
         .overlay(alignment: .bottom) { Rectangle().fill(theme.border).frame(height: 1) }
         .alert("Pacote do Playgrounds", isPresented: $showFiles) { Button("OK") {} } message: {
             Text(
-                "Crie um projeto com o template \"Swift Playground\" para ter um .swiftpm que o Swift Playgrounds abre e compila. Este projeto tem só arquivos .swift soltos, que o preview mostra mas não compila."
+                "Crie um projeto com o template \"Swift Playground\" para ter um .swiftpm que o "
+                    + "Swift Playgrounds abre e compila. Este projeto tem só arquivos .swift soltos, "
+                    + "que o preview mostra mas não compila."
             )
         }
     }

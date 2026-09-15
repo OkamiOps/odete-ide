@@ -1,4 +1,5 @@
 import Foundation
+import OdeteAccounts
 import OdeteAgent
 import OdeteShell
 
@@ -8,6 +9,8 @@ final class AppToolHost: FileToolHost, @unchecked Sendable {
     private let tailBox: SendBox<Int, String>
     private let revealBox: SendBox<String, Void>
     private let runBox: SendBox<Void, TerminalSession>
+    /// Slug, token e branch atual só existem no ator principal; o agente roda fora dele.
+    private let ghBox: SendBox<Void, (slug: String?, token: String?, branch: String?)>
 
     @MainActor
     init(ws: WorkspaceModel) {
@@ -19,6 +22,9 @@ final class AppToolHost: FileToolHost, @unchecked Sendable {
         }
         revealBox = SendBox { [weak ws] (p: String) in ws?.openFile(p) }
         runBox = SendBox { [weak ws] in ws!.run.agentSession() }
+        ghBox = SendBox { [weak ws] in
+            (ws?.git.githubSlug, ws?.git.githubToken, ws?.git.current?.name ?? ws?.git.headName)
+        }
         super.init(root: ws.root)
     }
 
@@ -56,6 +62,56 @@ final class AppToolHost: FileToolHost, @unchecked Sendable {
             let out = session.lines[min(start, session.lines.count)...].filter { $0.kind != .input }
                 .map { ($0.kind == .err ? "! " : "") + $0.text }.joined(separator: "\n")
             return out.isEmpty ? "(sem saída)" : out
+        }
+    }
+
+    /// Pull requests do repositório, com a conta que está nos Ajustes.
+    ///
+    /// A resposta é texto curto de propósito: o agente lê melhor uma linha por PR do que
+    /// um JSON, e o que ele precisa saber é número, título e estado.
+    override func github(_ pedido: GitHubPedido) async -> String {
+        let ctx = ghBox.value()
+        guard let slug = ctx.slug else {
+            return "este projeto não tem remoto no GitHub; publique primeiro pelo painel Git"
+        }
+        guard let token = ctx.token else {
+            return "sem conta do GitHub conectada; entre em Ajustes → Git e GitHub"
+        }
+        let api = GitHubAPI(token: token)
+        do {
+            switch pedido.acao {
+            case .listPulls:
+                let pulls = try await api.pulls(slug)
+                if pulls.isEmpty {
+                    return "nenhum PR aberto em \(slug)"
+                }
+                return pulls.map { p in
+                    "#\(p.number) \(p.title) · \(p.head.ref) → \(p.base.ref) · \(p.user?.login ?? "")"
+                }.joined(separator: "\n")
+            case .createPull:
+                guard let titulo = pedido.titulo else { return "create_pull precisa de title" }
+                guard let head = pedido.head ?? ctx.branch else { return "create_pull precisa de head" }
+                let base = pedido.base ?? "main"
+                let p = try await api.createPull(
+                    slug,
+                    title: titulo,
+                    body: pedido.corpo ?? "",
+                    head: head,
+                    base: base
+                )
+                return "PR #\(p.number) aberto: \(p.htmlUrl)"
+            case .comment:
+                try await api.comment(slug, number: pedido.numero!, body: pedido.corpo ?? "")
+                return "comentário publicado no #\(pedido.numero!)"
+            case .mergePull:
+                try await api.mergePull(slug, number: pedido.numero!, method: pedido.metodo ?? "squash")
+                return "PR #\(pedido.numero!) mergeado (\(pedido.metodo ?? "squash"))"
+            case .closePull:
+                try await api.closePull(slug, number: pedido.numero!)
+                return "PR #\(pedido.numero!) fechado sem merge"
+            }
+        } catch {
+            return "GitHub: \(error.localizedDescription)"
         }
     }
 }

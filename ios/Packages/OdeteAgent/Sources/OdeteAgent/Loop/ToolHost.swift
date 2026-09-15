@@ -1,6 +1,46 @@
 import Foundation
 import OdeteCore
 
+/// Um pedido ao GitHub do projeto. Campos separados, e não um dicionário, para o
+/// contrato ser o mesmo dos dois lados e atravessar ator sem cerimônia.
+public struct GitHubPedido: Sendable {
+    public enum Acao: String, Sendable, CaseIterable {
+        case listPulls = "list_pulls", createPull = "create_pull", comment, mergePull = "merge_pull",
+             closePull = "close_pull"
+
+        /// Só listar não muda nada lá fora.
+        public var escreve: Bool {
+            self != .listPulls
+        }
+    }
+
+    public var acao: Acao
+    public var numero: Int?
+    public var titulo: String?
+    public var corpo: String?
+    public var base: String?
+    public var head: String?
+    public var metodo: String?
+
+    public init(
+        acao: Acao,
+        numero: Int? = nil,
+        titulo: String? = nil,
+        corpo: String? = nil,
+        base: String? = nil,
+        head: String? = nil,
+        metodo: String? = nil
+    ) {
+        self.acao = acao
+        self.numero = numero
+        self.titulo = titulo
+        self.corpo = corpo
+        self.base = base
+        self.head = head
+        self.metodo = metodo
+    }
+}
+
 /// O que as ferramentas precisam do app: arquivos, terminal e shell.
 public protocol ToolHost: Sendable {
     var root: URL { get }
@@ -15,6 +55,8 @@ public protocol ToolHost: Sendable {
     func runShell(_ command: String) async -> String
     /// Abre o arquivo no editor (após patch); pode ser no-op.
     func reveal(_ path: String)
+    /// Pull requests do repositório. Quem não tem GitHub responde o porquê.
+    func github(_ pedido: GitHubPedido) async -> String
 }
 
 /// Implementação direta sobre FileManager. Serve para testes e como base para o app.
@@ -30,6 +72,12 @@ open class FileToolHost: ToolHost, @unchecked Sendable {
 
     public func inside(_ path: String) -> Bool {
         url(path).path.hasPrefix(root.standardizedFileURL.path)
+    }
+
+    /// Padrão como método da classe, e não como extensão do protocolo: em extensão a
+    /// escolha é estática e a subclasse do app nunca era chamada.
+    open func github(_: GitHubPedido) async -> String {
+        "este host não fala com o GitHub"
     }
 
     public func read(_ path: String) -> String? {

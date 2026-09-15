@@ -39,6 +39,12 @@ final class FakeProvider: Provider, @unchecked Sendable {
 
 final class TestHost: FileToolHost, @unchecked Sendable {
     let shellLog = Mutex<[String]>([])
+    let ghLog = Mutex<[GitHubPedido]>([])
+    override func github(_ pedido: GitHubPedido) async -> String {
+        ghLog.withLock { $0.append(pedido) }
+        return "feito: \(pedido.acao.rawValue)"
+    }
+
     override func runShell(_ command: String) async -> String {
         shellLog
             .withLock { $0.append(command) }; return "ok: \(command)"
@@ -105,6 +111,28 @@ func runAll(
         #expect(await r.run(ToolCall(id: "x", name: "grep", arguments: "{"), mode: .chat)
             .text == "argumentos JSON inválidos")
         #expect(host.allPaths() == ["a.txt", "src/x.ts"])
+    }
+
+    @Test func githubSoEscreveNoBuildESemprePedeLicenca() async throws {
+        let root = try tmpProject()
+        let host = TestHost(root: root)
+        let r = ToolRunner(host: host, patches: PatchStore(root: root))
+        // Listar é leitura: passa em qualquer modo e não chega a pedir licença.
+        #expect(await r.run(call("github", ["action": "list_pulls"]), mode: .chat).text == "feito: list_pulls")
+        #expect(!Tools.needsPermit(.full, call("github", ["action": "list_pulls"])))
+        // Escrever no GitHub é fora do iPad e não desfaz com um toque: pergunta sempre,
+        // até no modo que não pergunta nada.
+        #expect(Tools.needsPermit(.full, call("github", ["action": "merge_pull", "number": 3])))
+        #expect(Tools.needsPermit(.full, call("github", ["action": "create_pull"])))
+        #expect(!Tools.needsPermit(.full, call("read_file", ["path": "a.txt"])))
+        #expect(await r.run(call("github", ["action": "create_pull", "title": "x"]), mode: .plan).text
+            .contains("só lê o GitHub"))
+        #expect(await r.run(call("github", ["action": "merge_pull"]), mode: .build).text
+            .contains("precisa do number"))
+        #expect(await r.run(call("github", ["action": "voar"]), mode: .build).text.contains("action precisa ser"))
+        #expect(await r.run(call("github", ["action": "close_pull", "number": 7]), mode: .build).text
+            == "feito: close_pull")
+        #expect(host.ghLog.withLock { $0.last?.numero } == 7)
     }
 
     @Test func editsAndModes() async throws {

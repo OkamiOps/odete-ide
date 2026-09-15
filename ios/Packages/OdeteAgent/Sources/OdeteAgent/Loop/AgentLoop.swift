@@ -228,7 +228,7 @@ public final class AgentLoop: @unchecked Sendable {
                     break
                 }
                 let hint = Self.hint(call)
-                if Tools.needsPermit(config.permit, call.name) {
+                if Tools.needsPermit(config.permit, call) {
                     emit(.item(.permit(id: call.id, name: call.name, detail: hint, status: .pending)))
                     let ok = await withCheckedContinuation { (c: CheckedContinuation<Bool, Never>) in
                         permits.withLock { $0[call.id] = c }
@@ -243,7 +243,7 @@ public final class AgentLoop: @unchecked Sendable {
                 let out = await runner.run(call, mode: config.mode)
                 if let p = out.patch {
                     emit(.item(.patch(id: UUID().uuidString, patchId: p.id, path: p.path)))
-                } else if !Tools.needsPermit(config.permit, call.name) {
+                } else if !Tools.needsPermit(config.permit, call) {
                     emit(.item(.tool(
                         id: call.id,
                         name: call.name,
@@ -281,6 +281,13 @@ public final class AgentLoop: @unchecked Sendable {
 
     static func hint(_ call: ToolCall) -> String {
         let a = call.args
+        // No GitHub o que importa é a ação e o PR: "github" sozinho não diz o que se
+        // está autorizando, e é justamente aí que a pessoa decide.
+        if call.name == "github", let acao = a["action"] as? String {
+            let n = (a["number"] as? Int) ?? (a["number"] as? Double).map(Int.init)
+            let alvo = n.map { " #\($0)" } ?? (a["title"] as? String).map { ": \($0)" } ?? ""
+            return acao + alvo
+        }
         for k in ["path", "pattern", "command"] {
             if let v = a[k] as? String, !v.isEmpty {
                 return v

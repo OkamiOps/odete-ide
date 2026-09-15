@@ -35,7 +35,7 @@ public enum PermitMode: String, Codable, CaseIterable, Sendable, Identifiable {
 /// As sete ferramentas, com os mesmos nomes e schemas do web.
 public enum Tools {
     static let safe: Set<String> = ["read_file", "list_dir", "grep", "read_terminal"]
-    static let chatTools: Set<String> = ["read_file", "list_dir", "grep", "read_terminal", "run_shell"]
+    static let chatTools: Set<String> = ["read_file", "list_dir", "grep", "read_terminal", "run_shell", "github"]
     static let planTools: Set<String> = chatTools.union(["write_file", "str_replace"])
 
     public static let all: [ToolSpec] = [
@@ -77,6 +77,21 @@ public enum Tools {
                 + "commit com corpo, use um -m por parágrafo. Chat só lê. Plan: mkdir/touch só em .odete/.",
             parameters: obj(["command": str], required: ["command"])
         ),
+        ToolSpec(
+            name: "github",
+            description: "Pull requests do repositório no GitHub: list_pulls, create_pull (title, body, "
+                + "head, base), comment (number, body), merge_pull (number, method: squash|merge|rebase) e "
+                + "close_pull (number). O push é pelo run_shell; isto é só a parte que vive na API.",
+            parameters: obj([
+                "action": ["type": "string", "enum": GitHubPedido.Acao.allCases.map(\.rawValue)],
+                "number": ["type": "number", "description": "número do PR"],
+                "title": str,
+                "body": str,
+                "head": ["type": "string", "description": "branch de origem (default: a atual)"],
+                "base": ["type": "string", "description": "branch de destino (default: a principal)"],
+                "method": ["type": "string", "enum": ["squash", "merge", "rebase"]],
+            ], required: ["action"])
+        ),
     ]
 
     static var str: [String: Any] {
@@ -105,6 +120,17 @@ public enum Tools {
         case .auto: !safe.contains(name)
         case .ask: true
         }
+    }
+
+    /// Abrir, comentar, mergear ou fechar um PR aparece no repositório de outras pessoas
+    /// e não dá para desfazer com um toque, como um patch dá. Pergunta sempre, mesmo no
+    /// modo que não pergunta nada.
+    public static func needsPermit(_ mode: PermitMode, _ call: ToolCall) -> Bool {
+        if call.name == "github" {
+            let acao = (call.args["action"] as? String).flatMap(GitHubPedido.Acao.init(rawValue:))
+            return acao?.escreve ?? true
+        }
+        return needsPermit(mode, call.name)
     }
 
     /// Comandos que só leem (liberados em chat e plan).

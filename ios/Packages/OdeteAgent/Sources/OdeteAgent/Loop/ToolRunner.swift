@@ -84,9 +84,38 @@ public struct ToolRunner: Sendable {
                 }
             }
             return await .init(text: Self.clip(host.runShell(cmd)))
+        case "github":
+            return await .init(text: Self.clip(github(args, mode: mode)))
         default:
             return .init(text: "tool desconhecida: \(call.name)")
         }
+    }
+
+    func github(_ args: [String: Any], mode: AgentMode) async -> String {
+        guard let bruta = args["action"] as? String,
+              let acao = GitHubPedido.Acao(rawValue: bruta)
+        else { return "action precisa ser uma de: " + GitHubPedido.Acao.allCases.map(\.rawValue)
+            .joined(separator: ", ")
+        }
+        if acao.escreve, mode != .build {
+            return "\(mode.label) só lê o GitHub. Mude para Build para abrir, comentar, mergear ou fechar PR."
+        }
+        let numero = (args["number"] as? Int) ?? (args["number"] as? Double).map(Int.init)
+        if acao != .listPulls, acao != .createPull, numero == nil {
+            return "\(acao.rawValue) precisa do number do PR"
+        }
+        func texto(_ k: String) -> String? {
+            (args[k] as? String).flatMap { $0.isEmpty ? nil : $0 }
+        }
+        return await host.github(GitHubPedido(
+            acao: acao,
+            numero: numero,
+            titulo: texto("title"),
+            corpo: texto("body"),
+            base: texto("base"),
+            head: texto("head"),
+            metodo: texto("method")
+        ))
     }
 
     func edit(_ name: String, args: [String: Any], mode: AgentMode) async -> ToolOutcome {

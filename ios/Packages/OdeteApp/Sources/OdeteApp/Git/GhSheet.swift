@@ -325,6 +325,9 @@ struct PullDetail: View {
                         Button("Squash") { merge("squash") }
                         Button("Merge commit") { merge("merge") }
                         Button("Rebase") { merge("rebase") }
+                        Divider()
+                        // Fechar sem mergear não existia em lugar nenhum do app.
+                        Button("Fechar sem merge", role: .destructive) { fechar() }
                     }
                     .disabled(pull.merged == true)
                 }
@@ -359,6 +362,16 @@ struct PullDetail: View {
     func merge(_ method: String) {
         Task {
             do { try await api.mergePull(slug, number: pull.number, method: method); await onChange(); dismiss()
+            } catch { self.error = error.localizedDescription }
+        }
+    }
+
+    func fechar() {
+        Task {
+            do {
+                try await api.closePull(slug, number: pull.number)
+                await onChange()
+                dismiss()
             } catch { self.error = error.localizedDescription }
         }
     }

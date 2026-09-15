@@ -219,6 +219,11 @@ public struct GitHubAPI: Sendable {
         return try Self.decoder.decode(GitHubPull.self, from: data)
     }
 
+    /// Fecha sem mergear. Faltava: nem a interface sabia fazer isso.
+    public func closePull(_ slug: String, number: Int) async throws {
+        _ = try await request("PATCH", "/repos/\(slug)/pulls/\(number)", body: ["state": "closed"])
+    }
+
     public func mergePull(_ slug: String, number: Int, method: String = "squash") async throws {
         _ = try await request("PUT", "/repos/\(slug)/pulls/\(number)/merge", body: ["merge_method": method])
     }

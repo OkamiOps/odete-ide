@@ -347,21 +347,34 @@ struct PermitCard: View {
     let answer: (Bool) -> Void
 
     var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: status == .pending ? "hand.raised" : status == .ok ? "checkmark.circle" : "xmark.circle")
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(
+                    systemName: status == .pending ? "hand.raised" : status == .ok ? "checkmark.circle" : "xmark.circle"
+                )
                 .font(.system(size: 14))
                 .foregroundStyle(status == .no ? theme.danger : theme.accent)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(name).font(OdeteFont.mono(12, weight: .medium)).foregroundStyle(theme.fg)
-                Text(detail).font(OdeteFont.mono(11)).foregroundStyle(theme.fgMuted).lineLimit(3)
+                .frame(width: 16, alignment: .center)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(name).font(OdeteFont.mono(12, weight: .medium)).foregroundStyle(theme.fg)
+                    Text(detail).font(OdeteFont.mono(11)).foregroundStyle(theme.fgMuted).lineLimit(3)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
             }
-            Spacer(minLength: 8)
+            // Os botões numa linha só deles. Ao lado do texto, no painel de 290 pt, sobrava
+            // uns 60 pt para cada um e o rótulo quebrava no meio da palavra: "Re-cusar",
+            // "Aprov ar". Embaixo eles cabem inteiros e ficam com tamanho de botão.
             if status == .pending {
-                Button("Recusar") { answer(false) }.buttonStyle(.glass)
-                Button("Aprovar") { answer(true) }.buttonStyle(.glassProminent)
+                HStack(spacing: 8) {
+                    Spacer(minLength: 0)
+                    Button("Recusar") { answer(false) }.buttonStyle(.glass)
+                    Button("Aprovar") { answer(true) }.buttonStyle(.glassProminent)
+                }
+                .font(.subheadline.weight(.medium))
+                .lineLimit(1)
             }
         }
-        .controlSize(.small)
         .padding(12)
         .background(theme.bg, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)

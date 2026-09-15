@@ -97,6 +97,16 @@ struct GitCommand: ShellCommand {
                         partes.append(rest[i + 1])
                     }
                 }
+                // `-F arquivo` é o outro jeito de mandar mensagem comprida, e o agente
+                // tenta os dois.
+                if let i = rest.firstIndex(of: "-F"), i + 1 < rest.count {
+                    let u = ctx.resolve(rest[i + 1])
+                    guard let texto = try? String(contentsOf: u, encoding: .utf8) else {
+                        io.err("git: não achei o arquivo \(rest[i + 1])")
+                        return 1
+                    }
+                    partes.append(texto.trimmingCharacters(in: .whitespacesAndNewlines))
+                }
                 if rest.contains("-a") || rest.contains("-am") {
                     try await repo.stageAll()
                 }
@@ -201,12 +211,12 @@ struct GitCommand: ShellCommand {
                     }
                 }
             case "fetch":
-                let remote = rest.first ?? "origin"
+                let remote = posicionais(rest).first ?? "origin"
                 let url = try await repo.remotes().first { $0.name == remote }?.url ?? ""
                 try await repo.fetch(remote: remote, credentials: ctx.shell.services.credentials(url)); io
                     .out("fetch ok")
             case "pull":
-                let remote = rest.first ?? "origin"
+                let remote = posicionais(rest).first ?? "origin"
                 let url = try await repo.remotes().first { $0.name == remote }?.url ?? ""
                 switch try await repo.pull(
                     remote: remote,
@@ -219,9 +229,12 @@ struct GitCommand: ShellCommand {
                 case let .conflicts(p): io.err("CONFLITO em: \(p.joined(separator: ", "))"); return 1
                 }
             case "push":
-                let remote = rest.first { !$0.hasPrefix("-") } ?? "origin"
+                // `git push -u origin minha-branch`: contando pela posição crua, o `-u`
+                // empurrava tudo e a branch virava "origin". Só o que não é opção conta.
+                let args = posicionais(rest)
+                let remote = args.first ?? "origin"
                 let url = try await repo.remotes().first { $0.name == remote }?.url ?? ""
-                let branch = rest.count > 1 && !rest[1].hasPrefix("-") ? rest[1] : nil
+                let branch = args.count > 1 ? args[1] : nil
                 try await repo
                     .push(remote: remote, branch: branch, credentials: ctx.shell.services.credentials(url)); io
                     .out("push ok")
@@ -236,6 +249,11 @@ struct GitCommand: ShellCommand {
             }
             return 0
         } catch { io.err("git: \(error.localizedDescription)"); return 1 }
+    }
+
+    /// Os argumentos que não são opção, na ordem: remoto e branch.
+    func posicionais(_ rest: [String]) -> [String] {
+        rest.filter { !$0.hasPrefix("-") }
     }
 
     static let suportados = [

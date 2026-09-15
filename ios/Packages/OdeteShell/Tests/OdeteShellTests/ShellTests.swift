@@ -33,6 +33,16 @@ struct ParserTests {
         let empty = try Parser.parse("   # só comentário")
         #expect(empty.items.isEmpty)
     }
+
+    /// `git push -u origin minha-branch`: contando pela posição crua, a branch virava
+    /// "origin" e o push ia para o lugar errado.
+    @Test func posicionaisDoPushIgnoramAsOpcoes() {
+        let g = GitCommand()
+        #expect(g.posicionais(["-u", "origin", "minha-branch"]) == ["origin", "minha-branch"])
+        #expect(g.posicionais(["origin", "main"]) == ["origin", "main"])
+        #expect(g.posicionais(["--force"]) == [])
+        #expect(g.posicionais([]) == [])
+    }
 }
 
 final class Out: Sendable {

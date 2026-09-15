@@ -355,13 +355,22 @@ func runAll(
         #expect(r.history.contains { $0.role == .tool && $0.content == "usuário recusou esta ação" })
     }
 
+    @Test func tetoPadraoCabeUmFluxoDeGit() {
+        // Branch, edição, commit, push, abrir PR e conferir já passa de oito rodadas, e
+        // cada tentativa que falha come uma.
+        #expect(LoopConfig(mode: .build, permit: .ask, model: "m").maxRounds >= 15)
+    }
+
     @Test func roundCapAndStop() async throws {
         var script: [[StreamEvent]] = []
         for _ in 0 ..< 9 {
             script.append([.tools([call("list_dir", ["path": ""])]), .done])
         }
         let (loop, _, p, _) = try make(script)
-        let r = await runAll(loop, "loop", LoopConfig(mode: .chat, permit: .full, model: "m"))
+        // O teto vem do config: o teste é sobre parar nele, não sobre quanto ele vale.
+        var cfg = LoopConfig(mode: .chat, permit: .full, model: "m")
+        cfg.maxRounds = 8
+        let r = await runAll(loop, "loop", cfg)
         #expect(p.turns.withLock { $0.count } == 8)
         #expect(r.items.contains {
             if case let .error(_, t) = $0 {

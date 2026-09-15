@@ -7,7 +7,11 @@ public struct LoopConfig: Sendable {
     public var model: String
     public var effort: String
     public var conversationId: String
-    public var maxRounds = 8
+    /// Oito não dava para um fluxo de git inteiro: criar branch, editar, commitar, dar
+    /// push, abrir o PR e conferir já passa disso, e cada tentativa que falha come uma
+    /// rodada. O teto continua existindo para caso perdido não virar conta alta — e
+    /// parar aqui não é erro, é um ponto de retomada com botão.
+    public var maxRounds = 20
     public init(mode: AgentMode, permit: PermitMode, model: String, effort: String = "", conversationId: String = "") {
         self.mode = mode; self.permit = permit; self.model = model; self.effort = effort; self
             .conversationId = conversationId

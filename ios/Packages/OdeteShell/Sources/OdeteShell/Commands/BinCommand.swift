@@ -161,7 +161,7 @@ struct BinCommand: ShellCommand {
                 try f.text.write(to: dist.appending(path: name), atomically: true, encoding: .utf8)
                 io
                     .out(
-                        "  dist/\(name)  \(ByteCountFormatter.string(fromByteCount: Int64(f.text.utf8.count), countStyle: .file))"
+                        "  dist/\(name)  \(Tamanho.arquivo(f.text.utf8.count))"
                     )
             }
             for e in entries {

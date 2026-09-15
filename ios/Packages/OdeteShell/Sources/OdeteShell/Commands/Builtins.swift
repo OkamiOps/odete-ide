@@ -101,7 +101,7 @@ enum Builtins {
                         let attrs = (try? FileManager.default.attributesOfItem(atPath: p.path)) ?? [:]
                         var d: ObjCBool = false; FileManager.default.fileExists(atPath: p.path, isDirectory: &d)
                         let size = (attrs[.size] as? Int) ?? 0
-                        let date = ((attrs[.modificationDate] as? Date) ?? .now).formatted(
+                        let date = ((attrs[.modificationDate] as? Date) ?? .now).noIdioma(
                             date: .abbreviated,
                             time: .shortened
                         )

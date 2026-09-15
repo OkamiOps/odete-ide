@@ -319,8 +319,8 @@ struct ProjectCard: View {
 
     var when: String {
         let d = project.lastOpenedAt ?? project.createdAt
-        let rel = d.formatted(.relative(presentation: .named).locale(Locale(identifier: "pt_BR")))
-        return (project.lastOpenedAt == nil ? "criado " : "aberto ") + rel
+        let rel = d.noIdioma(.relative(presentation: .named))
+        return project.lastOpenedAt == nil ? tr("criado %1$@", rel) : tr("aberto %1$@", rel)
     }
 
     /// Primeira linha de texto do README, como descrição.

@@ -528,7 +528,7 @@ struct RunsList: View {
                         VStack(alignment: .leading) {
                             Text(r.name ?? "workflow").foregroundStyle(.primary)
                             Text(
-                                "\(r.headBranch ?? "") · \(r.event ?? "") · \(r.createdAt?.formatted(.relative(presentation: .named)) ?? "")"
+                                "\(r.headBranch ?? "") · \(r.event ?? "") · \(r.createdAt?.noIdioma(.relative(presentation: .named)) ?? "")"
                             )
                             .font(.caption).foregroundStyle(.secondary)
                         }

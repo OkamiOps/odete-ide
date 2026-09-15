@@ -87,7 +87,7 @@ struct FileTreeView: View {
     /// `.odete/lixeira` para o desfazer. Mostrar o tamanho é o que dá para a pessoa
     /// perceber que aquilo ocupa espaço e decidir limpar.
     func medida(_ bytes: Int) -> String {
-        ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)
+        Tamanho.arquivo(bytes)
     }
 
     /// O que não é de uso constante mora aqui, para o cabeçalho continuar legível numa

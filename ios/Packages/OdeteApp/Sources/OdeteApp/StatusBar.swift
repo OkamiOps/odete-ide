@@ -167,7 +167,7 @@ struct StatusBar: View {
         guard let u = try? ws.ops.url(path),
               let n = (try? FileManager.default.attributesOfItem(atPath: u.path)[.size]) as? Int
         else { return nil }
-        return ByteCountFormatter.string(fromByteCount: Int64(n), countStyle: .file)
+        return Tamanho.arquivo(n)
     }
 
     func eol(in path: String) -> String {

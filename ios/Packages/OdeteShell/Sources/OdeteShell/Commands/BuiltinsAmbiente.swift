@@ -48,7 +48,7 @@ extension Builtins {
                 )
             return 1
         },
-        Simple(name: "date", help: "data e hora") { _, ctx in ctx.io.out(Date().formatted(
+        Simple(name: "date", help: "data e hora") { _, ctx in ctx.io.out(Date().noIdioma(
             date: .complete,
             time: .standard
         )); return 0 },

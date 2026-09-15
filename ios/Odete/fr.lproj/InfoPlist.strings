@@ -1,0 +1,5 @@
+/* Texto que o sistema mostra: a permissão aparece antes do app abrir, e quem
+   decide o idioma dela é o iPad, não os Ajustes da Odete. */
+"NSMicrophoneUsageDescription" = "Odete utilise le micro pour que tu puisses dicter ta demande à l’agent.";
+"NSSpeechRecognitionUsageDescription" = "La reconnaissance vocale transforme ta dictée en texte, sur l’iPad même quand c’est possible.";
+"CFBundleDisplayName" = "Odete";

@@ -84,7 +84,7 @@ struct BlameSheet: View {
                     if !h.isUncommitted {
                         Text(h.short).font(OdeteFont.mono(10)).foregroundStyle(theme.accent)
                         Text(h.author).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
-                        Text(h.date.formatted(date: .abbreviated, time: .shortened))
+                        Text(h.date.noIdioma(date: .abbreviated, time: .shortened))
                             .font(.caption2).foregroundStyle(theme.fgSubtle)
                     }
                 }
@@ -153,7 +153,7 @@ struct BlameSheet: View {
                     .font(.caption2).foregroundStyle(theme.fgMuted).lineLimit(1)
                 Spacer(minLength: 4)
                 if !h.isUncommitted {
-                    Text(h.date.formatted(.dateTime.day().month(.abbreviated)))
+                    Text(h.date.noIdioma(.dateTime.day().month(.abbreviated)))
                         .font(.caption2).foregroundStyle(theme.fgSubtle)
                 }
             }

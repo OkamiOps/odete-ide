@@ -279,7 +279,7 @@ struct GitCommand: ShellCommand {
     /// o agente não conseguia confirmar a mensagem que tinha acabado de escrever.
     func cabecalho(_ c: Commit) -> String {
         var s = "commit \(c.id)\nAutor: \(c.author.name) <\(c.author.email)>\n"
-        s += "Data:  \(c.date.formatted())\n\n    \(c.summary)\n"
+        s += "Data:  \(c.date.noIdioma(date: .long, time: .standard))\n\n    \(c.summary)\n"
         if !c.body.isEmpty {
             s += c.body.split(separator: "\n", omittingEmptySubsequences: false)
                 .map { "    " + $0 }.joined(separator: "\n") + "\n"

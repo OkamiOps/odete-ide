@@ -82,7 +82,7 @@ struct CloneSheet: View {
                                 "%1$@/%2$@ objetos · %3$@",
                                 "\(p.received)",
                                 "\(p.total)",
-                                "\(ByteCountFormatter.string(fromByteCount: Int64(p.bytes), countStyle: .file))"
+                                "\(Tamanho.arquivo(p.bytes))"
                             )
                         )
                         .font(.footnote.monospacedDigit()).foregroundStyle(.secondary)

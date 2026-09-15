@@ -56,11 +56,18 @@ targets:
     platform: iOS
     sources:
       - path: Odete
+      - path: Odete/pt-BR.lproj
+      - path: Odete/en.lproj
+      - path: Odete/de.lproj
+      - path: Odete/fr.lproj
+      - path: Odete/es.lproj
     info:
       path: Odete/Info.plist
       properties:
         CFBundleDisplayName: Odete
         CFBundleName: Odete
+        CFBundleDevelopmentRegion: pt-BR
+        CFBundleLocalizations: [pt-BR, en, de, fr, es]
         UILaunchScreen: {}
         UIFileSharingEnabled: true
         LSSupportsOpeningDocumentsInPlace: true

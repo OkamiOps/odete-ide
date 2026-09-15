@@ -75,10 +75,9 @@ struct HistoryCard: View {
                             Text(c.author.name).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
                             Text("·").font(.caption2).foregroundStyle(.secondary)
                         }
-                        Text(c.date.formatted(Date.RelativeFormatStyle(
+                        Text(c.date.noIdioma(Date.RelativeFormatStyle(
                             presentation: .named,
-                            unitsStyle: paneWidth < 260 ? .narrow : .wide,
-                            locale: Locale(identifier: "pt_BR")
+                            unitsStyle: paneWidth < 260 ? .narrow : .wide
                         )))
                         .font(.caption2).foregroundStyle(.secondary).lineLimit(1).fixedSize()
                     }

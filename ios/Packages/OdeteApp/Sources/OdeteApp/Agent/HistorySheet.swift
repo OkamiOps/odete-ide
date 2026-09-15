@@ -165,7 +165,7 @@ struct HistorySheet: View {
     func rodape(_ t: ChatThread) -> String {
         let trocas = t.messages.count { $0.role == .user }
         let tokens = t.usage.input + t.usage.output
-        var partes = [t.updated.formatted(date: .omitted, time: .shortened)]
+        var partes = [t.updated.noIdioma(date: .omitted, time: .shortened)]
         partes.append(trocas == 1 ? "1 pergunta" : "\(trocas) perguntas")
         if tokens > 0 {
             partes.append("\(fmtTok(tokens)) tokens")
@@ -198,6 +198,6 @@ struct HistorySheet: View {
         if cal.isDateInYesterday(d) {
             return "Ontem"
         }
-        return d.formatted(.dateTime.day().month(.wide).year())
+        return d.noIdioma(.dateTime.day().month(.wide).year())
     }
 }

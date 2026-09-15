@@ -65,7 +65,7 @@ final class Dictation {
     }
 
     private func comecar() {
-        guard let rec = SFSpeechRecognizer(locale: Locale(identifier: "pt_BR")) ?? SFSpeechRecognizer(),
+        guard let rec = SFSpeechRecognizer(locale: Texto.idioma.locale) ?? SFSpeechRecognizer(),
               rec.isAvailable
         else {
             error = tr("ditado indisponível neste aparelho")

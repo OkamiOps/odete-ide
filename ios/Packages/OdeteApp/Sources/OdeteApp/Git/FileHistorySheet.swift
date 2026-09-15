@@ -147,7 +147,7 @@ struct FileHistorySheet: View {
                                 .padding(.horizontal, 5).frame(height: 16)
                                 .background(theme.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 4))
                             Text(c.author.name).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
-                            Text(c.date.formatted(date: .omitted, time: .shortened))
+                            Text(c.date.noIdioma(date: .omitted, time: .shortened))
                                 .font(.caption2).foregroundStyle(theme.fgSubtle)
                         } else {
                             Text(tr("mudanças no disco, sem commit"))
@@ -211,7 +211,7 @@ struct FileHistorySheet: View {
         if cal.isDateInYesterday(d) {
             return "Ontem"
         }
-        return d.formatted(.dateTime.day().month(.wide).year())
+        return d.noIdioma(.dateTime.day().month(.wide).year())
     }
 
     // MARK: diff da versão
@@ -248,7 +248,7 @@ struct FileHistorySheet: View {
                         .padding(.horizontal, 6).frame(height: 18)
                         .background(theme.accent.opacity(0.12), in: RoundedRectangle(cornerRadius: 5))
                     Text(c.author.name).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                    Text(c.date.formatted(date: .abbreviated, time: .shortened))
+                    Text(c.date.noIdioma(date: .abbreviated, time: .shortened))
                         .font(.caption).foregroundStyle(theme.fgSubtle)
                 } else {
                     Label(tr("no disco, ainda sem commit"), systemImage: "pencil.circle")

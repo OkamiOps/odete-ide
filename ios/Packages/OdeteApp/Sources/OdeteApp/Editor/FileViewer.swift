@@ -51,7 +51,7 @@ struct FileViewer: View {
 
     var medida: String {
         let bytes = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int) ?? 0
-        return ByteCountFormatter.string(fromByteCount: Int64(bytes ?? 0), countStyle: .file)
+        return Tamanho.arquivo(bytes ?? 0)
     }
 }
 

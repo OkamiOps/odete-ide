@@ -70,7 +70,19 @@ struct StatusBar: View {
                 .help("Servidores no ar · abrir preview")
             }
             Spacer(minLength: Metrics.s2)
-            if let path = ws.active {
+            if let path = ws.active, ws.naoEhTexto.contains(path) {
+                // Imagem, PDF, banco: linha do cursor, indentação e codificação descrevem
+                // um editor que não está na tela. Um PNG anunciava "Ln 1, Col 1 · UTF-8 ·
+                // LF · Texto". Sobra o que é do arquivo mesmo.
+                if roomy, let m = medida(path) {
+                    label(text: m)
+                }
+                HStack(spacing: 5) {
+                    FileGlyph(path: path, size: 10)
+                    Text(extensao(path)).foregroundStyle(theme.fgMuted)
+                }
+                .padding(.horizontal, 8).frame(height: 22)
+            } else if let path = ws.active {
                 let (line, col) = cursor(in: path)
                 item(text: "Ln \(line), Col \(col)") { ws.paletteOpen = true; ws.paletteQuery = "@" }
                     .help("Ir para símbolo")
@@ -141,6 +153,19 @@ struct StatusBar: View {
             i += 1
         }
         return (line, off - last + 1)
+    }
+
+    /// "PNG", "PDF", "SQLITE" — o que o visualizador está mostrando.
+    func extensao(_ path: String) -> String {
+        let e = (path as NSString).pathExtension
+        return e.isEmpty ? "binário" : e.uppercased()
+    }
+
+    func medida(_ path: String) -> String? {
+        guard let u = try? ws.ops.url(path),
+              let n = (try? FileManager.default.attributesOfItem(atPath: u.path)[.size]) as? Int
+        else { return nil }
+        return ByteCountFormatter.string(fromByteCount: Int64(n), countStyle: .file)
     }
 
     func eol(in path: String) -> String {

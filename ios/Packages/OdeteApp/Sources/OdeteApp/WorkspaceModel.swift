@@ -349,6 +349,13 @@ public final class WorkspaceModel {
         }
         active = path
         selected = path
+        // Diff e Preview ocupam o centro inteiro e não mostram editor nenhum: abrir um
+        // arquivo com um deles na frente trocava a aba e a trilha e deixava na tela o
+        // diff de outro arquivo. Os modos que mostram o editor (Dois, Split) ficam como
+        // estão — lá o arquivo aberto aparece.
+        if chrome.snapshot.center == .diff || chrome.snapshot.center == .preview {
+            chrome.snapshot.center = .code
+        }
         persistTabs()
     }
 

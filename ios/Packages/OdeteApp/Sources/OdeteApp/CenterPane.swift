@@ -402,7 +402,12 @@ struct Crumbs: View {
                 .help("Git deste arquivo")
                 .menuIndicator(.hidden)
             }
-            Text(Language.detect(path: path).label).font(OdeteFont.mono(10)).foregroundStyle(theme.fgSubtle)
+            // Um PNG não é "Texto": quando o centro está com um visualizador, o que vale
+            // dizer é o formato do arquivo.
+            Text(ws.naoEhTexto.contains(path)
+                ? (path as NSString).pathExtension.uppercased()
+                : Language.detect(path: path).label)
+                .font(OdeteFont.mono(10)).foregroundStyle(theme.fgSubtle)
         }
         .sheet(isPresented: $tabelaAberta) {
             NavigationStack {

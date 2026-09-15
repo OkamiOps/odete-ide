@@ -110,17 +110,27 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.okamiops.odete
-        # Assinatura local ("-"): sem ela o app roda, mas não ganha a entitlement
-        # application-identifier e o Keychain recusa tudo com -34018.
+        # Simulador: assinatura local ("-"). Sem ela o app roda, mas não ganha a
+        # entitlement application-identifier e o Keychain recusa tudo com -34018.
+        # Aparelho e arquivo: assinatura de verdade, pelo time, com o Xcode cuidando
+        # do perfil. As duas convivem porque cada uma vale para um SDK.
         CODE_SIGNING_ALLOWED: "YES"
         CODE_SIGNING_REQUIRED: "NO"
         CODE_SIGN_IDENTITY: "-"
         CODE_SIGN_STYLE: Manual
+        CODE_SIGNING_REQUIRED[sdk=iphoneos*]: "YES"
+        CODE_SIGN_STYLE[sdk=iphoneos*]: Automatic
+        DEVELOPMENT_TEAM[sdk=iphoneos*]: 7U9S5DB9K9
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         INFOPLIST_KEY_UIUserInterfaceStyle: Automatic
         CODE_SIGN_ENTITLEMENTS: Odete/Odete.entitlements
         CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]: Odete/OdeteSimulator.entitlements
+      configs:
+        Debug:
+          CODE_SIGN_IDENTITY[sdk=iphoneos*]: Apple Development
+        Release:
+          CODE_SIGN_IDENTITY[sdk=iphoneos*]: Apple Distribution
     dependencies:
       - package: OdeteApp
         product: OdeteApp

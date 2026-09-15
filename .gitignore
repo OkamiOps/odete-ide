@@ -2,6 +2,7 @@
 build/
 build-acc/
 build-rt/
+build-device/
 DerivedData/
 Odete.xcodeproj/
 .build/

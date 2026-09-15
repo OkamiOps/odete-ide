@@ -66,7 +66,7 @@ struct GitPane: View {
     /// Numa coluna de 200 pt "4 alterações" virava "4 alt...ções".
     var resumo: String {
         if git.isClean {
-            return "limpo"
+            return tr("limpo")
         }
         return largura < 250 ? "\(git.status.count)" : tr("%1$@ alterações", "\(git.status.count)")
     }

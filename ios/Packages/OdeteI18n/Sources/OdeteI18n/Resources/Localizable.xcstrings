@@ -19181,6 +19181,34 @@
         }
       }
     },
+    "limpo": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "clean"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "sauber"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "propre"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "limpio"
+          }
+        }
+      }
+    },
     "ls: %1$@: não existe": {
       "localizations": {
         "en": {

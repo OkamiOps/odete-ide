@@ -14,6 +14,21 @@ public struct PaneHeader<Trailing: View>: View {
     }
 
     public var body: some View {
+        // O detalhe cabe inteiro ou não aparece. Antes ele encolhia até sobrar só a
+        // reticência, e o cabeçalho ficava "FILES …" — o rótulo traduzido é mais curto
+        // que "ARQUIVOS", sobrou um naco de espaço, e o nome do projeto coube nele
+        // sem caber. A decisão é contra a largura que o pai oferece, não contra a que
+        // sobrou depois de espremer.
+        ViewThatFits(in: .horizontal) {
+            linha(comDetalhe: true)
+            linha(comDetalhe: false)
+        }
+        .padding(.leading, Metrics.s3)
+        .padding(.trailing, Metrics.s2)
+        .frame(height: Metrics.paneHeader)
+    }
+
+    func linha(comDetalhe: Bool) -> some View {
         HStack(spacing: Metrics.s2) {
             Text(label.uppercased())
                 .font(OdeteFont.label)
@@ -21,22 +36,18 @@ public struct PaneHeader<Trailing: View>: View {
                 .foregroundStyle(theme.fgSubtle)
                 .lineLimit(1)
                 .fixedSize()
-                .layoutPriority(2)
-            if let detail {
+            if let detail, comDetalhe {
                 Text(detail)
                     .font(OdeteFont.ui(11.5))
                     .foregroundStyle(theme.fgMuted)
                     .lineLimit(1)
                     .truncationMode(.middle)
-                    .layoutPriority(1)
+                    .fixedSize()
                     .contentTransition(.numericText())
             }
             Spacer(minLength: 4)
             HStack(spacing: 2) { trailing }
         }
-        .padding(.leading, Metrics.s3)
-        .padding(.trailing, Metrics.s2)
-        .frame(height: Metrics.paneHeader)
     }
 }
 

@@ -12,6 +12,7 @@ import UniformTypeIdentifiers
 /// cada resultado e a marca do git na direita de quem mudou.
 struct FileTreeView: View {
     @Environment(WorkspaceModel.self) private var ws
+    @Environment(ChromeState.self) private var chrome
     @Environment(\.theme) private var theme
     @State private var renaming: String?
     @State private var newFolderAt: String?
@@ -86,6 +87,12 @@ struct FileTreeView: View {
             Button("Revelar arquivo aberto", systemImage: "scope") { pedido += 1 }
                 .disabled(ws.active == nil)
             Button("Recolher tudo", systemImage: "arrow.down.right.and.arrow.up.left") { recolherTudo() }
+            Toggle(isOn: Binding(
+                get: { chrome.snapshot.mostrarOcultos },
+                set: { chrome.snapshot.mostrarOcultos = $0; ws.reload() }
+            )) {
+                Label("Mostrar ocultos", systemImage: "eye")
+            }
             Divider()
             if let a = ws.ultimaAcao, a.podeDesfazer {
                 Button("Desfazer \(a.descricao)", systemImage: "arrow.uturn.backward") { ws.desfazerArquivo() }

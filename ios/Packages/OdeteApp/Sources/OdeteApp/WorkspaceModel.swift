@@ -132,11 +132,12 @@ public final class WorkspaceModel {
 
     public func reload() {
         do {
-            tree = try FileTreeBuilder.build(at: root)
-            filePaths = tree.allFiles().map(\.path)
+            tree = try FileTreeBuilder.build(at: root, ocultos: chrome.snapshot.mostrarOcultos)
+            filePaths = tree.allFiles().map(\.path).filter { !Ignore.isNoisePath($0) }
             let pkg = try? Data(contentsOf: root.appending(path: "package.json"))
             stack = Stack.detect(paths: filePaths, packageJSON: pkg)
             scripts = Self.lerScripts(pkg)
+            preencherAbertas()
             reloadTick += 1
         } catch {
             self.error = error.localizedDescription
@@ -211,6 +212,26 @@ public final class WorkspaceModel {
         return (e, w)
     }
 
+    /// Depois de remontar a árvore, as pastas pesadas que estavam abertas voltam a ser
+    /// lidas: sem isto elas apareciam abertas e vazias depois de qualquer mudança.
+    func preencherAbertas() {
+        for p in expanded.sorted(by: { $0.split(separator: "/").count < $1.split(separator: "/").count }) {
+            lerSePreciso(p)
+        }
+    }
+
+    /// Pasta pesada (node_modules, .git, dist) entra na árvore por ler; o conteúdo só é
+    /// lido quando a pessoa abre, senão abrir o projeto esperaria por milhares de arquivos.
+    func lerSePreciso(_ path: String) {
+        guard let node = tree.find(path), node.naoLido else { return }
+        let filhos = (try? FileTreeBuilder.children(
+            of: root.appending(path: path),
+            prefix: path,
+            ocultos: chrome.snapshot.mostrarOcultos
+        )) ?? []
+        tree.inserir(filhos, em: path)
+    }
+
     /// Lê `scripts` do package.json preservando a ordem do arquivo, que é a ordem em que
     /// a pessoa pensa neles (dev, build, test…).
     nonisolated static func lerScripts(_ pkg: Data?) -> [(nome: String, comando: String)] {
@@ -229,11 +250,12 @@ public final class WorkspaceModel {
     /// Igual a `reload()`, mas a varredura do disco acontece fora do ator principal.
     private func recarregarArvoreEmSegundoPlano() {
         let raiz = root
+        let ocultos = chrome.snapshot.mostrarOcultos
         Task.detached(priority: .utility) { [weak self] in
-            let arvore = try? FileTreeBuilder.build(at: raiz)
+            let arvore = try? FileTreeBuilder.build(at: raiz, ocultos: ocultos)
             let pkg = try? Data(contentsOf: raiz.appending(path: "package.json"))
             guard let arvore else { return }
-            let caminhos = arvore.allFiles().map(\.path)
+            let caminhos = arvore.allFiles().map(\.path).filter { !Ignore.isNoisePath($0) }
             let stack = Stack.detect(paths: caminhos, packageJSON: pkg)
             let scripts = Self.lerScripts(pkg)
             await MainActor.run {
@@ -242,6 +264,7 @@ public final class WorkspaceModel {
                 self.filePaths = caminhos
                 self.stack = stack
                 self.scripts = scripts
+                self.preencherAbertas()
                 self.reloadTick += 1
             }
         }
@@ -252,6 +275,8 @@ public final class WorkspaceModel {
             expanded.remove(path)
         } else {
             expanded.insert(path)
+            lerSePreciso(path)
+            reloadTick += 1
         }
         chrome.snapshot.expandedByProject[project.id] = Array(expanded)
     }

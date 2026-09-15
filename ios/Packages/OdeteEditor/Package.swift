@@ -8,6 +8,7 @@ let package = Package(
         .library(name: "OdeteEditor", targets: ["OdeteEditor"]),
     ],
     dependencies: [
+        .package(path: "../OdeteI18n"),
         .package(path: "../OdeteCore"),
         .package(url: "https://github.com/simonbs/Runestone.git", from: "0.5.2"),
         .package(url: "https://github.com/simonbs/TreeSitterLanguages.git", from: "0.1.10"),
@@ -16,6 +17,7 @@ let package = Package(
         .target(
             name: "OdeteEditor",
             dependencies: [
+                .product(name: "OdeteI18n", package: "OdeteI18n"),
                 .product(name: "OdeteCore", package: "OdeteCore"),
                 .product(name: "Runestone", package: "Runestone"),
                 .product(name: "TreeSitterHTMLRunestone", package: "TreeSitterLanguages"),

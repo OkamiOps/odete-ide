@@ -1,0 +1,30 @@
+{
+  "sourceLanguage" : "pt-BR",
+  "strings" : {
+    "Idioma" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Sprache" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Language" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Idioma" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Langue" } }
+      }
+    },
+    "Idioma do aparelho" : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Gerätesprache" } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Device language" } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Idioma del dispositivo" } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "Langue de l’appareil" } }
+      }
+    },
+    "Vale para o app inteiro: telas, terminal, git e as respostas do agente." : {
+      "localizations" : {
+        "de" : { "stringUnit" : { "state" : "translated", "value" : "Gilt für die ganze App: Oberfläche, Terminal, Git und die Antworten des Agenten." } },
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Applies to the whole app: screens, terminal, git and the agent’s replies." } },
+        "es" : { "stringUnit" : { "state" : "translated", "value" : "Se aplica a toda la app: pantallas, terminal, git y las respuestas del agente." } },
+        "fr" : { "stringUnit" : { "state" : "translated", "value" : "S’applique à toute l’app : écrans, terminal, git et les réponses de l’agent." } }
+      }
+    }
+  },
+  "version" : "1.0"
+}

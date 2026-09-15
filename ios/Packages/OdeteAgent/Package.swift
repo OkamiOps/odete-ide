@@ -6,12 +6,14 @@ let package = Package(
     platforms: [.iOS(.v26)],
     products: [.library(name: "OdeteAgent", targets: ["OdeteAgent"])],
     dependencies: [
+        .package(path: "../OdeteI18n"),
         .package(path: "../OdeteCore"), .package(path: "../OdeteAccounts"), .package(path: "../OdeteGit"),
     ],
     targets: [
         .target(
             name: "OdeteAgent",
             dependencies: [
+                .product(name: "OdeteI18n", package: "OdeteI18n"),
                 .product(name: "OdeteCore", package: "OdeteCore"), .product(
                     name: "OdeteAccounts",
                     package: "OdeteAccounts"

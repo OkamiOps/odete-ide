@@ -1,16 +1,18 @@
 import OdeteCore
+import OdeteI18n
 import OdeteUI
 import SwiftUI
 
 enum SettingsSection: String, CaseIterable, Identifiable {
-    case appearance, editor, layout, git, ai, system, about
+    case idioma, appearance, editor, layout, git, ai, system, about
     var id: String {
         rawValue
     }
 
     var label: String {
         switch self {
-        case .appearance: "Aparência"
+        case .idioma: tr("Idioma")
+        case .appearance: tr("Aparência")
         case .editor: "Editor"
         case .layout: "Layout"
         case .git: "Git e GitHub"
@@ -22,6 +24,7 @@ enum SettingsSection: String, CaseIterable, Identifiable {
 
     var symbol: String {
         switch self {
+        case .idioma: "globe"
         case .appearance: "paintpalette"
         case .editor: "chevron.left.forwardslash.chevron.right"
         case .layout: "rectangle.3.group"
@@ -113,12 +116,19 @@ struct SettingsContent: View {
     @Environment(ChromeState.self) private var chrome
     @Environment(AppModel.self) private var app
     @Environment(\.theme) private var theme
+    /// Calculada, e não guardada: uma propriedade guardada com valor inicial deixaria
+    /// o init de membros privado, e quem monta a folha é outro arquivo.
+    private var idiomas: Idiomas {
+        Idiomas.shared
+    }
+
     var section: SettingsSection
 
     var body: some View {
         ScrollPane {
             VStack(alignment: .leading, spacing: 16) {
                 switch section {
+                case .idioma: idioma
                 case .appearance: appearance
                 case .editor: editor
                 case .layout: layout
@@ -133,6 +143,37 @@ struct SettingsContent: View {
         }
         .scrollIndicators(.hidden)
         .tint(theme.accent)
+    }
+
+    // MARK: idioma
+
+    /// A lista começa por "Idioma do aparelho", que é o padrão: quem nunca abriu esta
+    /// tela já está no idioma certo. Cada opção aparece escrita nela mesma — quem abriu
+    /// os Ajustes num idioma que não lê precisa reconhecer o dele sem entender o resto.
+    var idioma: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            SectionTitle(tr("Idioma"))
+            CardList {
+                ForEach(Array(([Idioma.sistema] + Idioma.traduzidos).enumerated()), id: \.element) { i, op in
+                    Button { idiomas.escolher(op) } label: {
+                        CardRow(
+                            op.nome,
+                            emoji: op.bandeira,
+                            detail: op == .sistema ? Idioma.doAparelho.nome : nil,
+                            first: i == 0
+                        ) {
+                            if idiomas.atual == op {
+                                Image(systemName: "checkmark").font(.footnote.bold())
+                                    .foregroundStyle(theme.accent)
+                            }
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            CardNote(tr("Vale para o app inteiro: telas, terminal, git e as respostas do agente."))
+        }
     }
 
     // MARK: aparência

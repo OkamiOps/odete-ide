@@ -6,6 +6,7 @@ let package = Package(
     platforms: [.iOS(.v26)],
     products: [.library(name: "OdeteShell", targets: ["OdeteShell"])],
     dependencies: [
+        .package(path: "../OdeteI18n"),
         .package(path: "../OdeteCore"), .package(path: "../OdeteGit"), .package(path: "../OdeteNpm"),
         .package(path: "../OdeteRuntime"), .package(path: "../OdeteBundler"),
     ],
@@ -13,6 +14,7 @@ let package = Package(
         .target(
             name: "OdeteShell",
             dependencies: [
+                .product(name: "OdeteI18n", package: "OdeteI18n"),
                 .product(name: "OdeteCore", package: "OdeteCore"), .product(name: "OdeteGit", package: "OdeteGit"),
                 .product(name: "OdeteNpm", package: "OdeteNpm"), .product(
                     name: "OdeteRuntime",

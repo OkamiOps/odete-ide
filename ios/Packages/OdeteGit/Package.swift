@@ -8,6 +8,7 @@ let package = Package(
         .library(name: "OdeteGit", targets: ["OdeteGit"]),
     ],
     dependencies: [
+        .package(path: "../OdeteI18n"),
         .package(path: "../OdeteCore"),
     ],
     targets: [
@@ -15,6 +16,7 @@ let package = Package(
         .target(
             name: "OdeteGit",
             dependencies: [
+                .product(name: "OdeteI18n", package: "OdeteI18n"),
                 "Clibgit2",
                 .product(name: "OdeteCore", package: "OdeteCore"),
             ],

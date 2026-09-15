@@ -102,6 +102,9 @@ public struct CardList<Content: View>: View {
 public struct CardRow<Trailing: View>: View {
     @Environment(\.theme) private var theme
     var symbol: String
+    /// No lugar do símbolo, quando o que identifica a linha é uma figura e não um ícone
+    /// do sistema — a bandeira do idioma, por exemplo. O quadrado colorido some junto.
+    var emoji: String?
     var color: Color?
     var label: String
     var detail: String?
@@ -112,7 +115,8 @@ public struct CardRow<Trailing: View>: View {
 
     public init(
         _ label: String,
-        symbol: String,
+        symbol: String = "",
+        emoji: String? = nil,
         color: Color? = nil,
         detail: String? = nil,
         first: Bool = false,
@@ -121,6 +125,7 @@ public struct CardRow<Trailing: View>: View {
     ) {
         self.label = label
         self.symbol = symbol
+        self.emoji = emoji
         self.color = color
         self.detail = detail
         self.first = first
@@ -130,11 +135,15 @@ public struct CardRow<Trailing: View>: View {
 
     public var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: symbol)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(width: 22, height: 22)
-                .background(color ?? theme.accent, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            if let emoji {
+                Text(emoji).font(.system(size: 17)).frame(width: 22, height: 22)
+            } else {
+                Image(systemName: symbol)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 22, height: 22)
+                    .background(color ?? theme.accent, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            }
             VStack(alignment: .leading, spacing: 0) {
                 Text(label).font(.subheadline).foregroundStyle(theme.fg).lineLimit(lines)
                     .fixedSize(horizontal: false, vertical: true)

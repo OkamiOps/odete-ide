@@ -8,12 +8,14 @@ let package = Package(
         .library(name: "OdeteFiles", targets: ["OdeteFiles"]),
     ],
     dependencies: [
+        .package(path: "../OdeteI18n"),
         .package(path: "../OdeteCore"),
     ],
     targets: [
         .target(
             name: "OdeteFiles",
             dependencies: [
+                .product(name: "OdeteI18n", package: "OdeteI18n"),
                 .product(name: "OdeteCore", package: "OdeteCore"),
             ],
             swiftSettings: [.swiftLanguageMode(.v6)]

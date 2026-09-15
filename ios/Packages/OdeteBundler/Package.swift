@@ -5,11 +5,14 @@ let package = Package(
     name: "OdeteBundler",
     platforms: [.iOS(.v26)],
     products: [.library(name: "OdeteBundler", targets: ["OdeteBundler"])],
-    dependencies: [.package(path: "../OdeteCore"), .package(path: "../OdeteRuntime")],
+    dependencies: [
+        .package(path: "../OdeteI18n"), .package(path: "../OdeteCore"), .package(path: "../OdeteRuntime"),
+    ],
     targets: [
         .target(
             name: "OdeteBundler",
             dependencies: [
+                .product(name: "OdeteI18n", package: "OdeteI18n"),
                 .product(name: "OdeteCore", package: "OdeteCore"),
                 .product(name: "OdeteRuntime", package: "OdeteRuntime"),
             ],

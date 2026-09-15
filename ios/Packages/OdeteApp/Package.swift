@@ -8,6 +8,7 @@ let package = Package(
         .library(name: "OdeteApp", targets: ["OdeteApp"]),
     ],
     dependencies: [
+        .package(path: "../OdeteI18n"),
         .package(path: "../OdeteCore"),
         .package(path: "../OdeteFiles"),
         .package(path: "../OdeteEditor"),
@@ -23,6 +24,7 @@ let package = Package(
         .target(
             name: "OdeteApp",
             dependencies: [
+                .product(name: "OdeteI18n", package: "OdeteI18n"),
                 .product(name: "OdeteCore", package: "OdeteCore"),
                 .product(name: "OdeteFiles", package: "OdeteFiles"),
                 .product(name: "OdeteEditor", package: "OdeteEditor"),

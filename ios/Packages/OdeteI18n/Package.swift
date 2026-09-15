@@ -2,22 +2,22 @@
 import PackageDescription
 
 let package = Package(
-    name: "OdeteCore",
+    name: "OdeteI18n",
+    defaultLocalization: "pt-BR",
     platforms: [.iOS(.v26)],
     products: [
-        .library(name: "OdeteCore", targets: ["OdeteCore"]),
+        .library(name: "OdeteI18n", targets: ["OdeteI18n"]),
     ],
     dependencies: [
-        .package(path: "../OdeteI18n"),
     ],
     targets: [
         .target(
-            name: "OdeteCore",
+            name: "OdeteI18n",
             dependencies: [
-                .product(name: "OdeteI18n", package: "OdeteI18n"),
             ],
+            resources: [.process("Resources")],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
-        .testTarget(name: "OdeteCoreTests", dependencies: ["OdeteCore"]),
+        .testTarget(name: "OdeteI18nTests", dependencies: ["OdeteI18n"]),
     ]
 )

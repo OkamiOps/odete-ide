@@ -20,6 +20,8 @@ settings:
     ENABLE_USER_SCRIPT_SANDBOXING: "YES"
     SWIFT_UPCOMING_FEATURE_EXISTENTIAL_ANY: "YES"
 packages:
+  OdeteI18n:
+    path: Packages/OdeteI18n
   OdeteCore:
     path: Packages/OdeteCore
   OdeteFiles:

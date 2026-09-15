@@ -66,4 +66,47 @@ struct AccountStoreTests {
         store.remove(acc)
         #expect(store.accounts.isEmpty && store.token(for: acc) == nil)
     }
+
+    func vazio() -> AccountStore {
+        AccountStore(
+            url: FileManager.default.temporaryDirectory.appending(path: "odete-acc-\(UUID().uuidString)/accounts.json"),
+            keychain: MemorySecrets()
+        )
+    }
+
+    @Test func assinaturaSaiDoQueFoiEscrito() {
+        let store = vazio()
+        store.authorName = "Marcos Santos"
+        store.authorEmail = "marcos@exemplo.com"
+        #expect(store.autor.name == "Marcos Santos")
+        #expect(store.autor.email == "marcos@exemplo.com")
+    }
+
+    @Test func semNadaEscritoAContaDaONomeEOEmail() throws {
+        let store = vazio()
+        // `add` já preenche os campos vazios; zerando-os, a dedução é que responde.
+        try store.add(
+            HostAccount(kind: .github, host: "github.com", login: "okamiops", name: "Okami Ops", email: "c@okami.dev"),
+            token: "t"
+        )
+        store.authorName = ""
+        store.authorEmail = ""
+        #expect(store.autor.name == "Okami Ops")
+        #expect(store.autor.email == "c@okami.dev")
+    }
+
+    @Test func semContaNenhumaAindaSaiUmaAssinaturaValida() {
+        let store = vazio()
+        #expect(store.autor.name == "Odete")
+        #expect(store.autor.email == "odete@odete.local")
+    }
+
+    @Test func contaSemEmailCaiNoEnderecoDaCasa() throws {
+        let store = vazio()
+        try store.add(HostAccount(kind: .github, host: "github.com", login: "marcos"), token: "t")
+        store.authorName = ""
+        store.authorEmail = ""
+        #expect(store.autor.name == "marcos")
+        #expect(store.autor.email == "marcos@odete.local")
+    }
 }

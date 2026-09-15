@@ -85,4 +85,17 @@ public final class AccountStore {
     public var github: HostAccount? {
         accounts.first { $0.kind == .github && $0.host == "github.com" }
     }
+
+    /// Como o commit vai assinado: o que estiver escrito nos ajustes, ou o que dá para
+    /// deduzir da conta conectada. A tela de contas mostra exatamente isto, para não
+    /// prometer um nome e gravar outro.
+    public var autor: (name: String, email: String) {
+        let n = authorName.isEmpty ? (github?.name ?? github?.login ?? "Odete") : authorName
+        // O e-mail da conta vale mais que um endereço inventado: só se o host não mandar
+        // nenhum é que sobra o `@odete.local`.
+        let e = authorEmail.isEmpty
+            ? (github?.email ?? "\(n.lowercased().replacingOccurrences(of: " ", with: ""))@odete.local")
+            : authorEmail
+        return (n, e)
+    }
 }

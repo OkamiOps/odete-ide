@@ -4,6 +4,13 @@ import OdeteUI
 import SwiftUI
 
 /// Ajustes → Contas: GitHub por device flow ou token; outros hosts por token.
+///
+/// A tela era três títulos de seção empilhados no vazio: uma frase cinza onde deveria
+/// estar a conta, a ação principal disfarçada de linha de lista e dois campos de autor
+/// com o texto encostado na direita, sem dizer o que sairia gravado. Aqui o topo diz
+/// para que serve a tela, a ação principal é um botão, a conta conectada aparece com
+/// rosto e host, e o autor mostra a assinatura pronta — inclusive o que a Odete deduz
+/// quando os campos estão vazios.
 struct AccountsSettings: View {
     @Environment(AccountStore.self) private var accounts
     @Environment(\.theme) private var theme
@@ -16,124 +23,283 @@ struct AccountsSettings: View {
     @State private var device: GitHubDeviceFlow.DeviceCode?
     @State private var waiting = false
     @State private var error: String?
+    @State private var removendo: HostAccount?
+
+    var temDeviceFlow: Bool {
+        GitHubDeviceFlow().isConfigured
+    }
 
     var body: some View {
-        @Bindable var accounts = accounts
-        VStack(alignment: .leading, spacing: 16) {
-            VStack(alignment: .leading, spacing: 8) {
-                SectionTitle("Contas", detail: accounts.accounts.isEmpty ? nil : "\(accounts.accounts.count)")
-                if accounts.accounts.isEmpty {
-                    CardNote("Sem conta, push e clone de repositórios privados não funcionam.")
-                } else {
-                    CardList {
-                        ForEach(Array(accounts.accounts.enumerated()), id: \.element.id) { i, a in
-                            CardRow(
-                                "\(a.login) · \(a.kind.label)",
-                                symbol: a.kind == .github ? "cat" : "server.rack",
-                                color: theme.accent,
-                                detail: a.host,
-                                first: i == 0
-                            ) {
-                                Button("Remover", systemImage: "trash", role: .destructive) { accounts.remove(a) }
-                                    .labelStyle(.iconOnly)
-                                    .buttonStyle(.borderless)
-                                    .controlSize(.small)
-                            }
-                        }
-                    }
-                }
-            }
+        VStack(alignment: .leading, spacing: 20) {
+            cabecalho
             if let d = device {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("No GitHub, digite o código:").font(OdeteFont.ui(12)).foregroundStyle(theme.fgMuted)
-                    HStack {
-                        Text(d.userCode).font(OdeteFont.mono(22, weight: .medium)).foregroundStyle(theme.fg)
-                        Spacer()
-                        Button("Copiar") { UIPasteboard.general.string = d.userCode }.buttonStyle(.glass)
-                        Button("Abrir GitHub") { openURL(URL(string: d.verificationUri)!) }.buttonStyle(.glassProminent)
-                    }
-                    if waiting {
-                        HStack(spacing: 6) {
-                            ProgressView().controlSize(.small); Text("aguardando autorização…").font(OdeteFont.ui(11))
-                                .foregroundStyle(theme.fgSubtle)
-                        }
-                    }
-                }
-                .padding(10)
-                .background(theme.bg, in: RoundedRectangle(cornerRadius: 12))
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(theme.accent))
+                codigo(d)
             }
-            VStack(alignment: .leading, spacing: 8) {
-                SectionTitle("Adicionar")
-                CardList {
-                    if GitHubDeviceFlow().isConfigured {
-                        Button { startDeviceFlow() } label: {
-                            CardRow("Entrar com GitHub", symbol: "cat", color: theme.accent, first: true) {
-                                if waiting {
-                                    ProgressView().controlSize(.small)
-                                } else {
-                                    Image(systemName: "chevron.right").font(.caption2.bold())
-                                        .foregroundStyle(theme.fgSubtle)
-                                }
-                            }
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(waiting)
-                    }
-                    Button { adding = true } label: {
-                        CardRow(
-                            "Adicionar por token",
-                            symbol: "key",
-                            color: theme.fgMuted,
-                            detail: "GitHub, GitLab ou qualquer host",
-                            first: !GitHubDeviceFlow().isConfigured
-                        ) {
-                            Image(systemName: "chevron.right").font(.caption2.bold())
-                                .foregroundStyle(theme.fgSubtle)
-                        }
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                }
-                if let error {
-                    CardNote(error)
-                }
+            if accounts.accounts.isEmpty {
+                vazio
+            } else {
+                lista
             }
-            VStack(alignment: .leading, spacing: 8) {
-                SectionTitle("Autor dos commits")
-                CardList {
-                    CardRow("Nome", symbol: "person", color: .gray, first: true) {
-                        TextField("seu nome", text: $accounts.authorName)
-                            .multilineTextAlignment(.trailing)
-                            .textFieldStyle(.plain)
-                            .font(.subheadline)
-                            .frame(maxWidth: 220)
-                    }
-                    CardRow("E-mail", symbol: "envelope", color: .gray) {
-                        TextField("seu@email", text: $accounts.authorEmail)
-                            .multilineTextAlignment(.trailing)
-                            .textFieldStyle(.plain)
-                            .font(.subheadline)
-                            .keyboardType(.emailAddress)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                            .frame(maxWidth: 220)
-                    }
-                }
-                CardNote("Vai assinado em cada commit feito daqui.")
+            if let error {
+                CardNote(error)
             }
+            autor
         }
         .sheet(isPresented: $adding) { tokenSheet }
+        .confirmationDialog(
+            "Remover \(removendo?.login ?? "")?",
+            isPresented: Binding(get: { removendo != nil }, set: {
+                if !$0 {
+                    removendo = nil
+                }
+            }),
+            titleVisibility: .visible
+        ) {
+            Button("Remover", role: .destructive) {
+                if let a = removendo {
+                    accounts.remove(a)
+                }
+                removendo = nil
+            }
+            Button("Cancelar", role: .cancel) { removendo = nil }
+        } message: {
+            Text("O token sai do Keychain. Push e clone de repositório privado param de funcionar.")
+        }
     }
+
+    // MARK: topo
+
+    var cabecalho: some View {
+        HStack(alignment: .top, spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(theme.accent.opacity(0.14)).frame(width: 44, height: 44)
+                Ratinha(size: 24).foregroundStyle(theme.accent)
+            }
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Contas de código").font(.headline).foregroundStyle(theme.fg)
+                Text("Uma conta conectada libera push, clone de repositório privado e os "
+                    + "pull requests dentro da Odete. O token fica no Keychain do iPad.")
+                    .font(.footnote).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    /// O código do device flow, enquanto o GitHub espera a autorização.
+    func codigo(_ d: GitHubDeviceFlow.DeviceCode) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("No GitHub, digite este código:").font(.footnote).foregroundStyle(theme.fgMuted)
+            HStack(spacing: 12) {
+                Text(d.userCode)
+                    .font(OdeteFont.mono(24, weight: .medium)).foregroundStyle(theme.fg)
+                    .textSelection(.enabled)
+                Spacer(minLength: 0)
+                Button("Copiar") { UIPasteboard.general.string = d.userCode }.buttonStyle(.glass)
+                Button("Abrir GitHub") { openURL(URL(string: d.verificationUri)!) }.buttonStyle(.glassProminent)
+            }
+            if waiting {
+                HStack(spacing: 6) {
+                    ProgressView().controlSize(.small)
+                    Text("esperando você autorizar…").font(.caption).foregroundStyle(theme.fgSubtle)
+                }
+            }
+        }
+        .padding(14)
+        .background(theme.bg, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(theme.accent))
+    }
+
+    // MARK: sem conta
+
+    var vazio: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if temDeviceFlow {
+                principal("Entrar com GitHub", acao: startDeviceFlow)
+                secundaria("Adicionar por token", detalhe: "GitHub, GitLab, Gitea ou qualquer host")
+            } else {
+                principal("Adicionar conta por token") { adding = true }
+                Text("GitHub, GitLab, Gitea ou qualquer host que aceite token de acesso pessoal.")
+                    .font(.caption).foregroundStyle(theme.fgSubtle)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    func principal(_ titulo: String, acao: @escaping () -> Void) -> some View {
+        Button(action: acao) {
+            HStack(spacing: 8) {
+                if waiting {
+                    ProgressView().controlSize(.small)
+                } else {
+                    Image(systemName: "person.badge.key").font(.system(size: 13, weight: .bold))
+                }
+                Text(waiting ? "Esperando o GitHub…" : titulo)
+            }
+            .font(.subheadline.weight(.semibold)).foregroundStyle(theme.accentFg)
+            // Numa folha estreita ela ocupa a linha; num painel de ajustes largo, uma
+            // barra laranja de ponta a ponta viraria o assunto da tela.
+            .frame(maxWidth: 360).frame(height: 42)
+            .background(theme.accent, in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .disabled(waiting)
+        .hoverEffect(.highlight)
+    }
+
+    func secundaria(_ titulo: String, detalhe: String) -> some View {
+        CardList {
+            Button { adding = true } label: {
+                CardRow(titulo, symbol: "key", color: theme.fgMuted, detail: detalhe, first: true) {
+                    Image(systemName: "chevron.right").font(.caption2.bold()).foregroundStyle(theme.fgSubtle)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    // MARK: com conta
+
+    var lista: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            SectionTitle("Conectadas", detail: "\(accounts.accounts.count)")
+            CardList {
+                ForEach(Array(accounts.accounts.enumerated()), id: \.element.id) { i, a in
+                    linha(a, first: i == 0)
+                }
+            }
+            Button { adding = true } label: {
+                Label("Adicionar outra conta", systemImage: "plus")
+                    .font(.subheadline).foregroundStyle(theme.accent)
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 2)
+            if temDeviceFlow, accounts.github == nil {
+                Button("Entrar com GitHub", action: startDeviceFlow)
+                    .font(.subheadline).foregroundStyle(theme.accent)
+                    .buttonStyle(.plain)
+            }
+        }
+    }
+
+    func linha(_ a: HostAccount, first: Bool) -> some View {
+        HStack(spacing: 11) {
+            rosto(a)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(a.name ?? a.login).font(.subheadline.weight(.medium)).foregroundStyle(theme.fg)
+                    .lineLimit(1)
+                Text(a.name == nil ? a.host : "\(a.login) · \(a.host)")
+                    .font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+            }
+            Spacer(minLength: 8)
+            Menu {
+                // O endereço inteiro no rótulo quebrava o item do menu em três linhas; ele
+                // aparece por extenso na prévia da assinatura, logo abaixo.
+                if let e = a.email {
+                    Button("Assinar commits com este e-mail", systemImage: "envelope") { accounts.authorEmail = e }
+                }
+                Button("Remover conta", systemImage: "trash", role: .destructive) { removendo = a }
+            } label: {
+                Image(systemName: "ellipsis").font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(theme.fgMuted)
+                    .frame(width: 28, height: 28).contentShape(Rectangle())
+            }
+            .menuIndicator(.hidden)
+            .accessibilityLabel("Ações da conta \(a.login)")
+        }
+        .padding(.horizontal, 12).frame(height: 56)
+        .overlay(alignment: .top) {
+            if !first {
+                Rectangle().fill(theme.separator).frame(height: 0.5).padding(.leading, 55)
+            }
+        }
+    }
+
+    /// Foto da conta quando o host manda uma; senão, a inicial num quadrado.
+    func rosto(_ a: HostAccount) -> some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .fill(theme.accent.opacity(0.18))
+            if let s = a.avatarURL, let u = URL(string: s) {
+                AsyncImage(url: u) { img in
+                    img.resizable().scaledToFill()
+                } placeholder: {
+                    inicial(a)
+                }
+            } else {
+                inicial(a)
+            }
+        }
+        .frame(width: 34, height: 34)
+        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+    }
+
+    func inicial(_ a: HostAccount) -> some View {
+        Text(a.login.prefix(1).uppercased())
+            .font(.headline).foregroundStyle(theme.accent)
+    }
+
+    // MARK: autor
+
+    var autor: some View {
+        @Bindable var accounts = accounts
+        return VStack(alignment: .leading, spacing: 8) {
+            SectionTitle("Autor dos commits")
+            CardList {
+                CardRow("Nome", symbol: "person", color: .gray, first: true) {
+                    TextField(assinatura.name, text: $accounts.authorName)
+                        .multilineTextAlignment(.trailing)
+                        .textFieldStyle(.plain)
+                        .font(.subheadline)
+                        .frame(maxWidth: 220)
+                }
+                CardRow("E-mail", symbol: "envelope", color: .gray) {
+                    TextField(assinatura.email, text: $accounts.authorEmail)
+                        .multilineTextAlignment(.trailing)
+                        .textFieldStyle(.plain)
+                        .font(.subheadline)
+                        .keyboardType(.emailAddress)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .frame(maxWidth: 220)
+                }
+            }
+            // Os campos vazios não significam "sem autor": a Odete deduz um. Melhor
+            // mostrar a linha pronta do que deixar a pessoa descobrir no primeiro commit.
+            VStack(alignment: .leading, spacing: 3) {
+                Text(deduzida
+                    ? "Sem preencher, a Odete deduz e cada commit vai assinado assim:"
+                    : "Cada commit feito daqui vai assinado assim:")
+                    .font(.caption).foregroundStyle(theme.fgSubtle)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("\(assinatura.name) <\(assinatura.email)>")
+                    .font(OdeteFont.mono(11)).foregroundStyle(theme.fgMuted)
+                    .textSelection(.enabled)
+                    .lineLimit(1).truncationMode(.middle)
+            }
+        }
+    }
+
+    var assinatura: (name: String, email: String) {
+        accounts.autor
+    }
+
+    var deduzida: Bool {
+        accounts.authorName.isEmpty || accounts.authorEmail.isEmpty
+    }
+
+    // MARK: token
 
     var tokenSheet: some View {
         NavigationStack {
             Form {
-                Picker("Serviço", selection: $kind) { ForEach(HostKind.allCases, id: \.self) { Text($0.label).tag($0) }
+                Picker("Serviço", selection: $kind) {
+                    ForEach(HostKind.allCases, id: \.self) { Text($0.label).tag($0) }
                 }
-                .onChange(of: kind) {
-                    _, k in if !k.defaultHost.isEmpty {
+                .onChange(of: kind) { _, k in
+                    if !k.defaultHost.isEmpty {
                         host = k.defaultHost
                     }
                 }
@@ -142,9 +308,10 @@ struct AccountsSettings: View {
                 TextField("usuário", text: $login).autocorrectionDisabled().textInputAutocapitalization(.never)
                 SecureField("token de acesso pessoal", text: $token)
                 Section {
-                    Text(kind == .github ?
-                        "Crie em github.com → Settings → Developer settings → Tokens, com escopo repo (e workflow para Actions)." :
-                        "Token com permissão de leitura e escrita no repositório.")
+                    Text(kind == .github
+                        ? "Crie em github.com → Settings → Developer settings → Tokens, "
+                        + "com escopo repo (e workflow para Actions)."
+                        : "Token com permissão de leitura e escrita no repositório.")
                         .font(.footnote).foregroundStyle(.secondary)
                 }
             }
@@ -165,9 +332,17 @@ struct AccountsSettings: View {
         Task {
             var acc = HostAccount(kind: kind, host: h, login: login.isEmpty ? "eu" : login)
             if kind == .github, h == "github.com", let u = try? await GitHubAPI(token: t).user() {
-                acc.login = u.login; acc.name = u.name; acc.email = u.email; acc.avatarURL = u.avatarUrl
+                acc.login = u.login
+                acc.name = u.name
+                acc.email = u.email
+                acc.avatarURL = u.avatarUrl
             }
-            do { try accounts.add(acc, token: t); adding = false; token = ""; login = "" } catch {
+            do {
+                try accounts.add(acc, token: t)
+                adding = false
+                token = ""
+                login = ""
+            } catch {
                 self.error = error.localizedDescription
             }
         }

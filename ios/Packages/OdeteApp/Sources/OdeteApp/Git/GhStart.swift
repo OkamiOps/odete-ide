@@ -84,8 +84,7 @@ struct GhStart: View {
             ZStack {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .fill(theme.accent.opacity(0.14)).frame(width: 44, height: 44)
-                Image(systemName: "cat").font(.system(size: 20, weight: .medium))
-                    .foregroundStyle(theme.accent)
+                Ratinha(size: 24).foregroundStyle(theme.accent)
             }
             VStack(alignment: .leading, spacing: 3) {
                 Text("\(ws.project.name) ainda não está no GitHub")

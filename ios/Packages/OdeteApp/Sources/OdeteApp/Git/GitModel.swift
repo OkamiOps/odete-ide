@@ -93,10 +93,8 @@ public final class GitModel {
     }
 
     public var author: Signature {
-        let n = accounts.authorName.isEmpty ? (accounts.github?.login ?? "Odete") : accounts.authorName
-        let e = accounts.authorEmail
-            .isEmpty ? "\(n.lowercased().replacingOccurrences(of: " ", with: ""))@odete.local" : accounts.authorEmail
-        return Signature(name: n, email: e)
+        let a = accounts.autor
+        return Signature(name: a.name, email: a.email)
     }
 
     public func credentials(for remote: Remote?) -> Credentials? {

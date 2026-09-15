@@ -23,7 +23,7 @@ struct GitPane: View {
                 // publicar, que é justamente onde a pessoa precisa dele. Escondê-lo
                 // deixava o painel sem porta nenhuma para o GitHub.
                 if git.isRepo {
-                    HeaderButton("cat", label: "GitHub") { showGh = true }
+                    RatinhaButton(label: "GitHub") { showGh = true }
                 }
                 HeaderButton("arrow.clockwise", label: "Atualizar") { git.scheduleRefresh() }
             }

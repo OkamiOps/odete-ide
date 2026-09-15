@@ -7,9 +7,12 @@ import SwiftUI
 /// é desenhada aqui, e não colocada como imagem: assim herda a cor de quem a usa, como
 /// um símbolo do sistema, e fica nítida em qualquer tamanho.
 ///
-/// O traçado vive numa caixa de 100×100 e é escalado na hora de desenhar; o furo da
-/// orelha e o olho são recortados com `destinationOut`, do mesmo jeito que um símbolo do
-/// sistema deixa buraco em vez de pintar o fundo.
+/// A primeira versão tinha a orelha vazada, com um furo no meio, e a 20 pt era só isso
+/// que se via: um anel grande em cima de um borrão — parecia uma orelha, não um rato.
+/// A orelha agora é cheia, o focinho é mais comprido e o rabo enrola até embaixo. Só o
+/// olho continua recortado, como um símbolo do sistema deixa buraco em vez de pintar.
+///
+/// O traçado vive numa caixa de 100×100 e é escalado na hora de desenhar.
 public struct Ratinha: View {
     public var size: CGFloat
 
@@ -21,16 +24,11 @@ public struct Ratinha: View {
         Canvas { ctx, caixa in
             let k = min(caixa.width, caixa.height) / 100
             ctx.scaleBy(x: k, y: k)
+            ctx.stroke(Self.rabo, with: .foreground, style: StrokeStyle(lineWidth: 8, lineCap: .round))
+            ctx.fill(Path(ellipseIn: CGRect(x: 29, y: 11, width: 30, height: 30)), with: .foreground)
             ctx.fill(Self.corpo, with: .foreground)
-            ctx.fill(Path(ellipseIn: CGRect(x: 35, y: 13, width: 34, height: 34)), with: .foreground)
-            ctx.stroke(
-                Self.rabo,
-                with: .foreground,
-                style: StrokeStyle(lineWidth: 6, lineCap: .round)
-            )
             ctx.blendMode = .destinationOut
-            ctx.fill(Path(ellipseIn: CGRect(x: 43, y: 21, width: 18, height: 18)), with: .foreground)
-            ctx.fill(Path(ellipseIn: CGRect(x: 72, y: 48, width: 8, height: 8)), with: .foreground)
+            ctx.fill(Path(ellipseIn: CGRect(x: 69.4, y: 47.4, width: 7.2, height: 7.2)), with: .foreground)
         }
         .frame(width: size, height: size)
         .accessibilityHidden(true)
@@ -39,21 +37,22 @@ public struct Ratinha: View {
     /// Anca, costas, nuca, focinho e barriga, nessa ordem.
     static let corpo: Path = {
         var p = Path()
-        p.move(to: CGPoint(x: 22, y: 58))
-        p.addCurve(to: CGPoint(x: 56, y: 32), control1: CGPoint(x: 22, y: 38), control2: CGPoint(x: 38, y: 30))
-        p.addCurve(to: CGPoint(x: 88, y: 54), control1: CGPoint(x: 72, y: 34), control2: CGPoint(x: 80, y: 44))
-        p.addCurve(to: CGPoint(x: 95, y: 64), control1: CGPoint(x: 94, y: 58), control2: CGPoint(x: 96, y: 60))
-        p.addCurve(to: CGPoint(x: 78, y: 68), control1: CGPoint(x: 93, y: 68), control2: CGPoint(x: 86, y: 68))
-        p.addCurve(to: CGPoint(x: 44, y: 82), control1: CGPoint(x: 66, y: 72), control2: CGPoint(x: 58, y: 80))
-        p.addCurve(to: CGPoint(x: 22, y: 58), control1: CGPoint(x: 32, y: 83), control2: CGPoint(x: 22, y: 74))
+        p.move(to: CGPoint(x: 20, y: 60))
+        p.addCurve(to: CGPoint(x: 52, y: 32), control1: CGPoint(x: 20, y: 40), control2: CGPoint(x: 34, y: 30))
+        p.addCurve(to: CGPoint(x: 84, y: 50), control1: CGPoint(x: 66, y: 34), control2: CGPoint(x: 74, y: 42))
+        p.addCurve(to: CGPoint(x: 95, y: 62), control1: CGPoint(x: 92, y: 55), control2: CGPoint(x: 96, y: 58))
+        p.addCurve(to: CGPoint(x: 76, y: 66), control1: CGPoint(x: 93, y: 66), control2: CGPoint(x: 85, y: 67))
+        p.addCurve(to: CGPoint(x: 40, y: 80), control1: CGPoint(x: 62, y: 72), control2: CGPoint(x: 52, y: 80))
+        p.addCurve(to: CGPoint(x: 20, y: 60), control1: CGPoint(x: 28, y: 80), control2: CGPoint(x: 20, y: 74))
         p.closeSubpath()
         return p
     }()
 
+    /// Desenhado antes do corpo, para sair de trás da anca em vez de grudar por cima.
     static let rabo: Path = {
         var p = Path()
-        p.move(to: CGPoint(x: 24, y: 70))
-        p.addCurve(to: CGPoint(x: 20, y: 96), control1: CGPoint(x: 10, y: 78), control2: CGPoint(x: 6, y: 92))
+        p.move(to: CGPoint(x: 21, y: 68))
+        p.addCurve(to: CGPoint(x: 22, y: 98), control1: CGPoint(x: 4, y: 76), control2: CGPoint(x: 2, y: 94))
         return p
     }()
 }

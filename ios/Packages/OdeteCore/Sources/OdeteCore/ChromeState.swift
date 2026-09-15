@@ -146,6 +146,8 @@ public struct ChromeSnapshot: Codable, Hashable, Sendable {
     public var editor = EditorPrefs()
     /// Mostrar node_modules, .git, dist e companhia na árvore.
     public var mostrarOcultos = false
+    /// Já explicamos uma vez que o Safari em tela cheia suspende o servidor.
+    public var avisoSafariVisto = false
     public var lastProjectId: UUID?
     /// Abas abertas por projeto.
     public var tabsByProject: [UUID: [EditorTab]] = [:]
@@ -174,6 +176,7 @@ public struct ChromeSnapshot: Codable, Hashable, Sendable {
         phoneTab = try c.decodeIfPresent(PhoneTab.self, forKey: .phoneTab) ?? d.phoneTab
         editor = try c.decodeIfPresent(EditorPrefs.self, forKey: .editor) ?? d.editor
         mostrarOcultos = try c.decodeIfPresent(Bool.self, forKey: .mostrarOcultos) ?? d.mostrarOcultos
+        avisoSafariVisto = try c.decodeIfPresent(Bool.self, forKey: .avisoSafariVisto) ?? d.avisoSafariVisto
         lastProjectId = try c.decodeIfPresent(UUID.self, forKey: .lastProjectId)
         tabsByProject = try c.decodeIfPresent([UUID: [EditorTab]].self, forKey: .tabsByProject) ?? [:]
         activeTabByProject = try c.decodeIfPresent([UUID: String].self, forKey: .activeTabByProject) ?? [:]

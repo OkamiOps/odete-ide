@@ -6,9 +6,11 @@ import SwiftUI
 /// Preview do app do usuário: barra de URL, viewport, reload, Safari e console.
 struct PreviewPane: View {
     @Environment(WorkspaceModel.self) private var ws
+    @Environment(ChromeState.self) private var chrome
     @Environment(\.theme) private var theme
     @Environment(\.openURL) private var openURL
     @State private var urlText = ""
+    @State private var avisoSafari: URL?
 
     var body: some View {
         if ws.stack.kind == .swift {
@@ -58,11 +60,7 @@ struct PreviewPane: View {
                             .background(theme.danger, in: Capsule()).offset(x: 2, y: 2)
                     }
                 }
-                HeaderButton("safari", label: "Abrir no Safari") {
-                    if let u = pv.url, u.scheme?.hasPrefix("http") == true {
-                        openURL(u)
-                    }
-                }
+                HeaderButton("safari", label: "Abrir no Safari") { abrirNoSafari() }
             }
             .padding(.horizontal, Metrics.s2)
             .frame(height: 48)
@@ -86,6 +84,48 @@ struct PreviewPane: View {
         }
         .onChange(of: ws.run.servers.count) { _, _ in soltarServidorMorto() }
         .onChange(of: ws.preview.url) { _, new in urlText = new?.absoluteString ?? "" }
+        .confirmationDialog(
+            "O servidor só continua no ar com a Odete à vista",
+            isPresented: Binding(get: { avisoSafari != nil }, set: {
+                if !$0 {
+                    avisoSafari = nil
+                }
+            }),
+            titleVisibility: .visible
+        ) {
+            Button("Abrir assim mesmo") {
+                if let u = avisoSafari {
+                    openURL(u)
+                }
+                avisoSafari = nil
+            }
+            Button("Abrir e não avisar mais") {
+                chrome.snapshot.avisoSafariVisto = true
+                if let u = avisoSafari {
+                    openURL(u)
+                }
+                avisoSafari = nil
+            }
+            Button("Cancelar", role: .cancel) { avisoSafari = nil }
+        } message: {
+            Text(
+                "Em tela cheia o iPad suspende a Odete e a página para de responder em poucos segundos. "
+                    + "Arraste o Safari para o lado (Split View) e o servidor continua servindo enquanto você testa."
+            )
+        }
+    }
+
+    /// Abrir no Safari em tela cheia suspende a Odete, e com ela o servidor: medido, a
+    /// página para de responder cerca de 18 segundos depois de sair. Lado a lado o
+    /// servidor não é suspenso e continua servindo o tempo todo — vale dizer isso uma vez
+    /// em vez de deixar a pessoa descobrir com a página morrendo na mão.
+    func abrirNoSafari() {
+        guard let u = ws.preview.url, u.scheme?.hasPrefix("http") == true else { return }
+        if !ws.run.servers.isEmpty, !chrome.snapshot.avisoSafariVisto {
+            avisoSafari = u
+        } else {
+            openURL(u)
+        }
     }
 
     /// Volta para a tela de "nada rodando" quando a porta que o preview mostrava morreu.

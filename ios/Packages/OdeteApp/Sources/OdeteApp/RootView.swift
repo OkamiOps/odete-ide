@@ -17,7 +17,15 @@ public struct RootView: View {
     public init() {
         let store = StateStore()
         self.store = store
-        let snap = store.load()
+        var snap = store.load()
+        // Instalação nova com iCloud à mão: os projetos nascem no iCloud Drive. Dentro do
+        // container do app eles não sobrevivem a uma desinstalação — some tudo, incluindo
+        // o histórico git e as conversas do agente. Só vale para instalação nova: mudar o
+        // lugar de quem já tem projeto é decisão da pessoa, nos Ajustes.
+        if !snap.welcomeDone, !snap.projectsInCloud, AppModel.cloudRoot() != nil {
+            snap.projectsInCloud = true
+            try? store.saveNow(snap)
+        }
         _chrome = State(initialValue: ChromeState(snapshot: snap))
         _app =
             State(initialValue: AppModel(store: ProjectStore(root: AppModel.projectsRoot(cloud: snap.projectsInCloud))))

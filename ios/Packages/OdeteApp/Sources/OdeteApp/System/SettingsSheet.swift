@@ -289,6 +289,21 @@ struct SettingsContent: View {
 
     // MARK: sistema
 
+    /// Diz onde os projetos moram e o que isso significa. Desinstalar o app apaga o
+    /// container inteiro: sem iCloud, vai junto o código, o histórico git e as conversas.
+    var nota: String {
+        if chrome.snapshot.projectsInCloud {
+            return "Os projetos ficam no iCloud Drive: sincronizam entre aparelhos, "
+                + "funcionam offline e sobrevivem a desinstalar o app."
+        }
+        if app.cloudAvailable {
+            return "Os projetos estão dentro do app. Desinstalar apaga tudo — código, histórico do git "
+                + "e conversas. Ligue o iCloud Drive, ou copie a pasta Odete pelo app Arquivos de vez em quando."
+        }
+        return "iCloud Drive indisponível neste aparelho; os projetos ficam dentro do app e desinstalar "
+            + "apaga tudo. Entre com o Apple ID, ou copie a pasta Odete pelo app Arquivos de vez em quando."
+    }
+
     @ViewBuilder
     var system: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -303,9 +318,7 @@ struct SettingsContent: View {
                     .disabled(!app.cloudAvailable && !chrome.snapshot.projectsInCloud)
                 }
             }
-            CardNote(app.cloudAvailable
-                ? "Move a pasta Projects para o iCloud Drive; continua funcionando offline."
-                : "iCloud Drive indisponível neste aparelho. Entre com o Apple ID ou habilite o iCloud Drive.")
+            CardNote(nota)
         }
         VStack(alignment: .leading, spacing: 8) {
             SectionTitle("Atalhos e arquivos")

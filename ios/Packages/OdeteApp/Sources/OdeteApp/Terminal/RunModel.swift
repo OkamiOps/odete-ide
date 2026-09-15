@@ -94,6 +94,7 @@ public final class RunModel {
         }
         servers.removeAll()
         previewURL = nil
+        diagnostics = []
     }
 
     private func serverOpened(_ port: Int, _ cmd: String) {
@@ -107,6 +108,11 @@ public final class RunModel {
     public func pruneServers() {
         let live = Set(jobs.flatMap(\.ports))
         servers.removeAll { !live.contains($0.port) }
+        // Erro de build é do servidor que os produziu. Sem isto o rodapé seguia com
+        // "1 ⊗" de um build que já não existe, até alguém rodar outro.
+        if servers.isEmpty {
+            diagnostics = []
+        }
         if let u = previewURL, let p = u.port, !live.contains(p) {
             previewURL = servers.last.flatMap { URL(string: "http://127.0.0.1:\($0.port)/") }
         }

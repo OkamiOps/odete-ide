@@ -237,39 +237,64 @@ enum SHA1Digest {
 }
 
 enum HostHttp {
+    /// Abre o listener, pulando para a porta seguinte quando a pedida está ocupada.
+    ///
+    /// Porta em uso só aparece quando o listener falha, nunca ao criá-lo: a tentativa em
+    /// sequência que existia aqui (`try? HttpServer(...)`) não descobria nada, e o
+    /// servidor morria com "NWError 48 - Address already in use" e uma pilha apontando
+    /// para dentro do runtime. Deixar um servidor de pé e mandar subir outro virava um
+    /// erro ilegível em vez de uma porta nova, que é o que o vite faz.
+    static func abrir(
+        rt: JSRuntime,
+        box: ServersBox,
+        id: Int,
+        porta: UInt16,
+        restantes: Int,
+        avisar: @escaping @Sendable (String) -> Void
+    ) {
+        guard let server = try? HttpServer(id: id, port: porta, rt: rt) else {
+            avisar("não consegui abrir a porta \(porta)")
+            return
+        }
+        server.listener.stateUpdateHandler = { [weak server] state in
+            guard let server else { return }
+            switch state {
+            case .ready:
+                rt.call("__odete_httpListening", [id, Int(server.actualPort)])
+            case let .failed(erro):
+                let ocupada = if case .posix(.EADDRINUSE) = erro {
+                    true
+                } else {
+                    false
+                }
+                if ocupada, porta != 0, restantes > 0 {
+                    server.stop()
+                    box.servers.removeValue(forKey: id)
+                    abrir(rt: rt, box: box, id: id, porta: porta + 1, restantes: restantes - 1, avisar: avisar)
+                } else if ocupada {
+                    avisar("porta \(porta) ocupada, e as \(21 - restantes) seguintes também")
+                } else {
+                    avisar(erro.localizedDescription)
+                }
+            default: break
+            }
+        }
+        box.servers[id] = server
+        server.start()
+    }
+
     static func install(_ rt: JSRuntime) {
         let h = rt.host
-        var servers: [Int: HttpServer] = [:]
         var nextId = 1
         let box = ServersBox()
         let listen: @convention(block) (Int) -> Any = { [unowned rt] port in
             let id = nextId
             nextId += 1
-            var p = UInt16(clamping: port)
-            var server: HttpServer?
-            for attempt in 0 ..< 20 {
-                let candidate = p == 0 ? 0 : p + UInt16(attempt)
-                if let s = try? HttpServer(id: id, port: candidate, rt: rt) {
-                    server = s
-                    p = candidate
-                    break
-                }
-            }
-            guard let server else { return ["error": "EADDRINUSE"] }
-            server.listener.stateUpdateHandler = { [weak server] state in
-                guard let server else { return }
-                switch state {
-                case .ready:
-                    rt.call("__odete_httpListening", [id, Int(server.actualPort)])
-                case let .failed(e):
-                    rt.call("__odete_httpError", [id, e.localizedDescription])
-                default: break
-                }
-            }
-            box.servers[id] = server
-            servers[id] = server
             rt.keepAlive += 1
-            server.start()
+            abrir(rt: rt, box: box, id: id, porta: UInt16(clamping: port), restantes: 20) { msg in
+                rt.keepAlive = max(rt.keepAlive - 1, 0)
+                rt.call("__odete_httpError", [id, msg])
+            }
             return ["id": id]
         }
         h.setObject(listen, forKeyedSubscript: "httpListen" as NSString)

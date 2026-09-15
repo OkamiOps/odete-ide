@@ -79,6 +79,7 @@ struct HistorySheet: View {
                     Image(systemName: "xmark.circle.fill").font(.system(size: 12)).foregroundStyle(theme.fgSubtle)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Limpar busca")
             }
         }
         .padding(.horizontal, 10).frame(height: 34)

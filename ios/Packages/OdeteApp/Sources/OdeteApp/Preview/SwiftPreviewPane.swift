@@ -62,6 +62,8 @@ struct SwiftPreviewPane: View {
                     )
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Tamanho da tela: \(viewport.label)")
+            .help("Tamanho da tela")
             if let p = package, p.isPackage {
                 PlaygroundButton(package: p.root)
             } else {

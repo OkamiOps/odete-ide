@@ -76,6 +76,7 @@ public struct SectionTitle<MenuContent: View>: View {
                 }
                 .menuIndicator(.hidden)
                 .fixedSize()
+                .accessibilityLabel("Mais ações em \(title)")
             }
         }
     }

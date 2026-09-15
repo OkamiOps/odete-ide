@@ -138,6 +138,7 @@ struct FileTreeView: View {
                         .foregroundStyle(theme.fgSubtle)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Limpar filtro")
             }
         }
         .padding(.horizontal, 8)

@@ -398,6 +398,8 @@ struct Crumbs: View {
                         .frame(width: 22, height: 22).contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Git deste arquivo")
+                .help("Git deste arquivo")
                 .menuIndicator(.hidden)
             }
             Text(Language.detect(path: path).label).font(OdeteFont.mono(10)).foregroundStyle(theme.fgSubtle)

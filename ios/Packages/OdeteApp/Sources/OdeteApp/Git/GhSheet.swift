@@ -219,6 +219,8 @@ struct PullDetail: View {
                         Spacer()
                         Button { openURL(URL(string: pull.htmlUrl)!) } label: { Image(systemName: "safari") }
                             .buttonStyle(.glass).controlSize(.small)
+                            .accessibilityLabel("Abrir no GitHub")
+                            .help("Abrir no GitHub")
                     }
                     MarkdownText(text: pull.body?.isEmpty == false ? pull.body! : "_sem descrição_")
                 }
@@ -381,6 +383,7 @@ struct CreatePR: View {
                     }
                 }
                 .buttonStyle(.glass).controlSize(.small).disabled(suggesting)
+                .accessibilityLabel("Sugerir título e descrição com o agente")
                 .help("Sugerir título e descrição com o agente")
             }
             TextField("Descrição", text: $desc, axis: .vertical).lineLimit(4 ... 12)

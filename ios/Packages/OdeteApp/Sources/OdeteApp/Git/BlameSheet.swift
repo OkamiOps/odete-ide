@@ -94,6 +94,7 @@ struct BlameSheet: View {
                     .frame(width: 28, height: 28).contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Fechar o commit")
         }
         .padding(.horizontal, 14).padding(.vertical, 8)
         .frame(maxWidth: .infinity, alignment: .leading)

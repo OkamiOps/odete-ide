@@ -49,6 +49,7 @@ struct SearchPane: View {
                             Image(systemName: "xmark.circle.fill").foregroundStyle(theme.fgSubtle)
                         }
                         .buttonStyle(.plain)
+                        .accessibilityLabel("Limpar busca")
                     }
                 }
                 .padding(.horizontal, 10)

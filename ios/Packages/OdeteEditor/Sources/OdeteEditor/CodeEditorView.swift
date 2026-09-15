@@ -19,6 +19,10 @@ public struct CodeEditorView: UIViewRepresentable {
     public var changes: [EditorLineChange]
     /// Caminhos de import que apontam para arquivos do projeto.
     public var links: [EditorLink]
+    /// Busca dentro deste arquivo.
+    public var find: EditorFind?
+    /// Pedido de substituição, disparado pelo `token`.
+    public var replace: EditorReplace?
     public var completion: CompletionSource?
     public var onSave: () -> Void
     public var onFind: () -> Void
@@ -26,6 +30,8 @@ public struct CodeEditorView: UIViewRepresentable {
     public var onCursor: (Int) -> Void
     /// Tocou num caminho de import sublinhado.
     public var onOpenLink: (String) -> Void
+    /// Quantas ocorrências a busca do arquivo achou.
+    public var onFindResults: (Int) -> Void
 
     public init(
         text: Binding<String>,
@@ -38,12 +44,15 @@ public struct CodeEditorView: UIViewRepresentable {
         issues: [EditorIssue] = [],
         changes: [EditorLineChange] = [],
         links: [EditorLink] = [],
+        find: EditorFind? = nil,
+        replace: EditorReplace? = nil,
         completion: CompletionSource? = nil,
         onSave: @escaping () -> Void = {},
         onFind: @escaping () -> Void = {},
         onGutterLongPress: @escaping (Int) -> Void = { _ in },
         onCursor: @escaping (Int) -> Void = { _ in },
-        onOpenLink: @escaping (String) -> Void = { _ in }
+        onOpenLink: @escaping (String) -> Void = { _ in },
+        onFindResults: @escaping (Int) -> Void = { _ in }
     ) {
         _text = text
         self.documentId = documentId
@@ -55,12 +64,15 @@ public struct CodeEditorView: UIViewRepresentable {
         self.issues = issues
         self.changes = changes
         self.links = links
+        self.find = find
+        self.replace = replace
         self.completion = completion
         self.onSave = onSave
         self.onFind = onFind
         self.onGutterLongPress = onGutterLongPress
         self.onCursor = onCursor
         self.onOpenLink = onOpenLink
+        self.onFindResults = onFindResults
     }
 
     public func makeUIView(context: Context) -> TextView {
@@ -137,6 +149,14 @@ public struct CodeEditorView: UIViewRepresentable {
             c.changes = changes
             c.links = links
             c.scheduleDecorations()
+        }
+        if c.find != find || docChanged {
+            c.find = find
+            c.buscar(tv)
+        }
+        if let replace, c.replaceToken != replace.token {
+            c.replaceToken = replace.token
+            c.substituir(tv, replace)
         }
         if let reveal, c.revealToken != reveal.token {
             c.revealToken = reveal.token
@@ -246,6 +266,10 @@ public struct CodeEditorView: UIViewRepresentable {
         var issues: [EditorIssue] = []
         var changes: [EditorLineChange] = []
         var links: [EditorLink] = []
+        var find: EditorFind?
+        var replaceToken = -1
+        /// Onde estão as ocorrências da busca no arquivo.
+        var buscaRanges: [NSRange] = []
         let overlay = GutterOverlay(frame: .zero)
         let guides = IndentGuides(frame: .zero)
         let changeMarks = ChangeMarks(frame: .zero)

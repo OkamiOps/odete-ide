@@ -236,6 +236,9 @@ struct CenterPane: View {
         } else if let path {
             VStack(spacing: 0) {
                 Crumbs(path: path, escolher: escolher, trocar: trocar)
+                if ws.busca.aberta {
+                    FindBar(busca: ws.busca)
+                }
                 if let p = ws.agent.pendingPatches.first(where: { $0.path == path }) {
                     PatchBanner(patch: p)
                 }
@@ -258,16 +261,21 @@ struct CenterPane: View {
                     },
                     changes: ws.patchChanges[path] ?? [],
                     links: ws.links[path] ?? [],
+                    find: ws.busca.find,
+                    replace: ws.busca.replace,
                     completion: CompletionSource(files: ws.filePaths, packages: ws.packages, path: path),
                     onSave: { ws.save(path) },
-                    onFind: { chrome.snapshot.side = .search; chrome.snapshot.sideOpen = true },
+                    // A lupa do teclado procura aqui dentro; a busca do projeto inteiro
+                    // continua no painel lateral (⌘⇧F).
+                    onFind: { ws.busca.abrir() },
                     onGutterLongPress: { hunkAt = HunkRef(path: path, line: $0) },
                     onCursor: {
                         if path == ws.active {
                             ws.cursorOffset = $0
                         }
                     },
-                    onOpenLink: { ws.openFile($0) }
+                    onOpenLink: { ws.openFile($0) },
+                    onFindResults: { ws.busca.contagem($0) }
                 )
                 // Folha de ação, não popover: o popover reaparecia sozinho a cada
                 // redesenho e engolia o toque seguinte, que era o toque que devia levar

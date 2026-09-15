@@ -64,6 +64,9 @@ public final class WorkspaceModel {
     public var links: [String: [EditorLink]] = [:]
     /// Apelidos de caminho do `tsconfig.json` (`@/` → `src/`).
     public var tsAliases: [String: String] = [:]
+    /// Busca dentro do arquivo aberto. Mora aqui, e não num `@State` do centro, porque o
+    /// ⌘F vem do menu de comandos, que só alcança os modelos.
+    public let busca = BuscaLocal()
     /// Linhas que o patch pendente do agente mexeu, por arquivo aberto.
     public var patchChanges: [String: [EditorLineChange]] = [:]
     public var lint: [String: [LintIssue]] = [:]

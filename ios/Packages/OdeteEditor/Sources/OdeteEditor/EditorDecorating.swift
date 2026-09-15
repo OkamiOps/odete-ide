@@ -34,6 +34,7 @@ extension CodeEditorView.Coordinator {
         marcarMudancas(tv, ns: ns, starts: starts, into: &ranges)
         marcarProblemas(tv, ns: ns, starts: starts, into: &ranges)
         marcarElos(tv, ns: ns)
+        marcarBusca(into: &ranges)
         tv.highlightedRanges = ranges
     }
 
@@ -293,5 +294,64 @@ extension CodeEditorView.Coordinator {
             }
         }
         return out
+    }
+}
+
+/// Busca e substituição dentro do arquivo aberto.
+extension CodeEditorView.Coordinator {
+    func consulta(_ f: EditorFind) -> SearchQuery {
+        SearchQuery(
+            text: f.texto,
+            matchMethod: f.regex ? .regularExpression : .contains,
+            isCaseSensitive: f.caseSensitive
+        )
+    }
+
+    func buscar(_ tv: TextView) {
+        guard let f = find, f.texto.count >= 1 else {
+            buscaRanges = []
+            parent.onFindResults(0)
+            scheduleDecorations()
+            return
+        }
+        let achados = tv.search(for: consulta(f)).map(\.range)
+        // Só avisa a contagem quando ela muda: o retorno entra em `@State` da view que
+        // nos desenha, e avisar a cada layout seria um ciclo de atualização.
+        if achados.count != buscaRanges.count {
+            parent.onFindResults(achados.count)
+        }
+        buscaRanges = achados
+        if !achados.isEmpty {
+            let i = min(max(f.indice, 0), achados.count - 1)
+            tv.selectedRange = achados[i]
+            tv.scrollRangeToVisible(achados[i])
+        }
+        scheduleDecorations()
+    }
+
+    func substituir(_ tv: TextView, _ r: EditorReplace) {
+        guard let f = find, !f.texto.isEmpty else { return }
+        let achados = tv.search(for: consulta(f), replacingMatchesWith: r.por)
+        guard !achados.isEmpty else { return }
+        let alvo = r.todos ? achados : [achados[min(max(f.indice, 0), achados.count - 1)]]
+        tv.replaceText(in: BatchReplaceSet(replacements: alvo.map {
+            .init(range: $0.range, text: $0.replacementText)
+        }))
+        buscar(tv)
+    }
+
+    /// Pinta as ocorrências: todas de leve, a que está em foco por inteiro.
+    func marcarBusca(into ranges: inout [HighlightedRange]) {
+        guard !buscaRanges.isEmpty else { return }
+        let cores = palette ?? parent.palette
+        let atual = min(max(find?.indice ?? 0, 0), buscaRanges.count - 1)
+        for (i, r) in buscaRanges.enumerated() {
+            ranges.append(HighlightedRange(
+                id: "busca-\(i)",
+                range: r,
+                color: UIColor(hex: cores.accent).withAlphaComponent(i == atual ? 0.45 : 0.18),
+                cornerRadius: 3
+            ))
+        }
     }
 }

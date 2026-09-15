@@ -86,6 +86,7 @@ public final class WorkspaceModel {
     var lintEngine: Esbuild?
 
     private let chrome: ChromeState
+    private let rascunhos: Rascunhos
     private var watcher: DirectoryWatcher?
     private var saveTasks: [String: Task<Void, Never>] = [:]
 
@@ -93,6 +94,7 @@ public final class WorkspaceModel {
         self.project = project
         self.root = root
         self.chrome = chrome
+        rascunhos = Rascunhos(projeto: project.id.uuidString)
         ops = FileOps(root: root)
         git = GitModel(root: root, accounts: accounts)
         run = RunModel(root: root, git: git)
@@ -106,6 +108,7 @@ public final class WorkspaceModel {
         for t in tabs {
             load(t.path)
         }
+        retomarRascunhos()
         let w = DirectoryWatcher(url: root) { [weak self] in
             Task { @MainActor in self?.externalReload() }
         } onTick: { [weak self] in
@@ -119,6 +122,39 @@ public final class WorkspaceModel {
             analyze(t.path)
         }
         refreshGutters()
+    }
+
+    /// Devolve às abas o que estava digitado e não salvo quando o app saiu de cena.
+    ///
+    /// Só entra o que difere do disco: se alguém salvou pelo caminho, o rascunho é
+    /// passado e voltaria como falsa alteração pendente.
+    private func retomarRascunhos() {
+        let guardados = rascunhos.ler()
+        guard !guardados.isEmpty else { return }
+        for (caminho, texto) in guardados {
+            guard let i = tabs.firstIndex(where: { $0.path == caminho }),
+                  let disco = buffers[caminho], disco != texto else { continue }
+            buffers[caminho] = texto
+            tabs[i].isDirty = true
+        }
+    }
+
+    /// Última chance de não perder o que foi digitado: o iPad encerra app suspenso sem
+    /// aviso. Com salvamento automático, grava agora em vez de esperar o segundo de
+    /// espera; sem ele, guarda o rascunho fora do projeto, sem tocar no arquivo.
+    public func aoSairDeCena() {
+        if chrome.snapshot.editor.autoSave {
+            saveAll()
+        }
+        guardarRascunhos()
+    }
+
+    private func guardarRascunhos() {
+        var sujos: [String: String] = [:]
+        for t in tabs where t.isDirty {
+            sujos[t.path] = buffers[t.path]
+        }
+        rascunhos.gravar(sujos)
     }
 
     /// Recarrega o buffer de um arquivo que outra coisa (agente, shell) escreveu no disco.
@@ -144,6 +180,7 @@ public final class WorkspaceModel {
             t.cancel()
         }
         saveAll()
+        guardarRascunhos()
     }
 
     // MARK: árvore

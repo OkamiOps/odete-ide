@@ -50,7 +50,9 @@ public struct RootView: View {
         .onChange(of: fase) { _, nova in
             guard let ws = app.workspace else { return }
             switch nova {
-            case .background: ws.run.aoSairDeCena()
+            case .background:
+                ws.run.aoSairDeCena()
+                ws.aoSairDeCena()
             case .active: ws.run.aoVoltarParaCena()
             default: break
             }

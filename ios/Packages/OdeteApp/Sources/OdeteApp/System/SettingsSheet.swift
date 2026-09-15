@@ -241,7 +241,8 @@ struct SettingsContent: View {
                     }
                 }
                 CardNote(
-                    "O salvamento automático espera 1 s depois de você parar de digitar. Sem ele, ⌘S ou o botão Salvar."
+                    "O salvamento automático espera 1 s depois de você parar de digitar. Sem ele, ⌘S ou o botão "
+                        + "Salvar — e o que ficar sem salvar volta na próxima abertura, sem tocar no arquivo."
                 )
             }
         }

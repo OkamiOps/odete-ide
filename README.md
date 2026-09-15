@@ -1,164 +1,349 @@
-# Odete para iPad e iPhone
+<div align="center">
 
-App nativo SwiftUI da Odete. iOS/iPadOS 26 ou superior, Swift 6.
+<img src="docs/img/icone.png" width="104" alt="Odete" />
 
-Spec e plano: `../docs/superpowers/specs/2026-09-14-odete-ios-fase1-fundacao-design.md`
-e `../docs/superpowers/plans/2026-09-14-odete-ios-fase1-fundacao.md`.
+# Odete
 
-## Requisitos
+**A real IDE that runs entirely on an iPad.**
+Editor, git, terminal, npm, live preview and a coding agent — no Mac, no server, no remote runner.
 
-- Xcode 26.6 ou superior, com o runtime de simulador iOS 26.5.
+[![Platform](https://img.shields.io/badge/iPadOS%20%C2%B7%20iOS-26%2B-000000?style=flat-square&logo=apple&logoColor=white)](#requirements)
+[![Swift](https://img.shields.io/badge/Swift-6-F05138?style=flat-square&logo=swift&logoColor=white)](#architecture)
+[![SwiftUI](https://img.shields.io/badge/SwiftUI-native-0A84FF?style=flat-square)](#architecture)
+[![On-device](https://img.shields.io/badge/runs-100%25%20on--device-34C759?style=flat-square)](#how-it-actually-runs)
+[![Languages](https://img.shields.io/badge/languages-5-FF6B2C?style=flat-square)](#speaking-five-languages)
+[![Tests](https://img.shields.io/badge/tests-223-8E8E93?style=flat-square)](#contributing)
+
+**English** · [Português](README.pt-BR.md) · [Deutsch](README.de.md) · [Français](README.fr.md) · [Español](README.es.md)
+
+</div>
+
+---
+
+> **TL;DR** — Odete is a native SwiftUI IDE for iPadOS 26. It has a real git repository per
+> project (libgit2), a shell that actually runs `npm install` and `npm run dev`, a Node-compatible
+> runtime on JavaScriptCore, esbuild compiled to WebAssembly, and an AI agent that reads your
+> files, runs commands and proposes patches you accept hunk by hunk. Nothing is compiled in the
+> cloud. Nothing is uploaded. Close the lid — there is no lid.
+
+<div align="center">
+  <img src="docs/img/preview.png" width="900" alt="A Vite project running in Odete: source on the left, dev server in the terminal, live page in Preview" />
+  <br />
+  <sub>A React + Vite project: source, dev server and the live page — all on the iPad.</sub>
+</div>
+
+---
+
+## Why this exists
+
+An iPad is a fast computer with a terrible development story. The usual answers are a remote
+VM, a web IDE, or a Mac in the next room. All three mean: no plane, no subway, no signal, no work.
+
+Odete takes the other road. Everything that has to run, runs here.
+
+<table>
+<tr>
+<td width="50%" valign="top">
+
+<h3>✅ What it does</h3>
+
+- Edits code with tree-sitter highlighting and real autocomplete
+- Clones, commits, branches, merges, pushes — actual git
+- Runs `npm install` against the real registry
+- Runs `npm run dev` and serves your app on `127.0.0.1`
+- Renders the running app in a Preview pane with hot reload
+- Runs an AI agent with tools, patches and checkpoints
+- Speaks 5 languages, from the screens to the terminal output
+
+</td>
+<td width="50%" valign="top">
+
+<h3>❌ What it doesn't</h3>
+
+- No Swift compiler (Apple doesn't ship one for iOS)
+- No SSH for git — HTTPS and tokens only
+- No native binaries (`esbuild`, `swc`, `lightningcss`) —
+  Odete substitutes its own equivalents
+- No `astro build` / `next build` yet — dev mode only
+- No submodules, cherry-pick or interactive rebase
+- No account required, and no telemetry either
+
+</td>
+</tr>
+</table>
+
+---
+
+## The five panes
+
+<table>
+<tr>
+<td width="50%" valign="top">
+
+<h3>📝 Editor</h3>
+
+Runestone with tree-sitter. Git gutter marks (green, blue, red — tap one to open the hunk
+with **Discard**), the file's symbols one `@` away in the command palette, light per-language lint plus real syntax errors
+from esbuild, and completion from file words, project paths and snippets.
+
+Tabs, split view, diff view, image/PDF/SQLite viewers. Unsaved buffers survive a restart.
+
+</td>
+<td width="50%" valign="top">
+
+<h3>🌿 Git</h3>
+
+libgit2, not a wrapper. Status, stage by file or by hunk, commit, branch, merge with conflict
+resolution, stash, remotes over HTTPS, blame and per-file history.
+
+GitHub pull requests live in the pane: open one, read the Markdown, check CI, comment, merge.
+✨ writes the commit message from the staged diff.
+
+</td>
+</tr>
+<tr>
+<td valign="top">
+
+<h3>⌨️ Terminal</h3>
+
+Odete's own shell — pipes, redirects, `&&`, `||`, `;`, `&`, `$VAR`, job control, history and Tab
+completion. `npm`, `node`, `git`, `npx`, plus the usual `ls`/`cat`/`grep`/`find`.
+
+Anything that opens a port becomes a job (`jobs`, `kill %1`) and the Preview follows the last one.
+
+</td>
+<td valign="top">
+
+<h3>▶️ Preview</h3>
+
+A WKWebView pointed at your dev server, reloading every time you save. iPhone/iPad/desktop
+viewports, the page's own console, and one tap to open it in Safari.
+
+With no server running, `index.html` is served straight off disk through `odete://static/`.
+
+</td>
+</tr>
+<tr>
+<td colspan="2" valign="top">
+
+<h3>✨ Agent</h3>
+
+Bring your own account — Claude (subscription OAuth), Codex and Grok (device code), or any
+OpenAI-/Anthropic-compatible endpoint by key and base URL. Tokens live in the Keychain, never
+in a file.
+
+Eight tools run against the real project: read, write, replace, list, grep, read the terminal,
+run a shell command, and talk to the GitHub API. Three modes — **Chat** reads, **Plan** writes
+only `.odete/plan.md`, **Build** edits. Three permission levels — **Ask**, **Auto**, **Full** —
+and anything that writes to someone else's repository asks every time, even on Full.
+
+Every edit arrives as a patch you accept, reject, or accept hunk by hunk. A checkpoint is
+written before each turn, so "undo last turn" is one tap.
+
+</td>
+</tr>
+</table>
+
+<div align="center">
+  <img src="docs/img/git.png" width="620" alt="The Git pane: branch, commit box, changes, pull requests and history" />
+  <br />
+  <sub>The Git pane. Pull requests are read, reviewed and merged without leaving the app.</sub>
+</div>
+
+---
+
+## How it actually runs
+
+This is the part people don't believe, so here is the honest mechanism:
+
+| Piece | How | Caveat |
+|---|---|---|
+| **Node** | JavaScriptCore + a hand-written Node layer: `fs`, `path`, `events`, `buffer`, `stream`, `timers`, `fetch`, `http`, `require` | Not V8. No native addons. |
+| **npm** | Real registry, real semver resolution, real `package-lock.json` v3, real tarballs, real `.bin` | Packages with native binaries fall back to `esm.sh` |
+| **Bundler** | `esbuild-wasm` running inside JavaScriptCore | Transform and dev server; `build` for Vite only |
+| **HTTP server** | Network.framework, bound to `127.0.0.1` | Local to the device, by design |
+| **git** | libgit2 1.9.7 as an XCFramework, SecureTransport, no SSH | HTTPS + token |
+| **Swift preview** | An interpreter for a subset of SwiftUI, rendered as real SwiftUI | No compiler — see [Swift on the iPad](#swift-on-the-ipad) |
+
+Dev servers that work today: **Vite** (`dev`, `build`, `preview`), **Astro** (`dev`), **Next** (`dev`),
+**Nest** (via `node`).
+
+---
+
+## Swift on the iPad
+
+There is no Swift compiler on iOS, and Odete does not pretend otherwise.
+
+What it does instead: the Preview **interprets** a useful subset of SwiftUI and renders it as
+genuine SwiftUI — stacks, `List`/`Form`/`Section`, `ScrollView`, `NavigationStack`/`Link`, `Text`,
+`Button`, `Toggle`, `TextField`, `Slider`, `Stepper`, `Image(systemName:)`, `Label`, `ForEach`,
+`if`/`else`, `@State`/`@Binding`, functions, string interpolation and the common modifiers.
+State survives a save; "reset" starts it over. Anything outside the subset becomes a dashed
+placeholder plus a warning in Problems, with the line number.
+
+For code that must actually compile, the **Swift Playground** template produces a `.swiftpm`
+package and a button hands it to Swift Playgrounds.
+
+---
+
+## Speaking five languages
+
+<div align="center">
+  <img src="docs/img/idiomas.png" width="820" alt="The language picker: device language, Português, English, Deutsch, Français, Español" />
+</div>
+
+The whole app — screens, terminal output, git messages, lint warnings, and the language the
+agent answers in — is translated into **🇧🇷 Português · 🇺🇸 English · 🇩🇪 Deutsch · 🇫🇷 Français · 🇪🇸 Español**.
+
+By default Odete follows the iPad. Change it in **Settings → Language** and the interface
+switches immediately, without reopening the app. Dates, file sizes, relative times and the
+speech recogniser follow the same choice.
+
+826 strings live in a single String Catalog. `make i18n` compares it against the source and
+fails if a phrase was added without translations — which is how it stays that way.
+
+---
+
+## Getting started
+
+### Requirements
+
+- Xcode 26.6 or newer, with the iOS 26.5 simulator runtime
 - `brew install xcodegen swiftformat swiftlint`
 
-## Comandos
+### Build and run
 
 ```bash
-make gen     # gera Odete.xcodeproj a partir de project.yml
-make build   # compila para o simulador iPad Air 11-inch (M4)
-make run     # compila, instala e abre no simulador
-make unit    # testes unitários de todos os pacotes
-make test    # testes de interface (XCUITest)
-make lint    # swiftformat --lint + swiftlint
-make format  # swiftformat
+git clone https://github.com/OkamiOps/odete-ide.git
+cd odete-ide
+make run
 ```
 
-Outro simulador: `make run SIM="iPhone 17"`.
+`make run` generates the Xcode project, builds it, installs it on the iPad Air 11-inch (M4)
+simulator and launches it. For another device:
 
-## Estrutura
-
-```
-project.yml            XcodeGen
-Odete/                 target do app: OdeteApp.swift, Info.plist, Assets
-Packages/
-  OdeteCore            modelos puros, temas, ignore, linguagem, estado persistido
-  OdeteFiles           projetos em Documents/Projects, árvore, operações, watcher, busca, modelos
-  OdeteEditor          CodeEditorView (Runestone + tree-sitter), tema do editor, barra do teclado
-  OdeteGit             libgit2 (Vendor/libgit2/libgit2.xcframework): Repository actor, diff/hunks,
-                       branches, merge, stash, remotos HTTPS
-  OdeteAccounts        Keychain, contas por host, device flow e API REST do GitHub
-  OdeteRuntime         JavaScriptCore com camada Node (fs, path, events, buffer, stream,
-                       timers, fetch, http real em 127.0.0.1 via Network.framework, require)
-  OdeteNpm             npm de verdade: registro, semver, package-lock v3, tarballs, .bin,
-                       fallback esm.sh para o que não instalar
-  OdeteBundler         esbuild-wasm dentro do JSC: transform TS/ESM, build, dev server com reload
-  OdeteShell           shell da Odete: parser (| > >> < && || ; & $VAR), builtins, git, npm,
-                       node, binários de .bin, vite/astro/next, jobs, histórico, Tab
-  OdetePreview         WKWebView do preview, esquema odete://static/ e ponte de console
-  OdeteAgent           agente: contas (Claude OAuth, Codex e Grok por device code, chaves
-                       OpenAI/Anthropic-compatíveis), streaming dos três formatos, loop com
-                       sete ferramentas, patches, checkpoints, conversas, regras e skills
-  OdeteSwift           Swift no iPad: parser e interpretador do subconjunto de SwiftUI,
-                       render nativo, pacote .swiftpm e abertura no Swift Playgrounds
-  OdeteUI              design system: Theme, Rail, PaneHeader, EditorTabs, ModePicker, Splitter, FileGlyph
-  OdeteApp             telas: RootView, HubView, WorkspaceView, PhoneShell, FileTreeView,
-                       CenterPane, SearchPane, CommandPalette, SettingsShell, Commands,
-                       Git/ (GitModel, GitPane, DiffView, ConflictView, CloneSheet,
-                       AccountsSettings, GhSheet), Terminal/ (RunModel, TerminalPane),
-                       Preview/ (PreviewPane, SwiftPreviewPane, ProblemsPane), Agent/ (AgentModel, AgentPane,
-                       ChatList, Composer, AIAccountsSettings, AppToolHost)
-Vendor/libgit2         build-libgit2.sh + libgit2.xcframework (1.9.7, SecureTransport, sem SSH)
-Tests/OdeteUITests     XCUITest de fumaça
+```bash
+make run SIM="iPhone 17"
 ```
 
-Dependências entre pacotes: `OdeteApp → {OdeteUI, OdeteGit, OdeteAccounts, OdeteShell, OdetePreview, OdeteAgent}`,
+### Every command
+
+| Command | What it does |
+|---|---|
+| `make gen` | Generate `Odete.xcodeproj` from `project.yml` |
+| `make build` | Compile for the simulator |
+| `make run` | Build, install and launch |
+| `make unit` | Unit tests for all 15 packages (223 tests) |
+| `make test` | UI tests (XCUITest) |
+| `make lint` | `swiftformat --lint` + `swiftlint` |
+| `make format` | `swiftformat` |
+| `make i18n` | Check the translation catalog against the source |
+| `make check` | Everything CI runs, in one go |
+
+---
+
+## Architecture
+
+Fifteen local SwiftPM packages, wired by XcodeGen. Nothing is fetched from the network at
+build time except the pinned libgit2 XCFramework, which is vendored.
+
+| Package | Responsibility |
+|---|---|
+| `OdeteI18n` | The String Catalog, the chosen language, `tr()` and locale-aware formatting |
+| `OdeteCore` | Pure models, themes, ignore rules, language detection, lint, persisted state |
+| `OdeteFiles` | Projects in `Documents/Projects`, file tree, operations, watcher, search, templates |
+| `OdeteEditor` | `CodeEditorView` (Runestone + tree-sitter), editor theme, keyboard bar |
+| `OdeteGit` | libgit2: `Repository` actor, diff/hunks, branches, merge, stash, HTTPS remotes |
+| `OdeteAccounts` | Keychain, per-host accounts, GitHub device flow and REST API |
+| `OdeteRuntime` | JavaScriptCore with the Node layer, real HTTP on `127.0.0.1` |
+| `OdeteNpm` | Registry, semver, `package-lock` v3, tarballs, `.bin`, `esm.sh` fallback |
+| `OdeteBundler` | esbuild-wasm inside JSC: TS/ESM transform, build, dev server with reload |
+| `OdeteShell` | Parser (`\|` `>` `>>` `<` `&&` `\|\|` `;` `&` `$VAR`), builtins, git, npm, node, jobs |
+| `OdetePreview` | The Preview WKWebView, the `odete://static/` scheme and the console bridge |
+| `OdeteAgent` | Providers, streaming, the tool loop, patches, checkpoints, conversations, skills |
+| `OdeteSwift` | SwiftUI subset parser and interpreter, native rendering, `.swiftpm` packaging |
+| `OdeteUI` | Design system: `Theme`, `Rail`, `PaneHeader`, `EditorTabs`, `Splitter`, `FileGlyph` |
+| `OdeteApp` | The screens: hub, workspace, panes, sheets, settings |
+
+Dependencies flow one way: `OdeteApp → {OdeteUI, OdeteGit, OdeteAccounts, OdeteShell, OdetePreview, OdeteAgent, OdeteSwift}`,
 `OdeteShell → {OdeteGit, OdeteNpm, OdeteRuntime, OdeteBundler}`, `OdeteBundler → OdeteRuntime`,
-`OdeteApp → OdeteSwift`, tudo sobre `OdeteCore`.
+everything on top of `OdeteCore` and `OdeteI18n`.
 
-## Fontes
+Design specs and implementation plans for all six phases live in
+[`docs/superpowers/`](docs/superpowers/).
 
-IBM Plex Sans e Mono em `Odete/Fonts/` (licença OFL em `LICENSE-IBM-Plex.txt`).
+---
 
-## Onde ficam os dados
+## Where your data lives
 
-- Projetos: `Documents/Projects/<nome>/`, visíveis no app Arquivos (`UIFileSharingEnabled`,
-  `LSSupportsOpeningDocumentsInPlace`). Cada projeto tem `.odete/project.json`.
-- Layout e preferências: `Application Support/Odete/state.json`.
+| What | Where |
+|---|---|
+| Projects | `Documents/Projects/<name>/` — visible in the Files app |
+| Project metadata | `<project>/.odete/project.json` |
+| Conversations, patches, checkpoints, plans | `<project>/.odete/` (excluded from git) |
+| Layout and preferences | `Application Support/Odete/state.json` |
+| Tokens and keys | Keychain — never a file, never a backup |
 
-## Git (Fase 2)
+`.odete/` is added to `.git/info/exclude`, so the agent's history never lands in your commits.
 
-- Repositório real por projeto. `.odete/` fica em `.git/info/exclude`.
-- Contas em Ajustes → Contas: GitHub por device flow (quando `GitHubDeviceFlow.defaultClientId`
-  estiver preenchido com o OAuth App da Odete) ou token pessoal; outros hosts por token.
-- Sem SSH, rebase interativo, submódulos, cherry-pick ou blame.
+Projects can live in iCloud Drive instead (**Settings → System**), which is the difference
+between "uninstalling loses everything" and "uninstalling loses nothing".
 
-## Runtime, terminal e preview (Fase 3)
+---
 
-- Tudo roda no dispositivo: Node compatível em JavaScriptCore, npm contra o registro real,
-  esbuild em WebAssembly e servidor HTTP em `127.0.0.1`. Sem Mac, VPS ou runner remoto.
-- Terminal (⌘J): `npm install`, `npm run dev`, `node arquivo.ts`, `git ...`, pipes e redirects.
-  Processos que abrem porta viram jobs (`jobs`, `kill %1`); o Preview segue a última porta.
-- Preview: dev server com reload ao salvar, viewport iPhone/iPad, console do app e abrir no
-  Safari. Sem servidor, `index.html` é servido direto do disco em `odete://static/`.
-- Problemas: erros do esbuild e do preview, toque abre o arquivo na linha.
-- Presets: Vite (`vite`, `vite build`, `vite preview`), Astro e Next só em `dev` (SSR
-  completo fica para depois), Nest via `node`. Pacotes com binário nativo (esbuild, swc,
-  rolldown, lightningcss) não rodam no iPad; a Odete usa os equivalentes embutidos.
-- Spec e plano: `../docs/superpowers/specs/2026-09-14-odete-ios-fase3-runtime-design.md`,
-  `../docs/superpowers/plans/2026-09-14-odete-ios-fase3-runtime.md`.
+## The hub
 
-## Agente (Fase 4)
+<div align="center">
+  <img src="docs/img/hub.png" width="900" alt="The project hub: cards with stack badges and last-opened time" />
+</div>
 
-- Contas em Ajustes → Contas de IA: Claude pela assinatura (OAuth do Claude Code, cola o
-  código), Codex e Grok por device code (mesmos clients do Codex CLI e do Grok CLI), e
-  quantas contas OpenAI-compatíveis ou Anthropic-compatíveis quiser, por chave e URL base.
-  Tokens só no Keychain; renovação automática; `invalid_grant` pede reconectar.
-- O agente fala direto com os provedores (Chat Completions, Messages e Responses por SSE).
-  Ferramentas rodam no projeto real: ler, editar (vira patch), listar, grep, ler o terminal e
-  rodar no shell da Odete numa aba própria. Modos Chat/Plan/Build; permissões Ask/Auto/Full.
-- Patches: aceitar, rejeitar, aceitar por hunk, desfazer; faixa no editor e cards no chat.
-  Checkpoint antes de cada turno em `.odete/checkpoints/` com "desfazer último turno".
-- Conversas em `.odete/chats/`, regras em `AGENTS.md`/`CLAUDE.md`/`.odete/rules.md`, skills
-  em `.odete/skills/*.md` por `/nome`, `@arquivo` cola o conteúdo, anexos de foto e print do
-  preview. Redirecionar no meio: mande outra mensagem enquanto roda.
-- Atenção: entrar com a assinatura usa os clients OAuth do Claude Code e do Codex CLI, que
-  a Anthropic e a OpenAI restringem a seus próprios apps. É escolha do usuário.
-- Spec e plano: `../docs/superpowers/specs/2026-09-14-odete-ios-fase4-agente-design.md`,
-  `../docs/superpowers/plans/2026-09-14-odete-ios-fase4-agente.md`.
+Projects show their detected stack, the first line of their README, and when you last opened
+them. **Open folder** adopts a folder from anywhere via a security bookmark (marked *external*),
+**Clone** pulls from a URL, **New project** offers: blank, Vite + React, Astro, plain HTML,
+SwiftUI view, or a Swift Playground package.
 
-## Swift (Fase 5)
+Shortcuts are wired up too: *Open project*, *Run command*, *Ask Odete*, *New project*.
 
-- Templates "Swift Playground" (pacote `.swiftpm` que o Swift Playgrounds abre e compila) e
-  "SwiftUI (uma view)" (um `ContentView.swift` para brincar).
-- Sem compilador no iPad. O Preview interpreta um subconjunto de SwiftUI e renderiza como
-  SwiftUI de verdade: stacks, List/Form/Section, ScrollView, NavigationStack/Link, Text,
-  Button, Toggle, TextField, Slider, Stepper, Image(systemName:), Label, ForEach, if/else,
-  `@State`/`@Binding`, funcs, strings com interpolação e os modificadores comuns. O estado
-  sobrevive ao salvar; "zerar" reinicia. Fora do subconjunto vira um placeholder tracejado e
-  um aviso em Problemas com a linha.
-- Botão "Playgrounds" abre a folha do sistema com o pacote (Swift Playgrounds, Arquivos…).
-- Layout: iPad em retrato (ou janela estreita) vira "iPhone grande": abas embaixo (Arquivos com
-  Busca/Git/Problemas, Editar, Terminal, Preview, Ajustes) e, no máximo, o agente dividindo a tela.
-- Spec e plano: `../docs/superpowers/specs/2026-09-14-odete-ios-fase5-swift-design.md`,
-  `../docs/superpowers/plans/2026-09-14-odete-ios-fase5-swift.md`.
+---
 
-## Polimento e extras (Fase 6)
+## Known gaps
 
-- Interface no vocabulário do iPadOS 26: Liquid Glass nas barras, botões `.glass`/`.glassProminent`,
-  cards `OdeteCard`, rail com cápsula, abas arredondadas, Ajustes em `Form`, retrato com barra
-  flutuante. Tokens em `OdeteUI` (`Metrics`, `Theme.surface/separator/glassTint`).
-- Editor: marcas do git na margem (verde/azul/vermelho; toque abre o hunk com "Descartar"),
-  painel Esboço (funções, classes, títulos, seletores, chaves) e `@` na paleta, lint leve por
-  linguagem + sintaxe pelo esbuild (Problemas e sublinhado), autocompletar com palavras do
-  arquivo, caminhos do projeto e snippets (Tab/Enter aceita o primeiro, toque escolhe).
-- Git: card de Pull requests no painel (abertos, criar, ver todos), detalhe do PR com
-  Markdown, checks, patch por arquivo, comentários e merge; ✨ gera a mensagem de commit a
-  partir do diff staged e o título/descrição do PR a partir dos commits; Histórico por arquivo
-  e Blame no cabeçalho do editor e no menu da árvore.
-- Sistema: "Abrir pasta" no hub (bookmark de segurança; selo "externo"), projetos no iCloud
-  Drive (Ajustes → Sistema; precisa do entitlement e de Apple ID), compartilhar projeto como
-  `.zip` e arquivo avulso, receber `.zip`/pasta por `onOpenURL`; Atalhos: Abrir projeto, Rodar
-  comando, Perguntar à Odete e Novo projeto (`Odete/Intents`).
-- Loja: ícone com variantes dark/tinted, `PrivacyInfo.xcprivacy` (sem coleta), onboarding em
-  três telas na primeira abertura, `OdeteGitHubClientId` no `Info.plist` (via `project.yml`),
-  textos e capturas em `../docs/store/`.
-- Spec e plano: `../docs/superpowers/specs/2026-09-14-odete-ios-fase6-extras-design.md`,
-  `../docs/superpowers/plans/2026-09-14-odete-ios-fase6-extras.md`.
+Stated plainly, because a README that only lists wins is a brochure:
 
-## Pendências conhecidas
+- `astro build` and `next build` don't run yet — Astro and Next are dev-mode only
+- No SourceKit, so no Swift autocomplete; `GeometryReader` and `Canvas` aren't in the preview subset
+- Completion doesn't navigate with arrow keys — Tab/Enter takes the first item, or tap
+- Two agents in parallel, MCP and voice are not built
+- iCloud Drive needs the app signed with the `iCloud.com.okamiops.odete` container
+- GitHub device flow needs `OdeteGitHubClientId` filled in; until then, a personal token
+- Signing in with a Claude or Codex **subscription** uses those CLIs' OAuth clients, which
+  Anthropic and OpenAI restrict to their own apps. That is your call to make, not ours.
 
-- Dois agentes em paralelo, MCP e voz ficam para depois.
-- SourceKit/autocompletar Swift e GeometryReader/Canvas no preview não existem; use o Playgrounds.
-- `astro build` e `next build` ainda não rodam; Next e Astro só como SPA de desenvolvimento.
-- Autocompletar não navega com as setas (só Tab/Enter no primeiro item ou toque).
-- iCloud Drive só funciona com o app assinado com o container `iCloud.com.okamiops.odete`.
-- `OdeteGitHubClientId` vazio até registrar o OAuth App; por ora, token.
+---
+
+## Contributing
+
+`make check` is the gate: format, lint, translation catalog, build, 223 tests. CI runs the same
+thing on every push.
+
+Two rules that aren't obvious:
+
+1. **Any new user-facing string goes through `tr("…")`**, written in Portuguese — the Portuguese
+   *is* the key. Then add the four translations to
+   `Packages/OdeteI18n/Sources/OdeteI18n/Resources/Localizable.xcstrings`. `make i18n` will
+   tell you if you forgot.
+2. **Never translate a string that's compared anywhere.** If some code does `text == "x"`,
+   `"x"` is a sentinel, not a label.
+
+---
+
+## Credits
+
+| | |
+|---|---|
+| [IBM Plex](https://github.com/IBM/plex) | Sans and Mono — OFL |
+| [Runestone](https://github.com/simonbs/Runestone) + [tree-sitter](https://tree-sitter.github.io) | Editor and highlighting — MIT |
+| [libgit2](https://libgit2.org) | Git — GPL2 with linking exception |
+| [esbuild](https://esbuild.github.io) | Bundling and transform — MIT |
+
+Odete is named after a mouse. She is in the icon, and in the corner of the Git pane.

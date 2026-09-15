@@ -35,7 +35,7 @@ struct SearchPane: View {
     var body: some View {
         VStack(spacing: 0) {
             PaneHeader(
-                "Busca",
+                tr("Busca"),
                 detail: hits.isEmpty ? nil : tr("%1$@ em %2$@ arquivos", "\(hits.count)", "\(grouped.count)")
             )
             VStack(spacing: 8) {

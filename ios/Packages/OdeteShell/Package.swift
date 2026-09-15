@@ -24,6 +24,9 @@ let package = Package(
             ],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
-        .testTarget(name: "OdeteShellTests", dependencies: ["OdeteShell"]),
+        .testTarget(
+            name: "OdeteShellTests",
+            dependencies: ["OdeteShell", .product(name: "OdeteI18n", package: "OdeteI18n")]
+        ),
     ]
 )

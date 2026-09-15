@@ -153,7 +153,7 @@ public enum Lint {
             let ns = error as NSError
             let idx = ns.userInfo["NSJSONSerializationErrorIndex"] as? Int ?? 0
             let (line, col) = position(of: idx, in: text)
-            let msg = (ns.userInfo[NSDebugDescriptionErrorKey] as? String ?? "JSON inválido")
+            let msg = (ns.userInfo[NSDebugDescriptionErrorKey] as? String ?? tr("JSON inválido"))
                 .replacingOccurrences(of: #" around (line|character) \d+.*$"#, with: "", options: .regularExpression)
             return [LintIssue(rule: "json", message: msg, severity: .error, line: line, column: col, length: 1)]
         }

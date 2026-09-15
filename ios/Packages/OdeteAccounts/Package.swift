@@ -19,6 +19,9 @@ let package = Package(
             ],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
-        .testTarget(name: "OdeteAccountsTests", dependencies: ["OdeteAccounts"]),
+        .testTarget(
+            name: "OdeteAccountsTests",
+            dependencies: ["OdeteAccounts", .product(name: "OdeteI18n", package: "OdeteI18n")]
+        ),
     ]
 )

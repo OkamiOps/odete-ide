@@ -4,7 +4,7 @@ DEST = platform=iOS Simulator,name=$(SIM),OS=$(OS)
 DERIVED = build
 BUNDLE = com.okamiops.odete
 
-.PHONY: gen build test unit run lint format check clean
+.PHONY: gen build test unit run lint format check clean i18n i18n-limpa
 
 gen:
 	xcodegen generate --spec project.yml
@@ -26,8 +26,15 @@ run: build
 	xcrun simctl install "$(SIM)" $(DERIVED)/Build/Products/Debug-iphonesimulator/Odete.app
 	xcrun simctl launch "$(SIM)" $(BUNDLE)
 
+# Confere o catálogo de tradução contra o código.
+i18n:
+	python3 scripts/i18n.py
+
+i18n-limpa:
+	python3 scripts/i18n.py --limpa
+
 # Tudo que a CI roda, de uma vez, antes de commitar.
-check: lint build unit
+check: lint i18n build unit
 
 lint:
 	swiftformat --lint .

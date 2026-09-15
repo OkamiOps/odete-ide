@@ -1,8 +1,15 @@
 import Foundation
 @testable import OdeteAccounts
+import OdeteI18n
 import Testing
 
 struct DeviceFlowTests {
+    /// Os testes conferem a frase exata que está no código, que é o português. Sem
+    /// travar o idioma, o mesmo teste passa no Mac e falha no simulador em inglês.
+    init() {
+        Texto.escolher(.ptBR)
+    }
+
     @Test func parsesCode() throws {
         let json = #"{"device_code":"dc","user_code":"ABCD-1234","verification_uri":"https://github.com/login/device","expires_in":900,"interval":5}"#
         let c = try GitHubDeviceFlow.parseCode(Data(json.utf8))

@@ -4,10 +4,17 @@ import OdeteAgent
 @testable import OdeteApp
 import OdeteCore
 import OdeteFiles
+import OdeteI18n
 import Testing
 
 @MainActor
 struct WorkspaceModelTests {
+    /// Os testes conferem a frase exata que está no código, que é o português. Sem
+    /// travar o idioma, o mesmo teste passa no Mac e falha no simulador em inglês.
+    init() {
+        Texto.escolher(.ptBR)
+    }
+
     func make() throws -> (WorkspaceModel, ChromeState, URL) {
         let root = FileManager.default.temporaryDirectory.appending(path: "odete-ws-\(UUID().uuidString)")
         let store = ProjectStore(root: root)

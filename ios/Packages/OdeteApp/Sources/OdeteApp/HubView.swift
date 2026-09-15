@@ -281,7 +281,7 @@ struct ProjectCard: View {
                     )
                 Spacer()
                 if project.external {
-                    Pill("externo", on: false)
+                    Pill(tr("externo"), on: false)
                 }
                 Pill(stack.label, on: true, color: stackColor(stack))
             }

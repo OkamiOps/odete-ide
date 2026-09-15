@@ -19,7 +19,7 @@ struct GitPane: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            PaneHeader("Git", detail: git.isRepo ? resumo : nil) {
+            PaneHeader(tr("Git"), detail: git.isRepo ? resumo : nil) {
                 // O gatinho fica sempre: sem repositório no GitHub ele abre a tela de
                 // publicar, que é justamente onde a pessoa precisa dele. Escondê-lo
                 // deixava o painel sem porta nenhuma para o GitHub.

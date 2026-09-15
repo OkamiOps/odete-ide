@@ -31,6 +31,12 @@ jobs:
         working-directory: ios
         run: make lint
 
+      # Frase nova entra no app em português dentro de `tr("…")`. Sem este passo ela
+      # fica em português nos outros quatro idiomas para sempre, sem teste vermelho.
+      - name: Catálogo de tradução
+        working-directory: ios
+        run: make i18n
+
       - name: Build
         working-directory: ios
         run: make build DEST='generic/platform=iOS Simulator'

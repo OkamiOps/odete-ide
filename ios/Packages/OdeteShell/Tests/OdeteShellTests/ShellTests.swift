@@ -1,4 +1,5 @@
 import Foundation
+import OdeteI18n
 @testable import OdeteShell
 import Synchronization
 import Testing
@@ -76,6 +77,12 @@ func project() throws -> URL {
 }
 
 @Suite(.serialized) struct ShellTests {
+    /// Os testes conferem a frase exata que está no código, que é o português. Sem
+    /// travar o idioma, o mesmo teste passa no Mac e falha no simulador em inglês.
+    init() {
+        Texto.escolher(.ptBR)
+    }
+
     @Test func builtinsPipesRedirects() async throws {
         let root = try project()
         let sh = Shell(root: root)

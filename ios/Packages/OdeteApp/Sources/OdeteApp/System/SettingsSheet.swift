@@ -370,7 +370,7 @@ struct SettingsContent: View {
             SectionTitle(tr("Atalhos e arquivos"))
             CardList {
                 CardRow(
-                    tr("Atalhos"),
+                    tr("App Atalhos"),
                     symbol: "app.badge",
                     color: .purple,
                     detail: tr("Abrir projeto, Rodar comando, Perguntar à Odete, Novo projeto"),

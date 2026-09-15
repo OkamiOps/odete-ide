@@ -1,9 +1,16 @@
 import OdeteAgent
 @testable import OdeteApp
+import OdeteI18n
 import Testing
 
 /// Quando o cartão vermelho do agente oferece "Tentar de novo".
 struct RetomadaTests {
+    /// Os testes conferem a frase exata que está no código, que é o português. Sem
+    /// travar o idioma, o mesmo teste passa no Mac e falha no simulador em inglês.
+    init() {
+        Texto.escolher(.ptBR)
+    }
+
     @Test func erroDoProvedorDaParaRepetir() {
         #expect(AgentModel.ehErroQueDaParaRepetir(.error(id: "1", text: "HTTP 404: chatgpt.com")))
     }

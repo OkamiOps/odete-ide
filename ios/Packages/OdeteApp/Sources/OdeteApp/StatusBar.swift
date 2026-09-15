@@ -102,7 +102,7 @@ struct StatusBar: View {
                         Toggle(tr("Mostrar espaços"), isOn: $chrome.snapshot.editor.showWhitespace)
                         Toggle(tr("Guias de indentação"), isOn: $chrome.snapshot.editor.indentGuides)
                     } label: {
-                        label(text: roomy ? "Espaços: \(chrome.snapshot.editor.tabWidth)"
+                        label(text: roomy ? tr("Espaços: %1$@", "\(chrome.snapshot.editor.tabWidth)")
                             : "⇥\(chrome.snapshot.editor.tabWidth)")
                     }
                     .buttonStyle(.plain)

@@ -22,6 +22,10 @@ let package = Package(
             ],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
-        .testTarget(name: "OdeteAgentTests", dependencies: ["OdeteAgent"], resources: [.copy("Fixtures")]),
+        .testTarget(
+            name: "OdeteAgentTests",
+            dependencies: ["OdeteAgent", .product(name: "OdeteI18n", package: "OdeteI18n")],
+            resources: [.copy("Fixtures")]
+        ),
     ]
 )

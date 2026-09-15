@@ -201,7 +201,7 @@ struct SettingsShell: View {
     var body: some View {
         @Bindable var chrome = chrome
         VStack(spacing: 0) {
-            PaneHeader("Ajustes")
+            PaneHeader(tr("Ajustes"))
             Form {
                 Section {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 96), spacing: Metrics.s2)], spacing: Metrics.s2) {

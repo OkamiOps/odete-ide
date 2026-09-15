@@ -21,7 +21,7 @@ struct ProblemsPane: View {
         let total = diags.count + errors.count + swift.count + lint.count
         VStack(spacing: 0) {
             PaneHeader(
-                "Problemas",
+                tr("Problemas"),
                 detail: total == 0 ? tr("tudo limpo") : "\(total)"
             ) {
                 HeaderButton("arrow.clockwise", label: tr("Rebuild")) { ws.run.active?.shell.devServer?.invalidate() }

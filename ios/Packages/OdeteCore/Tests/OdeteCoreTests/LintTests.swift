@@ -1,7 +1,14 @@
 @testable import OdeteCore
+import OdeteI18n
 import Testing
 
 struct LintTests {
+    /// Os testes conferem a frase exata que está no código, que é o português. Sem
+    /// travar o idioma, o mesmo teste passa no Mac e falha no simulador em inglês.
+    init() {
+        Texto.escolher(.ptBR)
+    }
+
     @Test func jsRules() {
         let src = "var a = 1\nif (a == null) debugger\nconsole.log('x == y')\n// var inside comment\nconst s = \"debugger\"\n"
         let issues = Lint.rules(text: src, language: .javascript)

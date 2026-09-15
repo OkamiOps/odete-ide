@@ -1,9 +1,16 @@
 import Foundation
 import OdeteCore
 @testable import OdeteFiles
+import OdeteI18n
 import Testing
 
 struct ProjectStoreTests {
+    /// Os testes conferem a frase exata que está no código, que é o português. Sem
+    /// travar o idioma, o mesmo teste passa no Mac e falha no simulador em inglês.
+    init() {
+        Texto.escolher(.ptBR)
+    }
+
     @Test func createListRenameDuplicateDelete() throws {
         let store = try ProjectStore(root: tempDir())
         #expect(try store.list().isEmpty)

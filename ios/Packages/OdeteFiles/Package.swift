@@ -20,6 +20,9 @@ let package = Package(
             ],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
-        .testTarget(name: "OdeteFilesTests", dependencies: ["OdeteFiles"]),
+        .testTarget(
+            name: "OdeteFilesTests",
+            dependencies: ["OdeteFiles", .product(name: "OdeteI18n", package: "OdeteI18n")]
+        ),
     ]
 )

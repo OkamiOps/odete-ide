@@ -25,7 +25,7 @@ struct FileTreeView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            PaneHeader("Arquivos", detail: ws.project.name) {
+            PaneHeader(tr("Arquivos"), detail: ws.project.name) {
                 HeaderButton("doc.badge.plus", label: tr("Novo arquivo")) { ws.createFile(near: ws.selected) }
                 HeaderButton("folder.badge.plus", label: tr("Nova pasta")) {
                     draft = ""; newFolderAt = ws.selected ?? ""

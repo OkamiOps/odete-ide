@@ -1,5 +1,6 @@
 import Foundation
 @testable import OdeteAgent
+import OdeteI18n
 import Synchronization
 import Testing
 
@@ -265,6 +266,12 @@ func runAll(
 }
 
 @Suite(.serialized) struct LoopTests {
+    /// Os testes conferem a frase exata que está no código, que é o português. Sem
+    /// travar o idioma, o mesmo teste passa no Mac e falha no simulador em inglês.
+    init() {
+        Texto.escolher(.ptBR)
+    }
+
     func make(_ script: [[StreamEvent]]) throws -> (AgentLoop, TestHost, FakeProvider, PatchStore) {
         let root = try tmpProject()
         let host = TestHost(root: root)

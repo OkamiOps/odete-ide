@@ -5,6 +5,8 @@ public enum FileError: LocalizedError, Equatable {
     case alreadyExists(String)
     case notFound(String)
     case outsideRoot(String)
+    /// O conteúdo não é texto em UTF-8; abrir no editor destruiria o arquivo ao salvar.
+    case naoEhTexto(String)
 
     public var errorDescription: String? {
         switch self {
@@ -12,6 +14,7 @@ public enum FileError: LocalizedError, Equatable {
         case let .alreadyExists(p): "Já existe: \(p)"
         case let .notFound(p): "Não encontrado: \(p)"
         case let .outsideRoot(p): "Fora do projeto: \(p)"
+        case let .naoEhTexto(p): "\(p) não é texto em UTF-8"
         }
     }
 }

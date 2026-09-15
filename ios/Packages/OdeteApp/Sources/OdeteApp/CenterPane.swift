@@ -229,8 +229,13 @@ struct CenterPane: View {
         escolher: ((String) -> Void)? = nil,
         trocar: (() -> Void)? = nil
     ) -> some View {
-        if let path, ws.git.conflicts.contains(path), !ws.forceTextEdit.contains(path),
-           ConflictParser.hasMarkers(ws.text(for: path))
+        if let path, ws.naoEhTexto.contains(path) {
+            VStack(spacing: 0) {
+                Crumbs(path: path, escolher: escolher, trocar: trocar)
+                BinaryView(path: path)
+            }
+        } else if let path, ws.git.conflicts.contains(path), !ws.forceTextEdit.contains(path),
+                  ConflictParser.hasMarkers(ws.text(for: path))
         {
             ConflictView(path: path)
         } else if let path {

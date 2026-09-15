@@ -37,7 +37,12 @@ public struct ToolRunner: Sendable {
         switch call.name {
         case "read_file":
             let p = Self.clean(str("path"))
-            return .init(text: host.read(p).map { Self.clip($0) } ?? "não existe: \(p)")
+            if let texto = host.read(p) {
+                return .init(text: Self.clip(texto))
+            }
+            // Binário e latin-1 também devolvem nil aqui; dizer "não existe" fazia o
+            // agente afirmar que um arquivo do projeto não estava lá.
+            return .init(text: host.exists(p) ? "\(p) existe, mas não é texto em UTF-8" : "não existe: \(p)")
         case "list_dir":
             let l = host.list(Self.clean(str("path")))
             return .init(text: l.isEmpty ? "(vazio)" : l.joined(separator: "\n"))

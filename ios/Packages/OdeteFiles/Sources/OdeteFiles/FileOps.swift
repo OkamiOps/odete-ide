@@ -23,7 +23,19 @@ public struct FileOps: Sendable {
         let u = try url(rel)
         guard FileManager.default.fileExists(atPath: u.path) else { throw FileError.notFound(rel) }
         let data = try Data(contentsOf: u)
-        return String(decoding: data, as: UTF8.self)
+        // `String(decoding:as:)` não falha: byte inválido vira `\u{FFFD}`. Abrir um PNG
+        // assim enchia o editor de losangos e, ao salvar, gravava os losangos por cima —
+        // o arquivo original ia embora. Melhor dizer que não é texto.
+        guard !Self.pareceBinario(data), let texto = String(data: data, encoding: .utf8) else {
+            throw FileError.naoEhTexto(rel)
+        }
+        return texto
+    }
+
+    /// Byte zero é o sinal clássico de binário, e nenhum texto de verdade tem um. Olha só
+    /// o começo: arquivo grande não precisa ser lido inteiro para se saber isso.
+    public static func pareceBinario(_ data: Data) -> Bool {
+        data.prefix(8192).contains(0)
     }
 
     public func write(_ rel: String, _ text: String) throws {

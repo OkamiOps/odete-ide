@@ -60,6 +60,8 @@ public final class WorkspaceModel {
     public var forceTextEdit: Set<String> = []
     /// Análise do editor por arquivo aberto: esboço, lint e marcas do git.
     public var outlines: [String: [OutlineItem]] = [:]
+    /// Arquivos abertos que não são texto: ficam sem buffer e nunca são gravados.
+    public var naoEhTexto: Set<String> = []
     /// Caminhos de import que apontam para arquivos do projeto, por arquivo aberto.
     public var links: [String: [EditorLink]] = [:]
     /// Apelidos de caminho do `tsconfig.json` (`@/` → `src/`).
@@ -121,8 +123,8 @@ public final class WorkspaceModel {
 
     /// Recarrega o buffer de um arquivo que outra coisa (agente, shell) escreveu no disco.
     public func reloadBuffer(_ path: String) {
-        guard buffers[path] != nil else { return }
-        buffers[path] = (try? ops.read(path)) ?? ""
+        guard buffers[path] != nil, let novo = try? ops.read(path) else { return }
+        buffers[path] = novo
         markDirty(path, false)
         analyze(path)
     }
@@ -370,7 +372,16 @@ public final class WorkspaceModel {
 
     private func load(_ path: String) {
         if buffers[path] == nil {
-            buffers[path] = (try? ops.read(path)) ?? ""
+            do {
+                buffers[path] = try ops.read(path)
+                naoEhTexto.remove(path)
+            } catch FileError.naoEhTexto {
+                // Sem buffer de propósito: com um buffer vazio o editor abriria em branco
+                // e o primeiro salvamento gravaria o vazio por cima do arquivo.
+                naoEhTexto.insert(path)
+            } catch {
+                buffers[path] = ""
+            }
         }
         marcaDisco[path] = ops.modifiedAt(path)
     }
@@ -431,7 +442,7 @@ public final class WorkspaceModel {
     }
 
     public func save(_ path: String? = nil) {
-        guard let path = path ?? active, let text = buffers[path] else { return }
+        guard let path = path ?? active, let text = buffers[path], !naoEhTexto.contains(path) else { return }
         do {
             try ops.write(path, text)
             marcaDisco[path] = ops.modifiedAt(path)

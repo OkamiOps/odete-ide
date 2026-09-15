@@ -5,13 +5,13 @@ Contagens conferidas contra os limites do [README](README.md).
 ## Nome (30)
 
 ```
-Odete
+Odete IDE
 ```
 
 ## Subtítulo (30)
 
 ```
-A IDE que roda no seu iPad
+Programe de verdade no iPad
 ```
 
 ## Texto promocional (170)

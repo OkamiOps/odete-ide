@@ -5,13 +5,13 @@
 ## Name (30)
 
 ```
-Odete
+Odete IDE
 ```
 
 ## Untertitel (30)
 
 ```
-Eine echte IDE auf dem iPad
+Echt entwickeln, auf dem iPad
 ```
 
 ## Werbetext (170)

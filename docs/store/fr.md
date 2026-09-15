@@ -5,13 +5,13 @@ Locale secondaire. Nombre de caractères vérifié par rapport aux limites du [R
 ## Nom (30)
 
 ```
-Odete
+Odete IDE
 ```
 
 ## Sous-titre (30)
 
 ```
-L’IDE qui tourne sur iPad
+Développer vraiment sur iPad
 ```
 
 ## Texte promotionnel (170)

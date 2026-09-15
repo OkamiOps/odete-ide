@@ -5,13 +5,13 @@ Primary locale. Character counts checked against the limits in [README](README.m
 ## Name (30)
 
 ```
-Odete
+Odete IDE
 ```
 
 ## Subtitle (30)
 
 ```
-The IDE that runs on iPad
+Real development, on iPad
 ```
 
 ## Promotional text (170)

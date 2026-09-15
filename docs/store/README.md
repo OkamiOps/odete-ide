@@ -6,11 +6,15 @@ descrição em alemão.
 
 | Idioma | Arquivo | Locale no App Store Connect |
 |---|---|---|
-| Português (Brasil) | [pt-BR.md](pt-BR.md) | Portuguese (Brazil) |
-| Inglês | [en.md](en.md) | English (U.S.) — idioma principal |
+| Português (Brasil) | [pt-BR.md](pt-BR.md) | Portuguese (Brazil) — idioma principal do app |
+| Inglês | [en.md](en.md) | English (U.S.) |
 | Alemão | [de.md](de.md) | German |
 | Francês | [fr.md](fr.md) | French |
 | Espanhol | [es.md](es.md) | Spanish (Mexico) + Spanish (Spain) |
+
+O app está registrado como **Odete IDE** (`com.okamiops.odete`), com português do
+Brasil como idioma principal. Com "IDE" já no nome, o subtítulo não repete a palavra —
+esses 30 caracteres rendem mais dizendo o que mais ninguém faz.
 
 ## Limites que o App Store Connect impõe
 

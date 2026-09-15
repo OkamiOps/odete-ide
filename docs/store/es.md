@@ -5,13 +5,13 @@ Traducción de [en.md](en.md). Conteo de caracteres verificado contra los límit
 ## Name (30)
 
 ```
-Odete
+Odete IDE
 ```
 
 ## Subtitle (30)
 
 ```
-El IDE que corre en el iPad
+Programar de verdad en iPad
 ```
 
 ## Promotional text (170)

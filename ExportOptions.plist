@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Como o .ipa sai do arquivo, para App Store Connect e TestFlight. -->
+	<key>method</key>
+	<string>app-store-connect</string>
+	<key>teamID</key>
+	<string>7U9S5DB9K9</string>
+
+	<!-- O Xcode cria o App ID, o contêiner iCloud e o perfil no primeiro arquivo,
+	     desde que haja uma conta Apple logada (Xcode → Settings → Accounts). -->
+	<key>signingStyle</key>
+	<string>automatic</string>
+
+	<!-- Subir sozinho na hora de exportar fica para o `make upload`, que é um passo
+	     separado de propósito: dá para conferir o .ipa antes de publicar. -->
+	<key>destination</key>
+	<string>export</string>
+
+	<!-- O bitcode morreu no Xcode 14; declarar aqui evita o aviso. -->
+	<key>uploadSymbols</key>
+	<true/>
+	<key>manageAppVersionAndBuildNumber</key>
+	<false/>
+</dict>
+</plist>

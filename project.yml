@@ -12,7 +12,7 @@ settings:
     SWIFT_STRICT_CONCURRENCY: complete
     IPHONEOS_DEPLOYMENT_TARGET: "26.0"
     TARGETED_DEVICE_FAMILY: "1,2"
-    MARKETING_VERSION: "0.1.0"
+    MARKETING_VERSION: "1.0"
     CURRENT_PROJECT_VERSION: "1"
     CODE_SIGN_STYLE: Automatic
     CODE_SIGNING_ALLOWED: "NO"
@@ -66,6 +66,13 @@ targets:
       properties:
         CFBundleDisplayName: Odete
         CFBundleName: Odete
+        # No topo do Info.plist, e não só dentro de CFBundleIcons: o actool escreve o
+        # aninhado, e a validação da App Store cobra este. Sem ele o upload volta com
+        # ITMS-90713 depois de vinte minutos de espera.
+        CFBundleIconName: AppIcon
+        # O Xcode põe esta em todo app de iOS quando gera o Info.plist sozinho; aqui o
+        # arquivo é escrito à mão, então ela precisa estar escrita.
+        LSRequiresIPhoneOS: true
         CFBundleDevelopmentRegion: pt-BR
         CFBundleLocalizations: [pt-BR, en, de, fr, es]
         UILaunchScreen: {}
@@ -116,21 +123,16 @@ targets:
         # do perfil. As duas convivem porque cada uma vale para um SDK.
         CODE_SIGNING_ALLOWED: "YES"
         CODE_SIGNING_REQUIRED: "NO"
-        CODE_SIGN_IDENTITY: "-"
-        CODE_SIGN_STYLE: Manual
         CODE_SIGNING_REQUIRED[sdk=iphoneos*]: "YES"
-        CODE_SIGN_STYLE[sdk=iphoneos*]: Automatic
+        CODE_SIGN_IDENTITY[sdk=iphonesimulator*]: "-"
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_STYLE[sdk=iphonesimulator*]: Manual
         DEVELOPMENT_TEAM[sdk=iphoneos*]: 7U9S5DB9K9
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         INFOPLIST_KEY_UIUserInterfaceStyle: Automatic
         CODE_SIGN_ENTITLEMENTS: Odete/Odete.entitlements
         CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]: Odete/OdeteSimulator.entitlements
-      configs:
-        Debug:
-          CODE_SIGN_IDENTITY[sdk=iphoneos*]: Apple Development
-        Release:
-          CODE_SIGN_IDENTITY[sdk=iphoneos*]: Apple Distribution
     dependencies:
       - package: OdeteApp
         product: OdeteApp

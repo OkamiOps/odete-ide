@@ -4,7 +4,7 @@ DEST = platform=iOS Simulator,name=$(SIM),OS=$(OS)
 DERIVED = build
 BUNDLE = com.okamiops.odete
 
-.PHONY: gen build test unit run lint format check clean i18n i18n-limpa
+.PHONY: gen build test unit run lint format check clean i18n i18n-limpa archive ipa upload
 
 gen:
 	xcodegen generate --spec project.yml
@@ -25,6 +25,34 @@ run: build
 	open -a Simulator
 	xcrun simctl install "$(SIM)" $(DERIVED)/Build/Products/Debug-iphonesimulator/Odete.app
 	xcrun simctl launch "$(SIM)" $(BUNDLE)
+
+# Caminho para a App Store. Precisa de uma conta Apple logada no Xcode
+# (Settings → Accounts) com o time 7U9S5DB9K9: é ela que cria o App ID
+# com.okamiops.odete, o contêiner iCloud e o perfil, no primeiro `make archive`.
+ARCHIVE = $(DERIVED)/Odete.xcarchive
+
+archive: gen
+	xcodebuild -project Odete.xcodeproj -scheme Odete -configuration Release \
+	  -destination 'generic/platform=iOS' -archivePath $(ARCHIVE) \
+	  -allowProvisioningUpdates archive
+
+ipa: archive
+	rm -rf $(DERIVED)/ipa
+	xcodebuild -exportArchive -archivePath $(ARCHIVE) \
+	  -exportOptionsPlist ExportOptions.plist -exportPath $(DERIVED)/ipa \
+	  -allowProvisioningUpdates
+	@echo "ipa em $(DERIVED)/ipa/"
+
+# Sobe para o App Store Connect. A chave fica em ~/.appstoreconnect/private_keys/
+# (arquivo AuthKey_XXXX.p8); aqui só passam o id e o issuer, nunca o conteúdo dela.
+#   make upload ASC_KEY=XXXXXXXXXX ASC_ISSUER=aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee
+upload:
+	@test -n "$(ASC_KEY)" || (echo "falta ASC_KEY (o id da chave do App Store Connect)"; exit 1)
+	@test -n "$(ASC_ISSUER)" || (echo "falta ASC_ISSUER (o issuer id)"; exit 1)
+	xcrun altool --validate-app -f $(DERIVED)/ipa/Odete.ipa -t ios \
+	  --apiKey $(ASC_KEY) --apiIssuer $(ASC_ISSUER)
+	xcrun altool --upload-app -f $(DERIVED)/ipa/Odete.ipa -t ios \
+	  --apiKey $(ASC_KEY) --apiIssuer $(ASC_ISSUER)
 
 # Confere o catálogo de tradução contra o código.
 i18n:

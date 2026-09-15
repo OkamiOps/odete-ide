@@ -11,6 +11,14 @@ struct DiffPane: View {
         ws.git
     }
 
+    /// Binário não tem linha para contar. Somando zero por ele, um diff só de binários
+    /// anunciava "+0 −0" — que se lê como "não mudou nada" bem em cima da mudança.
+    var resumo: String {
+        let texto = git.diff.files.filter { !$0.isBinary }
+        guard !texto.isEmpty else { return git.diff.files.isEmpty ? "" : "binário" }
+        return "+\(texto.reduce(0) { $0 + $1.additions })  −\(texto.reduce(0) { $0 + $1.deletions })"
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 8) {
@@ -33,10 +41,7 @@ struct DiffPane: View {
                     Button("todos os arquivos") { git.setDiff(git.diffSource) }.font(OdeteFont.ui(11))
                 }
                 Spacer()
-                Text(
-                    "+\(git.diff.files.reduce(0) { $0 + $1.additions })  −\(git.diff.files.reduce(0) { $0 + $1.deletions })"
-                )
-                .font(OdeteFont.mono(11)).foregroundStyle(theme.fgMuted)
+                Text(resumo).font(OdeteFont.mono(11)).foregroundStyle(theme.fgMuted)
             }
             .padding(.horizontal, 12)
             .frame(height: 40)
@@ -111,8 +116,10 @@ struct FileDiffView: View {
                     Text("← \(old)").font(OdeteFont.mono(10)).foregroundStyle(theme.fgSubtle)
                 }
                 Spacer()
-                Text("+\(file.additions)").font(OdeteFont.mono(11)).foregroundStyle(theme.ok)
-                Text("−\(file.deletions)").font(OdeteFont.mono(11)).foregroundStyle(theme.danger)
+                if !file.isBinary {
+                    Text("+\(file.additions)").font(OdeteFont.mono(11)).foregroundStyle(theme.ok)
+                    Text("−\(file.deletions)").font(OdeteFont.mono(11)).foregroundStyle(theme.danger)
+                }
                 HeaderButton("doc.text", label: "Abrir") { ws.openFile(file.path) }
             }
             .padding(.horizontal, 10)

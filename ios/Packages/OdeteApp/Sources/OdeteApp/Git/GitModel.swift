@@ -72,10 +72,16 @@ public final class GitModel {
         }
     }
 
-    /// Linhas que entraram e saíram num arquivo.
+    /// Linhas que entraram e saíram num arquivo. Binário devolve `nil`: não tem linha
+    /// para contar, e "+0 −0" ao lado do nome se lê como "não mudou nada".
     public func lineStat(for path: String) -> (added: Int, removed: Int)? {
-        guard let f = stat.files.first(where: { $0.path == path }) else { return nil }
+        guard let f = stat.files.first(where: { $0.path == path }), !f.isBinary else { return nil }
         return (f.additions, f.deletions)
+    }
+
+    /// Arquivo que o git trata como binário: imagem, banco, PDF.
+    public func ehBinario(_ path: String) -> Bool {
+        stat.files.first { $0.path == path }?.isBinary ?? false
     }
 
     public var origin: Remote? {

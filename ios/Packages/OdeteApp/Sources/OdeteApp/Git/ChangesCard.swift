@@ -172,6 +172,8 @@ struct ChangeRow: View {
             .font(.caption).monospacedDigit()
             .lineLimit(1)
             .fixedSize()
+        } else if git.ehBinario(entry.path) {
+            Text("binário").font(.caption).foregroundStyle(theme.fgSubtle).lineLimit(1).fixedSize()
         }
     }
 

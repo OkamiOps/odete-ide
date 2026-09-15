@@ -25,7 +25,7 @@ struct GitPane: View {
                 HeaderButton("arrow.clockwise", label: "Atualizar") { git.scheduleRefresh() }
             }
             if !git.isRepo {
-                initCard
+                ScrollPane { GitEmpty(largura: largura) }
             } else {
                 ScrollPane {
                     VStack(spacing: 14) {
@@ -65,17 +65,6 @@ struct GitPane: View {
             return "limpo"
         }
         return largura < 250 ? "\(git.status.count)" : "\(git.status.count) alterações"
-    }
-
-    var initCard: some View {
-        EmptyState(
-            "arrow.triangle.branch",
-            title: "Sem git ainda",
-            text: "Inicie um repositório para ter histórico, branches e push para o GitHub."
-        ) {
-            Button { git.initRepository() } label: { Label("Iniciar repositório", systemImage: "plus") }
-                .buttonStyle(.glassProminent)
-        }
     }
 }
 

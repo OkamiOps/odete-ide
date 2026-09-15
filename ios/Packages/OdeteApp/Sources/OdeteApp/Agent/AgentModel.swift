@@ -182,6 +182,64 @@ public final class AgentModel {
         }
     }
 
+    /// A última pergunta que chegou a ser enviada, para o "Tentar de novo".
+    private var ultimaPergunta: (texto: String, imagens: [AgentImage])?
+
+    /// O que repetir. Depois de reabrir o app a pergunta em memória se perdeu, mas o
+    /// histórico da conversa ainda termina nela — e é justamente aí, no erro do fim da
+    /// sessão, que a pessoa fecha o app e volta depois.
+    private var perguntaParaRepetir: String? {
+        if let p = ultimaPergunta?.texto {
+            return p
+        }
+        guard let ultima = thread.messages.last, ultima.role == .user else { return nil }
+        return ultima.content
+    }
+
+    /// Só vale oferecer repetir quando o turno morreu num erro e nada está rodando.
+    public var podeTentarDeNovo: Bool {
+        !running && perguntaParaRepetir != nil && Self.ehErroQueDaParaRepetir(items.last)
+    }
+
+    /// Parar foi escolha da pessoa, não falha: ali não se oferece repetir.
+    nonisolated static func ehErroQueDaParaRepetir(_ ultimo: ChatItem?) -> Bool {
+        if case let .error(_, texto) = ultimo {
+            return texto != "parado"
+        }
+        return false
+    }
+
+    /// Manda a mesma pergunta outra vez depois de um erro.
+    ///
+    /// Erro de provedor (modelo que não existe, parâmetro recusado, 429) deixava o
+    /// cartão vermelho como beco sem saída: a única saída era redigitar tudo. Quando o
+    /// turno não chegou a produzir nada, rebobina de verdade — tira o cartão de erro e a
+    /// pergunta do transcript e do histórico — e reenvia. Se já havia resposta ou
+    /// ferramenta no meio, não joga esse trabalho fora: pede para continuar de onde
+    /// parou.
+    public func tentarDeNovo() {
+        guard podeTentarDeNovo, let pergunta = perguntaParaRepetir else { return }
+        while case .error = items.last {
+            items.removeLast()
+        }
+        let virgem = thread.messages.last?.role == .user
+        if virgem {
+            thread.messages.removeLast()
+            if let i = items.lastIndex(where: {
+                if case .user = $0 {
+                    return true
+                }; return false
+            }) {
+                items.removeSubrange(i...)
+            }
+            draft = pergunta
+            attachments = ultimaPergunta?.imagens ?? []
+        } else {
+            draft = "Continua de onde parou."
+        }
+        send()
+    }
+
     /// Envia (ou redireciona, se estiver rodando).
     public func send() {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -206,6 +264,7 @@ public final class AgentModel {
         let images = attachments
         draft = ""
         attachments = []
+        ultimaPergunta = (text, images)
         let provider = ProviderFactory.make(account: acc, session: accounts.session(for: acc))
         let loop = AgentLoop(provider: provider, host: host, patches: patches, checkpoints: checkpoints)
         self.loop = loop

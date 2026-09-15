@@ -110,6 +110,30 @@ struct ChatList: View {
 }
 
 struct ChatRow: View {
+    /// Traduz o erro do provedor numa frase que diz o que fazer.
+    ///
+    /// O que chega é `HTTP 404: chatgpt.com {"detail":"Not Found"}`, que não ajuda
+    /// ninguém a descobrir que o modelo escolhido não existe naquela conta.
+    nonisolated static func dica(_ texto: String) -> String? {
+        let t = texto.lowercased()
+        if t.contains("404") {
+            return "O modelo escolhido não existe nessa conta. Troque o modelo no rodapé do compositor."
+        }
+        if t.contains("unsupported parameter") || t.contains("400") {
+            return "A conta recusou um parâmetro do pedido. Troque o modelo ou baixe o esforço."
+        }
+        if t.contains("401") || t.contains("403") || t.contains("unauthorized") {
+            return "A sessão da conta caiu. Reconecte em Ajustes → Contas."
+        }
+        if t.contains("429") || t.contains("rate limit") {
+            return "Limite de uso batido. Espere um pouco ou use outra conta."
+        }
+        if t.contains("offline") || t.contains("internet") || t.contains("network") {
+            return "Sem rede. Confira a conexão e mande de novo."
+        }
+        return nil
+    }
+
     @Environment(WorkspaceModel.self) private var ws
     @Environment(\.theme) private var theme
     let agent: AgentModel
@@ -179,16 +203,33 @@ struct ChatRow: View {
             PermitCard(name: name, detail: detail, status: status) { agent.approve(id, $0) }
         case let .tool(_, name, detail):
             ToolGroup(items: [.tool(id: item.id, name: name, detail: detail)])
-        case let .error(_, text):
+        case let .error(id, text):
             let parado = text == "parado"
-            HStack(alignment: .top, spacing: 9) {
-                Image(systemName: parado ? "stop.circle" : "exclamationmark.triangle.fill")
-                    .font(.system(size: 13))
-                    .foregroundStyle(parado ? theme.fgSubtle : theme.danger)
-                Text(text).font(.footnote).foregroundStyle(parado ? theme.fgMuted : theme.fg)
-                    .textSelection(.enabled)
-                    .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 0)
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .top, spacing: 9) {
+                    Image(systemName: parado ? "stop.circle" : "exclamationmark.triangle.fill")
+                        .font(.system(size: 13))
+                        .foregroundStyle(parado ? theme.fgSubtle : theme.danger)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(text).font(.footnote).foregroundStyle(parado ? theme.fgMuted : theme.fg)
+                            .textSelection(.enabled)
+                            .fixedSize(horizontal: false, vertical: true)
+                        // O texto cru do provedor é um HTTP com JSON dentro: sozinho não
+                        // diz o que fazer.
+                        if let dica = Self.dica(text) {
+                            Text(dica).font(.caption).foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    Spacer(minLength: 0)
+                }
+                if !parado, agent.items.last?.id == id, agent.podeTentarDeNovo {
+                    Button("Tentar de novo", systemImage: "arrow.clockwise") { agent.tentarDeNovo() }
+                        .font(.caption.weight(.medium))
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                        .tint(theme.danger)
+                }
             }
             .padding(.horizontal, 12).padding(.vertical, 10)
             .background(

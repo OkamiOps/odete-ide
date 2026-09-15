@@ -369,3 +369,30 @@ extension CodeEditorView.Coordinator {
         tv.setContentOffset(CGPoint(x: tv.contentOffset.x, y: min(max(alvo, 0), maximo)), animated: true)
     }
 }
+
+/// Mandar um trecho do arquivo para o agente.
+extension CodeEditorView.Coordinator {
+    /// O que está selecionado; sem seleção, a linha do cursor.
+    ///
+    /// Descrever onde mexer é o que mais custa numa conversa com o agente. Selecionar as
+    /// linhas e mandar resolve isso de uma vez, e sem seleção a linha do cursor é o
+    /// palpite certo: é onde a pessoa está olhando.
+    func mandarSelecao() {
+        guard let tv = textView else { return }
+        let ns = tv.text as NSString
+        let starts = lineStarts(ns)
+        var faixa = tv.selectedRange
+        if faixa.length == 0 {
+            // Linha inteira do cursor, sem a quebra no fim.
+            let i = max(0, (starts.lastIndex { $0 <= faixa.location } ?? 0))
+            let de = starts[i]
+            let ate = i + 1 < starts.count ? starts[i + 1] - 1 : ns.length
+            faixa = NSRange(location: de, length: max(ate - de, 0))
+        }
+        guard faixa.location >= 0, faixa.location + faixa.length <= ns.length else { return }
+        let texto = ns.substring(with: faixa)
+        let primeira = (starts.lastIndex { $0 <= faixa.location } ?? 0) + 1
+        let ultima = (starts.lastIndex { $0 <= faixa.location + max(faixa.length - 1, 0) } ?? 0) + 1
+        parent.onSendSelection(texto, primeira, ultima)
+    }
+}

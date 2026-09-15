@@ -281,7 +281,15 @@ struct CenterPane: View {
                     },
                     onOpenLink: { ws.openFile($0) },
                     onFindResults: { ws.busca.contagem($0) },
-                    onDefinition: { ws.irParaDefinicao() }
+                    onDefinition: { ws.irParaDefinicao() },
+                    onSendSelection: { texto, de, ate in
+                        ws.agent.anexarTrecho(
+                            origem: de == ate ? "\(path):\(de)" : "\(path):\(de)-\(ate)",
+                            texto: texto,
+                            linguagem: Language.detect(path: path).rawValue
+                        )
+                        chrome.snapshot.agentVisible = true
+                    }
                 )
                 // Folha de ação, não popover: o popover reaparecia sozinho a cada
                 // redesenho e engolia o toque seguinte, que era o toque que devia levar
@@ -399,7 +407,8 @@ struct Crumbs: View {
                 DBView(
                     url: (try? ws.ops.url(path)) ?? URL(filePath: "/dev/null"),
                     nome: path,
-                    script: ws.text(for: path)
+                    script: ws.text(for: path),
+                    sqlPath: path
                 )
                 .background(theme.bg)
                 .navigationBarTitleDisplayMode(.inline)

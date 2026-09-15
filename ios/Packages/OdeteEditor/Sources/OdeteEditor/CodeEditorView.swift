@@ -34,6 +34,8 @@ public struct CodeEditorView: UIViewRepresentable {
     public var onFindResults: (Int) -> Void
     /// Pediu para ir à definição do nome sob o cursor.
     public var onDefinition: () -> Void
+    /// Mandar para o agente: o texto escolhido e as linhas (1-based) de onde ele veio.
+    public var onSendSelection: (String, Int, Int) -> Void
 
     public init(
         text: Binding<String>,
@@ -55,7 +57,8 @@ public struct CodeEditorView: UIViewRepresentable {
         onCursor: @escaping (Int) -> Void = { _ in },
         onOpenLink: @escaping (String) -> Void = { _ in },
         onFindResults: @escaping (Int) -> Void = { _ in },
-        onDefinition: @escaping () -> Void = {}
+        onDefinition: @escaping () -> Void = {},
+        onSendSelection: @escaping (String, Int, Int) -> Void = { _, _, _ in }
     ) {
         _text = text
         self.documentId = documentId
@@ -77,6 +80,7 @@ public struct CodeEditorView: UIViewRepresentable {
         self.onOpenLink = onOpenLink
         self.onFindResults = onFindResults
         self.onDefinition = onDefinition
+        self.onSendSelection = onSendSelection
     }
 
     public func makeUIView(context: Context) -> TextView {
@@ -99,13 +103,14 @@ public struct CodeEditorView: UIViewRepresentable {
         tv.textContainerInset = UIEdgeInsets(top: 8, left: 0, bottom: 200, right: 8)
         tv.lineSelectionDisplayType = .line
         tv.characterPairs = Self.pairs
+        let c = context.coordinator
         tv.inputAccessoryView = KeyboardBar(
             textView: tv,
             onSave: onSave,
             onFind: onFind,
-            onDefinition: onDefinition
+            onDefinition: onDefinition,
+            onSendSelection: { [weak c] in c?.mandarSelecao() }
         )
-        let c = context.coordinator
         c.textView = tv
         c.overlay.onLongPress = { [weak c] line in c?.parent.onGutterLongPress(line) }
         tv.addSubview(c.guides)
@@ -153,6 +158,7 @@ public struct CodeEditorView: UIViewRepresentable {
         (tv.inputAccessoryView as? KeyboardBar)?.onSave = onSave
         (tv.inputAccessoryView as? KeyboardBar)?.onFind = onFind
         (tv.inputAccessoryView as? KeyboardBar)?.onDefinition = onDefinition
+        (tv.inputAccessoryView as? KeyboardBar)?.onSendSelection = { [weak c] in c?.mandarSelecao() }
         if c.marks != marks || c.issues != issues || c.changes != changes || c.links != links || docChanged {
             c.marks = marks
             c.issues = issues

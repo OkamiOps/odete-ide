@@ -240,6 +240,21 @@ public final class AgentModel {
         send()
     }
 
+    /// Põe um trecho do projeto no compositor, com de onde ele veio.
+    ///
+    /// É a forma mais direta de dar contexto: em vez de descrever onde mexer, a pessoa
+    /// seleciona as linhas e manda. O texto entra como bloco citado e o cursor fica
+    /// depois dele, para escrever o pedido em cima.
+    public func anexarTrecho(origem: String, texto: String, linguagem: String = "") {
+        let corpo = texto.trimmingCharacters(in: .newlines)
+        guard !corpo.isEmpty else { return }
+        // Cerca maior que qualquer cerca de dentro do trecho: colar markdown com ``` no
+        // meio fechava o bloco cedo e o resto virava texto solto.
+        let cerca = String(repeating: "`", count: max(3, corpo.components(separatedBy: "```").count > 1 ? 4 : 3))
+        let bloco = "\(origem)\n\(cerca)\(linguagem)\n\(corpo)\n\(cerca)\n"
+        draft = draft.isEmpty ? bloco : draft + "\n" + bloco
+    }
+
     /// Envia (ou redireciona, se estiver rodando).
     public func send() {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)

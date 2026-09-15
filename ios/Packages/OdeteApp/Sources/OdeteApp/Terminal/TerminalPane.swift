@@ -2,6 +2,7 @@ import OdeteCore
 import OdeteShell
 import OdeteUI
 import SwiftUI
+import UIKit
 
 /// Terminal: abas, saída, prompt, jobs e barra de atalhos.
 struct TerminalPane: View {
@@ -9,6 +10,16 @@ struct TerminalPane: View {
     @Environment(WorkspaceModel.self) private var ws
     @Environment(\.theme) private var theme
     @Environment(\.horizontalSizeClass) private var sizeClass
+
+    /// Manda o último comando com a saída dele para o compositor do agente.
+    ///
+    /// Uma linha isolada raramente basta: o que se quer mostrar é "rodei isto e deu
+    /// nisto". O bloco vai do último comando digitado até o fim da saída.
+    func enviarUltimoBloco(_ s: TerminalSession) {
+        guard let i = s.lines.lastIndex(where: { $0.kind == .input }) else { return }
+        ws.agent.anexarTrecho(origem: "terminal", texto: s.lines[i...].map(\.text).joined(separator: "\n"))
+        chrome.snapshot.agentVisible = true
+    }
 
     /// Ícone por convenção de nome, para a lista não ser seis vezes o mesmo desenho.
     func simbolo(_ nome: String) -> String {
@@ -60,6 +71,11 @@ struct TerminalPane: View {
                         .background(theme.bgSubtle, in: Capsule())
                     }
                     .buttonStyle(.plain)
+                }
+                if let s = run.active, s.lines.contains(where: { $0.kind == .input }) {
+                    HeaderButton("sparkles", label: "Enviar último comando para a Odete") {
+                        enviarUltimoBloco(s)
+                    }
                 }
                 if let s = run.active, s.running != nil {
                     HeaderButton("stop.fill", label: "Interromper (Ctrl+C)") { s.cancel() }
@@ -131,8 +147,16 @@ struct TermTab: View {
 /// Saída e prompt de uma sessão.
 struct TerminalView: View {
     @Environment(\.theme) private var theme
+    @Environment(WorkspaceModel.self) private var ws
+    @Environment(ChromeState.self) private var chrome
     @Bindable var session: TerminalSession
     @FocusState private var focused: Bool
+
+    /// Manda uma linha do terminal para o compositor do agente.
+    func enviar(linha: TermLine) {
+        ws.agent.anexarTrecho(origem: "terminal", texto: linha.text)
+        chrome.snapshot.agentVisible = true
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -146,6 +170,14 @@ struct TerminalView: View {
                                 .textSelection(.enabled)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .id(line.id)
+                                .contextMenu {
+                                    Button("Enviar para a Odete", systemImage: "sparkles") {
+                                        enviar(linha: line)
+                                    }
+                                    Button("Copiar linha", systemImage: "doc.on.doc") {
+                                        UIPasteboard.general.string = line.text
+                                    }
+                                }
                         }
                         Color.clear.frame(height: 1).id("bottom")
                     }

@@ -1,7 +1,0 @@
-build/
-Odete.xcodeproj/
-.build/
-*.xcuserstate
-xcuserdata/
-.swiftpm/
-DerivedData/

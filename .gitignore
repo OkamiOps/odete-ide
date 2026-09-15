@@ -1,13 +1,17 @@
-node_modules
-.output
-.vercel
-.nitro
-dist
-.tanstack
-.wrangler
-*.log
+# Xcode e SwiftPM
+build/
+build-acc/
+build-rt/
+DerivedData/
+Odete.xcodeproj/
+.build/
+.swiftpm/
+xcuserdata/
+*.xcuserstate
+
+# macOS
 .DS_Store
-screenshots
-artifacts
-tmp
-.grok/preview.log
+
+# sobras de execução
+*.log
+tmp/

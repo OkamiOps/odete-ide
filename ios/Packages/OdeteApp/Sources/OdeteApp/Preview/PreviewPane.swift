@@ -77,9 +77,24 @@ struct PreviewPane: View {
         .onChange(of: ws.run.previewURL) { _, new in
             if let new {
                 ws.preview.go(new)
+            } else {
+                // Servidor parou. Sem isto o preview seguia mostrando a última página
+                // renderizada, com a URL na barra, e dava a impressão de que o servidor
+                // continuava no ar depois do kill.
+                soltarServidorMorto()
             }
         }
+        .onChange(of: ws.run.servers.count) { _, _ in soltarServidorMorto() }
         .onChange(of: ws.preview.url) { _, new in urlText = new?.absoluteString ?? "" }
+    }
+
+    /// Volta para a tela de "nada rodando" quando a porta que o preview mostrava morreu.
+    /// Página estática e arquivo local não são mexidos: ali não há servidor nenhum.
+    func soltarServidorMorto() {
+        guard let u = ws.preview.url, u.scheme?.hasPrefix("http") == true,
+              let porta = u.port, u.host == "127.0.0.1" || u.host == "localhost" else { return }
+        guard !ws.run.servers.contains(where: { $0.port == porta }) else { return }
+        ws.preview.go(nil)
     }
 
     @ViewBuilder var content: some View {

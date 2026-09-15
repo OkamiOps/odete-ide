@@ -12,16 +12,21 @@ public struct ShellServices: Sendable {
     public var registry: any RegistryClient
     public var onServer: @Sendable (Int, String) -> Void // porta aberta por um job (porta, comando)
     public var onDiagnostics: @Sendable ([Diagnostic]) -> Void
+    /// Para tudo do projeto, não só desta aba. O servidor sobe numa aba e a pessoa
+    /// tenta pará-lo de outra; sem isto o `kill` de lá não achava job nenhum.
+    public var onKillAll: (@Sendable () -> Void)?
 
     public init(
         author: @escaping @Sendable () -> Signature = { Signature(name: "Odete", email: "odete@local") },
         credentials: @escaping @Sendable (String) -> Credentials? = { _ in nil },
         registry: any RegistryClient = HTTPRegistry(),
         onServer: @escaping @Sendable (Int, String) -> Void = { _, _ in },
-        onDiagnostics: @escaping @Sendable ([Diagnostic]) -> Void = { _ in }
+        onDiagnostics: @escaping @Sendable ([Diagnostic]) -> Void = { _ in },
+        onKillAll: (@Sendable () -> Void)? = nil
     ) {
         self.author = author; self.credentials = credentials; self.registry = registry; self.onServer = onServer; self
             .onDiagnostics = onDiagnostics
+        self.onKillAll = onKillAll
     }
 }
 
@@ -32,6 +37,12 @@ public final class Job: @unchecked Sendable, Identifiable {
     public private(set) var ports: [Int] = []
     let stop: @Sendable () -> Void
     public private(set) var finished = false
+    /// Quem tira o job da lista quando ele acaba. O `stop` só desliga a coisa; sem isto
+    /// o job continuava listado para sempre e o app dizia que o servidor estava no ar
+    /// depois de o socket já ter morrido.
+    var onFinish: (@Sendable (Job) -> Void)?
+    private let trava = NSLock()
+
     init(id: Int, command: String, stop: @escaping @Sendable () -> Void) {
         self.id = id; self.command = command; self.stop = stop
     }
@@ -41,11 +52,25 @@ public final class Job: @unchecked Sendable, Identifiable {
     }
 
     func finish() {
+        trava.lock()
+        if finished {
+            trava.unlock(); return
+        }
         finished = true
+        trava.unlock()
+        onFinish?(self)
     }
 
+    /// Para o job. Dois `kill` seguidos no mesmo job não fazem o trabalho duas vezes.
     public func kill() {
+        trava.lock()
+        if finished {
+            trava.unlock(); return
+        }
+        finished = true
+        trava.unlock()
         stop()
+        onFinish?(self)
     }
 }
 
@@ -209,6 +234,7 @@ public final class Shell: @unchecked Sendable {
         nextJob += 1
         let box = TaskBox()
         let job = Job(id: id, command: text) { box.cancel() }
+        job.onFinish = { [weak self] j in self?.removeJob(j) }
         lock.lock(); jobs.append(job); lock.unlock()
         onJobsChanged?()
         box.task = Task { [weak self] in
@@ -228,6 +254,7 @@ public final class Shell: @unchecked Sendable {
         let id = nextJob
         nextJob += 1
         let job = Job(id: id, command: text, stop: stop)
+        job.onFinish = { [weak self] j in self?.removeJob(j) }
         job.setPorts(ports)
         lock.lock(); jobs.append(job); lock.unlock()
         onJobsChanged?()
@@ -243,6 +270,7 @@ public final class Shell: @unchecked Sendable {
             j.kill()
         }
         devServer?.stop(); devServer = nil
+        onJobsChanged?()
     }
 
     // MARK: utilidades

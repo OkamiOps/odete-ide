@@ -34,6 +34,7 @@ public final class RunModel {
         s.credentials = { c.value($0) }
         s.onServer = { [weak self] port, cmd in Task { @MainActor in self?.serverOpened(port, cmd) } }
         s.onDiagnostics = { [weak self] d in Task { @MainActor in self?.diagnostics = d } }
+        s.onKillAll = { [weak self] in Task { @MainActor in self?.stopAll() } }
         return s
     }
 
@@ -41,6 +42,9 @@ public final class RunModel {
     public func newSession() -> TerminalSession {
         let shell = Shell(root: root, services: services)
         let s = TerminalSession(shell: shell, banner: sessions.isEmpty)
+        // Job que morre tem de levar embora a porta, o chip e a URL do preview: era isso
+        // que fazia o app jurar que o servidor continuava no ar depois do kill.
+        s.aoMudarJobs = { [weak self] in self?.pruneServers() }
         sessions.append(s)
         activeSession = s.id
         return s

@@ -158,3 +158,45 @@ func project() throws -> URL {
         #expect(s.input == "cat a.txt")
     }
 }
+
+/// Ciclo de vida do job de servidor. Um job que continua na lista depois de morto faz o
+/// app inteiro mentir: chip de "1 job", porta no rodapé e preview de uma página que já
+/// não é servida.
+struct JobTests {
+    func shell() -> Shell {
+        let raiz = FileManager.default.temporaryDirectory.appending(path: "odete-job-\(UUID().uuidString)")
+        try? FileManager.default.createDirectory(at: raiz, withIntermediateDirectories: true)
+        return Shell(root: raiz)
+    }
+
+    @Test func matarTiraODaLista() {
+        let sh = shell()
+        let parado = Mutex(false)
+        let job = sh.registerJob("vite", ports: [5173]) { parado.withLock { $0 = true } }
+        #expect(sh.jobs.count == 1)
+        job.kill()
+        #expect(parado.withLock { $0 })
+        #expect(job.finished)
+        #expect(sh.jobs.isEmpty)
+    }
+
+    @Test func doisKillsNaoParamDuasVezes() {
+        let sh = shell()
+        let vezes = Mutex(0)
+        let job = sh.registerJob("vite", ports: [5173]) { vezes.withLock { $0 += 1 } }
+        job.kill()
+        job.kill()
+        #expect(vezes.withLock { $0 } == 1)
+    }
+
+    @Test func killAllLimpaTudoEAvisa() {
+        let sh = shell()
+        let avisos = Mutex(0)
+        sh.onJobsChanged = { avisos.withLock { $0 += 1 } }
+        _ = sh.registerJob("vite", ports: [5173]) {}
+        _ = sh.registerJob("node", ports: [3000]) {}
+        sh.killAll()
+        #expect(sh.jobs.isEmpty)
+        #expect(avisos.withLock { $0 } > 0)
+    }
+}

@@ -24,9 +24,18 @@ public final class TerminalSession: Identifiable {
         running ?? shell.prompt
     }
 
+    /// Avisado sempre que a lista de jobs muda, para quem está acima poder recolher as
+    /// portas que morreram.
+    public var aoMudarJobs: (@MainActor () -> Void)?
+
     public init(shell: Shell, banner: Bool = true) {
         self.shell = shell
-        shell.onJobsChanged = { [weak self] in Task { @MainActor in self?.jobs = shell.jobs } }
+        shell.onJobsChanged = { [weak self] in
+            Task { @MainActor in
+                self?.jobs = shell.jobs
+                self?.aoMudarJobs?()
+            }
+        }
         if banner {
             append(.system, "Odete · shell no iPad. Digite help.")
         }
@@ -77,7 +86,7 @@ public final class TerminalSession: Identifiable {
     public func cancel() {
         shell.cancel()
         if running == nil, let j = shell.jobs.last {
-            j.kill(); append(.system, "^C job \(j.id) parado")
+            j.kill(); jobs = shell.jobs; aoMudarJobs?(); append(.system, "^C job \(j.id) parado")
         } else {
             append(
                 .system,

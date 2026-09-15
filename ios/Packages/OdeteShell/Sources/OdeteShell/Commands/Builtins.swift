@@ -433,7 +433,13 @@ enum Builtins {
         },
         Simple(name: "kill", help: "para um job (kill %1 ou kill all)") { args, ctx in
             if args.first == "all" || args.isEmpty {
-                ctx.shell.killAll(); ctx.io.out("jobs encerrados"); return 0
+                // O servidor costuma subir numa aba e ser morto de outra.
+                if let todos = ctx.shell.services.onKillAll {
+                    todos()
+                } else {
+                    ctx.shell.killAll()
+                }
+                ctx.io.out("jobs encerrados"); return 0
             }
             for a in args {
                 let id = Int(a.replacingOccurrences(of: "%", with: "")); if let j = ctx.shell.jobs
@@ -441,7 +447,7 @@ enum Builtins {
                 {
                     j.kill(); ctx.io.out("[\(j.id)] parado")
                 } else {
-                    ctx.io.err("kill: job \(a) não existe")
+                    ctx.io.err("kill: job \(a) não existe nesta aba (kill all para o projeto inteiro)")
                 }
             }
             return 0

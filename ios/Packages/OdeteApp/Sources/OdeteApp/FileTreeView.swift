@@ -80,6 +80,13 @@ struct FileTreeView: View {
         }
     }
 
+    /// Apagar no iPad não manda nada para a lixeira do sistema: o arquivo fica em
+    /// `.odete/lixeira` para o desfazer. Mostrar o tamanho é o que dá para a pessoa
+    /// perceber que aquilo ocupa espaço e decidir limpar.
+    func medida(_ bytes: Int) -> String {
+        ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)
+    }
+
     /// O que não é de uso constante mora aqui, para o cabeçalho continuar legível numa
     /// coluna de 200 pt.
     var mais: some View {
@@ -98,6 +105,12 @@ struct FileTreeView: View {
                 Button("Desfazer \(a.descricao)", systemImage: "arrow.uturn.backward") { ws.desfazerArquivo() }
             }
             Button("Recarregar", systemImage: "arrow.clockwise") { ws.reload() }
+            if ws.lixeira > 0 {
+                Divider()
+                Button("Esvaziar lixeira (\(medida(ws.lixeira)))", systemImage: "trash", role: .destructive) {
+                    ws.esvaziarLixeira()
+                }
+            }
         } label: {
             Image(systemName: "ellipsis")
                 .font(.system(size: 14, weight: .semibold))

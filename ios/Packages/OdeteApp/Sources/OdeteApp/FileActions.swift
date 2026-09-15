@@ -29,6 +29,17 @@ public extension WorkspaceModel {
         }
     }
 
+    /// Joga fora o que estava guardado para o desfazer. A ação de desfazer que apontava
+    /// para lá deixa de valer junto — senão o menu oferece restaurar um arquivo que não
+    /// existe mais.
+    func esvaziarLixeira() {
+        ops.esvaziarLixeira()
+        lixeira = 0
+        if case .apagado = ultimaAcao {
+            ultimaAcao = nil
+        }
+    }
+
     /// Desfaz a última ação de arquivo: tirar do lugar por engano, ou apagar sem querer,
     /// deixa de ser definitivo.
     func desfazerArquivo() {

@@ -35,3 +35,35 @@ struct FileOpsTests {
         #expect(ops.freeName(in: "", base: "sem-titulo", ext: "txt") == "sem-titulo-2.txt")
     }
 }
+
+/// Apagar no iPad não some com o arquivo: ele fica na lixeira do projeto até a poda.
+struct LixeiraTests {
+    func projeto() throws -> FileOps {
+        let raiz = FileManager.default.temporaryDirectory.appending(path: "odete-lixo-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: raiz, withIntermediateDirectories: true)
+        return FileOps(root: raiz)
+    }
+
+    @Test func apagarGuardaEDesfazerTrazDeVolta() throws {
+        let ops = try projeto()
+        try ops.write("a.txt", "conteúdo")
+        let lixo = try #require(try ops.delete("a.txt"))
+        #expect(!ops.exists("a.txt"))
+        #expect(FileManager.default.fileExists(atPath: lixo.path))
+        try ops.restore(from: lixo, to: "a.txt")
+        #expect(try ops.read("a.txt") == "conteúdo")
+    }
+
+    @Test func aLixeiraNaoCresceSemFim() throws {
+        let ops = try projeto()
+        for i in 0 ..< 60 {
+            try ops.write("f\(i).txt", "x")
+            _ = try ops.delete("f\(i).txt")
+        }
+        let itens = try FileManager.default.contentsOfDirectory(at: ops.lixeira, includingPropertiesForKeys: nil)
+        #expect(itens.count <= 50)
+        #expect(ops.tamanhoDaLixeira() > 0)
+        ops.esvaziarLixeira()
+        #expect(ops.tamanhoDaLixeira() == 0)
+    }
+}

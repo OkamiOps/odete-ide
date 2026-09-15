@@ -81,16 +81,63 @@ public struct FileOps: Sendable {
             try FileManager.default.trashItem(at: alvo, resultingItemURL: &lixo)
             return lixo as URL?
         } catch {
-            // Volume sem lixeira: guarda em .odete/lixeira, que dá na mesma para desfazer.
-            let pasta = root.appending(path: ".odete/lixeira", directoryHint: .isDirectory)
-            try? FileManager.default.createDirectory(at: pasta, withIntermediateDirectories: true)
-            let destino = pasta.appending(path: "\(Int(Date().timeIntervalSince1970))-\(alvo.lastPathComponent)")
+            // No sandbox do iOS `trashItem` não funciona; na prática é sempre por aqui.
+            // A lixeira do projeto faz o mesmo papel, e o desfazer traz de volta.
+            try? FileManager.default.createDirectory(at: lixeira, withIntermediateDirectories: true)
+            let destino = lixeira.appending(path: "\(Int(Date().timeIntervalSince1970))-\(alvo.lastPathComponent)")
             do {
                 try FileManager.default.moveItem(at: alvo, to: destino)
+                podarLixeira()
                 return destino
             } catch {
                 try FileManager.default.removeItem(at: alvo)
                 return nil
+            }
+        }
+    }
+
+    /// Pasta da lixeira do projeto. Fica em `.odete/`, que o git já ignora por
+    /// `.git/info/exclude`, então o que foi apagado não reaparece como arquivo novo.
+    public var lixeira: URL {
+        root.appending(path: ".odete/lixeira", directoryHint: .isDirectory)
+    }
+
+    /// Quanto a lixeira ocupa, para dar para decidir se vale esvaziar.
+    public func tamanhoDaLixeira() -> Int {
+        var total = 0
+        let fm = FileManager.default
+        guard let e = fm.enumerator(at: lixeira, includingPropertiesForKeys: [.fileSizeKey]) else { return 0 }
+        for case let u as URL in e {
+            total += (try? u.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+        }
+        return total
+    }
+
+    public func esvaziarLixeira() {
+        try? FileManager.default.removeItem(at: lixeira)
+    }
+
+    /// Guarda os mais novos e joga fora o resto: sem isto a lixeira só cresce, e num iPad
+    /// espaço é o que falta primeiro.
+    func podarLixeira(manter: Int = 50, dias: Int = 7) {
+        let fm = FileManager.default
+        guard let itens = try? fm.contentsOfDirectory(
+            at: lixeira,
+            includingPropertiesForKeys: [.contentModificationDateKey]
+        ) else { return }
+        let limite = Date().addingTimeInterval(-Double(dias) * 86400)
+        let ordenados = itens.sorted {
+            let a = (try? $0.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ??
+                .distantPast
+            let b = (try? $1.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ??
+                .distantPast
+            return a > b
+        }
+        for (i, u) in ordenados.enumerated() {
+            let data = (try? u.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ??
+                .distantPast
+            if i >= manter || data < limite {
+                try? fm.removeItem(at: u)
             }
         }
     }

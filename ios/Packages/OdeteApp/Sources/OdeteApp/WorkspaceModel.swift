@@ -40,6 +40,9 @@ public final class WorkspaceModel {
     public var secondary: String?
     /// Última ação de arquivo, para o desfazer da árvore.
     public var ultimaAcao: AcaoArquivo?
+    /// Quanto o apagado guardado em `.odete/lixeira` ocupa. Fica aqui, e não numa conta
+    /// dentro do menu, porque menu de SwiftUI só é remontado quando algo observado muda.
+    public var lixeira = 0
     public var error: String?
     public var stack: Stack = .html
     public var externalChange = false
@@ -142,6 +145,7 @@ public final class WorkspaceModel {
             scripts = Self.lerScripts(pkg)
             packages = Self.lerPacotes(pkg, root: root)
             preencherAbertas()
+            lixeira = ops.tamanhoDaLixeira()
             reloadTick += 1
         } catch {
             self.error = error.localizedDescription

@@ -232,7 +232,7 @@ struct CenterPane: View {
         if let path, ws.naoEhTexto.contains(path) {
             VStack(spacing: 0) {
                 Crumbs(path: path, escolher: escolher, trocar: trocar)
-                BinaryView(path: path)
+                FileViewer(path: path)
             }
         } else if let path, ws.git.conflicts.contains(path), !ws.forceTextEdit.contains(path),
                   ConflictParser.hasMarkers(ws.text(for: path))
@@ -326,6 +326,7 @@ struct Crumbs: View {
     /// seletor nem aparece.
     var escolher: ((String) -> Void)?
     var trocar: (() -> Void)?
+    @State private var tabelaAberta = false
 
     var body: some View {
         HStack(spacing: 4) {
@@ -365,6 +366,17 @@ struct Crumbs: View {
                     .foregroundStyle(i == path.split(separator: "/").count - 1 ? theme.fgMuted : theme.fgSubtle)
             }
             Spacer()
+            // `.sql` é texto e continua no editor, mas ver o dump como tabela é o que a
+            // pessoa quer na hora de conferir os dados.
+            if (path as NSString).pathExtension.lowercased() == "sql" {
+                Button { tabelaAberta = true } label: {
+                    Image(systemName: "tablecells").font(.system(size: 11)).foregroundStyle(theme.fgSubtle)
+                        .frame(width: 22, height: 22).contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Ver como tabela")
+                .help("Ver como tabela")
+            }
             if ws.git.isRepo {
                 Menu {
                     Button("Histórico do arquivo", systemImage: "clock.arrow.circlepath") { ws.historyPath = path }
@@ -381,6 +393,24 @@ struct Crumbs: View {
                 .menuIndicator(.hidden)
             }
             Text(Language.detect(path: path).label).font(OdeteFont.mono(10)).foregroundStyle(theme.fgSubtle)
+        }
+        .sheet(isPresented: $tabelaAberta) {
+            NavigationStack {
+                DBView(
+                    url: (try? ws.ops.url(path)) ?? URL(filePath: "/dev/null"),
+                    nome: path,
+                    script: ws.text(for: path)
+                )
+                .background(theme.bg)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) { Button("Fechar") { tabelaAberta = false } }
+                    ToolbarItem(placement: .principal) { Titulo(path: path, detalhe: "Tabelas") }
+                }
+            }
+            .presentationDetents([.large])
+            .presentationSizing(.page)
+            .odeteTheme(Theme(chrome.palette))
         }
         .padding(.horizontal, 12)
         .frame(height: 26)

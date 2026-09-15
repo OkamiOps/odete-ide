@@ -355,3 +355,17 @@ extension CodeEditorView.Coordinator {
         }
     }
 }
+
+extension CodeEditorView.Coordinator {
+    /// Põe a linha a um terço do topo da área visível, quando há rolagem para isso.
+    func centralizar(_ tv: TextView, linha: Int) {
+        let ns = tv.text as NSString
+        let starts = lineStarts(ns)
+        guard linha >= 1, linha <= starts.count,
+              let pos = tv.position(from: tv.beginningOfDocument, offset: starts[linha - 1]) else { return }
+        let r = tv.caretRect(for: pos)
+        let alvo = r.minY - tv.bounds.height / 3
+        let maximo = max(0, tv.contentSize.height - tv.bounds.height)
+        tv.setContentOffset(CGPoint(x: tv.contentOffset.x, y: min(max(alvo, 0), maximo)), animated: true)
+    }
+}

@@ -32,6 +32,8 @@ public struct CodeEditorView: UIViewRepresentable {
     public var onOpenLink: (String) -> Void
     /// Quantas ocorrências a busca do arquivo achou.
     public var onFindResults: (Int) -> Void
+    /// Pediu para ir à definição do nome sob o cursor.
+    public var onDefinition: () -> Void
 
     public init(
         text: Binding<String>,
@@ -52,7 +54,8 @@ public struct CodeEditorView: UIViewRepresentable {
         onGutterLongPress: @escaping (Int) -> Void = { _ in },
         onCursor: @escaping (Int) -> Void = { _ in },
         onOpenLink: @escaping (String) -> Void = { _ in },
-        onFindResults: @escaping (Int) -> Void = { _ in }
+        onFindResults: @escaping (Int) -> Void = { _ in },
+        onDefinition: @escaping () -> Void = {}
     ) {
         _text = text
         self.documentId = documentId
@@ -73,6 +76,7 @@ public struct CodeEditorView: UIViewRepresentable {
         self.onCursor = onCursor
         self.onOpenLink = onOpenLink
         self.onFindResults = onFindResults
+        self.onDefinition = onDefinition
     }
 
     public func makeUIView(context: Context) -> TextView {
@@ -95,7 +99,12 @@ public struct CodeEditorView: UIViewRepresentable {
         tv.textContainerInset = UIEdgeInsets(top: 8, left: 0, bottom: 200, right: 8)
         tv.lineSelectionDisplayType = .line
         tv.characterPairs = Self.pairs
-        tv.inputAccessoryView = KeyboardBar(textView: tv, onSave: onSave, onFind: onFind)
+        tv.inputAccessoryView = KeyboardBar(
+            textView: tv,
+            onSave: onSave,
+            onFind: onFind,
+            onDefinition: onDefinition
+        )
         let c = context.coordinator
         c.textView = tv
         c.overlay.onLongPress = { [weak c] line in c?.parent.onGutterLongPress(line) }
@@ -143,6 +152,7 @@ public struct CodeEditorView: UIViewRepresentable {
         }
         (tv.inputAccessoryView as? KeyboardBar)?.onSave = onSave
         (tv.inputAccessoryView as? KeyboardBar)?.onFind = onFind
+        (tv.inputAccessoryView as? KeyboardBar)?.onDefinition = onDefinition
         if c.marks != marks || c.issues != issues || c.changes != changes || c.links != links || docChanged {
             c.marks = marks
             c.issues = issues
@@ -163,6 +173,10 @@ public struct CodeEditorView: UIViewRepresentable {
             DispatchQueue.main.async {
                 _ = tv.goToLine(max(reveal.line - 1, 0), select: .line)
                 tv.becomeFirstResponder()
+                // O `goToLine` rola o mínimo, e a linha alvo acabava colada na borda de
+                // baixo — chegar na definição e não vê-la não serve de nada. Um terço a
+                // partir do topo deixa o contexto de cima e de baixo à vista.
+                c.centralizar(tv, linha: reveal.line)
             }
         }
     }

@@ -151,8 +151,27 @@ struct CommandPalette: View {
         }
     }
 
+    /// Símbolos do projeto inteiro. O `#` é o que o VS Code usa, e separar do `@` mantém
+    /// a lista do arquivo aberto curta.
+    var simbolosDoProjeto: [PaletteItem] {
+        ws.simbolos.map {
+            PaletteItem(
+                id: "#\($0.path):\($0.line)",
+                kind: .symbol,
+                title: $0.name,
+                detail: "\($0.kind.rawValue) · \($0.path):\($0.line)",
+                symbol: $0.kind.symbol,
+                shortcut: nil
+            )
+        }
+    }
+
     var items: [PaletteItem] {
         let q = ws.paletteQuery
+        if q.hasPrefix("#") {
+            let rest = q.dropFirst().trimmingCharacters(in: .whitespaces)
+            return simbolosDoProjeto.filter { rest.isEmpty || fuzzy(rest, $0.title) }.prefix(60).map(\.self)
+        }
         if q.hasPrefix("@") {
             let rest = q.dropFirst().trimmingCharacters(in: .whitespaces)
             return symbols.filter { rest.isEmpty || fuzzy(rest, $0.title) }.prefix(60).map(\.self)
@@ -266,7 +285,13 @@ struct CommandPalette: View {
         switch item.kind {
         case .file: ws.openFile(item.id)
         case .symbol:
-            if let path = ws.active, let line = Int(item.id.dropFirst()) {
+            // "#caminho:linha" é símbolo do projeto; "@linha" é do arquivo aberto.
+            if item.id.hasPrefix("#") {
+                let corpo = item.id.dropFirst()
+                if let corte = corpo.lastIndex(of: ":"), let line = Int(corpo[corpo.index(after: corte)...]) {
+                    ws.open(String(corpo[..<corte]), line: line)
+                }
+            } else if let path = ws.active, let line = Int(item.id.dropFirst()) {
                 ws.open(path, line: line)
             }
         case .command:

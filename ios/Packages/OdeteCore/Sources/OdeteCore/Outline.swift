@@ -304,3 +304,56 @@ public enum Outline {
         try! NSRegularExpression(pattern: p)
     }
 }
+
+/// Um símbolo com o arquivo onde mora: é isto que permite "ir para a definição" sem
+/// abrir os arquivos um a um.
+public struct ProjectSymbol: Sendable, Hashable, Identifiable {
+    public var name: String
+    public var kind: OutlineItem.Kind
+    public var path: String
+    public var line: Int
+    public var id: String {
+        "\(path):\(line):\(name)"
+    }
+
+    public init(name: String, kind: OutlineItem.Kind, path: String, line: Int) {
+        self.name = name
+        self.kind = kind
+        self.path = path
+        self.line = line
+    }
+}
+
+public extension ProjectSymbol {
+    /// Onde `nome` é declarado. Exato primeiro: buscar por `App` não pode devolver
+    /// `AppShell` antes de `App`.
+    static func procurar(_ nome: String, em indice: [ProjectSymbol]) -> [ProjectSymbol] {
+        let exatos = indice.filter { $0.name == nome }
+        return exatos.isEmpty ? indice.filter { $0.name.hasPrefix(nome) } : exatos
+    }
+
+    /// A palavra em volta de uma posição do texto, que é o que "ir para a definição"
+    /// tem em mãos: só o cursor.
+    static func palavra(em texto: String, offset: Int) -> String? {
+        let chars = Array(texto)
+        guard offset >= 0, offset <= chars.count else { return nil }
+        func parte(_ c: Character) -> Bool {
+            c.isLetter || c.isNumber || c == "_" || c == "$"
+        }
+        var de = min(offset, max(chars.count - 1, 0))
+        // Cursor logo depois da palavra conta como dentro dela: é onde ele fica ao
+        // terminar de digitar um nome.
+        if de >= chars.count || !parte(chars[de]), de > 0, parte(chars[de - 1]) {
+            de -= 1
+        }
+        guard de < chars.count, parte(chars[de]) else { return nil }
+        var ate = de
+        while de > 0, parte(chars[de - 1]) {
+            de -= 1
+        }
+        while ate + 1 < chars.count, parte(chars[ate + 1]) {
+            ate += 1
+        }
+        return String(chars[de ... ate])
+    }
+}

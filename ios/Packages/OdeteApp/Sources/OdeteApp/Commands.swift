@@ -72,6 +72,10 @@ public struct OdeteCommands: Commands {
                 .keyboardShortcut("p", modifiers: [.command, .shift])
             Button("Ir para arquivo") { a?.ws.paletteQuery = ""; a?.ws.paletteOpen = true }
                 .keyboardShortcut("p", modifiers: .command)
+            Button("Ir para definição") { a?.ws.irParaDefinicao() }
+                .keyboardShortcut("j", modifiers: [.command, .control])
+            Button("Símbolo no projeto") { a?.ws.paletteQuery = "#"; a?.ws.paletteOpen = true }
+                .keyboardShortcut("o", modifiers: [.command, .shift])
             Button("Localizar no arquivo") { a?.ws.busca.abrir() }
                 .keyboardShortcut("f", modifiers: .command)
             Button("Buscar no projeto") { a?.chrome.snapshot.side = .search; a?.chrome.snapshot.sideOpen = true }

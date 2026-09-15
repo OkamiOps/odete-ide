@@ -6,11 +6,20 @@ final class KeyboardBar: UIInputView {
     private weak var textView: TextView?
     var onSave: () -> Void
     var onFind: () -> Void
+    /// Ir para onde o nome sob o cursor é declarado. Sem teclado físico não há ⌘⌃J, e
+    /// esta barra é onde a mão já está enquanto se escreve.
+    var onDefinition: () -> Void
 
-    init(textView: TextView, onSave: @escaping () -> Void, onFind: @escaping () -> Void) {
+    init(
+        textView: TextView,
+        onSave: @escaping () -> Void,
+        onFind: @escaping () -> Void,
+        onDefinition: @escaping () -> Void
+    ) {
         self.textView = textView
         self.onSave = onSave
         self.onFind = onFind
+        self.onDefinition = onDefinition
         super.init(frame: CGRect(x: 0, y: 0, width: 0, height: 44), inputViewStyle: .keyboard)
         build()
     }
@@ -54,6 +63,7 @@ final class KeyboardBar: UIInputView {
             ("", "arrow.uturn.backward", { [weak self] in self?.textView?.undoManager?.undo() }),
             ("", "arrow.uturn.forward", { [weak self] in self?.textView?.undoManager?.redo() }),
             ("", "magnifyingglass", { [weak self] in self?.onFind() }),
+            ("", "f.cursive", { [weak self] in self?.onDefinition() }),
             ("", "square.and.arrow.down", { [weak self] in self?.onSave() }),
             ("", "keyboard.chevron.compact.down", { [weak self] in self?.textView?.resignFirstResponder() }),
         ]

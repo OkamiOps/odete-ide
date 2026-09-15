@@ -275,7 +275,8 @@ struct CenterPane: View {
                         }
                     },
                     onOpenLink: { ws.openFile($0) },
-                    onFindResults: { ws.busca.contagem($0) }
+                    onFindResults: { ws.busca.contagem($0) },
+                    onDefinition: { ws.irParaDefinicao() }
                 )
                 // Folha de ação, não popover: o popover reaparecia sozinho a cada
                 // redesenho e engolia o toque seguinte, que era o toque que devia levar

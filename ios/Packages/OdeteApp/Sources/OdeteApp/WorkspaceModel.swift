@@ -64,6 +64,9 @@ public final class WorkspaceModel {
     public var links: [String: [EditorLink]] = [:]
     /// Apelidos de caminho do `tsconfig.json` (`@/` → `src/`).
     public var tsAliases: [String: String] = [:]
+    /// Símbolos do projeto inteiro, para ir à definição e para a paleta.
+    public var simbolos: [ProjectSymbol] = []
+    var indexTask: Task<Void, Never>?
     /// Busca dentro do arquivo aberto. Mora aqui, e não num `@State` do centro, porque o
     /// ⌘F vem do menu de comandos, que só alcança os modelos.
     public let busca = BuscaLocal()
@@ -153,6 +156,7 @@ public final class WorkspaceModel {
             packages = Self.lerPacotes(pkg, root: root)
             tsAliases = ImportLinks.aliases(tsconfig: try? Data(contentsOf: root.appending(path: "tsconfig.json")))
             preencherAbertas()
+            indexarSimbolos()
             lixeira = ops.tamanhoDaLixeira()
             reloadTick += 1
         } catch {

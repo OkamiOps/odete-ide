@@ -1,4 +1,5 @@
 import Foundation
+import OdeteI18n
 
 /// Os idiomas que a Odete fala. `sistema` é o padrão: segue o aparelho, e é o que
 /// a pessoa nunca precisa escolher.
@@ -21,7 +22,7 @@ public enum Idioma: String, CaseIterable, Sendable, Identifiable, Codable {
     /// precisa reconhecer o dele na lista sem entender o resto da tela.
     public var nome: String {
         switch self {
-        case .sistema: tr("Idioma do aparelho")
+        case .sistema: tr(tr("Idioma do aparelho"))
         case .ptBR: "Português (Brasil)"
         case .en: "English"
         case .de: "Deutsch"
@@ -65,6 +66,20 @@ public enum Idioma: String, CaseIterable, Sendable, Identifiable, Codable {
             }
         }
         return .ptBR
+    }
+
+    /// Como o idioma se chama dentro de um prompt. Em inglês de propósito: é assim
+    /// que o modelo reconhece o pedido sem ambiguidade, mesmo quando o resto do
+    /// prompt está em português.
+    public var paraOModelo: String {
+        switch self {
+        case .sistema: Self.doAparelho.paraOModelo
+        case .ptBR: "Brazilian Portuguese"
+        case .en: "English"
+        case .de: "German"
+        case .fr: "French"
+        case .es: "Spanish"
+        }
     }
 
     /// `Locale` para formatar data, número e ordenação — não só para traduzir texto.

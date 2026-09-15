@@ -1,4 +1,5 @@
 import Foundation
+import OdeteI18n
 import SwiftUI
 
 /// A avaliação de expressões do interpretador. Mora aqui para o corpo da classe
@@ -44,7 +45,7 @@ extension ViewInstance {
                 if program.structs[name] != nil || name.first?.isUppercase == true {
                     return .token(name)
                 }
-                throw RuntimeError(line: line, message: "não conheço '\(name)'")
+                throw RuntimeError(line: line, message: tr("não conheço '%1$@'", "\(name)"))
             }
         case let .member(base, name, line):
             guard let base else { return .token(name) }
@@ -58,10 +59,10 @@ extension ViewInstance {
                 guard idx >= 0, idx < items.count
                 else { throw RuntimeError(
                     line: a.line,
-                    message: "índice \(idx) fora do array"
+                    message: tr("índice %1$@ fora do array", "\(idx)")
                 ) }; return items[idx]
             }
-            throw RuntimeError(line: a.line, message: "subscript em algo que não é array")
+            throw RuntimeError(line: a.line, message: tr("subscript em algo que não é array"))
         case let .unary(op, x):
             let v = try eval(x, env).deref
             if op == "!" {
@@ -129,10 +130,10 @@ extension ViewInstance {
                 case "-": return .int(x - y); case "*": return .int(x * y); case "/": guard y != 0
                     else { throw RuntimeError(
                         line: line,
-                        message: "divisão por zero"
+                        message: tr("divisão por zero")
                     ) }; return .int(x / y); default: guard y != 0 else { throw RuntimeError(
                         line: line,
-                        message: "divisão por zero"
+                        message: tr("divisão por zero")
                     ) }; return .int(x % y)
                 }
             }
@@ -141,7 +142,7 @@ extension ViewInstance {
             case "-": return .double(x - y); case "*": return .double(x * y); case "/": return .double(x /
                     y); default: return .double(x.truncatingRemainder(dividingBy: y))
             }
-        default: throw RuntimeError(line: line, message: "operador \(op)")
+        default: throw RuntimeError(line: line, message: tr("operador %1$@", "\(op)"))
         }
     }
 
@@ -170,26 +171,26 @@ extension ViewInstance {
                     Closure(params: [], body: [], line: line),
                     self
                 ).stringOp(s, name)
-            default: throw RuntimeError(line: line, message: "String não tem .\(name)") }
+            default: throw RuntimeError(line: line, message: tr("String não tem .%1$@", "\(name)")) }
         case let .array(a):
             switch name {
             case "count": return .int(a.count); case "isEmpty": return .bool(a.isEmpty); case "first": return a
                 .first ?? .none; case "last": return a.last ?? .none
-            default: throw RuntimeError(line: line, message: "Array não tem .\(name) (fora do subconjunto)")
+            default: throw RuntimeError(line: line, message: tr("Array não tem .%1$@ (fora do subconjunto)", "\(name)"))
             }
         case let .int(i): if name == "description" {
                 return .string(String(i))
             }; throw RuntimeError(
                 line: line,
-                message: "Int não tem .\(name)"
+                message: tr("Int não tem .%1$@", "\(name)")
             )
         case let .double(d): if name == "rounded" {
                 return .double(d.rounded())
             }; throw RuntimeError(
                 line: line,
-                message: "Double não tem .\(name)"
+                message: tr("Double não tem .%1$@", "\(name)")
             )
-        default: throw RuntimeError(line: line, message: ".\(name) em \(base.asString)")
+        default: throw RuntimeError(line: line, message: tr(".%1$@ em %2$@", "\(name)", "\(base.asString)"))
         }
     }
 
@@ -240,7 +241,7 @@ extension ViewInstance {
                         of: eval(args[0].value, env).asString,
                         with: eval(args[1].value, env).asString
                     ))
-                default: throw RuntimeError(line: line, message: "String.\(name) (fora do subconjunto)")
+                default: throw RuntimeError(line: line, message: tr("String.%1$@ (fora do subconjunto)", "\(name)"))
                 }
             case .array, .binding, .int, .double, .bool:
                 if case let .binding(inst, n) = base {
@@ -330,7 +331,7 @@ extension ViewInstance {
                 {
                     return .string(d.formatted(.number.precision(.fractionLength(0 ... 2))))
                 }
-                throw RuntimeError(line: line, message: ".\(name) (fora do subconjunto)")
+                throw RuntimeError(line: line, message: tr(".%1$@ (fora do subconjunto)", "\(name)"))
             case let .token(t):
                 if t == "Color", name == "init" {
                     break
@@ -356,7 +357,7 @@ extension ViewInstance {
                     )))); case "italic": return .font(f.italic()); case "monospaced": return .font(f
                         .monospaced()); default: return .font(f)
                 }
-            default: throw RuntimeError(line: line, message: ".\(name)(…) em \(base.asString)")
+            default: throw RuntimeError(line: line, message: tr(".%1$@(…) em %2$@", "\(name)", "\(base.asString)"))
             }
         }
         // chamada por nome
@@ -364,7 +365,7 @@ extension ViewInstance {
             if case let .member(nil, n, _) = callee {
                 return try call(.ident(n, line: line), args, trailing, env, line)
             }
-            throw RuntimeError(line: line, message: "chamada fora do subconjunto")
+            throw RuntimeError(line: line, message: tr("chamada fora do subconjunto"))
         }
         // closure em variável / função da struct / parâmetro
         if let v = env[name] ?? state[name], case let .closure(c, inst) = v {
@@ -429,7 +430,7 @@ extension ViewInstance {
         // views embutidas
         if Builtins.views.contains(name) || name.first?.isUppercase == true {
             if !Builtins.views.contains(name) {
-                report("fora do subconjunto: \(name)", line); return .view(placeholder(
+                report(tr("fora do subconjunto: %1$@", "\(name)"), line); return .view(placeholder(
                     name,
                     line
                 ))
@@ -517,7 +518,7 @@ extension ViewInstance {
             }
             return .view(node)
         }
-        throw RuntimeError(line: line, message: "não conheço '\(name)'")
+        throw RuntimeError(line: line, message: tr("não conheço '%1$@'", "\(name)"))
     }
 
     func callClosure(_ c: Closure, _ args: [Value], _ env: [String: Value]) throws -> Value {

@@ -1,3 +1,4 @@
+import OdeteI18n
 import SwiftUI
 
 /// Alça de redimensionamento entre painéis. `value` é a dimensão do painel que ela controla.
@@ -46,7 +47,7 @@ public struct Splitter: View {
                     hot = false
                 }
         )
-        .accessibilityLabel("Redimensionar")
+        .accessibilityLabel(tr("Redimensionar"))
         .accessibilityAdjustableAction { d in
             let step: Double = d == .increment ? 24 : -24
             value = min(max(value + step, range.lowerBound), range.upperBound)

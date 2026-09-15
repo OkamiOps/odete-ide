@@ -1,5 +1,6 @@
 import Clibgit2
 import Foundation
+import OdeteI18n
 
 /// Erro do libgit2 com mensagem curta em português e classe para a interface decidir o que fazer.
 public struct GitError: LocalizedError, Sendable, Equatable {
@@ -19,7 +20,7 @@ public struct GitError: LocalizedError, Sendable, Equatable {
     }
 
     /// Lê `git_error_last()` para o código devolvido.
-    static func last(_ code: Int32, _ fallback: String = "erro no git") -> GitError {
+    static func last(_ code: Int32, _ fallback: String = tr("erro no git")) -> GitError {
         let raw = git_error_last().flatMap(\.pointee.message).map { String(cString: $0) } ?? fallback
         let kind: Kind
         switch code {
@@ -38,13 +39,13 @@ public struct GitError: LocalizedError, Sendable, Equatable {
 
     static func translate(_ s: String) -> String {
         if s.contains("authentication") || s.contains("401") {
-            return "autenticação recusada pelo remoto"
+            return tr("autenticação recusada pelo remoto")
         }
         if s.contains("could not resolve") || s.contains("failed to connect") {
-            return "sem conexão com o remoto"
+            return tr("sem conexão com o remoto")
         }
         if s.contains("conflict") {
-            return "há conflitos para resolver"
+            return tr("há conflitos para resolver")
         }
         return s
     }

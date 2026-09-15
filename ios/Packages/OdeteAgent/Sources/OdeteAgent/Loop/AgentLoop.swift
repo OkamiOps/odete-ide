@@ -1,4 +1,5 @@
 import Foundation
+import OdeteI18n
 import Synchronization
 
 public struct LoopConfig: Sendable {
@@ -200,7 +201,10 @@ public final class AgentLoop: @unchecked Sendable {
                 }
                 let note = takeSteer()
                 messages
-                    .append(.user("Redireciona a execução agora. Interrompe o plano anterior e segue isto:\n\n\(note)"))
+                    .append(.user(tr(
+                        "Redireciona a execução agora. Interrompe o plano anterior e segue isto:\n\n%1$@",
+                        "\(note)"
+                    )))
                 emit(.item(.user(id: UUID().uuidString, text: note, images: nil)))
                 round = 0
                 continue
@@ -225,7 +229,7 @@ public final class AgentLoop: @unchecked Sendable {
                     for c in toolCalls[i...] {
                         messages.append(.tool(
                             c.id,
-                            "cancelado: o usuário redirecionou a execução"
+                            tr("cancelado: o usuário redirecionou a execução")
                         ))
                     }
                     redirected = hasSteer
@@ -260,7 +264,10 @@ public final class AgentLoop: @unchecked Sendable {
             if redirected {
                 let note = takeSteer()
                 messages
-                    .append(.user("Redireciona a execução agora. Interrompe o plano anterior e segue isto:\n\n\(note)"))
+                    .append(.user(tr(
+                        "Redireciona a execução agora. Interrompe o plano anterior e segue isto:\n\n%1$@",
+                        "\(note)"
+                    )))
                 emit(.item(.user(id: UUID().uuidString, text: note, images: nil)))
                 round = 0
                 continue
@@ -276,7 +283,7 @@ public final class AgentLoop: @unchecked Sendable {
         if hitCap, !isStopped {
             emit(.item(.error(
                 id: UUID().uuidString,
-                text: "parei em \(config.maxRounds) rodadas de ferramenta — manda de novo pra continuar"
+                text: tr("parei em %1$@ rodadas de ferramenta — manda de novo pra continuar", "\(config.maxRounds)")
             )))
         }
         emit(.history(messages))

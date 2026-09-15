@@ -1,4 +1,5 @@
 import OdeteAgent
+import OdeteI18n
 import OdeteUI
 import SwiftUI
 
@@ -50,17 +51,19 @@ struct ChatList: View {
     }
 
     /// Uma cor por assunto, como nos grupos dos Ajustes: entender, rodar, criar, revisar.
-    static let sugestoes: [(symbol: String, color: Color, text: String)] = [
-        ("text.magnifyingglass", .blue, "Explica a estrutura deste projeto"),
-        ("play.circle", .green, "Roda npm run dev e me diz se subiu"),
-        ("plus.square.on.square", .indigo, "Cria um componente de header em src/"),
-        ("checkmark.seal", .teal, "/review no arquivo aberto"),
-    ]
+    static var sugestoes: [(symbol: String, color: Color, text: String)] {
+        [
+            ("text.magnifyingglass", .blue, tr("Explica a estrutura deste projeto")),
+            ("play.circle", .green, tr("Roda npm run dev e me diz se subiu")),
+            ("plus.square.on.square", .indigo, tr("Cria um componente de header em src/")),
+            ("checkmark.seal", .teal, tr("/review no arquivo aberto")),
+        ]
+    }
 
     var starters: some View {
         VStack(alignment: .leading, spacing: 10) {
             Wordmark(height: 22).opacity(0.6)
-            Text("Peça em português. O agente lê o projeto, roda no terminal e edita com patches que você aceita.")
+            Text(tr("Peça em português. O agente lê o projeto, roda no terminal e edita com patches que você aceita."))
                 .font(.subheadline).foregroundStyle(theme.fgMuted)
                 .fixedSize(horizontal: false, vertical: true)
             CardList {
@@ -117,19 +120,19 @@ struct ChatRow: View {
     nonisolated static func dica(_ texto: String) -> String? {
         let t = texto.lowercased()
         if t.contains("404") {
-            return "O modelo escolhido não existe nessa conta. Troque o modelo no rodapé do compositor."
+            return tr("O modelo escolhido não existe nessa conta. Troque o modelo no rodapé do compositor.")
         }
         if t.contains("unsupported parameter") || t.contains("400") {
-            return "A conta recusou um parâmetro do pedido. Troque o modelo ou baixe o esforço."
+            return tr("A conta recusou um parâmetro do pedido. Troque o modelo ou baixe o esforço.")
         }
         if t.contains("401") || t.contains("403") || t.contains("unauthorized") {
-            return "A sessão da conta caiu. Reconecte em Ajustes → Contas."
+            return tr("A sessão da conta caiu. Reconecte em Ajustes → Contas.")
         }
         if t.contains("429") || t.contains("rate limit") {
-            return "Limite de uso batido. Espere um pouco ou use outra conta."
+            return tr("Limite de uso batido. Espere um pouco ou use outra conta.")
         }
         if t.contains("offline") || t.contains("internet") || t.contains("network") {
-            return "Sem rede. Confira a conexão e mande de novo."
+            return tr("Sem rede. Confira a conexão e mande de novo.")
         }
         return nil
     }
@@ -224,7 +227,7 @@ struct ChatRow: View {
                     Spacer(minLength: 0)
                 }
                 if !parado, agent.items.last?.id == id, agent.podeTentarDeNovo {
-                    Button("Tentar de novo", systemImage: "arrow.clockwise") { agent.tentarDeNovo() }
+                    Button(tr("Tentar de novo"), systemImage: "arrow.clockwise") { agent.tentarDeNovo() }
                         .font(.caption.weight(.medium))
                         .buttonStyle(.bordered)
                         .controlSize(.small)
@@ -248,7 +251,7 @@ struct ChatRow: View {
                         FileGlyph(path: path, size: 11)
                         Text(path).font(OdeteFont.mono(11)).foregroundStyle(theme.fgMuted)
                             .lineLimit(1).truncationMode(.middle)
-                        Text("patch já resolvido").font(.caption2).foregroundStyle(theme.fgSubtle)
+                        Text(tr("patch já resolvido")).font(.caption2).foregroundStyle(theme.fgSubtle)
                     }
                     .contentShape(Rectangle())
                 }
@@ -368,8 +371,8 @@ struct PermitCard: View {
             if status == .pending {
                 HStack(spacing: 8) {
                     Spacer(minLength: 0)
-                    Button("Recusar") { answer(false) }.buttonStyle(.glass)
-                    Button("Aprovar") { answer(true) }.buttonStyle(.glassProminent)
+                    Button(tr("Recusar")) { answer(false) }.buttonStyle(.glass)
+                    Button(tr("Aprovar")) { answer(true) }.buttonStyle(.glassProminent)
                 }
                 .font(.subheadline.weight(.medium))
                 .lineLimit(1)
@@ -553,9 +556,9 @@ struct MarkdownText: View {
     func codeBlock(lang: String, code c: String) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
-                Text(lang.isEmpty ? "código" : lang).font(.caption2).foregroundStyle(.secondary)
+                Text(lang.isEmpty ? tr("código") : lang).font(.caption2).foregroundStyle(.secondary)
                 Spacer()
-                Button("Copiar", systemImage: "doc.on.doc") { UIPasteboard.general.string = c }
+                Button(tr("Copiar"), systemImage: "doc.on.doc") { UIPasteboard.general.string = c }
                     .labelStyle(.iconOnly)
                     .buttonStyle(.borderless)
                     .controlSize(.small)

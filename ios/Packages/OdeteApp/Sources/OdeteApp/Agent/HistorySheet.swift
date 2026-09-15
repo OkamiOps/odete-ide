@@ -1,4 +1,5 @@
 import OdeteAgent
+import OdeteI18n
 import OdeteUI
 import SwiftUI
 
@@ -16,20 +17,20 @@ struct HistorySheet: View {
                 if agent.threads.isEmpty {
                     EmptyState(
                         "bubble.left.and.bubble.right",
-                        title: "Nenhuma conversa",
-                        text: "O que você perguntar à Odete fica guardado aqui, por projeto."
+                        title: tr("Nenhuma conversa"),
+                        text: tr("O que você perguntar à Odete fica guardado aqui, por projeto.")
                     )
                 } else {
                     lista
                 }
             }
             .background(theme.bg)
-            .navigationTitle("Conversas")
+            .navigationTitle(tr("Conversas"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Fechar") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button(tr("Fechar")) { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button { agent.newChat(); dismiss() } label: { Label("Nova", systemImage: "square.and.pencil") }
+                    Button { agent.newChat(); dismiss() } label: { Label(tr("Nova"), systemImage: "square.and.pencil") }
                         .disabled(agent.thread.isEmpty)
                 }
             }
@@ -60,7 +61,7 @@ struct HistorySheet: View {
                     }
                 }
                 if grupos.isEmpty {
-                    Text("Nada com \"\(busca)\"").font(.footnote).foregroundStyle(.secondary).padding(20)
+                    Text(tr("Nada com \"%1$@\"", "\(busca)")).font(.footnote).foregroundStyle(.secondary).padding(20)
                 }
             }
             .padding(.bottom, 20)
@@ -71,7 +72,7 @@ struct HistorySheet: View {
         HStack(spacing: 6) {
             Image(systemName: "magnifyingglass").font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(theme.fgSubtle)
-            TextField("Buscar nas conversas", text: $busca)
+            TextField(tr("Buscar nas conversas"), text: $busca)
                 .textFieldStyle(.plain).font(.subheadline).foregroundStyle(theme.fg)
                 .autocorrectionDisabled()
             if !busca.isEmpty {
@@ -79,7 +80,7 @@ struct HistorySheet: View {
                     Image(systemName: "xmark.circle.fill").font(.system(size: 12)).foregroundStyle(theme.fgSubtle)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Limpar busca")
+                .accessibilityLabel(tr("Limpar busca"))
             }
         }
         .padding(.horizontal, 10).frame(height: 34)
@@ -103,10 +104,11 @@ struct HistorySheet: View {
                     .frame(width: 7, height: 7).padding(.top, 6)
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 6) {
-                        Text(t.title).font(.subheadline.weight(atual ? .semibold : .regular))
+                        Text(t.title.isEmpty ? tr("Nova conversa") : t.title)
+                            .font(.subheadline.weight(atual ? .semibold : .regular))
                             .foregroundStyle(theme.fg).lineLimit(1)
                         if atual {
-                            Text("aberta").font(.caption2.weight(.medium)).foregroundStyle(theme.accent)
+                            Text(tr("aberta")).font(.caption2.weight(.medium)).foregroundStyle(theme.accent)
                                 .padding(.horizontal, 5).frame(height: 15)
                                 .background(theme.accent.opacity(0.14), in: Capsule())
                         }
@@ -130,8 +132,8 @@ struct HistorySheet: View {
             }
         }
         .contextMenu {
-            Button("Abrir", systemImage: "bubble.left") { agent.open(t); dismiss() }
-            Button("Apagar", systemImage: "trash", role: .destructive) { agent.remove(t) }
+            Button(tr("Abrir"), systemImage: "bubble.left") { agent.open(t); dismiss() }
+            Button(tr("Apagar"), systemImage: "trash", role: .destructive) { agent.remove(t) }
         }
     }
 

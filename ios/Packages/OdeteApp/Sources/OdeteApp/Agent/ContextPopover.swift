@@ -1,4 +1,5 @@
 import OdeteAgent
+import OdeteI18n
 import OdeteUI
 import SwiftUI
 
@@ -47,7 +48,7 @@ struct ContextPopover: View {
             VStack(alignment: .leading, spacing: 18) {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 8) {
-                        Text("Janela de contexto").font(.subheadline.weight(.semibold))
+                        Text(tr("Janela de contexto")).font(.subheadline.weight(.semibold))
                             .foregroundStyle(theme.fg)
                         Spacer(minLength: 8)
                         Text("\(fmtTok(usado)) / \(fmtTok(agent.contextWindow)) (\(pct)%)")
@@ -58,24 +59,24 @@ struct ContextPopover: View {
                         ("Cache", min(uso.cache, usado), .purple),
                     ])
                     Text(agent.contextWindow > 0
-                        ? "Quando encher, os turnos mais antigos saem da conversa."
-                        : "Conecte uma conta para saber o tamanho da janela.")
+                        ? tr("Quando encher, os turnos mais antigos saem da conversa.")
+                        : tr("Conecte uma conta para saber o tamanho da janela."))
                         .font(.caption).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 VStack(alignment: .leading, spacing: 8) {
-                    SectionTitle("Esta conversa")
+                    SectionTitle(tr("Esta conversa"))
                     CardList {
                         linha("Entrada", symbol: "arrow.down.to.line", cor: .blue, valor: uso.input, first: true)
-                        linha("Saída", symbol: "arrow.up.to.line", cor: .green, valor: uso.output)
+                        linha(tr("Saída"), symbol: "arrow.up.to.line", cor: .green, valor: uso.output)
                         linha("Cache", symbol: "bolt.horizontal", cor: .purple, valor: uso.cache)
                         if uso.reasoning > 0 {
-                            linha("Raciocínio", symbol: "brain", cor: .orange, valor: uso.reasoning)
+                            linha(tr("Raciocínio"), symbol: "brain", cor: .orange, valor: uso.reasoning)
                         }
                     }
                 }
                 VStack(alignment: .leading, spacing: 8) {
-                    SectionTitle("Último turno")
+                    SectionTitle(tr("Último turno"))
                     CardList {
                         linha(
                             "Entrada",
@@ -84,7 +85,7 @@ struct ContextPopover: View {
                             valor: agent.lastTurnUse.input,
                             first: true
                         )
-                        linha("Saída", symbol: "arrow.up.to.line", cor: .green, valor: agent.lastTurnUse.output)
+                        linha(tr("Saída"), symbol: "arrow.up.to.line", cor: .green, valor: agent.lastTurnUse.output)
                     }
                 }
             }
@@ -121,7 +122,7 @@ struct ContextGauge: View {
             }
             .frame(width: 13, height: 13)
             if mostrarTexto {
-                Text("\(Int((fracao * 100).rounded()))%")
+                Text(tr("%1$@%%", "\(Int((fracao * 100).rounded()))"))
                     .font(.caption).monospacedDigit().foregroundStyle(theme.fgMuted)
             }
         }

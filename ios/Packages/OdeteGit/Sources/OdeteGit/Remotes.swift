@@ -1,5 +1,6 @@
 import Clibgit2
 import Foundation
+import OdeteI18n
 
 public extension Repository {
     func remotes() throws -> [Remote] {
@@ -29,7 +30,7 @@ public extension Repository {
     }
 
     func setRemoteURL(name: String, url: String) throws {
-        try check(git_remote_set_url(repo, name, url), "url do remoto")
+        try check(git_remote_set_url(repo, name, url), tr("url do remoto"))
     }
 
     /// (à frente, atrás) da branch atual em relação ao upstream. `nil` sem upstream.
@@ -67,7 +68,7 @@ public extension Repository {
         opts.fetch_opts.callbacks = remoteCallbacks(payload.toOpaque())
         var r: OpaquePointer?
         try check(git_clone(&r, url, dir.path, &opts), "clonar")
-        guard let ptr = r else { throw GitError(kind: .other, code: -1, message: "clone sem repositório") }
+        guard let ptr = r else { throw GitError(kind: .other, code: -1, message: tr("clone sem repositório")) }
         let repo = Repository(repo: ptr, workdir: dir)
         try await repo.checkoutRemoteIfUnborn()
         return repo
@@ -104,7 +105,11 @@ public extension Repository {
     /// fetch + merge do upstream da branch atual.
     func pull(remote: String = "origin", credentials: Credentials? = nil, author: Signature) throws -> MergeResult {
         try fetch(remote: remote, credentials: credentials)
-        guard let b = try currentBranch() else { throw GitError(kind: .invalid, code: -1, message: "sem branch atual") }
+        guard let b = try currentBranch() else { throw GitError(
+            kind: .invalid,
+            code: -1,
+            message: tr("sem branch atual")
+        ) }
         let up = b.upstream ?? "\(remote)/\(b.name)"
         var ref: OpaquePointer?
         try check(git_reference_lookup(&ref, repo, "refs/remotes/\(up)"), "upstream \(up)")

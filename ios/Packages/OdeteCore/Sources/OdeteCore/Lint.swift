@@ -1,4 +1,5 @@
 import Foundation
+import OdeteI18n
 
 /// Um aviso do lint leve. `line`/`column` são 1-based; `length` cobre o trecho a sublinhar.
 public struct LintIssue: Sendable, Hashable, Identifiable {
@@ -50,7 +51,7 @@ public enum Lint {
         guard itens.count > tetoDeAvisos else { return itens }
         return Array(itens.prefix(tetoDeAvisos)) + [LintIssue(
             rule: "teto",
-            message: "mais \(itens.count - tetoDeAvisos) aviso(s) neste arquivo",
+            message: tr("mais %1$@ aviso(s) neste arquivo", "\(itens.count - tetoDeAvisos)"),
             severity: .info,
             line: itens[tetoDeAvisos].line,
             column: 1,
@@ -61,6 +62,8 @@ public enum Lint {
     private struct Rule {
         let id: String
         let rx: NSRegularExpression
+        /// Em português: é a chave do catálogo. As regras nascem uma vez, na primeira
+        /// checagem; traduzir aqui congelaria o idioma daquele instante.
         let message: String
         let severity: LintIssue.Severity
     }
@@ -103,7 +106,7 @@ public enum Lint {
                     }
                     out.append(LintIssue(
                         rule: rule.id,
-                        message: rule.message,
+                        message: tr(rule.message),
                         severity: rule.severity,
                         line: i + 1,
                         column: col,

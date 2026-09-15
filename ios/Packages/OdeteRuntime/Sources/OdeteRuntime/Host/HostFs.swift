@@ -1,5 +1,6 @@
 import Foundation
 import JavaScriptCore
+import OdeteI18n
 
 /// Sistema de arquivos síncrono. Caminhos absolutos; o JS resolve relativos contra cwd.
 enum HostFs {
@@ -16,13 +17,13 @@ enum HostFs {
         let fm = FileManager.default
 
         let readText: @convention(block) (String) -> Any = { p in
-            guard let d = fm.contents(atPath: p) else { return err("ENOENT", p, "no such file or directory") }
+            guard let d = fm.contents(atPath: p) else { return err("ENOENT", p, tr("no such file or directory")) }
             return String(decoding: d, as: UTF8.self)
         }
         h.setObject(readText, forKeyedSubscript: "readText" as NSString)
 
         let readB64: @convention(block) (String) -> Any = { p in
-            guard let d = fm.contents(atPath: p) else { return err("ENOENT", p, "no such file or directory") }
+            guard let d = fm.contents(atPath: p) else { return err("ENOENT", p, tr("no such file or directory")) }
             return d.base64EncodedString()
         }
         h.setObject(readB64, forKeyedSubscript: "readB64" as NSString)
@@ -57,7 +58,7 @@ enum HostFs {
             guard fm.fileExists(atPath: p, isDirectory: &isDir) else { return err(
                 "ENOENT",
                 p,
-                "no such file or directory"
+                tr("no such file or directory")
             ) }
             let attrs = (try? fm.attributesOfItem(atPath: p)) ?? [:]
             let size = (attrs[.size] as? NSNumber)?.intValue ?? 0
@@ -75,7 +76,7 @@ enum HostFs {
             do { return try fm.contentsOfDirectory(atPath: p).sorted() } catch { return err(
                 "ENOENT",
                 p,
-                "no such file or directory"
+                tr("no such file or directory")
             ) }
         }
         h.setObject(readdir, forKeyedSubscript: "readdir" as NSString)
@@ -99,7 +100,7 @@ enum HostFs {
             guard fm.fileExists(atPath: p, isDirectory: &isDir) else { return force ? true : err(
                 "ENOENT",
                 p,
-                "no such file or directory"
+                tr("no such file or directory")
             ) }
             if isDir.boolValue, !recursive, !((try? fm.contentsOfDirectory(atPath: p))?.isEmpty ?? true) {
                 return err(
@@ -147,7 +148,8 @@ enum HostFs {
         }
         h.setObject(symlink, forKeyedSubscript: "symlink" as NSString)
         let readlink: @convention(block) (String) -> Any = { p in
-            do { return try fm.destinationOfSymbolicLink(atPath: p) } catch { return err("EINVAL", p, "not a link") }
+            do { return try fm.destinationOfSymbolicLink(atPath: p) } catch { return err("EINVAL", p, tr("not a link"))
+            }
         }
         h.setObject(readlink, forKeyedSubscript: "readlink" as NSString)
         let chmod: @convention(block) (String, Int) -> Any = { p, mode in

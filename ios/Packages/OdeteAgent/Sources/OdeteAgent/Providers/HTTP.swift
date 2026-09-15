@@ -1,4 +1,5 @@
 import Foundation
+import OdeteI18n
 
 /// HTTP mínimo que os provedores usam; nos testes vira um fake.
 public protocol HTTPClient: Sendable {
@@ -14,13 +15,13 @@ public struct URLSessionClient: HTTPClient {
 
     public func data(for request: URLRequest) async throws -> (Data, HTTPURLResponse) {
         let (d, r) = try await session.data(for: request)
-        guard let h = r as? HTTPURLResponse else { throw AgentError.transport("resposta sem HTTP") }
+        guard let h = r as? HTTPURLResponse else { throw AgentError.transport(tr("resposta sem HTTP")) }
         return (d, h)
     }
 
     public func bytes(for request: URLRequest) async throws -> (URLSession.AsyncBytes, HTTPURLResponse) {
         let (b, r) = try await session.bytes(for: request)
-        guard let h = r as? HTTPURLResponse else { throw AgentError.transport("resposta sem HTTP") }
+        guard let h = r as? HTTPURLResponse else { throw AgentError.transport(tr("resposta sem HTTP")) }
         return (b, h)
     }
 }

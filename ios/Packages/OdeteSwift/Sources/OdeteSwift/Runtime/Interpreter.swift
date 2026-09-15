@@ -1,4 +1,5 @@
 import Foundation
+import OdeteI18n
 import SwiftUI
 
 struct RuntimeError: Error { let line: Int; let message: String }
@@ -162,7 +163,11 @@ public final class ViewInstance {
     public func evalBody() -> [ViewNode] {
         childSeq = 0
         diagnostics.removeAll()
-        guard let body = decl.body else { report("\(decl.name) não tem body", decl.line, warning: false); return [] }
+        guard let body = decl.body else { report(
+            tr("%1$@ não tem body", "\(decl.name)"),
+            decl.line,
+            warning: false
+        ); return [] }
         let nodes = builder(body, [:])
         if !appeared {
             appeared = true; for n in nodes {
@@ -200,7 +205,7 @@ public final class ViewInstance {
                     case let .view(n): out.append(n)
                     case let .views(ns): out += ns
                     case .none: break
-                    default: report("isto não é uma view", line)
+                    default: report(tr("isto não é uma view"), line)
                     }
                 case let .varDecl(v): env[v.name] = try v.initial.map { try eval($0, env) } ?? .none
                 case let .ifStmt(c, a, b, _):
@@ -279,14 +284,14 @@ public final class ViewInstance {
         switch v.deref {
         case let .array(a): return a
         case let .int(n): return (0 ..< max(0, n)).map { .int($0) }
-        default: throw RuntimeError(line: 0, message: "não dá para iterar \(v.asString)")
+        default: throw RuntimeError(line: 0, message: tr("não dá para iterar %1$@", "\(v.asString)"))
         }
     }
 
     func assign(_ target: Expr, _ op: String, _ value: Value, _ env: inout [String: Value], _ line: Int) throws {
         guard case let .ident(name, _) = target else { throw RuntimeError(
             line: line,
-            message: "só dá para atribuir a variáveis"
+            message: tr("só dá para atribuir a variáveis")
         ) }
         let cur: Value = env[name] ?? get(name)
         let new: Value
@@ -313,7 +318,7 @@ public final class ViewInstance {
                 new = .int((cur.asInt ?? 0) * (value.asInt ?? 1))
             }
         case "/=": new = .double((cur.asDouble ?? 0) / max(value.asDouble ?? 1, 0.000001))
-        default: throw RuntimeError(line: line, message: "operador \(op)")
+        default: throw RuntimeError(line: line, message: tr("operador %1$@", "\(op)"))
         }
         if env[name] != nil, state[name] == nil {
             env[name] = new

@@ -1,4 +1,5 @@
 import Foundation
+import OdeteI18n
 import OdeteNpm
 
 /// `npm install|i|add|uninstall|remove|ls|run|start|dev|build|test|init|exec` (+ `npx`, `pnpm`, `yarn` como aliases).
@@ -18,7 +19,7 @@ struct NpmCommand: ShellCommand {
         } else {
             try? "node_modules/\ndist/\n.DS_Store\n".write(to: u, atomically: true, encoding: .utf8)
         }
-        io.out(".gitignore: node_modules/ adicionado")
+        io.out(tr(".gitignore: node_modules/ adicionado"))
     }
 
     let name = "npm"
@@ -26,7 +27,7 @@ struct NpmCommand: ShellCommand {
 
     func run(_ args: [String], _ ctx: CommandContext) async -> Int32 {
         let io = ctx.io
-        guard let sub = args.first else { io.out("npm <install|uninstall|ls|run|init>"); return 0 }
+        guard let sub = args.first else { io.out(tr("npm <install|uninstall|ls|run|init>")); return 0 }
         let rest = Array(args.dropFirst())
         let pkg = PackageJSON(url: ctx.root.appending(path: "package.json"))
         let installer = Installer(project: ctx.root, registry: ctx.shell.services.registry) { line in io.out(line) }
@@ -42,7 +43,7 @@ struct NpmCommand: ShellCommand {
                             atomically: true,
                             encoding: .utf8
                         )
-                    io.out("package.json criado")
+                    io.out(tr("package.json criado"))
                 }
                 Self.ensureGitignore(ctx.root, io: io)
                 let rep = try await installer.install(add: specs, dev: dev)
@@ -51,12 +52,15 @@ struct NpmCommand: ShellCommand {
                 }
                 io
                     .out("\(rep.installed.count) pacote(s) instalado(s)" +
-                        (rep.installed.isEmpty ? " (já estava tudo lá)" : ""))
+                        (rep.installed.isEmpty ? tr(" (já estava tudo lá)") : ""))
                 if !rep.nativosCobertos.isEmpty {
-                    io.out("\(rep.nativosCobertos.count) ferramenta(s) nativa(s) com equivalente embutido na Odete")
+                    io.out(tr(
+                        "%1$@ ferramenta(s) nativa(s) com equivalente embutido na Odete",
+                        "\(rep.nativosCobertos.count)"
+                    ))
                 }
                 for n in rep.native {
-                    io.err("aviso: \(n) tem código nativo e não roda no iPad")
+                    io.err(tr("aviso: %1$@ tem código nativo e não roda no iPad", "\(n)"))
                 }
                 // Pacote de outra plataforma não é problema: é o rollup e o esbuild
                 // trazendo um binário por sistema. Uma linha vermelha para cada um fazia
@@ -67,8 +71,8 @@ struct NpmCommand: ShellCommand {
                         .joined(separator: ", ")
                     let resto = rep.plataforma.count - min(2, rep.plataforma.count)
                     io.out(
-                        "\(rep.plataforma.count) pacote(s) de outros sistemas ignorado(s): "
-                            + nomes + (resto > 0 ? " e mais \(resto)" : "")
+                        tr("%1$@ pacote(s) de outros sistemas ignorado(s): ", "\(rep.plataforma.count)")
+                            + nomes + (resto > 0 ? tr(" e mais %1$@", "\(resto)") : "")
                     )
                 }
                 // Estes são de verdade: a dependência não vai estar lá.
@@ -79,16 +83,16 @@ struct NpmCommand: ShellCommand {
                     io.err("aviso: \(a)")
                 }
                 for (n, e) in rep.failed {
-                    io.err("falhou: \(n): \(e)")
+                    io.err(tr("falhou: %1$@: %2$@", "\(n)", "\(e)"))
                 }
                 return rep.failed.isEmpty ? 0 : 1
             case "uninstall", "remove", "rm", "un":
                 _ = try await installer.uninstall(rest.filter { !$0.hasPrefix("-") })
-                io.out("removido: \(rest.joined(separator: " "))")
+                io.out(tr("removido: %1$@", "\(rest.joined(separator: " "))"))
             case "ls", "list":
                 let list = installer.list()
                 if list.isEmpty {
-                    io.out("nenhum pacote instalado (rode npm install)")
+                    io.out(tr("nenhum pacote instalado (rode npm install)"))
                 }
                 for p in list {
                     io.out("\(p.name)@\(p.version)\(p.dev ? " (dev)" : "")\(p.native ? "  [nativo, não roda]" : "")")
@@ -97,7 +101,7 @@ struct NpmCommand: ShellCommand {
                 if FileManager.default
                     .fileExists(atPath: ctx.root.appending(path: "package.json").path)
                 {
-                    io.out("package.json já existe")
+                    io.out(tr("package.json já existe"))
                 } else {
                     try #"{"name":"\#(ctx.root.lastPathComponent)","private":true,"version":"0.0.0","type":"module","scripts":{"dev":"vite","build":"vite build"},"dependencies":{}}"#
                         .write(
@@ -105,7 +109,7 @@ struct NpmCommand: ShellCommand {
                             atomically: true,
                             encoding: .utf8
                         )
-                    io.out("package.json criado")
+                    io.out(tr("package.json criado"))
                 }
             case "run", "run-script":
                 guard let script = rest.first
@@ -115,7 +119,7 @@ struct NpmCommand: ShellCommand {
                     }; return 0
                 }
                 guard let cmd = pkg.scripts[script]
-                else { io.err("npm: script \"\(script)\" não existe em package.json"); return 1 }
+                else { io.err(tr("npm: script \"%1$@\" não existe em package.json", "\(script)")); return 1 }
                 io.out("> \(cmd)")
                 return await ctx.shell
                     .run(cmd + (rest.count > 1 ? " " + rest.dropFirst().joined(separator: " ") : "")) { kind, text in
@@ -135,12 +139,12 @@ struct NpmCommand: ShellCommand {
                 {
                     return await ctx.shell.run("node index.js") { k, t in k == .out ? io.out(t) : io.err(t) }
                 }
-                io.err("npm: script \"\(sub)\" não existe em package.json"); return 1
+                io.err(tr("npm: script \"%1$@\" não existe em package.json", "\(sub)")); return 1
             case "exec", "x", "dlx":
                 return await BinCommand().run(rest, ctx)
-            case "-v", "--version", "version": io.out("odete-npm 0.1 (registro real, sem Node)")
-            case "cache": io.out("cache em Library/Caches/odete-npm")
-            default: io.err("npm: comando não suportado: \(sub)"); return 1
+            case "-v", "--version", "version": io.out(tr("odete-npm 0.1 (registro real, sem Node)"))
+            case "cache": io.out(tr("cache em Library/Caches/odete-npm"))
+            default: io.err(tr("npm: comando não suportado: %1$@", "\(sub)")); return 1
             }
             return 0
         } catch { io.err("npm: \(error.localizedDescription)"); return 1 }

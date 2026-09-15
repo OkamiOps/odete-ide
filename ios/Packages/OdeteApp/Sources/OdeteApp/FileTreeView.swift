@@ -1,5 +1,6 @@
 import OdeteCore
 import OdeteGit
+import OdeteI18n
 import OdeteUI
 import SwiftUI
 import UniformTypeIdentifiers
@@ -25,8 +26,10 @@ struct FileTreeView: View {
     var body: some View {
         VStack(spacing: 0) {
             PaneHeader("Arquivos", detail: ws.project.name) {
-                HeaderButton("doc.badge.plus", label: "Novo arquivo") { ws.createFile(near: ws.selected) }
-                HeaderButton("folder.badge.plus", label: "Nova pasta") { draft = ""; newFolderAt = ws.selected ?? "" }
+                HeaderButton("doc.badge.plus", label: tr("Novo arquivo")) { ws.createFile(near: ws.selected) }
+                HeaderButton("folder.badge.plus", label: tr("Nova pasta")) {
+                    draft = ""; newFolderAt = ws.selected ?? ""
+                }
                 mais
             }
             filtro
@@ -36,34 +39,34 @@ struct FileTreeView: View {
             Rectangle().fill(theme.separator).frame(height: 0.5)
             arvore
         }
-        .alert("Renomear", isPresented: Binding(get: { renaming != nil }, set: {
+        .alert(tr("Renomear"), isPresented: Binding(get: { renaming != nil }, set: {
             if !$0 {
                 renaming = nil
             }
         })) {
-            TextField("Nome", text: $draft)
-            Button("Renomear") {
+            TextField(tr("Nome"), text: $draft)
+            Button(tr("Renomear")) {
                 if let p = renaming {
                     ws.rename(p, to: draft)
                 }; renaming = nil
             }
-            Button("Cancelar", role: .cancel) { renaming = nil }
+            Button(tr("Cancelar"), role: .cancel) { renaming = nil }
         }
-        .alert("Nova pasta", isPresented: Binding(get: { newFolderAt != nil }, set: {
+        .alert(tr("Nova pasta"), isPresented: Binding(get: { newFolderAt != nil }, set: {
             if !$0 {
                 newFolderAt = nil
             }
         })) {
-            TextField("nome", text: $draft)
-            Button("Criar") {
+            TextField(tr("nome"), text: $draft)
+            Button(tr("Criar")) {
                 if let at = newFolderAt {
                     ws.createFolder(near: at, name: draft)
                 }; newFolderAt = nil
             }
-            Button("Cancelar", role: .cancel) { newFolderAt = nil }
+            Button(tr("Cancelar"), role: .cancel) { newFolderAt = nil }
         }
         .confirmationDialog(
-            "Apagar \"\(deleting ?? "")\"?",
+            tr("Apagar \"%1$@\"?", "\(deleting ?? "")"),
             isPresented: Binding(get: { deleting != nil }, set: {
                 if !$0 {
                     deleting = nil
@@ -71,12 +74,12 @@ struct FileTreeView: View {
             }),
             titleVisibility: .visible
         ) {
-            Button("Apagar", role: .destructive) {
+            Button(tr("Apagar"), role: .destructive) {
                 if let p = deleting {
                     ws.delete(p)
                 }; deleting = nil
             }
-            Button("Cancelar", role: .cancel) { deleting = nil }
+            Button(tr("Cancelar"), role: .cancel) { deleting = nil }
         }
     }
 
@@ -91,23 +94,29 @@ struct FileTreeView: View {
     /// coluna de 200 pt.
     var mais: some View {
         Menu {
-            Button("Revelar arquivo aberto", systemImage: "scope") { pedido += 1 }
+            Button(tr("Revelar arquivo aberto"), systemImage: "scope") { pedido += 1 }
                 .disabled(ws.active == nil)
-            Button("Recolher tudo", systemImage: "arrow.down.right.and.arrow.up.left") { recolherTudo() }
+            Button(tr("Recolher tudo"), systemImage: "arrow.down.right.and.arrow.up.left") { recolherTudo() }
             Toggle(isOn: Binding(
                 get: { chrome.snapshot.mostrarOcultos },
                 set: { chrome.snapshot.mostrarOcultos = $0; ws.reload() }
             )) {
-                Label("Mostrar ocultos", systemImage: "eye")
+                Label(tr("Mostrar ocultos"), systemImage: "eye")
             }
             Divider()
             if let a = ws.ultimaAcao, a.podeDesfazer {
-                Button("Desfazer \(a.descricao)", systemImage: "arrow.uturn.backward") { ws.desfazerArquivo() }
+                Button(tr("Desfazer %1$@", "\(a.descricao)"), systemImage: "arrow.uturn.backward") {
+                    ws.desfazerArquivo()
+                }
             }
-            Button("Recarregar", systemImage: "arrow.clockwise") { ws.reload() }
+            Button(tr("Recarregar"), systemImage: "arrow.clockwise") { ws.reload() }
             if ws.lixeira > 0 {
                 Divider()
-                Button("Esvaziar lixeira (\(medida(ws.lixeira)))", systemImage: "trash", role: .destructive) {
+                Button(
+                    tr("Esvaziar lixeira (%1$@)", "\(medida(ws.lixeira))"),
+                    systemImage: "trash",
+                    role: .destructive
+                ) {
                     ws.esvaziarLixeira()
                 }
             }
@@ -119,14 +128,14 @@ struct FileTreeView: View {
                 .contentShape(Rectangle())
         }
         .menuIndicator(.hidden)
-        .accessibilityLabel("Mais")
+        .accessibilityLabel(tr("Mais"))
     }
 
     var filtro: some View {
         HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 12, weight: .semibold)).foregroundStyle(theme.fgSubtle)
-            TextField("Filtrar arquivos", text: $busca)
+            TextField(tr("Filtrar arquivos"), text: $busca)
                 .textFieldStyle(.plain)
                 .font(OdeteFont.ui(12.5))
                 .foregroundStyle(theme.fg)
@@ -138,7 +147,7 @@ struct FileTreeView: View {
                         .foregroundStyle(theme.fgSubtle)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Limpar filtro")
+                .accessibilityLabel(tr("Limpar filtro"))
             }
         }
         .padding(.horizontal, 8)
@@ -232,10 +241,10 @@ struct FileTreeView: View {
         VStack(spacing: 8) {
             Image(systemName: busca.isEmpty ? "folder" : "magnifyingglass")
                 .font(.system(size: 26)).foregroundStyle(theme.fgSubtle)
-            Text(busca.isEmpty ? "Pasta vazia" : "Nada com \"\(busca)\"")
+            Text(busca.isEmpty ? "Pasta vazia" : tr("Nada com \"%1$@\"", "\(busca)"))
                 .font(OdeteFont.ui(13, weight: .medium)).foregroundStyle(theme.fgMuted)
             if busca.isEmpty {
-                Text("O botão de novo arquivo fica aqui em cima.")
+                Text(tr("O botão de novo arquivo fica aqui em cima."))
                     .font(OdeteFont.ui(11.5)).foregroundStyle(theme.fgSubtle).multilineTextAlignment(.center)
             }
         }
@@ -422,29 +431,31 @@ struct FileRow: View {
         } isTargeted: { over = $0 && node.isDirectory }
         .contextMenu {
             if node.isDirectory {
-                Button("Novo arquivo", systemImage: "doc.badge.plus") { ws.createFile(near: node.path) }
-                Button("Nova pasta", systemImage: "folder.badge.plus") { draft = ""; newFolderAt = node.path }
+                Button(tr("Novo arquivo"), systemImage: "doc.badge.plus") { ws.createFile(near: node.path) }
+                Button(tr("Nova pasta"), systemImage: "folder.badge.plus") { draft = ""; newFolderAt = node.path }
                 Divider()
             } else {
-                Button("Abrir", systemImage: "doc.text") { ws.openFile(node.path) }
+                Button(tr("Abrir"), systemImage: "doc.text") { ws.openFile(node.path) }
             }
-            Button("Renomear", systemImage: "pencil") { draft = node.name; renaming = node.path }
-            Button("Copiar caminho", systemImage: "doc.on.doc") { UIPasteboard.general.string = node.path }
+            Button(tr("Renomear"), systemImage: "pencil") { draft = node.name; renaming = node.path }
+            Button(tr("Copiar caminho"), systemImage: "doc.on.doc") { UIPasteboard.general.string = node.path }
             if !node.isDirectory {
                 ShareLink(item: ws.root.appending(path: node.path)) { Label(
-                    "Compartilhar",
+                    tr("Compartilhar"),
                     systemImage: "square.and.arrow.up"
                 ) }
             }
             if !node.isDirectory, ws.git.isRepo {
                 Divider()
-                Button("Histórico", systemImage: "clock.arrow.circlepath") { ws.historyPath = node.path }
-                Button("Blame", systemImage: "person.text.rectangle") { ws.blamePath = node.path }
+                Button(tr("Histórico"), systemImage: "clock.arrow.circlepath") { ws.historyPath = node.path }
+                Button(tr("Blame"), systemImage: "person.text.rectangle") { ws.blamePath = node.path }
             }
             Divider()
-            Button("Apagar", systemImage: "trash", role: .destructive) { deleting = node.path }
+            Button(tr("Apagar"), systemImage: "trash", role: .destructive) { deleting = node.path }
             if let a = ws.ultimaAcao, a.podeDesfazer {
-                Button("Desfazer \(a.descricao)", systemImage: "arrow.uturn.backward") { ws.desfazerArquivo() }
+                Button(tr("Desfazer %1$@", "\(a.descricao)"), systemImage: "arrow.uturn.backward") {
+                    ws.desfazerArquivo()
+                }
             }
         }
     }

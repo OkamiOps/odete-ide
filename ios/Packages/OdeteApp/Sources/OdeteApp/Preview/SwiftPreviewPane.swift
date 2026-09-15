@@ -1,4 +1,5 @@
 import OdeteCore
+import OdeteI18n
 import OdetePreview
 import OdeteSwift
 import OdeteUI
@@ -38,7 +39,7 @@ struct SwiftPreviewPane: View {
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: "swift").font(.system(size: 12, weight: .semibold)).foregroundStyle(theme.accent)
-                    Text(rootName ?? "sem View").font(OdeteFont.mono(11.5)).foregroundStyle(theme.fg).lineLimit(1)
+                    Text(rootName ?? tr("sem View")).font(OdeteFont.mono(11.5)).foregroundStyle(theme.fg).lineLimit(1)
                     Image(systemName: "chevron.down").font(.system(size: 9, weight: .bold))
                         .foregroundStyle(theme.fgSubtle)
                 }
@@ -49,7 +50,7 @@ struct SwiftPreviewPane: View {
                 Text(p.displayName).font(OdeteFont.ui(11)).foregroundStyle(theme.fgSubtle).lineLimit(1)
             }
             Spacer()
-            HeaderButton("arrow.counterclockwise", label: "Zerar estado") { rebuild(keepState: false) }
+            HeaderButton("arrow.counterclockwise", label: tr("Zerar estado")) { rebuild(keepState: false) }
             Menu {
                 ForEach(Viewport.allCases) { v in
                     Button { viewport = v } label: { Label(v.label, systemImage: v.symbol) }
@@ -62,23 +63,24 @@ struct SwiftPreviewPane: View {
                     )
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Tamanho da tela: \(viewport.label)")
-            .help("Tamanho da tela")
+            .accessibilityLabel(tr("Tamanho da tela: %1$@", "\(viewport.label)"))
+            .help(tr("Tamanho da tela"))
             if let p = package, p.isPackage {
                 PlaygroundButton(package: p.root)
             } else {
-                Button { showFiles = true } label: { Label("Criar pacote", systemImage: "shippingbox") }
+                Button { showFiles = true } label: { Label(tr("Criar pacote"), systemImage: "shippingbox") }
                     .buttonStyle(.glass).font(OdeteFont.ui(12))
             }
         }
         .padding(.horizontal, 8).frame(height: 44)
         .background(theme.bgElevated)
         .overlay(alignment: .bottom) { Rectangle().fill(theme.border).frame(height: 1) }
-        .alert("Pacote do Playgrounds", isPresented: $showFiles) { Button("OK") {} } message: {
+        .alert(tr("Pacote do Playgrounds"), isPresented: $showFiles) { Button(tr("OK")) {} } message: {
             Text(
-                "Crie um projeto com o template \"Swift Playground\" para ter um .swiftpm que o "
-                    + "Swift Playgrounds abre e compila. Este projeto tem só arquivos .swift soltos, "
-                    + "que o preview mostra mas não compila."
+                tr(
+                    // swiftlint:disable:next line_length
+                    "Crie um projeto com o template \"Swift Playground\" para ter um .swiftpm que o Swift Playgrounds abre e compila. Este projeto tem só arquivos .swift soltos, que o preview mostra mas não compila."
+                )
             )
         }
     }
@@ -124,7 +126,9 @@ struct SwiftPreviewPane: View {
                     weight: .medium
                 )).foregroundStyle(theme.fg)
                 Text(
-                    "Crie uma `struct X: View` com `var body: some View`. O preview mostra o subconjunto de SwiftUI na hora; o Playgrounds compila tudo."
+                    tr(
+                        "Crie uma `struct X: View` com `var body: some View`. O preview mostra o subconjunto de SwiftUI na hora; o Playgrounds compila tudo."
+                    )
                 )
                 .font(OdeteFont.ui(12)).foregroundStyle(theme.fgMuted).multilineTextAlignment(.center)
             }

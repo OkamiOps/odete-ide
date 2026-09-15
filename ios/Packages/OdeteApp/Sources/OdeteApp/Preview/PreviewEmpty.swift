@@ -1,4 +1,5 @@
 import OdeteCore
+import OdeteI18n
 import OdetePreview
 import OdeteUI
 import SwiftUI
@@ -23,9 +24,9 @@ struct PreviewEmpty: View {
                     janela
                 }
                 VStack(spacing: 6) {
-                    Text("Nada rodando ainda")
+                    Text(tr("Nada rodando ainda"))
                         .font(OdeteFont.ui(15, weight: .semibold)).foregroundStyle(theme.fg)
-                    Text("O preview abre aqui e recarrega sozinho toda vez que você salva.")
+                    Text(tr("O preview abre aqui e recarrega sozinho toda vez que você salva."))
                         .font(OdeteFont.ui(12)).foregroundStyle(theme.fgMuted)
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
@@ -58,7 +59,7 @@ struct PreviewEmpty: View {
         Button(action: onDev) { Label("npm run dev", systemImage: "play.fill") }
             .buttonStyle(.glassProminent)
         if let onStatic {
-            Button(action: onStatic) { Label("index.html estático", systemImage: "doc.richtext") }
+            Button(action: onStatic) { Label(tr("index.html estático"), systemImage: "doc.richtext") }
                 .buttonStyle(.glass)
         }
     }

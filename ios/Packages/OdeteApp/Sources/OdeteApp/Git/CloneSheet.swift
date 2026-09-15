@@ -2,6 +2,7 @@ import OdeteAccounts
 import OdeteCore
 import OdeteFiles
 import OdeteGit
+import OdeteI18n
 import OdeteUI
 import SwiftUI
 
@@ -24,7 +25,7 @@ struct CloneSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("URL do repositório") {
+                Section(tr("URL do repositório")) {
                     TextField("https://github.com/usuario/repo.git", text: $url)
                         .autocorrectionDisabled().textInputAutocapitalization(.never).keyboardType(.URL)
                         .onChange(of: url) { _, v in
@@ -32,11 +33,12 @@ struct CloneSheet: View {
                                 name = derivedName(from: v)
                             }
                         }
-                    TextField("nome da pasta", text: $name).autocorrectionDisabled().textInputAutocapitalization(.never)
+                    TextField(tr("nome da pasta"), text: $name).autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
                 }
                 if accounts.github != nil {
-                    Section("Seus repositórios no GitHub") {
-                        TextField("filtrar", text: $filter)
+                    Section(tr("Seus repositórios no GitHub")) {
+                        TextField(tr("filtrar"), text: $filter)
                         if loadingRepos {
                             ProgressView()
                         }
@@ -64,15 +66,24 @@ struct CloneSheet: View {
                     }
                 } else {
                     Section {
-                        Text("Entre com o GitHub em Ajustes → Contas para listar seus repositórios e clonar privados.")
-                            .font(.footnote).foregroundStyle(.secondary)
+                        Text(
+                            tr(
+                                "Entre com o GitHub em Ajustes → Contas para listar seus repositórios e clonar privados."
+                            )
+                        )
+                        .font(.footnote).foregroundStyle(.secondary)
                     }
                 }
                 if let p = progress {
-                    Section("Clonando") {
+                    Section(tr("Clonando")) {
                         ProgressView(value: p.fraction)
                         Text(
-                            "\(p.received)/\(p.total) objetos · \(ByteCountFormatter.string(fromByteCount: Int64(p.bytes), countStyle: .file))"
+                            tr(
+                                "%1$@/%2$@ objetos · %3$@",
+                                "\(p.received)",
+                                "\(p.total)",
+                                "\(ByteCountFormatter.string(fromByteCount: Int64(p.bytes), countStyle: .file))"
+                            )
                         )
                         .font(.footnote.monospacedDigit()).foregroundStyle(.secondary)
                     }
@@ -81,12 +92,12 @@ struct CloneSheet: View {
                     Section { Text(error).foregroundStyle(.red) }
                 }
             }
-            .navigationTitle("Clonar repositório")
+            .navigationTitle(tr("Clonar repositório"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancelar") { dismiss() }.disabled(running) }
+                ToolbarItem(placement: .cancellationAction) { Button(tr("Cancelar")) { dismiss() }.disabled(running) }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Clonar", action: clone)
+                    Button(tr("Clonar"), action: clone)
                         .disabled(running || url.trimmingCharacters(in: .whitespaces).isEmpty || name.isEmpty)
                 }
             }
@@ -118,7 +129,7 @@ struct CloneSheet: View {
         let u = url.trimmingCharacters(in: .whitespaces)
         let dir = app.store.root.appending(path: name, directoryHint: .isDirectory)
         if FileManager.default.fileExists(atPath: dir.path) {
-            error = "já existe um projeto chamado \(name)"; return
+            error = tr("já existe um projeto chamado %1$@", "\(name)"); return
         }
         var cred: Credentials?
         if let acc = accounts.account(forRemote: u), let t = accounts.token(for: acc) {

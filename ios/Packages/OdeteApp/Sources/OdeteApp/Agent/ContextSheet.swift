@@ -1,4 +1,5 @@
 import OdeteAgent
+import OdeteI18n
 import OdeteUI
 import PhotosUI
 import SwiftUI
@@ -19,7 +20,7 @@ struct ContextSheet: View {
                 VStack(alignment: .leading, spacing: 16) {
                     HStack(spacing: 10) {
                         PhotosPicker(selection: $photo, matching: .images) {
-                            Fonte(label: "Fotos", symbol: "photo")
+                            Fonte(label: tr("Fotos"), symbol: "photo")
                         }
                         .buttonStyle(.plain)
                         .onChange(of: photo) { _, novo in
@@ -30,7 +31,7 @@ struct ContextSheet: View {
                         Button {
                             agent.attachPreview(); dismiss()
                         } label: {
-                            Fonte(label: "Preview", symbol: "camera.viewfinder")
+                            Fonte(label: tr("Preview"), symbol: "camera.viewfinder")
                         }
                         .buttonStyle(.plain)
                         .disabled(!temPreview)
@@ -38,29 +39,29 @@ struct ContextSheet: View {
                         Button {
                             inserir("@")
                         } label: {
-                            Fonte(label: "Arquivo", symbol: "at")
+                            Fonte(label: tr("Arquivo"), symbol: "at")
                         }
                         .buttonStyle(.plain)
                     }
                     VStack(alignment: .leading, spacing: 8) {
-                        SectionTitle("Atalhos")
+                        SectionTitle(tr("Atalhos"))
                         CardList {
                             Button { inserir("/") } label: {
-                                CardRow("Skill", symbol: "slash.circle", color: .purple, first: true) {
+                                CardRow(tr("Skill"), symbol: "slash.circle", color: .purple, first: true) {
                                     chevron
                                 }
                                 .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
                             Button { agent.newChat(); dismiss() } label: {
-                                CardRow("Nova conversa", symbol: "square.and.pencil", color: .blue) { chevron }
+                                CardRow(tr("Nova conversa"), symbol: "square.and.pencil", color: .blue) { chevron }
                                     .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
                         }
                     }
                     VStack(alignment: .leading, spacing: 8) {
-                        SectionTitle("Permissão")
+                        SectionTitle(tr("Permissão"))
                         CardList {
                             ForEach(Array(PermitMode.allCases.enumerated()), id: \.element) { i, p in
                                 Button { agent.setPermit(p) } label: {
@@ -81,19 +82,19 @@ struct ContextSheet: View {
                                 .buttonStyle(.plain)
                             }
                         }
-                        CardNote("Vale para escrever arquivos e rodar comandos no terminal.")
+                        CardNote(tr("Vale para escrever arquivos e rodar comandos no terminal."))
                     }
                 }
                 .padding(16)
             }
             .background(theme.surface)
-            .navigationTitle("Contexto")
+            .navigationTitle(tr("Contexto"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button { dismiss() } label: { Image(systemName: "xmark") }
                         .tint(theme.fgMuted)
-                        .accessibilityLabel("Fechar")
+                        .accessibilityLabel(tr("Fechar"))
                 }
             }
         }

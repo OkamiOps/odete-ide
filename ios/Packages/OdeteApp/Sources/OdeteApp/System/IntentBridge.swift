@@ -2,6 +2,7 @@ import Foundation
 import OdeteAgent
 import OdeteCore
 import OdeteFiles
+import OdeteI18n
 
 /// Ponte entre os AppIntents (no alvo do app) e o estado vivo da Odete.
 @MainActor
@@ -56,12 +57,12 @@ public final class IntentBridge {
             throw NSError(
                 domain: "Odete",
                 code: 1,
-                userInfo: [NSLocalizedDescriptionKey: "Conecte uma conta de IA na Odete."]
+                userInfo: [NSLocalizedDescriptionKey: tr("Conecte uma conta de IA na Odete.")]
             )
         }
-        var system = "Você é a Odete, IDE no iPad. Responda em português, curto e direto."
+        var system = tr("Você é a Odete, IDE no iPad. Responda em português, curto e direto.")
         if let id, let p = projects().first(where: { $0.id == id }) {
-            system += " O usuário está falando do projeto \"\(p.name)\"."
+            system += tr(" O usuário está falando do projeto \"%1$@\".", "\(p.name)")
         }
         let provider = ProviderFactory.make(account: acc, session: accounts.session(for: acc))
         let model = app?.workspace?.agent.model ?? ""

@@ -1,5 +1,6 @@
 import OdeteAgent
 import OdeteCore
+import OdeteI18n
 import OdeteUI
 import PhotosUI
 import SwiftUI
@@ -42,7 +43,7 @@ struct Composer: View {
             ContextSheet(agent: agent, photo: $photo, temPreview: ws.preview.url != nil)
         }
         .onChange(of: ditado.texto) { _, t in agent.draft = t }
-        .alert("Ditado", isPresented: Binding(
+        .alert(tr("Ditado"), isPresented: Binding(
             get: { ditado.error != nil },
             set: {
                 if !$0 {
@@ -50,7 +51,7 @@ struct Composer: View {
                 }
             }
         )) {
-            Button("OK") { ditado.error = nil }
+            Button(tr("OK")) { ditado.error = nil }
         } message: { Text(ditado.error ?? "") }
         .onChange(of: agent.focusRequest) { focused = true }
         .onChange(of: photo) { _, item in
@@ -81,7 +82,7 @@ struct Composer: View {
                             )
                         }
                         .buttonStyle(.plain).offset(x: 5, y: -5)
-                        .accessibilityLabel("Remover anexo")
+                        .accessibilityLabel(tr("Remover anexo"))
                     }
                 }
             }
@@ -93,7 +94,7 @@ struct Composer: View {
         VStack(alignment: .leading, spacing: 6) {
             GrowingTextView(
                 text: $agent.draft,
-                placeholder: agent.running ? "redirecionar o agente…" : "Peça algo à Odete…",
+                placeholder: agent.running ? tr("redirecionar o agente…") : tr("Peça algo à Odete…"),
                 minHeight: 22,
                 maxHeight: 220,
                 focusRequest: agent.focusRequest,
@@ -124,7 +125,7 @@ struct Composer: View {
     /// Uma linha só: anexar, ditar, modo, e no canto o modelo, o contexto e o enviar.
     func controles(modoComTexto: Bool) -> some View {
         HStack(spacing: 3) {
-            iconeBotao("plus", label: "Contexto") { contexto = true }
+            iconeBotao("plus", label: tr("Contexto")) { contexto = true }
             iconeBotao(
                 ditado.running ? "mic.fill" : "mic",
                 label: ditado.running ? "Parar ditado" : "Ditar",
@@ -153,7 +154,7 @@ struct Composer: View {
                 .frame(width: 24, height: 28)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Janela de contexto")
+        .accessibilityLabel(tr("Janela de contexto"))
         .popover(isPresented: $janela) {
             ContextPopover(agent: agent).presentationCompactAdaptation(.popover)
         }
@@ -177,7 +178,7 @@ struct Composer: View {
 
     func modoMenu(comTexto: Bool) -> some View {
         Menu {
-            Picker("Modo", selection: Binding(get: { agent.mode }, set: { agent.setMode($0) })) {
+            Picker(tr("Modo"), selection: Binding(get: { agent.mode }, set: { agent.setMode($0) })) {
                 ForEach(AgentMode.allCases) { m in Label(m.label, systemImage: simbolo(m)).tag(m) }
             }
         } label: {
@@ -254,7 +255,7 @@ struct Composer: View {
                     .background(theme.danger, in: Circle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Parar")
+            .accessibilityLabel(tr("Parar"))
         } else {
             Button { send() } label: {
                 Image(systemName: agent.running ? "arrow.triangle.turn.up.right" : "arrow.up")
@@ -370,8 +371,8 @@ struct ModeloPopover: View {
             VStack(alignment: .leading, spacing: 14) {
                 if let acc = agent.account {
                     VStack(alignment: .leading, spacing: 8) {
-                        SectionTitle("Modelo", detail: acc.kind.label) {
-                            Button("Recarregar", systemImage: "arrow.clockwise") {
+                        SectionTitle(tr("Modelo"), detail: acc.kind.label) {
+                            Button(tr("Recarregar"), systemImage: "arrow.clockwise") {
                                 Task { await agent.loadModels() }
                             }
                         }
@@ -390,15 +391,15 @@ struct ModeloPopover: View {
                             }
                         }
                         if agent.loadingModels {
-                            CardNote("carregando a lista…")
+                            CardNote(tr("carregando a lista…"))
                         }
                     }
                 } else {
-                    CardNote("Conecte uma conta para escolher o modelo.")
+                    CardNote(tr("Conecte uma conta para escolher o modelo."))
                 }
                 if !agent.effortOptions.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
-                        SectionTitle("Esforço")
+                        SectionTitle(tr("Esforço"))
                         CardList {
                             ForEach(Array(agent.effortOptions.enumerated()), id: \.element) { i, e in
                                 Button { agent.setEffort(e); fechar() } label: {

@@ -1,4 +1,5 @@
 import Foundation
+import OdeteI18n
 
 public enum AgentMode: String, Codable, CaseIterable, Sendable, Identifiable {
     case chat, plan, build
@@ -7,7 +8,7 @@ public enum AgentMode: String, Codable, CaseIterable, Sendable, Identifiable {
     }
 
     public var label: String {
-        switch self { case .chat: "Chat"; case .plan: "Plan"; case .build: "Build" }
+        switch self { case .chat: tr("Chat"); case .plan: tr("Plan"); case .build: tr("Build") }
     }
 }
 
@@ -18,12 +19,14 @@ public enum PermitMode: String, Codable, CaseIterable, Sendable, Identifiable {
     }
 
     public var label: String {
-        switch self { case .ask: "Ask"; case .auto: "Auto"; case .full: "Full" }
+        switch self { case .ask: tr("Ask"); case .auto: tr("Auto"); case .full: tr("Full") }
     }
 
     public var hint: String {
         switch self {
-        case .ask: "pergunta antes de tudo"; case .auto: "só pergunta para escrever e rodar"; case .full: "não pergunta"
+        case .ask: tr(
+                "pergunta antes de tudo"
+            ); case .auto: tr("só pergunta para escrever e rodar"); case .full: tr("não pergunta")
         }
     }
 
@@ -210,20 +213,24 @@ public enum Tools {
 }
 
 public enum Prompts {
-    public static let system = """
-    Você é o agente da Odete, uma IDE que roda 100% no iPad.
-    O projeto é uma pasta real no dispositivo. A lista de caminhos vem no sistema; o conteúdo só entra se VOCÊ chamar read_file.
-    Você escolhe quando abrir e qual arquivo. Em todos os modos a leitura está liberada.
-    O terminal é o shell da Odete: npm install e npm run dev funcionam de verdade e o Preview mostra o app.
-    Responda em português brasileiro.
+    /// Calculado, e não guardado: a linha do idioma muda quando a pessoa muda de
+    /// idioma, e um `static let` prenderia o agente ao idioma da primeira conversa.
+    public static var system: String {
+        """
+        Você é o agente da Odete, uma IDE que roda 100% no iPad.
+        O projeto é uma pasta real no dispositivo. A lista de caminhos vem no sistema; o conteúdo só entra se VOCÊ chamar read_file.
+        Você escolhe quando abrir e qual arquivo. Em todos os modos a leitura está liberada.
+        O terminal é o shell da Odete: npm install e npm run dev funcionam de verdade e o Preview mostra o app.
+        Responda em \(Texto.idioma.paraOModelo).
 
-    Formato (obrigatório, o usuário tem TDAH):
-    - Nunca um bloco de texto corrido.
-    - Use ## título curto e listas.
-    - 1 ideia por bullet.
-    - No máximo 1 frase solta. O resto vira lista.
-    - Arquivos sempre em `backticks`.
-    """
+        Formato (obrigatório, o usuário tem TDAH):
+        - Nunca um bloco de texto corrido.
+        - Use ## título curto e listas.
+        - 1 ideia por bullet.
+        - No máximo 1 frase solta. O resto vira lista.
+        - Arquivos sempre em `backticks`.
+        """
+    }
 
     static let read = "Você decide se precisa abrir arquivo, qual, e quando. Use read_file / list_dir / grep / read_terminal só se o conteúdo for necessário. Não invente conteúdo."
 

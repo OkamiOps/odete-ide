@@ -1,5 +1,6 @@
 import OdeteCore
 import OdeteGit
+import OdeteI18n
 import OdeteUI
 import SwiftUI
 import UIKit
@@ -52,8 +53,8 @@ struct FileHistorySheet: View {
                             } else {
                                 EmptyState(
                                     "clock.arrow.circlepath",
-                                    title: "Escolha uma versão",
-                                    text: "O diff do arquivo naquele ponto aparece aqui."
+                                    title: tr("Escolha uma versão"),
+                                    text: tr("O diff do arquivo naquele ponto aparece aqui.")
                                 )
                             }
                         }
@@ -64,8 +65,8 @@ struct FileHistorySheet: View {
             .background(theme.bg)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Fechar") { dismiss() } }
-                ToolbarItem(placement: .principal) { Titulo(path: path, detalhe: "Histórico") }
+                ToolbarItem(placement: .cancellationAction) { Button(tr("Fechar")) { dismiss() } }
+                ToolbarItem(placement: .principal) { Titulo(path: path, detalhe: tr("Histórico")) }
                 ToolbarItem(placement: .topBarTrailing) { menu }
             }
             .task { await load() }
@@ -78,16 +79,16 @@ struct FileHistorySheet: View {
     /// bolota laranja sem rótulo no canto.
     var menu: some View {
         Menu {
-            Button("Blame", systemImage: "person.text.rectangle") { ws.blamePath = path; dismiss() }
+            Button(tr("Blame"), systemImage: "person.text.rectangle") { ws.blamePath = path; dismiss() }
             if case let .commit(c) = escolhida {
-                Button("Copiar sha", systemImage: "number") { UIPasteboard.general.string = c.id }
+                Button(tr("Copiar sha"), systemImage: "number") { UIPasteboard.general.string = c.id }
             }
-            Button("Copiar caminho", systemImage: "doc.on.doc") { UIPasteboard.general.string = path }
+            Button(tr("Copiar caminho"), systemImage: "doc.on.doc") { UIPasteboard.general.string = path }
         } label: {
             Image(systemName: "ellipsis")
         }
         .menuIndicator(.hidden)
-        .accessibilityLabel("Mais")
+        .accessibilityLabel(tr("Mais"))
     }
 
     // MARK: linha do tempo
@@ -98,7 +99,7 @@ struct FileHistorySheet: View {
                 if loading {
                     ProgressView().frame(maxWidth: .infinity).padding(.vertical, 24)
                 } else if commits.isEmpty, !temLocal {
-                    Text("Nenhum commit tocou este arquivo ainda.")
+                    Text(tr("Nenhum commit tocou este arquivo ainda."))
                         .font(.footnote).foregroundStyle(.secondary)
                         .padding(16)
                 }
@@ -149,7 +150,7 @@ struct FileHistorySheet: View {
                             Text(c.date.formatted(date: .omitted, time: .shortened))
                                 .font(.caption2).foregroundStyle(theme.fgSubtle)
                         } else {
-                            Text("mudanças no disco, sem commit")
+                            Text(tr("mudanças no disco, sem commit"))
                                 .font(.caption2).foregroundStyle(.secondary)
                         }
                     }
@@ -183,7 +184,7 @@ struct FileHistorySheet: View {
 
     func titulo(_ v: Versao) -> String {
         switch v {
-        case .local: "Alterações locais"
+        case .local: tr("Alterações locais")
         case let .commit(c): c.summary
         }
     }
@@ -228,8 +229,8 @@ struct FileHistorySheet: View {
             } else {
                 EmptyState(
                     "doc.text.magnifyingglass",
-                    title: "Sem diff",
-                    text: "Este commit não mudou o conteúdo deste arquivo."
+                    title: tr("Sem diff"),
+                    text: tr("Este commit não mudou o conteúdo deste arquivo.")
                 )
             }
         }
@@ -250,7 +251,7 @@ struct FileHistorySheet: View {
                     Text(c.date.formatted(date: .abbreviated, time: .shortened))
                         .font(.caption).foregroundStyle(theme.fgSubtle)
                 } else {
-                    Label("no disco, ainda sem commit", systemImage: "pencil.circle")
+                    Label(tr("no disco, ainda sem commit"), systemImage: "pencil.circle")
                         .font(.caption).foregroundStyle(theme.ok)
                 }
                 Spacer(minLength: 8)

@@ -1,4 +1,5 @@
 import OdeteAgent
+import OdeteI18n
 import OdeteUI
 import SafariServices
 import SwiftUI
@@ -27,7 +28,7 @@ struct AIAccountsSettings: View {
             case .builtIn: EmptyView()
             }
         }
-        .alert("Apple Intelligence", isPresented: Binding(
+        .alert(tr("Apple Intelligence"), isPresented: Binding(
             get: { recado != nil },
             set: {
                 if !$0 {
@@ -35,15 +36,15 @@ struct AIAccountsSettings: View {
                 }
             }
         )) {
-            Button("OK") { recado = nil }
+            Button(tr("OK")) { recado = nil }
         } message: { Text(recado ?? "") }
     }
 
     /// Sem nenhuma conta a tela não pode ser uma lista vazia com um título.
     var vazio: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("Nenhuma conta ainda").font(.title3.weight(.semibold)).foregroundStyle(theme.fg)
-            Text("Escolha abaixo por onde entrar. O modelo da Apple não pede conta nenhuma.")
+            Text(tr("Nenhuma conta ainda")).font(.title3.weight(.semibold)).foregroundStyle(theme.fg)
+            Text(tr("Escolha abaixo por onde entrar. O modelo da Apple não pede conta nenhuma."))
                 .font(.subheadline).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -53,14 +54,14 @@ struct AIAccountsSettings: View {
     /// Linha alta, com o ícone grande o bastante para identificar de relance.
     var conectadas: some View {
         VStack(alignment: .leading, spacing: 8) {
-            SectionTitle("Conectadas", detail: "\(store.accounts.count)")
+            SectionTitle(tr("Conectadas"), detail: "\(store.accounts.count)")
             CardList {
                 ForEach(Array(store.accounts.enumerated()), id: \.element.id) { i, a in
                     HStack(spacing: 12) {
                         Marca(kind: a.kind, lado: 34, glifo: 15, apagada: a.needsReconnect)
                         VStack(alignment: .leading, spacing: 1) {
                             Text(a.label).font(.body).foregroundStyle(theme.fg).lineLimit(1)
-                            Text(a.needsReconnect ? "a sessão expirou"
+                            Text(a.needsReconnect ? tr("a sessão expirou")
                                 : (a.login.isEmpty ? a.kind.vendor : a.login))
                                 .font(.caption)
                                 .foregroundStyle(a.needsReconnect ? theme.danger : .secondary)
@@ -68,14 +69,14 @@ struct AIAccountsSettings: View {
                         }
                         Spacer(minLength: 8)
                         if a.needsReconnect {
-                            Button("Reconectar") { adding = a.kind }
+                            Button(tr("Reconectar")) { adding = a.kind }
                                 .buttonStyle(.glass).controlSize(.small)
                         }
                         Menu {
                             if a.needsReconnect {
-                                Button("Reconectar", systemImage: "arrow.clockwise") { adding = a.kind }
+                                Button(tr("Reconectar"), systemImage: "arrow.clockwise") { adding = a.kind }
                             }
-                            Button("Remover", systemImage: "trash", role: .destructive) { store.remove(a) }
+                            Button(tr("Remover"), systemImage: "trash", role: .destructive) { store.remove(a) }
                         } label: {
                             Image(systemName: "ellipsis")
                                 .font(.system(size: 14, weight: .semibold))
@@ -85,7 +86,7 @@ struct AIAccountsSettings: View {
                         }
                         .menuIndicator(.hidden)
                         .buttonStyle(.plain)
-                        .accessibilityLabel("Opções de \(a.label)")
+                        .accessibilityLabel(tr("Opções de %1$@", "\(a.label)"))
                     }
                     .padding(.leading, 12)
                     .padding(.trailing, 6)
@@ -105,7 +106,7 @@ struct AIAccountsSettings: View {
     /// lista igual não dizia nada.
     var adicionar: some View {
         VStack(alignment: .leading, spacing: 8) {
-            SectionTitle("Adicionar")
+            SectionTitle(tr("Adicionar"))
             if faltando.contains(.apple) {
                 Button { escolher(.apple) } label: { appleCard }.buttonStyle(.plain)
             }
@@ -142,14 +143,14 @@ struct AIAccountsSettings: View {
         return HStack(spacing: 12) {
             Marca(kind: .apple, lado: 40, glifo: 18, apagada: impedimento != nil)
             VStack(alignment: .leading, spacing: 2) {
-                Text("Apple Intelligence").font(.body.weight(.medium)).foregroundStyle(theme.fg)
-                Text(impedimento ?? "Roda no próprio iPad, sem conta e sem rede.")
+                Text(tr("Apple Intelligence")).font(.body.weight(.medium)).foregroundStyle(theme.fg)
+                Text(impedimento ?? tr("Roda no próprio iPad, sem conta e sem rede."))
                     .font(.caption).foregroundStyle(impedimento == nil ? .secondary : Color(theme.danger))
                     .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 8)
             if impedimento == nil {
-                Text("Usar").font(.footnote.weight(.semibold))
+                Text(tr("Usar")).font(.footnote.weight(.semibold))
                     .padding(.horizontal, 14).frame(height: 30)
                     .background(theme.accent, in: Capsule())
                     .foregroundStyle(theme.accentFg)
@@ -167,7 +168,7 @@ struct AIAccountsSettings: View {
             Marca(kind: k, lado: 40, glifo: 18, apagada: false)
             VStack(spacing: 1) {
                 Text(k.label).font(.subheadline.weight(.medium)).foregroundStyle(theme.fg).lineLimit(1)
-                Text("assinatura").font(.caption2).foregroundStyle(.secondary)
+                Text(tr("assinatura")).font(.caption2).foregroundStyle(.secondary)
             }
         }
         .frame(maxWidth: .infinity)
@@ -208,13 +209,15 @@ struct ClaudeConnectSheet: View {
             Form {
                 Section {
                     Text(
-                        "1. Abra a página da Anthropic e entre com a conta Pro/Max.\n2. Copie o código que aparece no fim.\n3. Cole aqui."
+                        tr(
+                            "1. Abra a página da Anthropic e entre com a conta Pro/Max.\n2. Copie o código que aparece no fim.\n3. Cole aqui."
+                        )
                     )
                     .font(.footnote)
-                    Button { openURL(auth.url) } label: { Label("Abrir claude.com", systemImage: "safari") }
+                    Button { openURL(auth.url) } label: { Label(tr("Abrir claude.com"), systemImage: "safari") }
                 }
-                Section("Código") {
-                    TextField("cole o código (code#state)", text: $pasted).autocorrectionDisabled()
+                Section(tr("Código")) {
+                    TextField(tr("cole o código (code#state)"), text: $pasted).autocorrectionDisabled()
                         .textInputAutocapitalization(.never).font(.system(
                             .body,
                             design: .monospaced
@@ -224,9 +227,9 @@ struct ClaudeConnectSheet: View {
                     Section { Text(error).foregroundStyle(.red).font(.footnote) }
                 }
             }
-            .navigationTitle("Conectar Claude")
+            .navigationTitle(tr("Conectar Claude"))
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancelar") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button(tr("Cancelar")) { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(busy ? "Conectando…" : "Conectar") { connect() }.disabled(pasted.isEmpty || busy)
                 }
@@ -274,40 +277,43 @@ struct DeviceCodeSheet: View {
             VStack(spacing: 18) {
                 Cabecalho(
                     kind: kind,
-                    titulo: "Conectar \(kind.label)",
+                    titulo: tr("Conectar %1$@", "\(kind.label)"),
                     texto: kind == .grok
-                        ? "Entre na xAI com a conta SuperGrok ou X Premium e digite o código."
-                        : "Entre no ChatGPT e digite o código. Se pedir, ligue \"Device code\" em Ajustes → Segurança."
+                        ? tr("Entre na xAI com a conta SuperGrok ou X Premium e digite o código.")
+                        :
+                        tr(
+                            "Entre no ChatGPT e digite o código. Se pedir, ligue \"Device code\" em Ajustes → Segurança."
+                        )
                 )
                 if let s = start {
                     codigo(s.userCode)
-                    Button("Abrir \(s.verificationURL.host() ?? "site")") { openURL(s.verificationURL) }
+                    Button(tr("Abrir %1$@", "\(s.verificationURL.host() ?? "site")")) { openURL(s.verificationURL) }
                         .buttonStyle(.glassProminent)
                         .controlSize(.large)
                     HStack(spacing: 7) {
                         ProgressView().controlSize(.small)
-                        Text("aguardando você autorizar…").font(.footnote).foregroundStyle(.secondary)
+                        Text(tr("aguardando você autorizar…")).font(.footnote).foregroundStyle(.secondary)
                     }
                 } else if error == nil {
                     Spacer(minLength: 0)
-                    ProgressView("pedindo o código…").font(.footnote)
+                    ProgressView(tr("pedindo o código…")).font(.footnote)
                     Spacer(minLength: 0)
                 }
                 if let error {
                     Text(error).font(.footnote).foregroundStyle(theme.danger)
                         .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
-                    Button("Tentar de novo") { begin() }.buttonStyle(.glass)
+                    Button(tr("Tentar de novo")) { begin() }.buttonStyle(.glass)
                 }
                 Spacer(minLength: 0)
             }
             .padding(20)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(theme.bg)
-            .navigationTitle("Nova conta")
+            .navigationTitle(tr("Nova conta"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancelar") { task?.cancel(); dismiss() }
+                    Button(tr("Cancelar")) { task?.cancel(); dismiss() }
                 }
             }
         }
@@ -335,7 +341,7 @@ struct DeviceCodeSheet: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Copiar código")
+            .accessibilityLabel(tr("Copiar código"))
         }
         .padding(.horizontal, 10).padding(.vertical, 14)
         .background(theme.bgElevated, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
@@ -364,7 +370,7 @@ struct DeviceCodeSheet: View {
                     }
                 }
                 if !Task.isCancelled {
-                    error = "o código expirou; comece de novo"
+                    error = tr("o código expirou; comece de novo")
                 }
             } catch is CancellationError {} catch { self.error = error.localizedDescription }
         }
@@ -386,17 +392,19 @@ struct ApiKeySheet: View {
         NavigationStack {
             ScrollPane {
                 VStack(alignment: .leading, spacing: 16) {
-                    Cabecalho(kind: kind, titulo: kind.label, texto: "Endereço e chave do serviço.")
+                    Cabecalho(kind: kind, titulo: kind.label, texto: tr("Endereço e chave do serviço."))
                     CardList {
-                        campo("Nome", dica: "opcional, ex.: OpenRouter", texto: $label, first: true)
+                        campo("Nome", dica: tr("opcional, ex.: OpenRouter"), texto: $label, first: true)
                         campo("URL base", dica: kind.defaultBaseURL, texto: $base, url: true)
                         chave
                     }
                     CardNote(kind == .openaiCompat
-                        ? "Vale qualquer API no formato /chat/completions da OpenAI: OpenAI, OpenRouter, Groq, "
+                        ? tr("Vale qualquer API no formato /chat/completions da OpenAI: OpenAI, OpenRouter, Groq, ")
                         + "Together, Ollama, LM Studio."
-                        : "Vale qualquer API no formato /v1/messages da Anthropic. Para a Anthropic oficial, "
-                        + "deixe a URL padrão.")
+                        :
+                        tr(
+                            "Vale qualquer API no formato /v1/messages da Anthropic. Para a Anthropic oficial, deixe a URL padrão."
+                        ))
                     if let error {
                         Text(error).font(.footnote).foregroundStyle(theme.danger)
                             .fixedSize(horizontal: false, vertical: true).padding(.horizontal, 4)
@@ -405,12 +413,12 @@ struct ApiKeySheet: View {
                 .padding(16)
             }
             .background(theme.bg)
-            .navigationTitle("Nova conta")
+            .navigationTitle(tr("Nova conta"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancelar") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button(tr("Cancelar")) { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Salvar") { save() }.disabled(key.trimmingCharacters(in: .whitespaces).isEmpty)
+                    Button(tr("Salvar")) { save() }.disabled(key.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
             }
         }
@@ -440,8 +448,8 @@ struct ApiKeySheet: View {
 
     var chave: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text("Chave de API").font(.caption).foregroundStyle(.secondary)
-            SecureField("", text: $key, prompt: Text("cole aqui").foregroundStyle(theme.fgSubtle))
+            Text(tr("Chave de API")).font(.caption).foregroundStyle(.secondary)
+            SecureField("", text: $key, prompt: Text(tr("cole aqui")).foregroundStyle(theme.fgSubtle))
                 .font(.body).foregroundStyle(theme.fg).textFieldStyle(.plain)
         }
         .padding(.horizontal, 12).padding(.vertical, 9)

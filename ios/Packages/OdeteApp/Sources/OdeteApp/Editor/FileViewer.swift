@@ -1,4 +1,5 @@
 import OdeteFiles
+import OdeteI18n
 import OdeteUI
 import PDFKit
 import SwiftUI
@@ -83,8 +84,8 @@ struct ImagemView: View {
             } else {
                 EmptyState(
                     "photo",
-                    title: "Não deu para abrir",
-                    text: "O arquivo tem extensão de imagem mas não decodifica."
+                    title: tr("Não deu para abrir"),
+                    text: tr("O arquivo tem extensão de imagem mas não decodifica.")
                 )
             }
         }
@@ -149,10 +150,10 @@ struct HexView: View {
             HStack(spacing: 8) {
                 Image(systemName: "doc.badge.gearshape").foregroundStyle(theme.fgSubtle)
                 Text(nome).font(.subheadline.weight(.medium)).foregroundStyle(theme.fg)
-                Text("binário · \(medida)").font(.caption).foregroundStyle(.secondary)
+                Text(tr("binário · %1$@", "\(medida)")).font(.caption).foregroundStyle(.secondary)
                 Spacer(minLength: 0)
                 if dados.count >= Self.teto {
-                    Text("primeiros 64 KB").font(.caption2).foregroundStyle(theme.fgSubtle)
+                    Text(tr("primeiros 64 KB")).font(.caption2).foregroundStyle(theme.fgSubtle)
                 }
             }
             .padding(.horizontal, 14).frame(height: 40)

@@ -1,5 +1,6 @@
 import OdeteCore
 import OdeteGit
+import OdeteI18n
 import OdeteUI
 import SwiftUI
 
@@ -15,7 +16,7 @@ struct DiffPane: View {
     /// anunciava "+0 −0" — que se lê como "não mudou nada" bem em cima da mudança.
     var resumo: String {
         let texto = git.diff.files.filter { !$0.isBinary }
-        guard !texto.isEmpty else { return git.diff.files.isEmpty ? "" : "binário" }
+        guard !texto.isEmpty else { return git.diff.files.isEmpty ? "" : tr("binário") }
         return "+\(texto.reduce(0) { $0 + $1.additions })  −\(texto.reduce(0) { $0 + $1.deletions })"
     }
 
@@ -23,11 +24,11 @@ struct DiffPane: View {
         VStack(spacing: 0) {
             HStack(spacing: 8) {
                 Menu {
-                    Button("Tudo (HEAD → workdir)") { git.setDiff(.headToWorkdir) }
-                    Button("Não staged (índice → workdir)") { git.setDiff(.workdir) }
-                    Button("Staged (HEAD → índice)") { git.setDiff(.index) }
+                    Button(tr("Tudo (HEAD → workdir)")) { git.setDiff(.headToWorkdir) }
+                    Button(tr("Não staged (índice → workdir)")) { git.setDiff(.workdir) }
+                    Button(tr("Staged (HEAD → índice)")) { git.setDiff(.index) }
                     if let a = git.compareA, let b = git.compareB {
-                        Button("Comparar A → B") { git.setDiff(.commits(
+                        Button(tr("Comparar A → B")) { git.setDiff(.commits(
                             a,
                             b
                         )) }
@@ -38,7 +39,7 @@ struct DiffPane: View {
                 .buttonStyle(.glass)
                 if let p = git.diffPath {
                     Text(p).font(OdeteFont.mono(11)).foregroundStyle(theme.fgMuted).lineLimit(1).truncationMode(.middle)
-                    Button("todos os arquivos") { git.setDiff(git.diffSource) }.font(OdeteFont.ui(11))
+                    Button(tr("todos os arquivos")) { git.setDiff(git.diffSource) }.font(OdeteFont.ui(11))
                 }
                 Spacer()
                 Text(resumo).font(OdeteFont.mono(11)).foregroundStyle(theme.fgMuted)
@@ -51,13 +52,13 @@ struct DiffPane: View {
                     "Diff",
                     symbol: "plus.forwardslash.minus",
                     phase: 2,
-                    blurb: "Inicie um repositório no painel Git."
+                    blurb: tr("Inicie um repositório no painel Git.")
                 )
             } else if git.diff.files.isEmpty {
                 VStack(spacing: 8) {
                     Image(systemName: "checkmark.circle").font(.system(size: 26, weight: .light))
                         .foregroundStyle(theme.fgSubtle)
-                    Text("sem diferenças").font(OdeteFont.ui(13)).foregroundStyle(theme.fgMuted)
+                    Text(tr("sem diferenças")).font(OdeteFont.ui(13)).foregroundStyle(theme.fgMuted)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
@@ -120,13 +121,13 @@ struct FileDiffView: View {
                     Text("+\(file.additions)").font(OdeteFont.mono(11)).foregroundStyle(theme.ok)
                     Text("−\(file.deletions)").font(OdeteFont.mono(11)).foregroundStyle(theme.danger)
                 }
-                HeaderButton("doc.text", label: "Abrir") { ws.openFile(file.path) }
+                HeaderButton("doc.text", label: tr("Abrir")) { ws.openFile(file.path) }
             }
             .padding(.horizontal, 10)
             .frame(height: 38)
             .background(theme.bgElevated)
             if file.isBinary {
-                Text("arquivo binário").font(OdeteFont.mono(11)).foregroundStyle(theme.fgSubtle).padding(10)
+                Text(tr("arquivo binário")).font(OdeteFont.mono(11)).foregroundStyle(theme.fgSubtle).padding(10)
             }
             ForEach(file.hunks) { h in
                 VStack(alignment: .leading, spacing: 0) {
@@ -134,12 +135,12 @@ struct FileDiffView: View {
                         Text(h.header).font(OdeteFont.mono(11)).foregroundStyle(theme.accent).lineLimit(1)
                         Spacer()
                         if canStage {
-                            Button("Stage hunk") { git.stageHunk(h, in: file) }.font(OdeteFont.ui(11))
-                            Button("Descartar") { git.discardHunk(h, in: file) }.font(OdeteFont.ui(11))
+                            Button(tr("Stage hunk")) { git.stageHunk(h, in: file) }.font(OdeteFont.ui(11))
+                            Button(tr("Descartar")) { git.discardHunk(h, in: file) }.font(OdeteFont.ui(11))
                                 .foregroundStyle(theme.danger)
                         }
                         if canUnstage {
-                            Button("Unstage hunk") { git.unstageHunk(h, in: file) }.font(OdeteFont.ui(11))
+                            Button(tr("Unstage hunk")) { git.unstageHunk(h, in: file) }.font(OdeteFont.ui(11))
                         }
                     }
                     .padding(.horizontal, 10)

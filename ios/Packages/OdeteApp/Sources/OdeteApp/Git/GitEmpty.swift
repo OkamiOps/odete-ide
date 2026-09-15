@@ -1,3 +1,4 @@
+import OdeteI18n
 import OdeteUI
 import SwiftUI
 
@@ -21,24 +22,24 @@ struct GitEmpty: View {
         VStack(alignment: .leading, spacing: 16) {
             marca
             VStack(alignment: .leading, spacing: 5) {
-                Text("Versionar \(ws.project.name)")
+                Text(tr("Versionar %1$@", "\(ws.project.name)"))
                     .font(.headline).foregroundStyle(theme.fg)
                     .fixedSize(horizontal: false, vertical: true)
-                Text("Um repositório guarda cada passo e deixa desfazer sem medo.")
+                Text(tr("Um repositório guarda cada passo e deixa desfazer sem medo."))
                     .font(.footnote).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             if !apertado {
                 VStack(alignment: .leading, spacing: 10) {
-                    ganho("clock.arrow.circlepath", "Histórico", "Volte a qualquer ponto do arquivo.")
-                    ganho("arrow.triangle.branch", "Branches", "Teste uma ideia sem estragar o que funciona.")
-                    ganho("arrow.up.circle", "GitHub", "Suba o projeto e abra pull requests daqui.")
+                    ganho("clock.arrow.circlepath", tr("Histórico"), tr("Volte a qualquer ponto do arquivo."))
+                    ganho("arrow.triangle.branch", "Branches", tr("Teste uma ideia sem estragar o que funciona."))
+                    ganho("arrow.up.circle", "GitHub", tr("Suba o projeto e abra pull requests daqui."))
                 }
             }
             Button { ws.git.initRepository() } label: {
                 HStack(spacing: 7) {
                     Image(systemName: "plus").font(.system(size: 13, weight: .bold))
-                    Text(apertado ? "Iniciar" : "Iniciar repositório")
+                    Text(apertado ? "Iniciar" : tr("Iniciar repositório"))
                         .lineLimit(1).minimumScaleFactor(0.85)
                 }
                 .font(.subheadline.weight(.semibold))
@@ -50,7 +51,7 @@ struct GitEmpty: View {
             }
             .buttonStyle(.plain)
             .hoverEffect(.highlight)
-            Text("Cria um `.git` na pasta do projeto. Nada é enviado para fora do iPad.")
+            Text(tr("Cria um `.git` na pasta do projeto. Nada é enviado para fora do iPad."))
                 .font(.caption2).foregroundStyle(theme.fgSubtle)
                 .fixedSize(horizontal: false, vertical: true)
         }

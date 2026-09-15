@@ -1,5 +1,6 @@
 import Foundation
 import OdeteCore
+import OdeteI18n
 
 /// Leitor e escritor tar (ustar + GNU longname) em memória.
 public enum Tar {
@@ -115,7 +116,7 @@ public enum Tar {
 
     /// Extrai um `.tgz` de pacote npm (prefixo `package/` removido) em `dir`.
     public static func extractPackage(_ tgz: Data, to dir: URL) throws {
-        guard let tar = GzipCodec.decompress(tgz) else { throw NpmError.tarball("gzip inválido") }
+        guard let tar = GzipCodec.decompress(tgz) else { throw NpmError.tarball(tr("gzip inválido")) }
         let fm = FileManager.default
         try fm.createDirectory(at: dir, withIntermediateDirectories: true)
         for e in try read(tar) {

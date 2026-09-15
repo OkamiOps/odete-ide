@@ -1,4 +1,5 @@
 import Foundation
+import OdeteI18n
 
 public enum HostKind: String, Codable, CaseIterable, Sendable {
     case github, gitlab, gitea, bitbucket, other
@@ -6,9 +7,9 @@ public enum HostKind: String, Codable, CaseIterable, Sendable {
         switch self {
         case .github: "GitHub"
         case .gitlab: "GitLab"
-        case .gitea: "Gitea / Forgejo"
+        case .gitea: tr("Gitea / Forgejo")
         case .bitbucket: "Bitbucket"
-        case .other: "Outro"
+        case .other: tr("Outro")
         }
     }
 

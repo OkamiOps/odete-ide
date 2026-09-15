@@ -1,5 +1,6 @@
 import OdeteCore
 import OdeteFiles
+import OdeteI18n
 import OdeteUI
 import SwiftUI
 import UIKit
@@ -58,9 +59,13 @@ struct DBView: View {
     var body: some View {
         Group {
             if let erro {
-                EmptyState("exclamationmark.triangle", title: "Não deu para ler o banco", text: erro)
+                EmptyState("exclamationmark.triangle", title: tr("Não deu para ler o banco"), text: erro)
             } else if tabelas.isEmpty {
-                EmptyState("tablecells", title: "Banco sem tabelas", text: "\(nome) abriu, mas não tem nenhuma tabela.")
+                EmptyState(
+                    "tablecells",
+                    title: tr("Banco sem tabelas"),
+                    text: tr("%1$@ abriu, mas não tem nenhuma tabela.", "\(nome)")
+                )
             } else if largura > 0, largura < 520 {
                 // Numa janela estreita a coluna de 190 pt comia metade da largura e
                 // sobravam duas colunas de dados. As tabelas viram uma fila de fichas em
@@ -80,14 +85,14 @@ struct DBView: View {
         }
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { largura = $0 }
         .task(id: url) { abrir() }
-        .alert("Nova coluna", isPresented: $novaColuna) {
-            TextField("nome", text: $nomeDaColuna)
+        .alert(tr("Nova coluna"), isPresented: $novaColuna) {
+            TextField(tr("nome"), text: $nomeDaColuna)
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.never)
-            Button("Criar") { criarColuna(nomeDaColuna); nomeDaColuna = "" }
-            Button("Cancelar", role: .cancel) { nomeDaColuna = "" }
+            Button(tr("Criar")) { criarColuna(nomeDaColuna); nomeDaColuna = "" }
+            Button(tr("Cancelar"), role: .cancel) { nomeDaColuna = "" }
         } message: {
-            Text("Entra como TEXT no fim da tabela, vazia em todas as linhas.")
+            Text(tr("Entra como TEXT no fim da tabela, vazia em todas as linhas."))
         }
     }
 
@@ -129,7 +134,7 @@ struct DBView: View {
                                 .foregroundStyle(escolhida == t.nome ? theme.accent : theme.fgSubtle)
                             VStack(alignment: .leading, spacing: 1) {
                                 Text(t.nome).font(.subheadline).foregroundStyle(theme.fg).lineLimit(1)
-                                Text("\(t.linhas) linha\(t.linhas == 1 ? "" : "s")")
+                                Text(tr("%1$@ linha%2$@", "\(t.linhas)", "\(t.linhas == 1 ? "" : "s")"))
                                     .font(.caption2).foregroundStyle(.secondary).monospacedDigit()
                             }
                             Spacer(minLength: 0)
@@ -159,7 +164,7 @@ struct DBView: View {
                 Spacer(minLength: 0)
                 Button { self.aviso = nil } label: { Image(systemName: "xmark").font(.caption2) }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Fechar aviso")
+                    .accessibilityLabel(tr("Fechar aviso"))
             }
             .foregroundStyle(theme.danger)
             .padding(.horizontal, 12).padding(.vertical, 8)
@@ -239,7 +244,7 @@ struct DBView: View {
         .onTapGesture { abrirCelula(linha: linha, coluna: coluna, valor: c, cabecalho: cabecalho) }
         .contextMenu {
             if !cabecalho, linha >= 0 {
-                Button("Copiar célula", systemImage: "doc.on.doc") { UIPasteboard.general.string = c }
+                Button(tr("Copiar célula"), systemImage: "doc.on.doc") { UIPasteboard.general.string = c }
                 menuDaLinha(linha)
             }
         }
@@ -247,16 +252,16 @@ struct DBView: View {
 
     @ViewBuilder
     func menuDaLinha(_ i: Int) -> some View {
-        Button("Copiar linha", systemImage: "doc.on.doc") {
+        Button(tr("Copiar linha"), systemImage: "doc.on.doc") {
             UIPasteboard.general.string = pagina.linhas[i].joined(separator: "\t")
         }
-        Button("Copiar como CSV", systemImage: "tablecells") {
+        Button(tr("Copiar como CSV"), systemImage: "tablecells") {
             UIPasteboard.general.string = csv(pagina.linhas[i])
         }
-        Button("Copiar como INSERT", systemImage: "curlybraces") {
+        Button(tr("Copiar como INSERT"), systemImage: "curlybraces") {
             UIPasteboard.general.string = insert(pagina.linhas[i])
         }
-        Button("Enviar para a Odete", systemImage: "sparkles") {
+        Button(tr("Enviar para a Odete"), systemImage: "sparkles") {
             ws.agent.anexarTrecho(
                 origem: "\(nome) · \(escolhida ?? "")",
                 texto: ([pagina.colunas.joined(separator: " | ")] + [pagina.linhas[i].joined(separator: " | ")])
@@ -266,7 +271,7 @@ struct DBView: View {
         }
         if podeEditar {
             Divider()
-            Button("Apagar linha", systemImage: "trash", role: .destructive) { apagarLinha(i) }
+            Button(tr("Apagar linha"), systemImage: "trash", role: .destructive) { apagarLinha(i) }
         }
     }
 
@@ -298,21 +303,21 @@ struct DBView: View {
                 // Um menu só: dois botões com rótulo truncavam para "Colu…" na largura
                 // normal do painel.
                 Menu {
-                    Button("Nova linha", systemImage: "plus.rectangle") { novaLinha() }
-                    Button("Nova coluna", systemImage: "plus.rectangle.portrait") { novaColuna = true }
+                    Button(tr("Nova linha"), systemImage: "plus.rectangle") { novaLinha() }
+                    Button(tr("Nova coluna"), systemImage: "plus.rectangle.portrait") { novaColuna = true }
                 } label: {
                     Image(systemName: "plus")
                 }
                 .menuIndicator(.hidden)
-                .accessibilityLabel("Adicionar")
+                .accessibilityLabel(tr("Adicionar"))
             }
             Spacer(minLength: 0)
             Button { mover(-porPagina) } label: { Image(systemName: "chevron.left") }
                 .disabled(offset == 0)
-                .accessibilityLabel("Página anterior")
+                .accessibilityLabel(tr("Página anterior"))
             Button { mover(porPagina) } label: { Image(systemName: "chevron.right") }
                 .disabled(offset + porPagina >= pagina.total)
-                .accessibilityLabel("Próxima página")
+                .accessibilityLabel(tr("Próxima página"))
         }
         .buttonStyle(.bordered)
         .controlSize(.small)
@@ -322,9 +327,9 @@ struct DBView: View {
     }
 
     var faixa: String {
-        guard pagina.total > 0 else { return "sem linhas" }
+        guard pagina.total > 0 else { return tr("sem linhas") }
         let ate = min(offset + pagina.linhas.count, pagina.total)
-        return "\(offset + 1)–\(ate) de \(pagina.total)"
+        return tr("%1$@–%2$@ de %3$@", "\(offset + 1)", "\(ate)", "\(pagina.total)")
     }
 
     // MARK: editar

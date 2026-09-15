@@ -1,5 +1,6 @@
 import Clibgit2
 import Foundation
+import OdeteI18n
 
 /// Coleta callbacks do `git_diff_foreach` num `Diff`.
 final class DiffCollector {
@@ -145,13 +146,13 @@ public extension Repository {
             return nil
         }
         var obj: OpaquePointer?
-        try check(git_revparse_single(&obj, repo, "HEAD^{tree}"), "árvore do HEAD")
+        try check(git_revparse_single(&obj, repo, "HEAD^{tree}"), tr("árvore do HEAD"))
         return obj
     }
 
     internal func tree(of sha: String) throws -> OpaquePointer? {
         var obj: OpaquePointer?
-        try check(git_revparse_single(&obj, repo, "\(sha)^{tree}"), "árvore")
+        try check(git_revparse_single(&obj, repo, "\(sha)^{tree}"), tr("árvore"))
         return obj
     }
 }

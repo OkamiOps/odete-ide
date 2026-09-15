@@ -2,6 +2,7 @@ import Foundation
 import Observation
 import OdeteAgent
 import OdeteCore
+import OdeteI18n
 import UIKit
 
 /// Estado do agente num projeto: conta/modelo, conversa ativa, execução, patches.
@@ -249,7 +250,7 @@ public final class AgentModel {
             draft = pergunta
             attachments = ultimaPergunta?.imagens ?? []
         } else {
-            draft = "Continua de onde parou."
+            draft = tr("Continua de onde parou.")
         }
         send()
     }
@@ -279,14 +280,14 @@ public final class AgentModel {
         guard let acc = account else {
             items.append(.error(
                 id: UUID().uuidString,
-                text: "Conecte uma conta em Ajustes → Contas para usar o agente."
+                text: tr("Conecte uma conta em Ajustes → Contas para usar o agente.")
             ))
             return
         }
         if acc.needsReconnect {
             items.append(.error(
                 id: UUID().uuidString,
-                text: "A sessão da conta \(acc.label) expirou. Reconecte em Ajustes → Contas."
+                text: tr("A sessão da conta %1$@ expirou. Reconecte em Ajustes → Contas.", "\(acc.label)")
             ))
             return
         }
@@ -377,7 +378,7 @@ public final class AgentModel {
     }
 
     public func undoLastTurn() -> String {
-        guard let cp = checkpoints.last else { return "nada pra desfazer" }
+        guard let cp = checkpoints.last else { return tr("nada pra desfazer") }
         let msg = checkpoints.restore(cp.id)
         patches.rejectAll()
         for p in ws.tabs.map(\.path) {

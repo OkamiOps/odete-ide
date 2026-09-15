@@ -1,4 +1,5 @@
 import Foundation
+import OdeteI18n
 
 public enum ThemeId: String, CaseIterable, Codable, Sendable {
     case odete, catppuccin, latte, darcula, cursor, claude, linear, github, okami, volt, colo

@@ -2,6 +2,7 @@ import Foundation
 import OdeteBundler
 import OdeteCore
 import OdeteGit
+import OdeteI18n
 import OdeteNpm
 import OdeteRuntime
 
@@ -172,7 +173,7 @@ public final class Shell: @unchecked Sendable {
                 let u = resolvePath(f)
                 guard let s = try? String(contentsOf: u, encoding: .utf8) else { sink(
                     .err,
-                    "odete: \(f): não existe"
+                    tr("odete: %1$@: não existe", "\(f)")
                 ); return 1 }
                 stdin = s
             }
@@ -190,7 +191,7 @@ public final class Shell: @unchecked Sendable {
                     } else {
                         try io.captured.write(to: u, atomically: true, encoding: .utf8)
                     }
-                } catch { sink(.err, "odete: não consegui escrever \(f)"); return 1 }
+                } catch { sink(.err, tr("odete: não consegui escrever %1$@", "\(f)")); return 1 }
                 input = nil
             } else {
                 input = capturing ? String(io.captured.dropLast(io.captured.hasSuffix("\n") ? 1 : 0)) : nil
@@ -224,9 +225,9 @@ public final class Shell: @unchecked Sendable {
         let temPacote = FileManager.default.fileExists(atPath: root.appending(path: "package.json").path)
         let temModulos = FileManager.default.fileExists(atPath: root.appending(path: "node_modules").path)
         if temPacote, !temModulos {
-            io.err("odete: comando não encontrado: \(name). Rode npm install primeiro.")
+            io.err(tr("odete: comando não encontrado: %1$@. Rode npm install primeiro.", "\(name)"))
         } else {
-            io.err("odete: comando não encontrado: \(name). Digite help.")
+            io.err(tr("odete: comando não encontrado: %1$@. Digite help.", "\(name)"))
         }
         return 127
     }

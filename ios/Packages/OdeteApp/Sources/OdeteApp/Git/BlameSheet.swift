@@ -1,5 +1,6 @@
 import OdeteCore
 import OdeteGit
+import OdeteI18n
 import OdeteUI
 import SwiftUI
 import UIKit
@@ -33,7 +34,7 @@ struct BlameSheet: View {
                     if loading {
                         ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else if let error {
-                        EmptyState("person.text.rectangle", title: "Sem blame", text: error)
+                        EmptyState("person.text.rectangle", title: tr("Sem blame"), text: error)
                     } else {
                         corpo(linhas)
                     }
@@ -43,22 +44,22 @@ struct BlameSheet: View {
             .background(theme.bg)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Fechar") { dismiss() } }
-                ToolbarItem(placement: .principal) { Titulo(path: path, detalhe: "Blame") }
+                ToolbarItem(placement: .cancellationAction) { Button(tr("Fechar")) { dismiss() } }
+                ToolbarItem(placement: .principal) { Titulo(path: path, detalhe: tr("Blame")) }
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
-                        Button("Histórico", systemImage: "clock.arrow.circlepath") {
+                        Button(tr("Histórico"), systemImage: "clock.arrow.circlepath") {
                             ws.historyPath = path
                             dismiss()
                         }
                         if let h = selecionado, !h.isUncommitted {
-                            Button("Copiar sha", systemImage: "number") { UIPasteboard.general.string = h.sha }
+                            Button(tr("Copiar sha"), systemImage: "number") { UIPasteboard.general.string = h.sha }
                         }
                     } label: {
                         Image(systemName: "ellipsis")
                     }
                     .menuIndicator(.hidden)
-                    .accessibilityLabel("Mais")
+                    .accessibilityLabel(tr("Mais"))
                 }
             }
             .task { await load() }
@@ -77,7 +78,7 @@ struct BlameSheet: View {
         HStack(spacing: 10) {
             RoundedRectangle(cornerRadius: 2).fill(cor(h)).frame(width: 3, height: 30)
             VStack(alignment: .leading, spacing: 2) {
-                Text(h.isUncommitted ? "Alterações locais, ainda sem commit" : h.summary)
+                Text(h.isUncommitted ? tr("Alterações locais, ainda sem commit") : h.summary)
                     .font(.subheadline.weight(.medium)).foregroundStyle(theme.fg).lineLimit(2)
                 HStack(spacing: 6) {
                     if !h.isUncommitted {
@@ -94,7 +95,7 @@ struct BlameSheet: View {
                     .frame(width: 28, height: 28).contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Fechar o commit")
+            .accessibilityLabel(tr("Fechar o commit"))
         }
         .padding(.horizontal, 14).padding(.vertical, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -148,7 +149,7 @@ struct BlameSheet: View {
             Text(h.isUncommitted ? "local" : h.short)
                 .font(OdeteFont.mono(10)).foregroundStyle(h.isUncommitted ? theme.ok : theme.accent)
             if sizeClass != .compact {
-                Text(h.isUncommitted ? "sem commit" : h.author)
+                Text(h.isUncommitted ? tr("sem commit") : h.author)
                     .font(.caption2).foregroundStyle(theme.fgMuted).lineLimit(1)
                 Spacer(minLength: 4)
                 if !h.isUncommitted {
@@ -174,11 +175,12 @@ struct BlameSheet: View {
     }
 
     func load() async {
-        guard let repo = ws.git.repo else { error = "Este projeto não é um repositório git."; loading = false; return }
+        guard let repo = ws.git.repo
+        else { error = tr("Este projeto não é um repositório git."); loading = false; return }
         do {
             hunks = try await repo.blame(path: path)
             if hunks.isEmpty {
-                error = "Arquivo ainda sem commits."
+                error = tr("Arquivo ainda sem commits.")
             }
         } catch {
             self.error = error.localizedDescription

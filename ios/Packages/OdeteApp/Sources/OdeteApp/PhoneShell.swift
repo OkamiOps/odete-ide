@@ -1,5 +1,6 @@
 import OdeteCore
 import OdeteEditor
+import OdeteI18n
 import OdeteUI
 import SwiftUI
 
@@ -73,9 +74,9 @@ struct PhoneShell: View {
         case .files:
             VStack(spacing: 0) {
                 HStack(spacing: 8) {
-                    Button { app.closeWorkspace() } label: { Label("Projetos", systemImage: "square.grid.2x2") }
+                    Button { app.closeWorkspace() } label: { Label(tr("Projetos"), systemImage: "square.grid.2x2") }
                         .buttonStyle(.glass)
-                    Picker("Painel", selection: $chrome.snapshot.side) {
+                    Picker(tr("Painel"), selection: $chrome.snapshot.side) {
                         ForEach(SidePanel.allCases, id: \.self) { p in
                             Image(systemName: p.symbol).tag(p)
                         }

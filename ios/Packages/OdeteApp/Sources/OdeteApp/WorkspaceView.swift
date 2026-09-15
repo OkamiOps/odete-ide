@@ -1,4 +1,5 @@
 import OdeteCore
+import OdeteI18n
 import OdeteUI
 import SwiftUI
 
@@ -41,12 +42,12 @@ struct WorkspaceView: View {
         // GeometryReader, ela some e a barra de abas encosta no topo.
         .background(theme.surface.ignoresSafeArea())
         .focusedSceneValue(\.workspaceActions, WorkspaceActions(ws: ws, chrome: chrome, app: app))
-        .alert("Erro", isPresented: Binding(get: { ws.error != nil }, set: {
+        .alert(tr("Erro"), isPresented: Binding(get: { ws.error != nil }, set: {
             if !$0 {
                 ws.error = nil
             }
         })) {
-            Button("OK") { ws.error = nil }
+            Button(tr("OK")) { ws.error = nil }
         } message: { Text(ws.error ?? "") }
     }
 
@@ -218,7 +219,7 @@ struct SettingsShell: View {
                                     }
                                     Text(p.label).font(OdeteFont.ui(12.5, weight: .medium))
                                         .foregroundStyle(Color(hex: p.fg))
-                                    Text(p.blurb).font(OdeteFont.ui(10.5)).foregroundStyle(Color(hex: p.fgMuted))
+                                    Text(tr(p.blurb)).font(OdeteFont.ui(10.5)).foregroundStyle(Color(hex: p.fgMuted))
                                         .lineLimit(1)
                                 }
                                 .padding(10)
@@ -240,38 +241,42 @@ struct SettingsShell: View {
                 } header: { header("Tema") }
                 Section {
                     Stepper(value: $chrome.snapshot.editor.fontSize, in: 10 ... 22, step: 1) {
-                        LabeledContent("Tamanho da fonte") {
-                            Text("\(Int(chrome.snapshot.editor.fontSize)) pt").font(OdeteFont.mono(12))
+                        LabeledContent(tr("Tamanho da fonte")) {
+                            Text(tr("%1$@ pt", "\(Int(chrome.snapshot.editor.fontSize))")).font(OdeteFont.mono(12))
                                 .foregroundStyle(theme.fgMuted)
                         }
                     }
-                    Toggle("Salvar automaticamente", isOn: $chrome.snapshot.editor.autoSave)
-                    Toggle("Quebrar linhas", isOn: $chrome.snapshot.editor.wrap)
-                    Toggle("Números de linha", isOn: $chrome.snapshot.editor.lineNumbers)
+                    Toggle(tr("Salvar automaticamente"), isOn: $chrome.snapshot.editor.autoSave)
+                    Toggle(tr("Quebrar linhas"), isOn: $chrome.snapshot.editor.wrap)
+                    Toggle(tr("Números de linha"), isOn: $chrome.snapshot.editor.lineNumbers)
                 } header: { header("Editor") }
                 Section {
-                    Toggle("Agente", isOn: $chrome.snapshot.agentVisible)
-                    Toggle("Terminal", isOn: $chrome.snapshot.termVisible)
-                    Button("Restaurar layout") { chrome.resetLayout() }
+                    Toggle(tr("Agente"), isOn: $chrome.snapshot.agentVisible)
+                    Toggle(tr("Terminal"), isOn: $chrome.snapshot.termVisible)
+                    Button(tr("Restaurar layout")) { chrome.resetLayout() }
                 } header: { header("Layout") }
                 Section {
-                    Toggle("Projetos no iCloud Drive", isOn: Binding(
+                    Toggle(tr("Projetos no iCloud Drive"), isOn: Binding(
                         get: { chrome.snapshot.projectsInCloud },
                         set: { chrome.snapshot.projectsInCloud = app.setCloud($0) }
                     ))
                     .disabled(!app.cloudAvailable && !chrome.snapshot.projectsInCloud)
                     Text(app.cloudAvailable
-                        ? "Move a pasta Projects para o iCloud Drive; continua funcionando offline."
+                        ? tr("Move a pasta Projects para o iCloud Drive; continua funcionando offline.")
                         :
-                        "iCloud Drive indisponível neste dispositivo (entre com o Apple ID ou habilite o iCloud Drive).")
+                        tr(
+                            "iCloud Drive indisponível neste dispositivo (entre com o Apple ID ou habilite o iCloud Drive)."
+                        ))
                         .font(OdeteFont.ui(11)).foregroundStyle(theme.fgMuted)
                     Text(
-                        "Atalhos: Abrir projeto, Rodar comando, Perguntar à Odete e Novo projeto ficam no app Atalhos."
+                        tr(
+                            "Atalhos: Abrir projeto, Rodar comando, Perguntar à Odete e Novo projeto ficam no app Atalhos."
+                        )
                     )
                     .font(OdeteFont.ui(11)).foregroundStyle(theme.fgMuted)
                 } header: { header("Sistema") }
-                Section { AccountsSettings() } header: { header("Contas e Git") }
-                Section { AIAccountsSettings() } header: { header("Contas de IA") }
+                Section { AccountsSettings() } header: { header(tr("Contas e Git")) }
+                Section { AIAccountsSettings() } header: { header(tr("Contas de IA")) }
             }
             .formStyle(.grouped)
             .scrollContentBackground(.hidden)

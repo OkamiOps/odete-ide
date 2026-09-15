@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import OdeteI18n
 import UIKit
 
 /// Uma linha do console do app do usuário (ou erro de página).
@@ -41,11 +42,11 @@ public enum Viewport: String, CaseIterable, Sendable, Identifiable {
 
     public var label: String {
         switch self {
-        case .fill: "Livre"
-        case .phone: "iPhone"
-        case .tablet: "iPad"
-        case .desktop: "Desktop 16:9"
-        case .wide: "Full HD 16:9"
+        case .fill: tr("Livre")
+        case .phone: tr("iPhone")
+        case .tablet: tr("iPad")
+        case .desktop: tr("Desktop 16:9")
+        case .wide: tr("Full HD 16:9")
         }
     }
 

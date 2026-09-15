@@ -1,5 +1,6 @@
 import OdeteCore
 import OdeteFiles
+import OdeteI18n
 import OdeteUI
 import SwiftUI
 import UniformTypeIdentifiers
@@ -42,27 +43,36 @@ struct HubView: View {
                                 ProjectCard(project: p, root: app.url(for: p))
                                     .onTapGesture { app.open(p, chrome: chrome) }
                                     .contextMenu {
-                                        Button("Abrir", systemImage: "arrow.up.forward.square") { app.open(
+                                        Button(tr("Abrir"), systemImage: "arrow.up.forward.square") { app.open(
                                             p,
                                             chrome: chrome
                                         ) }
                                         if !p.external {
-                                            Button("Renomear", systemImage: "pencil") { newName = p.name; renaming = p }
-                                            Button("Duplicar", systemImage: "plus.square.on.square") { app.duplicate(p)
+                                            Button(tr("Renomear"), systemImage: "pencil") {
+                                                newName = p.name; renaming = p
+                                            }
+                                            Button(tr("Duplicar"), systemImage: "plus.square.on.square") {
+                                                app.duplicate(p)
                                             }
                                         }
                                         if let z = app.zip(p) {
                                             ShareLink(item: z, preview: SharePreview("\(p.name).zip")) {
-                                                Label("Compartilhar (.zip)", systemImage: "square.and.arrow.up")
+                                                Label(tr("Compartilhar (.zip)"), systemImage: "square.and.arrow.up")
                                             }
                                         }
                                         Divider()
                                         if p.external {
-                                            Button("Remover do hub", systemImage: "minus.circle", role: .destructive) {
+                                            Button(
+                                                tr("Remover do hub"),
+                                                systemImage: "minus.circle",
+                                                role: .destructive
+                                            ) {
                                                 app.delete(p)
                                             }
                                         } else {
-                                            Button("Apagar", systemImage: "trash", role: .destructive) { deleting = p }
+                                            Button(tr("Apagar"), systemImage: "trash", role: .destructive) {
+                                                deleting = p
+                                            }
                                         }
                                     }
                             }
@@ -85,21 +95,21 @@ struct HubView: View {
                 app.importURL(url, chrome: chrome)
             }
         }
-        .alert("Renomear projeto", isPresented: Binding(get: { renaming != nil }, set: {
+        .alert(tr("Renomear projeto"), isPresented: Binding(get: { renaming != nil }, set: {
             if !$0 {
                 renaming = nil
             }
         })) {
-            TextField("Nome", text: $newName)
-            Button("Renomear") {
+            TextField(tr("Nome"), text: $newName)
+            Button(tr("Renomear")) {
                 if let p = renaming {
                     app.rename(p, to: newName)
                 }; renaming = nil
             }
-            Button("Cancelar", role: .cancel) { renaming = nil }
+            Button(tr("Cancelar"), role: .cancel) { renaming = nil }
         }
         .confirmationDialog(
-            "Apagar \"\(deleting?.name ?? "")\"?",
+            tr("Apagar \"%1$@\"?", "\(deleting?.name ?? "")"),
             isPresented: Binding(get: { deleting != nil }, set: {
                 if !$0 {
                     deleting = nil
@@ -107,21 +117,21 @@ struct HubView: View {
             }),
             titleVisibility: .visible
         ) {
-            Button("Apagar projeto", role: .destructive) {
+            Button(tr("Apagar projeto"), role: .destructive) {
                 if let p = deleting {
                     app.delete(p)
                 }; deleting = nil
             }
-            Button("Cancelar", role: .cancel) { deleting = nil }
+            Button(tr("Cancelar"), role: .cancel) { deleting = nil }
         } message: {
-            Text("Os arquivos saem deste iPad. Não dá para desfazer.")
+            Text(tr("Os arquivos saem deste iPad. Não dá para desfazer."))
         }
-        .alert("Erro", isPresented: Binding(get: { app.error != nil }, set: {
+        .alert(tr("Erro"), isPresented: Binding(get: { app.error != nil }, set: {
             if !$0 {
                 app.error = nil
             }
         })) {
-            Button("OK") { app.error = nil }
+            Button(tr("OK")) { app.error = nil }
         } message: { Text(app.error ?? "") }
     }
 
@@ -130,7 +140,7 @@ struct HubView: View {
             BrandIcon(size: 44)
             VStack(alignment: .leading, spacing: 2) {
                 Wordmark(height: 20)
-                Text(sizeClass == .compact ? "IDE no colo." : "IDE no colo. Seus projetos, neste iPad.")
+                Text(sizeClass == .compact ? tr("IDE no colo.") : tr("IDE no colo. Seus projetos, neste iPad."))
                     .font(OdeteFont.ui(12))
                     .foregroundStyle(theme.fgMuted)
                     .lineLimit(1)
@@ -141,22 +151,22 @@ struct HubView: View {
                     Button(p.label) { chrome.snapshot.theme = p.id }
                 }
             } label: {
-                Label("Tema", systemImage: "paintpalette")
+                Label(tr("Tema"), systemImage: "paintpalette")
                     .labelStyle(sizeClass == .compact ? AnyLabelStyle(.iconOnly) : AnyLabelStyle(.titleAndIcon))
             }
             .buttonStyle(.glass)
             Button { importing = true } label: {
-                Label("Abrir pasta", systemImage: "folder")
+                Label(tr("Abrir pasta"), systemImage: "folder")
                     .labelStyle(sizeClass == .compact ? AnyLabelStyle(.iconOnly) : AnyLabelStyle(.titleAndIcon))
             }
             .buttonStyle(.glass)
             Button { cloning = true } label: {
-                Label("Clonar", systemImage: "arrow.down.circle")
+                Label(tr("Clonar"), systemImage: "arrow.down.circle")
                     .labelStyle(sizeClass == .compact ? AnyLabelStyle(.iconOnly) : AnyLabelStyle(.titleAndIcon))
             }
             .buttonStyle(.glass)
             Button { creating = true } label: {
-                Label("Novo projeto", systemImage: "plus")
+                Label(tr("Novo projeto"), systemImage: "plus")
                     .labelStyle(sizeClass == .compact ? AnyLabelStyle(.iconOnly) : AnyLabelStyle(.titleAndIcon))
                     .lineLimit(1)
                     .fixedSize()
@@ -173,22 +183,24 @@ struct WelcomeView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            Text("Bem-vindo à Odete")
+            Text(tr("Bem-vindo à Odete"))
                 .font(OdeteFont.ui(26, weight: .semibold))
                 .foregroundStyle(theme.fg)
             Text(
-                "Uma IDE que roda inteira no iPad: arquivos, git, terminal, preview e um agente que edita o projeto. Sem Mac, sem servidor."
+                tr(
+                    "Uma IDE que roda inteira no iPad: arquivos, git, terminal, preview e um agente que edita o projeto. Sem Mac, sem servidor."
+                )
             )
             .font(OdeteFont.ui(14))
             .foregroundStyle(theme.fgMuted)
             .frame(maxWidth: 520, alignment: .leading)
             VStack(alignment: .leading, spacing: 10) {
-                step(1, "Crie um projeto: em branco, Vite + React, Astro ou Swift Playground.")
-                step(2, "Edite na árvore e no editor. Salva sozinho.")
-                step(3, "Os projetos ficam em Arquivos → Odete, abertos para o Playgrounds e o Working Copy.")
+                step(1, tr("Crie um projeto: em branco, Vite + React, Astro ou Swift Playground."))
+                step(2, tr("Edite na árvore e no editor. Salva sozinho."))
+                step(3, tr("Os projetos ficam em Arquivos → Odete, abertos para o Playgrounds e o Working Copy."))
             }
             Button(action: onCreate) {
-                Label("Criar o primeiro projeto", systemImage: "plus")
+                Label(tr("Criar o primeiro projeto"), systemImage: "plus")
                     .padding(.horizontal, 6)
             }
             .buttonStyle(.glassProminent)
@@ -232,7 +244,7 @@ struct CartaoNovo: View {
                         cornerRadius: 12,
                         style: .continuous
                     ))
-                Text("Novo projeto").font(OdeteFont.ui(14, weight: .medium)).foregroundStyle(theme.fgMuted)
+                Text(tr("Novo projeto")).font(OdeteFont.ui(14, weight: .medium)).foregroundStyle(theme.fgMuted)
             }
             .frame(maxWidth: .infinity, minHeight: 150, maxHeight: .infinity)
             .background(theme.surface.opacity(0.4), in: RoundedRectangle(
@@ -363,14 +375,14 @@ struct NewProjectSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Nome") {
+                Section(tr("Nome")) {
                     TextField("meu-app", text: $name)
                         .focused($focused)
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
                         .onSubmit(create)
                 }
-                Section("Modelo") {
+                Section(tr("Modelo")) {
                     ForEach(Template.allCases) { t in
                         Button {
                             template = t
@@ -379,7 +391,7 @@ struct NewProjectSheet: View {
                                 Image(systemName: t.symbol).frame(width: 24)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(t.label).foregroundStyle(.primary)
-                                    Text(t.blurb).font(.footnote).foregroundStyle(.secondary)
+                                    Text(tr(t.blurb)).font(.footnote).foregroundStyle(.secondary)
                                 }
                                 Spacer()
                                 if template == t {
@@ -392,12 +404,12 @@ struct NewProjectSheet: View {
                     }
                 }
             }
-            .navigationTitle("Novo projeto")
+            .navigationTitle(tr("Novo projeto"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancelar") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button(tr("Cancelar")) { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Criar", action: create).disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
+                    Button(tr("Criar"), action: create).disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
             }
             .onAppear { focused = true }

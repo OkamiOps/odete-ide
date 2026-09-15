@@ -1,6 +1,7 @@
 import OdeteAccounts
 import OdeteCore
 import OdeteGit
+import OdeteI18n
 import OdeteUI
 import SwiftUI
 
@@ -10,14 +11,14 @@ import SwiftUI
 enum GhRecado {
     static func texto(_ erro: String?, semConta: Bool, assunto: String) -> String? {
         if semConta {
-            return "Conecte uma conta do GitHub nos Ajustes para ver \(assunto)."
+            return tr("Conecte uma conta do GitHub nos Ajustes para ver %1$@.", "\(assunto)")
         }
         guard let erro else { return nil }
         if erro.contains("404") {
-            return "Não achei este repositório no GitHub. Confira o remoto e se a conta tem acesso a ele."
+            return tr("Não achei este repositório no GitHub. Confira o remoto e se a conta tem acesso a ele.")
         }
         if erro.contains("401") || erro.contains("403") {
-            return "A conta do GitHub não tem acesso a este repositório."
+            return tr("A conta do GitHub não tem acesso a este repositório.")
         }
         return erro
     }
@@ -55,7 +56,8 @@ struct GhSheet: View {
         NavigationStack {
             VStack(spacing: 0) {
                 Picker("", selection: $tab) {
-                    Text("PRs").tag(0); Text("Criar PR").tag(1); Text("Issues").tag(2); Text("Actions").tag(3)
+                    Text(tr("PRs")).tag(0); Text(tr("Criar PR")).tag(1); Text(tr("Issues")).tag(2); Text(tr("Actions"))
+                        .tag(3)
                 }
                 .pickerStyle(.segmented).padding(10)
                 switch tab {
@@ -67,7 +69,7 @@ struct GhSheet: View {
             }
             .navigationTitle(slug)
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Fechar") { dismiss() } } }
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button(tr("Fechar")) { dismiss() } } }
         }
         .presentationDetents([.large])
         .sheet(item: $openPull) { p in PullDetail(slug: slug, api: api, pull: p) {} }
@@ -92,13 +94,13 @@ struct PullRequestsCard: View {
     }
 
     var body: some View {
-        GitCard(title: "Pull requests", trailing: loading ? "…" : "\(pulls.count) abertos") {
+        GitCard(title: tr("Pull requests"), trailing: loading ? "…" : "\(pulls.count) abertos") {
             if let recado {
                 // "GitHub 404: Not Found" no meio do painel não diz o que fazer.
                 Text(recado).font(.caption).foregroundStyle(theme.fgMuted)
                     .fixedSize(horizontal: false, vertical: true)
             } else if pulls.isEmpty, !loading {
-                Text("Nenhum PR aberto.").font(.caption).foregroundStyle(.secondary)
+                Text(tr("Nenhum PR aberto.")).font(.caption).foregroundStyle(.secondary)
             }
             ForEach(pulls.prefix(5)) { p in
                 Button { sheet = GhTarget(tab: 0, pull: p) } label: {
@@ -122,11 +124,11 @@ struct PullRequestsCard: View {
                 .buttonStyle(.plain)
             }
             HStack(spacing: 6) {
-                GitButton(title: "Criar PR", symbol: "plus", accent: true, disabled: false) { sheet = GhTarget(
+                GitButton(title: tr("Criar PR"), symbol: "plus", accent: true, disabled: false) { sheet = GhTarget(
                     tab: 1,
                     pull: nil
                 ) }
-                GitButton(title: "Ver todos", symbol: "list.bullet", disabled: false) { sheet = GhTarget(
+                GitButton(title: tr("Ver todos"), symbol: "list.bullet", disabled: false) { sheet = GhTarget(
                     tab: 0,
                     pull: nil
                 ) }
@@ -142,7 +144,7 @@ struct PullRequestsCard: View {
 
     /// Recado no lugar do erro cru da API.
     var recado: String? {
-        GhRecado.texto(error, semConta: ws.git.githubToken == nil, assunto: "e abrir pull requests")
+        GhRecado.texto(error, semConta: ws.git.githubToken == nil, assunto: tr("e abrir pull requests"))
     }
 
     func load() async {
@@ -168,11 +170,11 @@ struct PullsList: View {
             if loading {
                 ProgressView()
             }
-            if let r = GhRecado.texto(error, semConta: api.token == nil, assunto: "os pull requests") {
+            if let r = GhRecado.texto(error, semConta: api.token == nil, assunto: tr("os pull requests")) {
                 Text(r).foregroundStyle(api.token == nil ? Color.secondary : Color.red)
             }
             if !loading, pulls.isEmpty, error == nil, api.token != nil {
-                Text("nenhum PR aberto").foregroundStyle(.secondary)
+                Text(tr("nenhum PR aberto")).foregroundStyle(.secondary)
             }
             ForEach(pulls) { p in
                 Button { selected = p } label: {
@@ -228,21 +230,22 @@ struct PullDetail: View {
                     HStack(spacing: 8) {
                         Text("\(pull.head.ref) → \(pull.base.ref)").font(OdeteFont.mono(11))
                         if pull.draft == true {
-                            Text("rascunho").font(.caption2).padding(.horizontal, 6).padding(.vertical, 2).background(
-                                .quaternary,
-                                in: Capsule()
-                            )
+                            Text(tr("rascunho")).font(.caption2).padding(.horizontal, 6).padding(.vertical, 2)
+                                .background(
+                                    .quaternary,
+                                    in: Capsule()
+                                )
                         }
                         Spacer()
                         Button { openURL(URL(string: pull.htmlUrl)!) } label: { Image(systemName: "safari") }
                             .buttonStyle(.glass).controlSize(.small)
-                            .accessibilityLabel("Abrir no GitHub")
-                            .help("Abrir no GitHub")
+                            .accessibilityLabel(tr("Abrir no GitHub"))
+                            .help(tr("Abrir no GitHub"))
                     }
-                    MarkdownText(text: pull.body?.isEmpty == false ? pull.body! : "_sem descrição_")
+                    MarkdownText(text: pull.body?.isEmpty == false ? pull.body! : tr("_sem descrição_"))
                 }
                 if !checks.isEmpty {
-                    Section("Checks") {
+                    Section(tr("Checks")) {
                         ForEach(checks) { c in
                             HStack {
                                 Image(systemName: checkIcon(c)).foregroundStyle(checkColor(c))
@@ -253,7 +256,7 @@ struct PullDetail: View {
                         }
                     }
                 }
-                Section("Arquivos (\(files.count))") {
+                Section(tr("Arquivos (%1$@)", "\(files.count)")) {
                     ForEach(files) { f in
                         VStack(alignment: .leading, spacing: 6) {
                             Button {
@@ -296,15 +299,15 @@ struct PullDetail: View {
                         }
                     }
                 }
-                Section("Comentários") {
+                Section(tr("Comentários")) {
                     ForEach(comments) { c in
                         VStack(alignment: .leading) {
                             Text(c.user?.login ?? "").font(.caption).foregroundStyle(.secondary); Text(c.body)
                         }
                     }
                     HStack {
-                        TextField("comentar…", text: $draft, axis: .vertical).lineLimit(1 ... 6)
-                        Button("Enviar") {
+                        TextField(tr("comentar…"), text: $draft, axis: .vertical).lineLimit(1 ... 6)
+                        Button(tr("Enviar")) {
                             Task {
                                 try? await api.comment(slug, number: pull.number, body: draft); draft = ""; await load()
                             }
@@ -319,15 +322,15 @@ struct PullDetail: View {
             .navigationTitle("#\(pull.number) \(pull.title)")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Fechar") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button(tr("Fechar")) { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Menu("Merge") {
-                        Button("Squash") { merge("squash") }
-                        Button("Merge commit") { merge("merge") }
-                        Button("Rebase") { merge("rebase") }
+                    Menu(tr("Merge")) {
+                        Button(tr("Squash")) { merge("squash") }
+                        Button(tr("Merge commit")) { merge("merge") }
+                        Button(tr("Rebase")) { merge("rebase") }
                         Divider()
                         // Fechar sem mergear não existia em lugar nenhum do app.
-                        Button("Fechar sem merge", role: .destructive) { fechar() }
+                        Button(tr("Fechar sem merge"), role: .destructive) { fechar() }
                     }
                     .disabled(pull.merged == true)
                 }
@@ -394,7 +397,7 @@ struct CreatePR: View {
     var body: some View {
         Form {
             HStack {
-                TextField("Título", text: $title)
+                TextField(tr("Título"), text: $title)
                 Button {
                     suggesting = true
                     Task {
@@ -413,13 +416,13 @@ struct CreatePR: View {
                     }
                 }
                 .buttonStyle(.glass).controlSize(.small).disabled(suggesting)
-                .accessibilityLabel("Sugerir título e descrição com o agente")
-                .help("Sugerir título e descrição com o agente")
+                .accessibilityLabel(tr("Sugerir título e descrição com o agente"))
+                .help(tr("Sugerir título e descrição com o agente"))
             }
-            TextField("Descrição", text: $desc, axis: .vertical).lineLimit(4 ... 12)
+            TextField(tr("Descrição"), text: $desc, axis: .vertical).lineLimit(4 ... 12)
             HStack { Text("head"); TextField("branch", text: $head).multilineTextAlignment(.trailing) }
             HStack { Text("base"); TextField("main", text: $base).multilineTextAlignment(.trailing) }
-            Toggle("Rascunho", isOn: $draft)
+            Toggle(tr("Rascunho"), isOn: $draft)
             if let error {
                 Text(error).foregroundStyle(.red)
             }
@@ -465,10 +468,10 @@ struct IssuesList: View {
             if loading {
                 ProgressView()
             }
-            if let r = GhRecado.texto(error, semConta: api.token == nil, assunto: "as issues") {
+            if let r = GhRecado.texto(error, semConta: api.token == nil, assunto: tr("as issues")) {
                 Text(r).foregroundStyle(api.token == nil ? Color.secondary : Color.red)
             }
-            Button { creating = true } label: { Label("Nova issue", systemImage: "plus") }
+            Button { creating = true } label: { Label(tr("Nova issue"), systemImage: "plus") }
             ForEach(issues) { i in
                 VStack(alignment: .leading, spacing: 3) {
                     HStack {
@@ -480,15 +483,15 @@ struct IssuesList: View {
         }
         .task { await load() }
         .refreshable { await load() }
-        .alert("Nova issue", isPresented: $creating) {
-            TextField("Título", text: $title)
-            TextField("Descrição", text: $desc)
-            Button("Criar") {
+        .alert(tr("Nova issue"), isPresented: $creating) {
+            TextField(tr("Título"), text: $title)
+            TextField(tr("Descrição"), text: $desc)
+            Button(tr("Criar")) {
                 Task {
                     _ = try? await api.createIssue(slug, title: title, body: desc); title = ""; desc = ""; await load()
                 }
             }
-            Button("Cancelar", role: .cancel) {}
+            Button(tr("Cancelar"), role: .cancel) {}
         }
     }
 
@@ -512,11 +515,11 @@ struct RunsList: View {
             if loading {
                 ProgressView()
             }
-            if let r = GhRecado.texto(error, semConta: api.token == nil, assunto: "o Actions") {
+            if let r = GhRecado.texto(error, semConta: api.token == nil, assunto: tr("o Actions")) {
                 Text(r).foregroundStyle(api.token == nil ? Color.secondary : Color.red)
             }
             if !loading, runs.isEmpty, error == nil, api.token != nil {
-                Text("nenhuma execução").foregroundStyle(.secondary)
+                Text(tr("nenhuma execução")).foregroundStyle(.secondary)
             }
             ForEach(runs) { r in
                 Button { openURL(URL(string: r.htmlUrl)!) } label: {

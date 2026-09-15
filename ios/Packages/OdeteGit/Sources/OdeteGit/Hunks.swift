@@ -1,16 +1,17 @@
 import Clibgit2
 import Foundation
+import OdeteI18n
 
 /// Texto de patch unificado para um hunk, opcionalmente invertido.
 enum PatchText {
     static func make(file: FileDiff, hunk: Hunk, reverse: Bool) -> String {
         let old = file.oldPath ?? file.path
         let new = file.path
-        var out = "diff --git a/\(reverse ? new : old) b/\(reverse ? old : new)\n"
+        var out = tr("diff --git a/%1$@ b/%2$@\n", "\(reverse ? new : old)", "\(reverse ? old : new)")
         switch (file.change, reverse) {
         case (.added, false), (.deleted, true): out += "--- /dev/null\n+++ b/\(new)\n"
-        case (.deleted, false), (.added, true): out += "--- a/\(old)\n+++ /dev/null\n"
-        default: out += "--- a/\(reverse ? new : old)\n+++ b/\(reverse ? old : new)\n"
+        case (.deleted, false), (.added, true): out += tr("--- a/%1$@\n+++ /dev/null\n", "\(old)")
+        default: out += tr("--- a/%1$@\n+++ b/%2$@\n", "\(reverse ? new : old)", "\(reverse ? old : new)")
         }
         let (os, ol, ns, nl) = reverse
             ? (hunk.newStart, hunk.newLines, hunk.oldStart, hunk.oldLines)

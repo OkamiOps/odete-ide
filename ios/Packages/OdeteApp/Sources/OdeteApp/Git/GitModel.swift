@@ -3,6 +3,7 @@ import Observation
 import OdeteAccounts
 import OdeteCore
 import OdeteGit
+import OdeteI18n
 
 /// Estado git de um projeto aberto. Toda ação passa por `run`, que serializa e recarrega.
 @MainActor
@@ -173,7 +174,7 @@ public final class GitModel {
                 error = e.message
                 note = ""
                 if e.kind == .auth {
-                    error = "autenticação recusada. Entre em Ajustes → Contas."
+                    error = tr("autenticação recusada. Entre em Ajustes → Contas.")
                 }
             } catch {
                 self.error = error.localizedDescription
@@ -233,7 +234,7 @@ public final class GitModel {
     /// usa, e chamadas separadas cairiam no guarda de ocupado.
     public func commit(stagingEverything stageFirst: Bool = false) {
         let msg = commitMessage.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !msg.isEmpty else { error = "escreva a mensagem do commit"; return }
+        guard !msg.isEmpty else { error = tr("escreva a mensagem do commit"); return }
         let author = author
         let merging = mergeInProgress
         let cred = credentials(for: origin)
@@ -249,17 +250,17 @@ public final class GitModel {
                 try await repo.commit(message: msg, author: author)
             }
             guard let cred else {
-                return semConta ? "commit feito; conecte uma conta para enviar" : "commit feito"
+                return semConta ? tr("commit feito; conecte uma conta para enviar") : "commit feito"
             }
             do {
                 try await repo.push(credentials: cred)
-                return "commit e push feitos"
+                return tr("commit e push feitos")
             } catch {
                 // O commit já está no repositório; só o envio falhou, e é isso que se diz.
                 throw GitError(
                     kind: .network,
                     code: 0,
-                    message: "commit feito, mas o push falhou: \(error.localizedDescription)"
+                    message: tr("commit feito, mas o push falhou: %1$@", "\(error.localizedDescription)")
                 )
             }
         }
@@ -267,7 +268,7 @@ public final class GitModel {
     }
 
     public func undoLastCommit() {
-        run("desfazendo…") { try await $0.undoLastCommit(); return "último commit desfeito, alterações no stage" }
+        run("desfazendo…") { try await $0.undoLastCommit(); return tr("último commit desfeito, alterações no stage") }
     }
 
     public func createBranch(_ name: String) {
@@ -292,7 +293,7 @@ public final class GitModel {
             case .upToDate: "já atualizado"
             case .fastForward: "fast-forward"
             case .merged: "merge feito"
-            case let .conflicts(p): "conflitos em \(p.count) arquivo(s)"
+            case let .conflicts(p): tr("conflitos em %1$@ arquivo(s)", "\(p.count)")
             }
         }
     }
@@ -341,7 +342,7 @@ public final class GitModel {
             case .upToDate: "já atualizado"
             case .fastForward: "pull: fast-forward"
             case .merged: "pull: merge feito"
-            case let .conflicts(p): "pull: conflitos em \(p.count) arquivo(s)"
+            case let .conflicts(p): tr("pull: conflitos em %1$@ arquivo(s)", "\(p.count)")
             }
         }
     }
@@ -360,7 +361,7 @@ public final class GitModel {
         run("publicando…") { repo in
             try await repo.addRemote(name: "origin", url: url)
             try await repo.push(credentials: cred)
-            return "publicado no GitHub"
+            return tr("publicado no GitHub")
         }
     }
 }

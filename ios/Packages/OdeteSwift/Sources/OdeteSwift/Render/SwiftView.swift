@@ -1,3 +1,4 @@
+import OdeteI18n
 import SwiftUI
 
 /// Renderiza um `ViewNode` como SwiftUI de verdade.
@@ -171,7 +172,7 @@ public struct SwiftView: View {
             )
             Picker(text(node.firstUnlabeled), selection: sel) { kids(node.children) }.pickerStyle(.menu)
         default:
-            Text("fora do subconjunto: \(node.kind)").font(.caption).foregroundStyle(.secondary)
+            Text(tr("fora do subconjunto: %1$@", "\(node.kind)")).font(.caption).foregroundStyle(.secondary)
         }
     }
 
@@ -179,7 +180,7 @@ public struct SwiftView: View {
         if let lazy = node.lazyChildren {
             kids(lazy(owner))
         } else {
-            Text("destino")
+            Text(tr("destino"))
         }
     }
 

@@ -1,4 +1,5 @@
 import AVFoundation
+import OdeteI18n
 import Speech
 import SwiftUI
 
@@ -33,7 +34,7 @@ final class Dictation {
         texto = atual
         Task { @MainActor in
             guard await autorizado() else {
-                error = "permita o microfone e o reconhecimento de fala nos Ajustes do iPad"
+                error = tr("permita o microfone e o reconhecimento de fala nos Ajustes do iPad")
                 return
             }
             comecar()
@@ -67,7 +68,7 @@ final class Dictation {
         guard let rec = SFSpeechRecognizer(locale: Locale(identifier: "pt_BR")) ?? SFSpeechRecognizer(),
               rec.isAvailable
         else {
-            error = "ditado indisponível neste aparelho"
+            error = tr("ditado indisponível neste aparelho")
             return
         }
         do {

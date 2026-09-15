@@ -1,5 +1,6 @@
 import OdeteAgent
 import OdeteCore
+import OdeteI18n
 import OdeteUI
 import SwiftUI
 
@@ -35,11 +36,11 @@ struct AgentPane: View {
                 // mesma cor de `bgElevated`.
                 ScrollPane { AIAccountsSettings().padding(16) }
                     .background(theme.bg)
-                    .navigationTitle("Contas de IA")
+                    .navigationTitle(tr("Contas de IA"))
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
                         ToolbarItem(placement: .confirmationAction) {
-                            Button("Concluído") { showAccounts = false }
+                            Button(tr("Concluído")) { showAccounts = false }
                         }
                     }
             }
@@ -62,13 +63,13 @@ struct AgentPane: View {
             HStack(spacing: 0) {
                 // A contagem em cima do relógio: sem ela o botão parecia desligado, como
                 // se não houvesse conversa nenhuma guardada.
-                PaneAction("clock.arrow.circlepath", label: "Conversas", conta: ag.threads.count) { history = true }
-                PaneAction("arrow.uturn.backward", label: "Desfazer último turno") { _ = ag.undoLastTurn() }
+                PaneAction("clock.arrow.circlepath", label: tr("Conversas"), conta: ag.threads.count) { history = true }
+                PaneAction("arrow.uturn.backward", label: tr("Desfazer último turno")) { _ = ag.undoLastTurn() }
                     .disabled(!ag.canUndoTurn)
-                PaneAction("square.and.pencil", label: "Nova conversa") { ag.newChat() }
+                PaneAction("square.and.pencil", label: tr("Nova conversa")) { ag.newChat() }
                     .disabled(ag.thread.isEmpty)
                 if sizeClass != .compact {
-                    PaneAction("sidebar.trailing", label: "Fechar agente") { chrome.toggleAgent() }
+                    PaneAction("sidebar.trailing", label: tr("Fechar agente")) { chrome.toggleAgent() }
                 }
             }
             .padding(.horizontal, 2)
@@ -101,8 +102,8 @@ struct AgentPane: View {
                 .foregroundStyle(theme.accent)
             Text(texto).font(.subheadline).foregroundStyle(theme.fg).lineLimit(1).fixedSize()
             Spacer(minLength: 8)
-            Button("Rejeitar") { ag.rejectAll() }.buttonStyle(.glass).fixedSize()
-            Button("Aceitar") { ag.acceptAll() }.buttonStyle(.glassProminent).fixedSize()
+            Button(tr("Rejeitar")) { ag.rejectAll() }.buttonStyle(.glass).fixedSize()
+            Button(tr("Aceitar")) { ag.acceptAll() }.buttonStyle(.glassProminent).fixedSize()
         }
     }
 }
@@ -178,7 +179,7 @@ struct ModelMenu: View {
     var body: some View {
         Button { aberto = true } label: { label }
             .buttonStyle(.plain)
-            .accessibilityLabel("Conta")
+            .accessibilityLabel(tr("Conta"))
             .popover(isPresented: $aberto, arrowEdge: .bottom) {
                 ContasPopover(
                     agent: agent,
@@ -200,7 +201,7 @@ struct ModelMenu: View {
                 )
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 4) {
-                    Text(agent.account?.label ?? "Sem conta")
+                    Text(agent.account?.label ?? tr("Sem conta"))
                         .font(.subheadline.weight(.semibold)).foregroundStyle(theme.fg).lineLimit(1)
                     Image(systemName: "chevron.down").font(.system(size: 9, weight: .bold))
                         .foregroundStyle(theme.fgSubtle)
@@ -230,9 +231,9 @@ struct ContasPopover: View {
         ScrollPane {
             VStack(alignment: .leading, spacing: 14) {
                 if agent.accounts.accounts.isEmpty {
-                    CardNote("Nenhuma conta ainda. O modelo da Apple não pede conta nenhuma.")
+                    CardNote(tr("Nenhuma conta ainda. O modelo da Apple não pede conta nenhuma."))
                 } else {
-                    SectionTitle("Contas")
+                    SectionTitle(tr("Contas"))
                     CardList {
                         ForEach(Array(agent.accounts.accounts.enumerated()), id: \.element.id) { i, a in
                             Button { escolher(a) } label: {
@@ -240,7 +241,7 @@ struct ContasPopover: View {
                                     a.label,
                                     symbol: a.kind.symbol,
                                     color: a.needsReconnect ? theme.danger : ProviderCor.de(a.kind),
-                                    detail: a.needsReconnect ? "sessão expirou, reconecte"
+                                    detail: a.needsReconnect ? tr("sessão expirou, reconecte")
                                         : (a.login.isEmpty ? a.kind.vendor : a.login),
                                     first: i == 0
                                 ) {
@@ -258,7 +259,7 @@ struct ContasPopover: View {
                 CardList {
                     Button { gerenciar() } label: {
                         CardRow(
-                            "Contas de IA…",
+                            tr("Contas de IA…"),
                             symbol: "person.crop.circle.badge.plus",
                             color: .indigo,
                             first: true

@@ -1,4 +1,5 @@
 import Foundation
+import OdeteI18n
 
 public enum FileError: LocalizedError, Equatable {
     case invalidName(String)
@@ -10,11 +11,11 @@ public enum FileError: LocalizedError, Equatable {
 
     public var errorDescription: String? {
         switch self {
-        case let .invalidName(n): "Nome inválido: \(n)"
-        case let .alreadyExists(p): "Já existe: \(p)"
-        case let .notFound(p): "Não encontrado: \(p)"
-        case let .outsideRoot(p): "Fora do projeto: \(p)"
-        case let .naoEhTexto(p): "\(p) não é texto em UTF-8"
+        case let .invalidName(n): tr("Nome inválido: %1$@", "\(n)")
+        case let .alreadyExists(p): tr("Já existe: %1$@", "\(p)")
+        case let .notFound(p): tr("Não encontrado: %1$@", "\(p)")
+        case let .outsideRoot(p): tr("Fora do projeto: %1$@", "\(p)")
+        case let .naoEhTexto(p): tr("%1$@ não é texto em UTF-8", "\(p)")
         }
     }
 }

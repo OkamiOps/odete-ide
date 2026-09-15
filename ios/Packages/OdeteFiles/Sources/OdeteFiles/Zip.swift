@@ -1,5 +1,6 @@
 import Compression
 import Foundation
+import OdeteI18n
 
 /// ZIP mínimo (store/deflate) para compartilhar e receber projetos. Sem dependências.
 public enum Zip {
@@ -19,7 +20,7 @@ public enum Zip {
         let fm = FileManager.default
         var files: [(rel: String, url: URL)] = []
         guard let en = fm.enumerator(at: directory, includingPropertiesForKeys: [.isDirectoryKey], options: []) else {
-            throw Error(message: "não deu para ler \(directory.lastPathComponent)")
+            throw Error(message: tr("não deu para ler %1$@", "\(directory.lastPathComponent)"))
         }
         let base = directory.standardizedFileURL.path
         for case let u as URL in en {
@@ -79,7 +80,7 @@ public enum Zip {
     @discardableResult
     public static func extract(_ file: URL, to directory: URL) throws -> String? {
         let data = try Data(contentsOf: file)
-        guard data.count >= 22 else { throw Error(message: "zip vazio") }
+        guard data.count >= 22 else { throw Error(message: tr("zip vazio")) }
         // EOCD: procura a assinatura de trás para frente (comentário até 64 kB).
         var eocdAt: Int?
         var i = data.count - 22
@@ -91,14 +92,14 @@ public enum Zip {
             }
             i -= 1
         }
-        guard let eocdAt else { throw Error(message: "não é um zip") }
+        guard let eocdAt else { throw Error(message: tr("não é um zip")) }
         let count = Int(data.u16(at: eocdAt + 10))
         var p = Int(data.u32(at: eocdAt + 16))
         let fm = FileManager.default
         try fm.createDirectory(at: directory, withIntermediateDirectories: true)
         var roots = Set<String>()
         for _ in 0 ..< count {
-            guard data.u32(at: p) == 0x0201_4B50 else { throw Error(message: "diretório central inválido") }
+            guard data.u32(at: p) == 0x0201_4B50 else { throw Error(message: tr("diretório central inválido")) }
             let method = data.u16(at: p + 10)
             let csize = Int(data.u32(at: p + 20))
             let usize = Int(data.u32(at: p + 24))
@@ -123,20 +124,23 @@ public enum Zip {
                 try fm.createDirectory(at: dest, withIntermediateDirectories: true)
                 continue
             }
-            guard data.u32(at: offset) == 0x0403_4B50 else { throw Error(message: "entrada inválida: \(name)") }
+            guard data.u32(at: offset) == 0x0403_4B50 else { throw Error(message: tr(
+                "entrada inválida: %1$@",
+                "\(name)"
+            )) }
             let lname = Int(data.u16(at: offset + 26))
             let lextra = Int(data.u16(at: offset + 28))
             let start = offset + 30 + lname + lextra
-            guard start + csize <= data.count else { throw Error(message: "zip truncado") }
+            guard start + csize <= data.count else { throw Error(message: tr("zip truncado")) }
             let payload = data[start ..< (start + csize)]
             let content: Data
             switch method {
             case 0: content = Data(payload)
             case 8:
                 guard let d = inflate(Data(payload), size: usize)
-                else { throw Error(message: "deflate falhou: \(name)") }
+                else { throw Error(message: tr("deflate falhou: %1$@", "\(name)")) }
                 content = d
-            default: throw Error(message: "método \(method) não suportado: \(name)")
+            default: throw Error(message: tr("método %1$@ não suportado: %2$@", "\(method)", "\(name)"))
             }
             try fm.createDirectory(at: dest.deletingLastPathComponent(), withIntermediateDirectories: true)
             try content.write(to: dest, options: .atomic)

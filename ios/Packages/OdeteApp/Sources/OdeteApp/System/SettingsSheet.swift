@@ -12,13 +12,13 @@ enum SettingsSection: String, CaseIterable, Identifiable {
     var label: String {
         switch self {
         case .idioma: tr("Idioma")
-        case .appearance: tr("Aparência")
-        case .editor: "Editor"
-        case .layout: "Layout"
-        case .git: "Git e GitHub"
-        case .ai: "Contas de IA"
-        case .system: "Sistema"
-        case .about: "Sobre"
+        case .appearance: tr(tr("Aparência"))
+        case .editor: tr("Editor")
+        case .layout: tr("Layout")
+        case .git: tr("Git e GitHub")
+        case .ai: tr("Contas de IA")
+        case .system: tr("Sistema")
+        case .about: tr("Sobre")
         }
     }
 
@@ -51,16 +51,16 @@ struct SettingsSheet: View {
                     List(SettingsSection.allCases) { s in
                         NavigationLink(value: s) { Label(s.label, systemImage: s.symbol) }
                     }
-                    .navigationTitle("Ajustes")
+                    .navigationTitle(tr("Ajustes"))
                     .navigationDestination(for: SettingsSection.self) { s in
                         SettingsContent(section: s).navigationTitle(s.label)
                     }
-                    .toolbar { ToolbarItem(placement: .confirmationAction) { Button("OK") { dismiss() } } }
+                    .toolbar { ToolbarItem(placement: .confirmationAction) { Button(tr("OK")) { dismiss() } } }
                 }
             } else {
                 HStack(spacing: 0) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Ajustes").font(OdeteFont.ui(20, weight: .semibold)).foregroundStyle(theme.fg)
+                        Text(tr("Ajustes")).font(OdeteFont.ui(20, weight: .semibold)).foregroundStyle(theme.fg)
                             .padding(.horizontal, 14).padding(.top, 18).padding(.bottom, 10)
                         ForEach(SettingsSection.allCases) { s in
                             let on = s == section
@@ -94,7 +94,7 @@ struct SettingsSheet: View {
                         HStack {
                             Text(section.label).font(OdeteFont.ui(17, weight: .semibold)).foregroundStyle(theme.fg)
                             Spacer()
-                            Button("OK") { dismiss() }.buttonStyle(.glassProminent).controlSize(.small)
+                            Button(tr("OK")) { dismiss() }.buttonStyle(.glassProminent).controlSize(.small)
                         }
                         .padding(.horizontal, 20).padding(.top, 16).padding(.bottom, 4)
                         SettingsContent(section: section)
@@ -172,7 +172,7 @@ struct SettingsContent: View {
                     .buttonStyle(.plain)
                 }
             }
-            CardNote(tr("Vale para o app inteiro: telas, terminal, git e as respostas do agente."))
+            CardNote(tr(tr("Vale para o app inteiro: telas, terminal, git e as respostas do agente.")))
         }
     }
 
@@ -180,7 +180,7 @@ struct SettingsContent: View {
 
     var appearance: some View {
         VStack(alignment: .leading, spacing: 8) {
-            SectionTitle("Tema")
+            SectionTitle(tr("Tema"))
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 10)], spacing: 10) {
                 ForEach(ThemePalette.all) { p in
                     ThemeCard(palette: p, on: p.id == chrome.snapshot.theme) {
@@ -197,93 +197,94 @@ struct SettingsContent: View {
         @Bindable var chrome = chrome
         return Group {
             VStack(alignment: .leading, spacing: 8) {
-                SectionTitle("Texto")
+                SectionTitle(tr("Texto"))
                 CardList {
-                    CardRow("Tamanho da fonte", symbol: "textformat.size", color: .blue, first: true) {
+                    CardRow(tr("Tamanho da fonte"), symbol: "textformat.size", color: .blue, first: true) {
                         // O rótulo do Stepper fica escondido; o valor vai ao lado, como nos
                         // Ajustes do sistema.
-                        Text("\(Int(chrome.snapshot.editor.fontSize)) pt")
+                        Text(tr("%1$@ pt", "\(Int(chrome.snapshot.editor.fontSize))"))
                             .font(.footnote).monospacedDigit().foregroundStyle(.secondary)
-                        Stepper("Tamanho da fonte", value: $chrome.snapshot.editor.fontSize, in: 10 ... 22, step: 1)
+                        Stepper(tr("Tamanho da fonte"), value: $chrome.snapshot.editor.fontSize, in: 10 ... 22, step: 1)
                             .labelsHidden()
                             .fixedSize()
                     }
-                    CardRow("Altura da linha", symbol: "arrow.up.and.down.text.horizontal", color: .blue) {
+                    CardRow(tr("Altura da linha"), symbol: "arrow.up.and.down.text.horizontal", color: .blue) {
                         Picker("", selection: $chrome.snapshot.editor.lineHeight) {
-                            Text("Compacta").tag(1.1)
-                            Text("Normal").tag(1.25)
-                            Text("Arejada").tag(1.45)
+                            Text(tr("Compacta")).tag(1.1)
+                            Text(tr("Normal")).tag(1.25)
+                            Text(tr("Arejada")).tag(1.45)
                         }
                         .labelsHidden()
                     }
-                    CardRow("Quebrar linhas", symbol: "text.append", color: .blue) {
+                    CardRow(tr("Quebrar linhas"), symbol: "text.append", color: .blue) {
                         Toggle("", isOn: $chrome.snapshot.editor.wrap).labelsHidden()
                     }
-                    CardRow("Indentação", symbol: "increase.indent", color: .blue) {
+                    CardRow(tr("Indentação"), symbol: "increase.indent", color: .blue) {
                         Picker("", selection: $chrome.snapshot.editor.tabWidth) {
-                            Text("2 espaços").tag(2)
-                            Text("4 espaços").tag(4)
-                            Text("8 espaços").tag(8)
+                            Text(tr("2 espaços")).tag(2)
+                            Text(tr("4 espaços")).tag(4)
+                            Text(tr("8 espaços")).tag(8)
                         }
                         .labelsHidden()
                     }
                 }
             }
             VStack(alignment: .leading, spacing: 8) {
-                SectionTitle("Exibição")
+                SectionTitle(tr("Exibição"))
                 CardList {
-                    CardRow("Números de linha", symbol: "list.number", color: .indigo, first: true) {
+                    CardRow(tr("Números de linha"), symbol: "list.number", color: .indigo, first: true) {
                         Toggle("", isOn: $chrome.snapshot.editor.lineNumbers).labelsHidden()
                     }
-                    CardRow("Minimapa", symbol: "map", color: .indigo) {
+                    CardRow(tr("Minimapa"), symbol: "map", color: .indigo) {
                         Picker("", selection: $chrome.snapshot.editor.minimap) {
-                            Text("Desligado").tag(MinimapSize.off)
-                            Text("Pequeno").tag(MinimapSize.s)
-                            Text("Médio").tag(MinimapSize.m)
-                            Text("Grande").tag(MinimapSize.l)
+                            Text(tr("Desligado")).tag(MinimapSize.off)
+                            Text(tr("Pequeno")).tag(MinimapSize.s)
+                            Text(tr("Médio")).tag(MinimapSize.m)
+                            Text(tr("Grande")).tag(MinimapSize.l)
                         }
                         .labelsHidden()
                     }
                     CardRow(
-                        "Destacar linha atual",
+                        tr("Destacar linha atual"),
                         symbol: "text.line.first.and.arrowtriangle.forward",
                         color: .indigo
                     ) {
                         Toggle("", isOn: $chrome.snapshot.editor.highlightLine).labelsHidden()
                     }
-                    CardRow("Guias de indentação", symbol: "rectangle.split.3x1", color: .indigo) {
+                    CardRow(tr("Guias de indentação"), symbol: "rectangle.split.3x1", color: .indigo) {
                         Toggle("", isOn: $chrome.snapshot.editor.indentGuides).labelsHidden()
                     }
-                    CardRow("Mostrar espaços e tabs", symbol: "space", color: .indigo) {
+                    CardRow(tr("Mostrar espaços e tabs"), symbol: "space", color: .indigo) {
                         Toggle("", isOn: $chrome.snapshot.editor.showWhitespace).labelsHidden()
                     }
-                    CardRow("Mostrar quebras de linha", symbol: "return", color: .indigo) {
+                    CardRow(tr("Mostrar quebras de linha"), symbol: "return", color: .indigo) {
                         Toggle("", isOn: $chrome.snapshot.editor.showLineBreaks).labelsHidden()
                     }
-                    CardRow("Guia de página", symbol: "ruler", color: .indigo) {
+                    CardRow(tr("Guia de página"), symbol: "ruler", color: .indigo) {
                         Picker("", selection: $chrome.snapshot.editor.pageGuide) {
-                            Text("Nenhuma").tag(0)
-                            Text("80 colunas").tag(80)
-                            Text("100 colunas").tag(100)
-                            Text("120 colunas").tag(120)
+                            Text(tr("Nenhuma")).tag(0)
+                            Text(tr("80 colunas")).tag(80)
+                            Text(tr("100 colunas")).tag(100)
+                            Text(tr("120 colunas")).tag(120)
                         }
                         .labelsHidden()
                     }
                 }
             }
             VStack(alignment: .leading, spacing: 8) {
-                SectionTitle("Edição")
+                SectionTitle(tr("Edição"))
                 CardList {
-                    CardRow("Fechar pares automaticamente", symbol: "parentheses", color: .teal, first: true) {
+                    CardRow(tr("Fechar pares automaticamente"), symbol: "parentheses", color: .teal, first: true) {
                         Toggle("", isOn: $chrome.snapshot.editor.autoClosePairs).labelsHidden()
                     }
-                    CardRow("Salvar automaticamente", symbol: "square.and.arrow.down", color: .teal) {
+                    CardRow(tr("Salvar automaticamente"), symbol: "square.and.arrow.down", color: .teal) {
                         Toggle("", isOn: $chrome.snapshot.editor.autoSave).labelsHidden()
                     }
                 }
                 CardNote(
-                    "O salvamento automático espera 1 s depois de você parar de digitar. Sem ele, ⌘S ou o botão "
-                        + "Salvar — e o que ficar sem salvar volta na próxima abertura, sem tocar no arquivo."
+                    tr(
+                        "O salvamento automático espera 1 s depois de você parar de digitar. Sem ele, ⌘S ou o botão Salvar — e o que ficar sem salvar volta na próxima abertura, sem tocar no arquivo."
+                    )
                 )
             }
         }
@@ -295,15 +296,15 @@ struct SettingsContent: View {
         @Bindable var chrome = chrome
         return Group {
             VStack(alignment: .leading, spacing: 8) {
-                SectionTitle("Painéis")
+                SectionTitle(tr("Painéis"))
                 CardList {
-                    CardRow("Sidebar", symbol: "sidebar.left", color: .orange, first: true) {
+                    CardRow(tr("Sidebar"), symbol: "sidebar.left", color: .orange, first: true) {
                         Toggle("", isOn: $chrome.snapshot.sideOpen).labelsHidden()
                     }
-                    CardRow("Agente", symbol: "sparkles", color: .orange) {
+                    CardRow(tr("Agente"), symbol: "sparkles", color: .orange) {
                         Toggle("", isOn: $chrome.snapshot.agentVisible).labelsHidden()
                     }
-                    CardRow("Terminal", symbol: "terminal", color: .orange) {
+                    CardRow(tr("Terminal"), symbol: "terminal", color: .orange) {
                         Toggle("", isOn: $chrome.snapshot.termVisible).labelsHidden()
                     }
                 }
@@ -312,7 +313,7 @@ struct SettingsContent: View {
                 CardList {
                     Button { chrome.resetLayout() } label: {
                         CardRow(
-                            "Restaurar layout padrão",
+                            tr("Restaurar layout padrão"),
                             symbol: "arrow.counterclockwise",
                             color: .gray,
                             first: true
@@ -324,7 +325,7 @@ struct SettingsContent: View {
                     }
                     .buttonStyle(.plain)
                 }
-                CardNote("Volta as larguras da sidebar e do agente e a altura do terminal.")
+                CardNote(tr("Volta as larguras da sidebar e do agente e a altura do terminal."))
             }
         }
     }
@@ -335,23 +336,26 @@ struct SettingsContent: View {
     /// container inteiro: sem iCloud, vai junto o código, o histórico git e as conversas.
     var nota: String {
         if chrome.snapshot.projectsInCloud {
-            return "Os projetos ficam no iCloud Drive: sincronizam entre aparelhos, "
-                + "funcionam offline e sobrevivem a desinstalar o app."
+            return tr(
+                "Os projetos ficam no iCloud Drive: sincronizam entre aparelhos, funcionam offline e sobrevivem a desinstalar o app."
+            )
         }
         if app.cloudAvailable {
-            return "Os projetos estão dentro do app. Desinstalar apaga tudo — código, histórico do git "
-                + "e conversas. Ligue o iCloud Drive, ou copie a pasta Odete pelo app Arquivos de vez em quando."
+            return tr(
+                "Os projetos estão dentro do app. Desinstalar apaga tudo — código, histórico do git e conversas. Ligue o iCloud Drive, ou copie a pasta Odete pelo app Arquivos de vez em quando."
+            )
         }
-        return "iCloud Drive indisponível neste aparelho; os projetos ficam dentro do app e desinstalar "
-            + "apaga tudo. Entre com o Apple ID, ou copie a pasta Odete pelo app Arquivos de vez em quando."
+        return tr(
+            "iCloud Drive indisponível neste aparelho; os projetos ficam dentro do app e desinstalar apaga tudo. Entre com o Apple ID, ou copie a pasta Odete pelo app Arquivos de vez em quando."
+        )
     }
 
     @ViewBuilder
     var system: some View {
         VStack(alignment: .leading, spacing: 8) {
-            SectionTitle("Projetos")
+            SectionTitle(tr("Projetos"))
             CardList {
-                CardRow("Projetos no iCloud Drive", symbol: "icloud", color: .cyan, first: true) {
+                CardRow(tr("Projetos no iCloud Drive"), symbol: "icloud", color: .cyan, first: true) {
                     Toggle("", isOn: Binding(
                         get: { chrome.snapshot.projectsInCloud },
                         set: { chrome.snapshot.projectsInCloud = app.setCloud($0) }
@@ -363,20 +367,20 @@ struct SettingsContent: View {
             CardNote(nota)
         }
         VStack(alignment: .leading, spacing: 8) {
-            SectionTitle("Atalhos e arquivos")
+            SectionTitle(tr("Atalhos e arquivos"))
             CardList {
                 CardRow(
-                    "Atalhos",
+                    tr("Atalhos"),
                     symbol: "app.badge",
                     color: .purple,
-                    detail: "Abrir projeto, Rodar comando, Perguntar à Odete, Novo projeto",
+                    detail: tr("Abrir projeto, Rodar comando, Perguntar à Odete, Novo projeto"),
                     first: true
                 )
                 CardRow(
-                    "Arquivos",
+                    tr("Arquivos"),
                     symbol: "folder",
                     color: .purple,
-                    detail: "Odete → Projects, aberto para outros apps"
+                    detail: tr("Odete → Projects, aberto para outros apps")
                 )
             }
         }
@@ -392,7 +396,7 @@ struct SettingsContent: View {
                     BrandIcon(size: 52)
                     VStack(alignment: .leading, spacing: 3) {
                         Text("Odete").font(.title3.bold()).foregroundStyle(theme.fg)
-                        Text("IDE no colo · versão \(versao) (\(build))")
+                        Text(tr("IDE no colo · versão %1$@ (%2$@)", "\(versao)", "\(build)"))
                             .font(.footnote).foregroundStyle(.secondary)
                     }
                     Spacer(minLength: 0)
@@ -400,19 +404,21 @@ struct SettingsContent: View {
                 .padding(14)
             }
             CardNote(
-                "Tudo roda no iPad: JavaScriptCore com camada Node, esbuild, libgit2, Runestone e um agente que edita com patches. Sem servidores da Odete."
+                tr(
+                    "Tudo roda no iPad: JavaScriptCore com camada Node, esbuild, libgit2, Runestone e um agente que edita com patches. Sem servidores da Odete."
+                )
             )
         }
         VStack(alignment: .leading, spacing: 8) {
-            SectionTitle("Créditos")
+            SectionTitle(tr("Créditos"))
             CardList {
                 CardRow("IBM Plex", symbol: "textformat", color: .gray, detail: "OFL", first: true)
-                CardRow("Runestone e tree-sitter", symbol: "curlybraces", color: .gray, detail: "MIT")
+                CardRow(tr("Runestone e tree-sitter"), symbol: "curlybraces", color: .gray, detail: "MIT")
                 CardRow(
                     "libgit2",
                     symbol: "arrow.triangle.branch",
                     color: .gray,
-                    detail: "GPLv2 com exceção de linking"
+                    detail: tr("GPLv2 com exceção de linking")
                 )
                 CardRow("esbuild", symbol: "shippingbox", color: .gray, detail: "MIT")
             }
@@ -455,7 +461,7 @@ struct ThemeCard: View {
                 .frame(height: 56)
                 .background(Color(hex: palette.bg), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
                 Text(palette.label).font(OdeteFont.ui(12.5, weight: .semibold)).foregroundStyle(theme.fg)
-                Text(palette.blurb).font(OdeteFont.ui(10.5)).foregroundStyle(theme.fgMuted).lineLimit(1)
+                Text(tr(palette.blurb)).font(OdeteFont.ui(10.5)).foregroundStyle(theme.fgMuted).lineLimit(1)
             }
             .padding(8)
             .frame(maxWidth: .infinity, alignment: .leading)

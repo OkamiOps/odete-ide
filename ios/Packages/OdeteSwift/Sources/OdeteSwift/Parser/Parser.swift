@@ -1,4 +1,5 @@
 import Foundation
+import OdeteI18n
 
 struct ParseError: Error { let line: Int; let message: String }
 
@@ -75,7 +76,7 @@ public struct Parser {
         skipNewlines(); guard at(s)
         else { throw ParseError(
             line: line,
-            message: "esperava '\(s)'"
+            message: tr("esperava '%1$@'", "\(s)")
         ) }; advance()
     }
 
@@ -83,7 +84,7 @@ public struct Parser {
         skipNewlines(); guard case let .ident(s) = cur.kind
         else { throw ParseError(
             line: line,
-            message: "esperava um nome"
+            message: tr("esperava um nome")
         ) }; advance(); return s
     }
 
@@ -162,7 +163,10 @@ public struct Parser {
                 {
                     let what = "\(cur.kind)"
                     warn(
-                        "fora do subconjunto: \(what.replacingOccurrences(of: "ident(\"", with: "").replacingOccurrences(of: "\")", with: "")) no nível do arquivo (ignorado)",
+                        tr(
+                            "fora do subconjunto: %1$@ no nível do arquivo (ignorado)",
+                            "\(what.replacingOccurrences(of: "ident(\"", with: "").replacingOccurrences(of: "\")", with: ""))"
+                        ),
                         l
                     )
                     while !at("{"), !isNewline, !isEOF {
@@ -175,7 +179,7 @@ public struct Parser {
                     }
                     continue
                 }
-                throw ParseError(line: l, message: "não entendi o começo da linha")
+                throw ParseError(line: l, message: tr("não entendi o começo da linha"))
             } catch let e as ParseError {
                 fail(e.message, e.line)
                 // recupera: até a próxima linha em branco de nível zero
@@ -211,7 +215,7 @@ public struct Parser {
                 advance(); break
             }
             if isEOF {
-                throw ParseError(line: l, message: "struct \(name) sem fechar")
+                throw ParseError(line: l, message: tr("struct %1$@ sem fechar", "\(name)"))
             }
             let ml = line
             do {
@@ -241,7 +245,7 @@ public struct Parser {
                     if attr ==
                         .environment
                     {
-                        warn("fora do subconjunto: \(attrName) (ignorado)", ml); skipToLineEnd(); continue
+                        warn(tr("fora do subconjunto: %1$@ (ignorado)", "\(attrName)"), ml); skipToLineEnd(); continue
                     }
                     while at("private") || at("public") || at("internal") || at("fileprivate") {
                         advance()
@@ -270,7 +274,7 @@ public struct Parser {
                 if at("@") {
                     advance(); skipToLineEnd(); continue
                 }
-                throw ParseError(line: ml, message: "não entendi este membro de \(name)")
+                throw ParseError(line: ml, message: tr("não entendi este membro de %1$@", "\(name)"))
             } catch let e as ParseError {
                 fail(e.message, e.line)
                 while !isEOF, !isNewline {

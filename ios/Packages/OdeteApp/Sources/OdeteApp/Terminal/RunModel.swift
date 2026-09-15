@@ -2,6 +2,7 @@ import Foundation
 import Observation
 import OdeteBundler
 import OdeteGit
+import OdeteI18n
 import OdeteNpm
 import OdeteShell
 import UIKit
@@ -90,7 +91,7 @@ public final class RunModel {
             return s
         }
         let s = newSession()
-        s.append(.system, "aba do agente")
+        s.append(.system, tr("aba do agente"))
         agentSessionId = s.id
         return s
     }

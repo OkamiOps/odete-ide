@@ -1,4 +1,5 @@
 import OdeteCore
+import OdeteI18n
 import OdeteUI
 import SwiftUI
 
@@ -21,33 +22,39 @@ struct OnboardingView: View {
     let pages = [
         Page(
             symbol: "ipad.and.iphone",
-            title: "Uma IDE inteira no iPad",
-            text: "Editor, git, terminal, npm, preview e um agente que edita o projeto. Tudo roda aqui, sem Mac e sem servidor.",
+            title: tr("Uma IDE inteira no iPad"),
+            text: tr(
+                "Editor, git, terminal, npm, preview e um agente que edita o projeto. Tudo roda aqui, sem Mac e sem servidor."
+            ),
             points: [
-                "Projetos web (Vite, Astro, HTML) e Swift Playgrounds",
-                "Terminal com pipes, jobs e dev server",
-                "Preview ao vivo com console",
+                tr("Projetos web (Vite, Astro, HTML) e Swift Playgrounds"),
+                tr("Terminal com pipes, jobs e dev server"),
+                tr("Preview ao vivo com console"),
             ],
             marca: true
         ),
         Page(
             symbol: "lock.doc",
-            title: "Seus dados ficam com você",
-            text: "Os projetos vivem em Arquivos → Odete (ou no iCloud Drive, se quiser). Nada é enviado a servidores da Odete.",
+            title: tr("Seus dados ficam com você"),
+            text: tr(
+                "Os projetos vivem em Arquivos → Odete (ou no iCloud Drive, se quiser). Nada é enviado a servidores da Odete."
+            ),
             points: [
-                "Sem conta, sem telemetria, sem rastreio",
-                "Tokens guardados no Keychain do dispositivo",
-                "Abra pastas de outros apps e compartilhe como .zip",
+                tr("Sem conta, sem telemetria, sem rastreio"),
+                tr("Tokens guardados no Keychain do dispositivo"),
+                tr("Abra pastas de outros apps e compartilhe como .zip"),
             ]
         ),
         Page(
             symbol: "sparkles",
-            title: "Contas são opcionais",
-            text: "Conecte GitHub para clonar e abrir PRs, e uma conta de IA (Claude, Codex, Grok ou chave de API) para o agente.",
+            title: tr("Contas são opcionais"),
+            text: tr(
+                "Conecte GitHub para clonar e abrir PRs, e uma conta de IA (Claude, Codex, Grok ou chave de API) para o agente."
+            ),
             points: [
-                "Tudo em Ajustes → Contas",
-                "O agente só edita com a sua aprovação",
-                "Funciona offline no que não depende da rede",
+                tr("Tudo em Ajustes → Contas"),
+                tr("O agente só edita com a sua aprovação"),
+                tr("Funciona offline no que não depende da rede"),
             ]
         ),
     ]
@@ -100,9 +107,9 @@ struct OnboardingView: View {
             .tabViewStyle(.page(indexDisplayMode: .always))
             .indexViewStyle(.page(backgroundDisplayMode: .always))
             HStack {
-                Button("Pular") { finish() }.buttonStyle(.glass)
+                Button(tr("Pular")) { finish() }.buttonStyle(.glass)
                 Spacer()
-                Button(page == pages.count - 1 ? "Começar" : "Próximo") {
+                Button(page == pages.count - 1 ? tr("Começar") : tr("Próximo")) {
                     if page < pages.count - 1 {
                         withAnimation(.snappy(duration: 0.25)) { page += 1 }
                     } else {

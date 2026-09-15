@@ -1,6 +1,7 @@
 import OdeteAccounts
 import OdeteCore
 import OdeteGit
+import OdeteI18n
 import OdeteUI
 import SwiftUI
 
@@ -25,7 +26,7 @@ struct GitPane: View {
                 if git.isRepo {
                     RatinhaButton(label: "GitHub") { showGh = true }
                 }
-                HeaderButton("arrow.clockwise", label: "Atualizar") { git.scheduleRefresh() }
+                HeaderButton("arrow.clockwise", label: tr("Atualizar")) { git.scheduleRefresh() }
             }
             if !git.isRepo {
                 ScrollPane { GitEmpty(largura: largura) }
@@ -53,12 +54,12 @@ struct GitPane: View {
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { largura = $0 }
         .environment(\.paneWidth, largura)
         .sheet(isPresented: $showGh) { GhSheet() }
-        .alert("Git", isPresented: Binding(get: { git.error != nil }, set: {
+        .alert(tr("Git"), isPresented: Binding(get: { git.error != nil }, set: {
             if !$0 {
                 git.error = nil
             }
         })) {
-            Button("OK") { git.error = nil }
+            Button(tr("OK")) { git.error = nil }
         } message: { Text(git.error ?? "") }
     }
 
@@ -67,7 +68,7 @@ struct GitPane: View {
         if git.isClean {
             return "limpo"
         }
-        return largura < 250 ? "\(git.status.count)" : "\(git.status.count) alterações"
+        return largura < 250 ? "\(git.status.count)" : tr("%1$@ alterações", "\(git.status.count)")
     }
 }
 
@@ -145,10 +146,10 @@ struct HeroCard: View {
                 branchRow
                 if git.origin != nil {
                     HStack(spacing: 6) {
-                        GitButton(title: "Fetch", symbol: "arrow.down.circle", disabled: git.busy) { git.fetch() }
-                        GitButton(title: "Pull", symbol: "arrow.down.to.line", disabled: git.busy) { git.pull() }
+                        GitButton(title: tr("Fetch"), symbol: "arrow.down.circle", disabled: git.busy) { git.fetch() }
+                        GitButton(title: tr("Pull"), symbol: "arrow.down.to.line", disabled: git.busy) { git.pull() }
                         GitButton(
-                            title: "Push",
+                            title: tr("Push"),
                             symbol: "arrow.up.to.line",
                             accent: (git.aheadBehind?.ahead ?? 0) > 0,
                             disabled: git.busy
@@ -160,12 +161,12 @@ struct HeroCard: View {
             Rectangle().fill(theme.separator).frame(height: 0.5)
             CommitBox()
         }
-        .alert("Remoto origin", isPresented: $askingRemote) {
+        .alert(tr("Remoto origin"), isPresented: $askingRemote) {
             TextField("https://github.com/usuario/repo.git", text: $remoteURL)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
-            Button("Adicionar") { git.addRemote(url: remoteURL.trimmingCharacters(in: .whitespaces)) }
-            Button("Cancelar", role: .cancel) {}
+            Button(tr("Adicionar")) { git.addRemote(url: remoteURL.trimmingCharacters(in: .whitespaces)) }
+            Button(tr("Cancelar"), role: .cancel) {}
         }
     }
 
@@ -191,10 +192,10 @@ struct HeroCard: View {
                     Text(git.githubSlug ?? o.url.replacingOccurrences(of: "https://", with: ""))
                         .font(.caption2).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
                     if !git.hasCredentials {
-                        Text("sem conta").font(.caption2).foregroundStyle(theme.danger)
+                        Text(tr("sem conta")).font(.caption2).foregroundStyle(theme.danger)
                     }
                 } else {
-                    Button("adicionar remoto…") { askingRemote = true }
+                    Button(tr("adicionar remoto…")) { askingRemote = true }
                         .font(.caption).foregroundStyle(theme.accent)
                 }
                 Spacer(minLength: 0)
@@ -238,7 +239,7 @@ struct CommitBox: View {
             // ficar preso numa linha só.
             ZStack(alignment: .topTrailing) {
                 TextField(
-                    git.mergeInProgress ? "Mensagem do merge" : "Mensagem do commit",
+                    git.mergeInProgress ? tr("Mensagem do merge") : tr("Mensagem do commit"),
                     text: $git.commitMessage,
                     axis: .vertical
                 )
@@ -267,13 +268,13 @@ struct CommitBox: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(git.staged.isEmpty || suggesting)
-                .accessibilityLabel("Sugerir mensagem a partir do que está no stage")
+                .accessibilityLabel(tr("Sugerir mensagem a partir do que está no stage"))
                 .padding(4)
             }
             HStack(spacing: 6) {
                 GitButton(
-                    title: git.mergeInProgress ? (paneWidth < 300 ? "Merge" : "Commit de merge")
-                        : git.origin == nil || paneWidth < 300 ? "Commit" : "Commit e push",
+                    title: git.mergeInProgress ? (paneWidth < 300 ? "Merge" : tr("Commit de merge"))
+                        : git.origin == nil || paneWidth < 300 ? "Commit" : tr("Commit e push"),
                     symbol: "checkmark",
                     accent: true,
                     disabled: !canCommit,
@@ -289,13 +290,13 @@ struct CommitBox: View {
                 // A ação principal leva a largura; desfazer fica como ícone ao lado, para o
                 // rótulo "Commit e push" nunca precisar truncar.
                 if git.mergeInProgress {
-                    Button("Abortar merge", systemImage: "xmark") { git.abortMerge() }
+                    Button(tr("Abortar merge"), systemImage: "xmark") { git.abortMerge() }
                         .labelStyle(.iconOnly)
                         .buttonStyle(.glass)
                         .controlSize(.small)
                         .disabled(git.busy)
                 } else {
-                    Button("Desfazer último commit", systemImage: "arrow.uturn.backward") {
+                    Button(tr("Desfazer último commit"), systemImage: "arrow.uturn.backward") {
                         git.undoLastCommit()
                     }
                     .labelStyle(.iconOnly)
@@ -305,23 +306,23 @@ struct CommitBox: View {
                 }
             }
             if !git.conflicts.isEmpty {
-                Text("resolva os conflitos antes de commitar")
+                Text(tr("resolva os conflitos antes de commitar"))
                     .font(.caption2).foregroundStyle(theme.danger)
             }
         }
         .padding(12)
         .confirmationDialog(
-            "Nada está no stage",
+            tr("Nada está no stage"),
             isPresented: $asking,
             titleVisibility: .visible
         ) {
             Button(
-                git.unstaged.count == 1 ? "Commitar 1 alteração"
-                    : "Commitar \(git.unstaged.count) alterações"
+                git.unstaged.count == 1 ? tr("Commitar 1 alteração")
+                    : tr("Commitar %1$@ alterações", "\(git.unstaged.count)")
             ) { git.commit(stagingEverything: true) }
-            Button("Cancelar", role: .cancel) {}
+            Button(tr("Cancelar"), role: .cancel) {}
         } message: {
-            Text("Quer mandar tudo para o stage e commitar?")
+            Text(tr("Quer mandar tudo para o stage e commitar?"))
         }
     }
 

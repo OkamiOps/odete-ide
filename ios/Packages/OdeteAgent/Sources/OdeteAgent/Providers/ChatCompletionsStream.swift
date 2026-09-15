@@ -1,4 +1,5 @@
 import Foundation
+import OdeteI18n
 
 /// OpenAI Chat Completions com SSE: Codex (chatgpt.com) e provedores compatíveis.
 enum ChatCompletionsStream {
@@ -360,7 +361,7 @@ enum ResponsesStream {
                                 ((j["response"] as? [
                                     String: Any
                                 ])?["error"] as? [String: Any])?["message"] as? String ??
-                                (j["message"] as? String) ?? "erro do modelo"
+                                (j["message"] as? String) ?? tr("erro do modelo")
                             cont.yield(.error(msg))
                         default: break
                         }

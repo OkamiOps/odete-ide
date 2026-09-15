@@ -1,3 +1,4 @@
+import OdeteI18n
 @testable import OdeteSwift
 import SwiftUI
 import Testing
@@ -142,7 +143,7 @@ func texts(_ nodes: [ViewNode]) -> [String] {
         """)
         let nodes = inst.evalBody()
         #expect(nodes.count == 3 && nodes[0].kind == "__placeholder" && nodes[1].kind == "__placeholder")
-        #expect(inst.diagnostics.contains { $0.message.contains("divisão por zero") && $0.kind == .error })
+        #expect(inst.diagnostics.contains { $0.message.contains(tr("divisão por zero")) && $0.kind == .error })
         #expect(inst.diagnostics.contains { $0.message.contains("GeometryReader") && $0.kind == .warning })
         _ = SwiftView(node: nodes[2], instance: inst).body
         #expect(inst.diagnostics.contains { $0.message.contains(".foo") })

@@ -1,4 +1,5 @@
 import Foundation
+import OdeteI18n
 import SwiftUI
 
 /// Os modificadores aplicados a cada view do subconjunto.
@@ -186,7 +187,7 @@ extension SwiftView {
             }
             return v
         default:
-            owner.report("modificador fora do subconjunto: .\(m.name)", m.line)
+            owner.report(tr("modificador fora do subconjunto: .%1$@", "\(m.name)"), m.line)
             return v
         }
     }

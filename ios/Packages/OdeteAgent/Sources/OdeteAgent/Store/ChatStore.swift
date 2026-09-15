@@ -33,10 +33,15 @@ public struct ChatThread: Codable, Sendable, Hashable, Identifiable {
     public var usage: TokenUse
     public var lastInput: Int
 
+    /// Conversa sem título ainda. Guardada vazia, e não com a frase pronta: o título
+    /// fica no disco, e uma conversa criada em português não podia aparecer em
+    /// português na lista de quem usa o app em alemão.
+    public static let semTitulo = ""
+
     public static func blank() -> ChatThread {
         .init(
             id: UUID().uuidString,
-            title: "Nova conversa",
+            title: semTitulo,
             updated: .now,
             items: [],
             messages: [],
@@ -69,7 +74,7 @@ public final class ChatStore: @unchecked Sendable {
                 return t.count > 48 ? String(t.prefix(48)) + "…" : t
             }
         }
-        return "Nova conversa"
+        return ChatThread.semTitulo
     }
 
     public func list() -> [ChatThread] {
@@ -91,7 +96,7 @@ public final class ChatStore: @unchecked Sendable {
         var s = t
         s.items = Self.slim(t.items)
         s.messages = Array(t.messages.suffix(40))
-        if s.title == "Nova conversa" {
+        if s.title == ChatThread.semTitulo {
             s.title = Self.title(of: s.items)
         }
         s.updated = .now

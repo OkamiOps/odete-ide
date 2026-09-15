@@ -1,17 +1,18 @@
 import Foundation
+import OdeteI18n
 import OdeteRuntime
 
 /// `node arquivo.js [args]`, `node -e "código"`, `node -v`.
 struct NodeCommand: ShellCommand {
     let name = "node"
-    let help = "roda JavaScript/TypeScript no JavaScriptCore"
+    let help = tr("roda JavaScript/TypeScript no JavaScriptCore")
 
     func run(_ args: [String], _ ctx: CommandContext) async -> Int32 {
         let io = ctx.io
         if args.isEmpty || args.first == "-v" || args
             .first == "--version"
         {
-            io.out("v22.0.0-odete (JavaScriptCore)"); return 0
+            io.out(tr("v22.0.0-odete (JavaScriptCore)")); return 0
         }
         let esbuild = ctx.shell.esbuildEngine()
         var argv = args
@@ -30,7 +31,7 @@ struct NodeCommand: ShellCommand {
             file = ctx.resolve(f)
             guard let file,
                   FileManager.default.fileExists(atPath: file.path) || FileManager.default
-                  .fileExists(atPath: file.path + ".js") else { io.err("node: não achei \(f)"); return 1 }
+                  .fileExists(atPath: file.path + ".js") else { io.err(tr("node: não achei %1$@", "\(f)")); return 1 }
         }
         return await Self.runProcess(
             Alvo(code: code, file: file, argv: argv, label: "node " + args.joined(separator: " ")),
@@ -78,7 +79,12 @@ struct NodeCommand: ShellCommand {
             let ports = p.ports
             if !ports.isEmpty {
                 let job = ctx.shell.registerJob(label, ports: ports) { p.kill() }
-                io.out("servidor em http://127.0.0.1:\(ports[0]) (job \(job.id); kill %\(job.id) para parar)")
+                io.out(tr(
+                    "servidor em http://127.0.0.1:%1$@ (job %2$@; kill %%%3$@ para parar)",
+                    "\(ports[0])",
+                    "\(job.id)",
+                    "\(job.id)"
+                ))
                 Task { _ = await task.value; ctx.shell.removeJob(job) }
                 return 0
             }

@@ -2,6 +2,7 @@ import OdeteAgent
 import OdeteCore
 import OdeteEditor
 import OdeteGit
+import OdeteI18n
 import OdeteUI
 import SwiftUI
 
@@ -24,7 +25,7 @@ struct CenterPane: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Projetos")
+                .accessibilityLabel(tr("Projetos"))
                 EditorTabs(
                     tabs: ws.tabs,
                     active: ws.active,
@@ -83,24 +84,24 @@ struct CenterPane: View {
     /// Ficam a paleta, salvar e o menu do arquivo aberto.
     var actions: some View {
         HStack(spacing: 6) {
-            Button("Paleta", systemImage: "command") { ws.paletteOpen = true }
-            Button("Salvar", systemImage: "square.and.arrow.down") { ws.save() }
+            Button(tr("Paleta"), systemImage: "command") { ws.paletteOpen = true }
+            Button(tr("Salvar"), systemImage: "square.and.arrow.down") { ws.save() }
                 .disabled(ws.activeTab?.isDirty != true)
             Menu {
                 if let path = ws.active {
                     Section(path.split(separator: "/").last.map(String.init) ?? path) {
-                        Button("Histórico do arquivo", systemImage: "clock.arrow.circlepath") {
+                        Button(tr("Histórico do arquivo"), systemImage: "clock.arrow.circlepath") {
                             ws.historyPath = path
                         }
-                        Button("Blame", systemImage: "person.text.rectangle") { ws.blamePath = path }
-                        Button("Copiar caminho", systemImage: "doc.on.doc") { UIPasteboard.general.string = path }
+                        Button(tr("Blame"), systemImage: "person.text.rectangle") { ws.blamePath = path }
+                        Button(tr("Copiar caminho"), systemImage: "doc.on.doc") { UIPasteboard.general.string = path }
                     }
                     Section {
-                        Button("Fechar aba", systemImage: "xmark") { ws.closeTab(path) }
+                        Button(tr("Fechar aba"), systemImage: "xmark") { ws.closeTab(path) }
                     }
                 }
             } label: {
-                Label("Mais", systemImage: "ellipsis")
+                Label(tr("Mais"), systemImage: "ellipsis")
             }
             .menuStyle(.button)
             .menuIndicator(.hidden)
@@ -170,8 +171,8 @@ struct CenterPane: View {
             if path == nil, direita {
                 EmptyState(
                     "arrow.down.doc",
-                    title: "Nada para comparar",
-                    text: "Arraste um arquivo da lista para cá, ou escolha um na trilha do outro lado."
+                    title: tr("Nada para comparar"),
+                    text: tr("Arraste um arquivo da lista para cá, ou escolha um na trilha do outro lado.")
                 )
             } else {
                 editor(
@@ -197,7 +198,7 @@ struct CenterPane: View {
             if sobre == lado {
                 ZStack {
                     theme.accent.opacity(0.1)
-                    Label("Soltar aqui", systemImage: "arrow.down.doc")
+                    Label(tr("Soltar aqui"), systemImage: "arrow.down.doc")
                         .font(OdeteFont.ui(12, weight: .medium))
                         .foregroundStyle(theme.accent)
                         .padding(.horizontal, 12).frame(height: 32)
@@ -304,17 +305,17 @@ struct CenterPane: View {
                     titleVisibility: .visible
                 ) {
                     if let ref = hunkAt {
-                        Button("Descartar este trecho", role: .destructive) {
+                        Button(tr("Descartar este trecho"), role: .destructive) {
                             ws.discardHunk(at: ref.line, in: ref.path)
                             hunkAt = nil
                         }
-                        Button("Ver diff do arquivo") {
+                        Button(tr("Ver diff do arquivo")) {
                             ws.git.setDiff(.workdir, path: ref.path)
                             chrome.snapshot.center = .diff
                             hunkAt = nil
                         }
                     }
-                    Button("Cancelar", role: .cancel) { hunkAt = nil }
+                    Button(tr("Cancelar"), role: .cancel) { hunkAt = nil }
                 }
                 .onChange(of: ws.agent.pendingPatches) { _, _ in ws.refreshPatchMarks(path) }
                 .onAppear { ws.refreshPatchMarks(path) }
@@ -352,7 +353,7 @@ struct Crumbs: View {
                     }
                     if let trocar {
                         Divider()
-                        Button("Trocar os lados", systemImage: "arrow.left.arrow.right", action: trocar)
+                        Button(tr("Trocar os lados"), systemImage: "arrow.left.arrow.right", action: trocar)
                     }
                 } label: {
                     Image(systemName: "chevron.down.circle").font(.system(size: 11))
@@ -361,7 +362,7 @@ struct Crumbs: View {
                 }
                 .buttonStyle(.plain)
                 .menuIndicator(.hidden)
-                .accessibilityLabel("Escolher arquivo deste lado")
+                .accessibilityLabel(tr("Escolher arquivo deste lado"))
             }
             ForEach(Array(path.split(separator: "/").enumerated()), id: \.offset) { i, part in
                 if i >
@@ -382,14 +383,14 @@ struct Crumbs: View {
                         .frame(width: 22, height: 22).contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Ver como tabela")
-                .help("Ver como tabela")
+                .accessibilityLabel(tr("Ver como tabela"))
+                .help(tr("Ver como tabela"))
             }
             if ws.git.isRepo {
                 Menu {
-                    Button("Histórico do arquivo", systemImage: "clock.arrow.circlepath") { ws.historyPath = path }
-                    Button("Blame", systemImage: "person.text.rectangle") { ws.blamePath = path }
-                    Button("Diff deste arquivo", systemImage: "plus.forwardslash.minus") {
+                    Button(tr("Histórico do arquivo"), systemImage: "clock.arrow.circlepath") { ws.historyPath = path }
+                    Button(tr("Blame"), systemImage: "person.text.rectangle") { ws.blamePath = path }
+                    Button(tr("Diff deste arquivo"), systemImage: "plus.forwardslash.minus") {
                         ws.git.setDiff(.headToWorkdir, path: path)
                         chrome.snapshot.center = .diff
                     }
@@ -398,8 +399,8 @@ struct Crumbs: View {
                         .frame(width: 22, height: 22).contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Git deste arquivo")
-                .help("Git deste arquivo")
+                .accessibilityLabel(tr("Git deste arquivo"))
+                .help(tr("Git deste arquivo"))
                 .menuIndicator(.hidden)
             }
             // Um PNG não é "Texto": quando o centro está com um visualizador, o que vale
@@ -420,8 +421,8 @@ struct Crumbs: View {
                 .background(theme.bg)
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    ToolbarItem(placement: .cancellationAction) { Button("Fechar") { tabelaAberta = false } }
-                    ToolbarItem(placement: .principal) { Titulo(path: path, detalhe: "Tabelas") }
+                    ToolbarItem(placement: .cancellationAction) { Button(tr("Fechar")) { tabelaAberta = false } }
+                    ToolbarItem(placement: .principal) { Titulo(path: path, detalhe: tr("Tabelas")) }
                 }
             }
             .presentationDetents([.large])
@@ -440,9 +441,9 @@ struct EmptyEditor: View {
     var body: some View {
         VStack(spacing: 14) {
             Wordmark(height: 26).opacity(0.5)
-            Text("Abra um arquivo na árvore ou crie um novo.")
+            Text(tr("Abra um arquivo na árvore ou crie um novo."))
                 .font(OdeteFont.ui(13)).foregroundStyle(theme.fgMuted)
-            Button { ws.createFile(near: nil) } label: { Label("Novo arquivo", systemImage: "doc.badge.plus") }
+            Button { ws.createFile(near: nil) } label: { Label(tr("Novo arquivo"), systemImage: "doc.badge.plus") }
                 .buttonStyle(.glass)
             HStack(spacing: 14) {
                 key("⌘P", "paleta"); key("⌘S", "salvar"); key("⌘B", "sidebar"); key("⌘J", "terminal")
@@ -471,17 +472,17 @@ struct PatchBanner: View {
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: "sparkles").foregroundStyle(theme.accent)
-            Text("Patch do agente: +\(patch.additions) −\(patch.deletions)").font(OdeteFont.ui(12))
+            Text(tr("Patch do agente: +%1$@ −%2$@", "\(patch.additions)", "\(patch.deletions)")).font(OdeteFont.ui(12))
                 .foregroundStyle(theme.fg)
             Spacer()
-            Button("Ver no chat") {
+            Button(tr("Ver no chat")) {
                 if !chrome.snapshot.agentVisible {
                     chrome.toggleAgent()
                 }
             }.buttonStyle(.plain)
                 .font(OdeteFont.ui(12)).foregroundStyle(theme.fgMuted)
-            Button("Rejeitar") { ws.agent.reject(patch) }.buttonStyle(.glass).font(OdeteFont.ui(12))
-            Button("Aceitar") { ws.agent.accept(patch) }.buttonStyle(.glassProminent).font(OdeteFont.ui(12))
+            Button(tr("Rejeitar")) { ws.agent.reject(patch) }.buttonStyle(.glass).font(OdeteFont.ui(12))
+            Button(tr("Aceitar")) { ws.agent.accept(patch) }.buttonStyle(.glassProminent).font(OdeteFont.ui(12))
         }
         .padding(.horizontal, 12).frame(height: 38)
         .background(theme.accent.opacity(0.08))

@@ -1,4 +1,5 @@
 import Foundation
+import OdeteI18n
 import UIKit
 
 /// O que acontece com o servidor de dev quando o app sai da frente.
@@ -45,13 +46,13 @@ public extension RunModel {
             for j in jobs where j.ports.contains(morto.porta) {
                 j.kill()
             }
-            sessao.append(.system, "o servidor em :\(morto.porta) não sobreviveu ao app ir para o fundo")
+            sessao.append(.system, tr("o servidor em :%1$@ não sobreviveu ao app ir para o fundo", "\(morto.porta)"))
         }
         pruneServers()
         // Subir de novo em vez de só avisar: a pessoa saiu do app e voltou, não pediu
         // para parar nada.
         if let primeiro = mortos.first {
-            sessao.append(.system, "subindo de novo…")
+            sessao.append(.system, tr("subindo de novo…"))
             sessao.run(primeiro.comando)
         }
     }

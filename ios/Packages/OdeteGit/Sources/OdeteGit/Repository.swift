@@ -1,6 +1,7 @@
 import Clibgit2
 import Foundation
 import OdeteCore
+import OdeteI18n
 
 /// Um repositório git. Todas as chamadas ao libgit2 passam por este actor.
 public actor Repository {
@@ -21,7 +22,7 @@ public actor Repository {
     public static func open(_ url: URL) throws -> Repository {
         Libgit2.start()
         var r: OpaquePointer?
-        try check(git_repository_open(&r, url.path), "abrir repositório")
+        try check(git_repository_open(&r, url.path), tr("abrir repositório"))
         excludeOdeteMetadata(url)
         return Repository(repo: r!, workdir: url)
     }
@@ -48,7 +49,7 @@ public actor Repository {
         opts.flags = GIT_REPOSITORY_INIT_MKPATH.rawValue
         try defaultBranch.withCString { cstr in
             opts.initial_head = cstr
-            try check(git_repository_init_ext(&r, url.path, &opts), "iniciar repositório")
+            try check(git_repository_init_ext(&r, url.path, &opts), tr("iniciar repositório"))
         }
         excludeOdeteMetadata(url)
         return Repository(repo: r!, workdir: url)
@@ -181,13 +182,13 @@ public actor Repository {
     /// Índice do repositório; quem chama libera com `git_index_free`.
     func index() throws -> OpaquePointer {
         var idx: OpaquePointer?
-        try check(git_repository_index(&idx, repo), "índice")
+        try check(git_repository_index(&idx, repo), tr("índice"))
         return idx!
     }
 
     func withIndex<T>(_ body: (OpaquePointer) throws -> T) throws -> T {
         var idx: OpaquePointer?
-        try check(git_repository_index(&idx, repo), "índice")
+        try check(git_repository_index(&idx, repo), tr("índice"))
         defer { git_index_free(idx) }
         return try body(idx!)
     }
@@ -202,7 +203,7 @@ public actor Repository {
                     try check(git_index_remove_bypath(idx, p), "stage \(p)")
                 }
             }
-            try check(git_index_write(idx), "gravar índice")
+            try check(git_index_write(idx), tr("gravar índice"))
         }
     }
 
@@ -220,7 +221,7 @@ public actor Repository {
                 for p in paths {
                     git_index_remove_bypath(idx, p)
                 }
-                try check(git_index_write(idx), "gravar índice")
+                try check(git_index_write(idx), tr("gravar índice"))
             }
             return
         }
@@ -266,7 +267,7 @@ public actor Repository {
     public func commit(message: String, author: Signature, permitirVazio: Bool = false) throws -> Commit {
         let tree = try withIndex { idx -> git_oid in
             var oid = git_oid()
-            try check(git_index_write_tree(&oid, idx), "árvore")
+            try check(git_index_write_tree(&oid, idx), tr("árvore"))
             return oid
         }
         if !permitirVazio, !isUnborn() {
@@ -278,13 +279,13 @@ public actor Repository {
                 defer { git_commit_free(anterior) }
                 var t = tree
                 if git_oid_cmp(git_commit_tree_id(anterior), &t) == 0 {
-                    throw GitError(kind: .invalid, code: -1, message: "nada no stage para commitar")
+                    throw GitError(kind: .invalid, code: -1, message: tr("nada no stage para commitar"))
                 }
             }
         }
         var treeObj: OpaquePointer?
         var treeOid = tree
-        try check(git_tree_lookup(&treeObj, repo, &treeOid), "árvore")
+        try check(git_tree_lookup(&treeObj, repo, &treeOid), tr("árvore"))
         defer { git_tree_free(treeObj) }
         var sig: UnsafeMutablePointer<git_signature>?
         try check(git_signature_now(&sig, author.name, author.email), "autor")

@@ -1,4 +1,5 @@
 import Foundation
+import OdeteI18n
 
 /// A outra metade dos embutidos: ambiente, jobs, tempo e utilidades.
 extension Builtins {
@@ -26,7 +27,7 @@ extension Builtins {
                 ) {
                     ctx.io.out(ctx.display(p))
                 } else {
-                    ctx.io.err("\(a) não encontrado"); return 1
+                    ctx.io.err(tr("%1$@ não encontrado", "\(a)")); return 1
                 }
             }
             return 0
@@ -34,14 +35,16 @@ extension Builtins {
         Simple(name: "clear", help: "limpa a tela") { _, ctx in ctx.io.out("\u{1B}[clear]"); return 0 },
         Simple(name: "history", help: "histórico") { _, ctx in
             for (i, h) in ctx.shell.history.enumerated() {
-                ctx.io.out("\(String(i + 1).leftPad(4))  \(h)")
+                ctx.io.out(tr("%1$@  %2$@", "\(String(i + 1).leftPad(4))", "\(h)"))
             }; return 0
         },
         Simple(name: "swift", help: "explica como rodar Swift no iPad") { _, ctx in
-            ctx.io.out("Não há compilador Swift no iPad. O Preview mostra o subconjunto de SwiftUI na hora;")
+            ctx.io.out(tr("Não há compilador Swift no iPad. O Preview mostra o subconjunto de SwiftUI na hora;"))
             ctx.io
                 .out(
-                    "para compilar e rodar de verdade, abra o pacote .swiftpm no Swift Playgrounds (botão no Preview)."
+                    tr(
+                        "para compilar e rodar de verdade, abra o pacote .swiftpm no Swift Playgrounds (botão no Preview)."
+                    )
                 )
             return 1
         },
@@ -57,7 +60,7 @@ extension Builtins {
         Simple(name: "jobs", help: "jobs em execução") { _, ctx in
             let js = ctx.shell.jobs
             if js.isEmpty {
-                ctx.io.out("nenhum job")
+                ctx.io.out(tr("nenhum job"))
             }
             for j in js {
                 ctx.io
@@ -75,15 +78,15 @@ extension Builtins {
                 } else {
                     ctx.shell.killAll()
                 }
-                ctx.io.out("jobs encerrados"); return 0
+                ctx.io.out(tr("jobs encerrados")); return 0
             }
             for a in args {
                 let id = Int(a.replacingOccurrences(of: "%", with: "")); if let j = ctx.shell.jobs
                     .first(where: { $0.id == id })
                 {
-                    j.kill(); ctx.io.out("[\(j.id)] parado")
+                    j.kill(); ctx.io.out(tr("[%1$@] parado", "\(j.id)"))
                 } else {
-                    ctx.io.err("kill: job \(a) não existe nesta aba (kill all para o projeto inteiro)")
+                    ctx.io.err(tr("kill: job %1$@ não existe nesta aba (kill all para o projeto inteiro)", "\(a)"))
                 }
             }
             return 0

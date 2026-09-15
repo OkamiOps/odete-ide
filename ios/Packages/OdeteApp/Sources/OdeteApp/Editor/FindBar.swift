@@ -1,4 +1,5 @@
 import OdeteEditor
+import OdeteI18n
 import OdeteUI
 import SwiftUI
 
@@ -82,19 +83,19 @@ struct FindBar: View {
                 Button { busca.anterior() } label: { Image(systemName: "chevron.up") }
                     .disabled(busca.total == 0)
                     .keyboardShortcut("g", modifiers: [.command, .shift])
-                    .accessibilityLabel("Anterior")
+                    .accessibilityLabel(tr("Anterior"))
                 Button { busca.proximo() } label: { Image(systemName: "chevron.down") }
                     .disabled(busca.total == 0)
                     .keyboardShortcut("g", modifiers: .command)
-                    .accessibilityLabel("Próximo")
+                    .accessibilityLabel(tr("Próximo"))
                 opcoes
                 Button { busca.fechar() } label: { Image(systemName: "xmark") }
                     .keyboardShortcut(.escape, modifiers: [])
-                    .accessibilityLabel("Fechar busca")
+                    .accessibilityLabel(tr("Fechar busca"))
             }
             if busca.mostrarTroca {
                 HStack(spacing: 8) {
-                    TextField("Substituir por", text: $busca.troca)
+                    TextField(tr("Substituir por"), text: $busca.troca)
                         .textFieldStyle(.plain)
                         .font(OdeteFont.mono(12))
                         .padding(.horizontal, 8)
@@ -102,9 +103,9 @@ struct FindBar: View {
                         .background(theme.bg, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                         .autocorrectionDisabled()
                         .textInputAutocapitalization(.never)
-                    Button("Este") { busca.trocar(todos: false) }
+                    Button(tr("Este")) { busca.trocar(todos: false) }
                         .disabled(busca.total == 0)
-                    Button("Todos") { busca.trocar(todos: true) }
+                    Button(tr("Todos")) { busca.trocar(todos: true) }
                         .disabled(busca.total == 0)
                 }
                 .font(.caption)
@@ -124,7 +125,7 @@ struct FindBar: View {
         HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 12, weight: .semibold)).foregroundStyle(theme.fgSubtle)
-            TextField("Localizar no arquivo", text: $busca.texto)
+            TextField(tr("Localizar no arquivo"), text: $busca.texto)
                 .textFieldStyle(.plain)
                 .font(OdeteFont.mono(12))
                 .focused($focado)
@@ -156,14 +157,14 @@ struct FindBar: View {
 
     var opcoes: some View {
         Menu {
-            Toggle("Diferenciar maiúsculas", isOn: $busca.caseSensitive)
-            Toggle("Expressão regular", isOn: $busca.regex)
+            Toggle(tr("Diferenciar maiúsculas"), isOn: $busca.caseSensitive)
+            Toggle(tr("Expressão regular"), isOn: $busca.regex)
             Divider()
-            Toggle("Substituir", isOn: $busca.mostrarTroca)
+            Toggle(tr("Substituir"), isOn: $busca.mostrarTroca)
         } label: {
             Image(systemName: "slider.horizontal.3")
         }
         .menuIndicator(.hidden)
-        .accessibilityLabel("Opções da busca")
+        .accessibilityLabel(tr("Opções da busca"))
     }
 }

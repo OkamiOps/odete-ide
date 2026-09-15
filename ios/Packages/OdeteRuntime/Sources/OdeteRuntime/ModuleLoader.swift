@@ -1,6 +1,7 @@
 import Foundation
 import JavaScriptCore
 import OdeteCore
+import OdeteI18n
 
 /// Resolução Node de módulos e leitura/transformação de fontes para o `require` do JS.
 enum ModuleLoader {
@@ -25,7 +26,10 @@ enum ModuleLoader {
                 guard let t = rt.transform else {
                     return [
                         "error": "ESM",
-                        "message": "\(path): módulos ES e TypeScript precisam do transformador (esbuild), que chega no marco 3",
+                        "message": tr(
+                            "%1$@: módulos ES e TypeScript precisam do transformador (esbuild), que chega no marco 3",
+                            "\(path)"
+                        ),
                     ]
                 }
                 do { src = try t(src, path) } catch { return [

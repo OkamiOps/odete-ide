@@ -1,3 +1,4 @@
+import OdeteI18n
 import SwiftUI
 
 // Formato de seção que veio das capturas em docs/design: título em negrito fora do cartão,
@@ -76,7 +77,7 @@ public struct SectionTitle<MenuContent: View>: View {
                 }
                 .menuIndicator(.hidden)
                 .fixedSize()
-                .accessibilityLabel("Mais ações em \(title)")
+                .accessibilityLabel(tr("Mais ações em %1$@", "\(title)"))
             }
         }
     }

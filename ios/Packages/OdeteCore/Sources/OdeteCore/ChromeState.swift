@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import OdeteI18n
 
 public enum SidePanel: String, Codable, CaseIterable, Sendable {
     /// Sem "esboço": a lista de símbolos do arquivo já mora na paleta de comandos, em @,
@@ -17,10 +18,10 @@ public enum SidePanel: String, Codable, CaseIterable, Sendable {
 
     public var label: String {
         switch self {
-        case .files: "Arquivos"
-        case .search: "Busca"
-        case .git: "Git"
-        case .problems: "Problemas"
+        case .files: tr("Arquivos")
+        case .search: tr("Busca")
+        case .git: tr("Git")
+        case .problems: tr("Problemas")
         }
     }
 
@@ -38,11 +39,11 @@ public enum CenterMode: String, Codable, CaseIterable, Sendable {
     case code, diff, dual, split, preview
     public var label: String {
         switch self {
-        case .code: "Código"
-        case .diff: "Diff"
-        case .dual: "Dois"
-        case .split: "Split"
-        case .preview: "Preview"
+        case .code: tr("Código")
+        case .diff: tr("Diff")
+        case .dual: tr("Dois")
+        case .split: tr("Split")
+        case .preview: tr("Preview")
         }
     }
 }
@@ -51,12 +52,12 @@ public enum PhoneTab: String, Codable, CaseIterable, Sendable {
     case files, edit, agent, term, preview, settings
     public var label: String {
         switch self {
-        case .files: "Arquivos"
-        case .edit: "Editar"
-        case .agent: "Agente"
-        case .term: "Terminal"
-        case .preview: "Preview"
-        case .settings: "Ajustes"
+        case .files: tr("Arquivos")
+        case .edit: tr("Editar")
+        case .agent: tr("Agente")
+        case .term: tr("Terminal")
+        case .preview: tr("Preview")
+        case .settings: tr("Ajustes")
         }
     }
 

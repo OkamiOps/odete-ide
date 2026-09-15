@@ -1,4 +1,5 @@
 import Foundation
+import OdeteI18n
 
 public struct GitHubUser: Codable, Sendable, Equatable {
     public var login: String
@@ -151,7 +152,7 @@ public struct GitHubAPI: Sendable {
         guard (200 ..< 300).contains(code) else {
             let msg = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["message"] as? String ?? ""
             if code == 401 || code == 403 {
-                throw GitHubError.auth(msg.isEmpty ? "sem permissão" : msg)
+                throw GitHubError.auth(msg.isEmpty ? tr("sem permissão") : msg)
             }
             throw GitHubError.http(code, msg)
         }

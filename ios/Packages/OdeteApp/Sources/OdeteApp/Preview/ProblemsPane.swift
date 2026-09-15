@@ -1,5 +1,6 @@
 import OdeteBundler
 import OdeteCore
+import OdeteI18n
 import OdetePreview
 import OdeteSwift
 import OdeteUI
@@ -21,17 +22,17 @@ struct ProblemsPane: View {
         VStack(spacing: 0) {
             PaneHeader(
                 "Problemas",
-                detail: total == 0 ? "tudo limpo" : "\(total)"
+                detail: total == 0 ? tr("tudo limpo") : "\(total)"
             ) {
-                HeaderButton("arrow.clockwise", label: "Rebuild") { ws.run.active?.shell.devServer?.invalidate() }
+                HeaderButton("arrow.clockwise", label: tr("Rebuild")) { ws.run.active?.shell.devServer?.invalidate() }
             }
             if total == 0 {
                 VStack(spacing: 10) {
                     Image(systemName: "checkmark.seal").font(.system(size: 30)).foregroundStyle(theme.ok)
-                    Text("Nenhum problema").font(OdeteFont.ui(13, weight: .medium)).foregroundStyle(theme.fg)
+                    Text(tr("Nenhum problema")).font(OdeteFont.ui(13, weight: .medium)).foregroundStyle(theme.fg)
                     Text(ws.run.servers
-                        .isEmpty ? "Erros do build aparecem aqui quando o dev server estiver rodando." :
-                        "O build e o preview estão sem erros.")
+                        .isEmpty ? tr("Erros do build aparecem aqui quando o dev server estiver rodando.") :
+                        tr("O build e o preview estão sem erros."))
                         .font(OdeteFont.ui(12)).foregroundStyle(theme.fgMuted).multilineTextAlignment(.center)
                 }
                 .padding(24)
@@ -71,7 +72,7 @@ struct ProblemsPane: View {
                                 ) }
                                 .buttonStyle(.plain)
                                 .allowsHitTesting(alvo != nil)
-                                .contextMenu { Button("Copiar erro", systemImage: "doc.on.doc") {
+                                .contextMenu { Button(tr("Copiar erro"), systemImage: "doc.on.doc") {
                                     UIPasteboard.general.string = d.text
                                 } }
                             }
@@ -110,7 +111,7 @@ struct ProblemsPane: View {
                                 // Erro sem arquivo no projeto não leva a lugar nenhum; tocar
                                 // nele abria uma aba em branco.
                                 .allowsHitTesting(alvo != nil)
-                                .contextMenu { Button("Copiar erro", systemImage: "doc.on.doc") {
+                                .contextMenu { Button(tr("Copiar erro"), systemImage: "doc.on.doc") {
                                     UIPasteboard.general.string = e.text
                                 } }
                             }

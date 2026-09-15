@@ -1,6 +1,7 @@
 import Foundation
 import OdeteAccounts
 import OdeteAgent
+import OdeteI18n
 import OdeteShell
 
 /// Ferramentas do agente sobre o workspace: arquivos no disco, terminal e shell reais.
@@ -55,13 +56,13 @@ final class AppToolHost: FileToolHost, @unchecked Sendable {
                 return await MainActor
                     .run { session.lines[start...].map(\.text).joined(
                         separator: "\n"
-                    ) } + "\n… (ainda rodando após 5 min)"
+                    ) } + tr("\n… (ainda rodando após 5 min)")
             }
         }
         return await MainActor.run {
             let out = session.lines[min(start, session.lines.count)...].filter { $0.kind != .input }
                 .map { ($0.kind == .err ? "! " : "") + $0.text }.joined(separator: "\n")
-            return out.isEmpty ? "(sem saída)" : out
+            return out.isEmpty ? tr("(sem saída)") : out
         }
     }
 
@@ -72,10 +73,10 @@ final class AppToolHost: FileToolHost, @unchecked Sendable {
     override func github(_ pedido: GitHubPedido) async -> String {
         let ctx = ghBox.value()
         guard let slug = ctx.slug else {
-            return "este projeto não tem remoto no GitHub; publique primeiro pelo painel Git"
+            return tr("este projeto não tem remoto no GitHub; publique primeiro pelo painel Git")
         }
         guard let token = ctx.token else {
-            return "sem conta do GitHub conectada; entre em Ajustes → Git e GitHub"
+            return tr("sem conta do GitHub conectada; entre em Ajustes → Git e GitHub")
         }
         let api = GitHubAPI(token: token)
         do {
@@ -83,14 +84,14 @@ final class AppToolHost: FileToolHost, @unchecked Sendable {
             case .listPulls:
                 let pulls = try await api.pulls(slug)
                 if pulls.isEmpty {
-                    return "nenhum PR aberto em \(slug)"
+                    return tr("nenhum PR aberto em %1$@", "\(slug)")
                 }
                 return pulls.map { p in
                     "#\(p.number) \(p.title) · \(p.head.ref) → \(p.base.ref) · \(p.user?.login ?? "")"
                 }.joined(separator: "\n")
             case .createPull:
-                guard let titulo = pedido.titulo else { return "create_pull precisa de title" }
-                guard let head = pedido.head ?? ctx.branch else { return "create_pull precisa de head" }
+                guard let titulo = pedido.titulo else { return tr("create_pull precisa de title") }
+                guard let head = pedido.head ?? ctx.branch else { return tr("create_pull precisa de head") }
                 let base = pedido.base ?? "main"
                 let p = try await api.createPull(
                     slug,
@@ -102,13 +103,13 @@ final class AppToolHost: FileToolHost, @unchecked Sendable {
                 return "PR #\(p.number) aberto: \(p.htmlUrl)"
             case .comment:
                 try await api.comment(slug, number: pedido.numero!, body: pedido.corpo ?? "")
-                return "comentário publicado no #\(pedido.numero!)"
+                return tr("comentário publicado no #%1$@", "\(pedido.numero!)")
             case .mergePull:
                 try await api.mergePull(slug, number: pedido.numero!, method: pedido.metodo ?? "squash")
                 return "PR #\(pedido.numero!) mergeado (\(pedido.metodo ?? "squash"))"
             case .closePull:
                 try await api.closePull(slug, number: pedido.numero!)
-                return "PR #\(pedido.numero!) fechado sem merge"
+                return tr("PR #%1$@ fechado sem merge", "\(pedido.numero!)")
             }
         } catch {
             return "GitHub: \(error.localizedDescription)"

@@ -1,4 +1,5 @@
 import Foundation
+import OdeteI18n
 
 /// Uma linha de shell: lista de pipelines ligados por `&&`, `||` ou `;`.
 public struct CommandLine: Equatable, Sendable {
@@ -49,9 +50,9 @@ public enum ParseError: LocalizedError, Equatable {
         case let .unexpected(t): "inesperado: \(t)"
         case .emptyCommand: "comando vazio"
         case .semSubstituicao: "não tenho substituição de comando ($(…) nem crase): "
-            + "rode o comando antes e passe a saída na mão"
+            + tr("rode o comando antes e passe a saída na mão")
         case .semHeredoc: "não tenho heredoc (<<): para mensagem de várias linhas, "
-            + "repita -m uma vez por parágrafo"
+            + tr("repita -m uma vez por parágrafo")
         }
     }
 }

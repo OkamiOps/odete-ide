@@ -1,4 +1,5 @@
 import Foundation
+import OdeteI18n
 
 /// Início de um device flow: o que mostrar ao usuário e o handle para o poll.
 public struct DeviceStart: Sendable, Equatable {
@@ -34,13 +35,16 @@ public struct OpenAIDeviceAuth: DeviceAuth {
     public func start() async throws -> DeviceStart {
         let (data, resp) = try await http.data(for: .json(Self.userCodeURL, body: ["client_id": Self.clientId]))
         guard (200 ..< 300).contains(resp.statusCode) else {
-            throw AgentError.auth("device \(resp.statusCode). Ative \"Device code\" em ChatGPT → Ajustes → Segurança.")
+            throw AgentError.auth(tr(
+                "device %1$@. Ative \"Device code\" em ChatGPT → Ajustes → Segurança.",
+                "\(resp.statusCode)"
+            ))
         }
         let j = jsonObject(data)
         guard let code = (j["user_code"] as? String) ?? (j["usercode"] as? String),
               let id = j["device_auth_id"] as? String
         else {
-            throw AgentError.auth("resposta incompleta do device auth")
+            throw AgentError.auth(tr("resposta incompleta do device auth"))
         }
         return DeviceStart(
             userCode: code,
@@ -90,7 +94,7 @@ public struct OpenAIDeviceAuth: DeviceAuth {
             throw AgentError.http(resp.statusCode, body)
         }
         let j = jsonObject(data)
-        guard let access = j["access_token"] as? String else { throw AgentError.auth("ChatGPT não devolveu token") }
+        guard let access = j["access_token"] as? String else { throw AgentError.auth(tr("ChatGPT não devolveu token")) }
         let exp = (j["expires_in"] as? Double) ?? 3600
         return TokenBundle(
             access: access,
@@ -142,7 +146,7 @@ public struct GrokDeviceAuth: DeviceAuth {
         guard let dc = j["device_code"] as? String, let uc = j["user_code"] as? String,
               let v = (j["verification_uri_complete"] as? String) ?? (j["verification_uri"] as? String),
               let url = URL(string: v)
-        else { throw AgentError.auth("xAI não devolveu device_code, user_code e verification_uri") }
+        else { throw AgentError.auth(tr("xAI não devolveu device_code, user_code e verification_uri")) }
         return DeviceStart(
             userCode: uc,
             verificationURL: url,
@@ -162,8 +166,8 @@ public struct GrokDeviceAuth: DeviceAuth {
             switch err {
             case "authorization_pending": return .pending
             case "slow_down": return .slowDown
-            case "expired_token": throw AgentError.auth("o código expirou; comece de novo")
-            case "access_denied": throw AgentError.auth("acesso negado na xAI")
+            case "expired_token": throw AgentError.auth(tr("o código expirou; comece de novo"))
+            case "access_denied": throw AgentError.auth(tr("acesso negado na xAI"))
             default: throw AgentError.auth("xAI: \(err)")
             }
         }
@@ -191,7 +195,8 @@ public struct GrokDeviceAuth: DeviceAuth {
     }
 
     static func tokens(_ j: [String: Any], fallbackRefresh: String) throws -> TokenBundle {
-        guard let access = j["access_token"] as? String else { throw AgentError.auth("xAI não devolveu access token") }
+        guard let access = j["access_token"] as? String
+        else { throw AgentError.auth(tr("xAI não devolveu access token")) }
         let exp = (j["expires_in"] as? Double) ?? 3600
         let claims = PKCE.jwtClaims((j["id_token"] as? String) ?? access)
         return TokenBundle(

@@ -1,5 +1,6 @@
 // swiftlint:disable line_length
 import Foundation
+import OdeteI18n
 
 /// Modelos de projeto novo. `files` devolve caminho relativo → conteúdo.
 public enum Template: String, CaseIterable, Identifiable, Sendable {
@@ -11,21 +12,21 @@ public enum Template: String, CaseIterable, Identifiable, Sendable {
 
     public var label: String {
         switch self {
-        case .blank: "Em branco"
-        case .viteReact: "Vite + React"
-        case .swiftView: "SwiftUI (uma view)"
-        case .astro: "Astro"
-        case .swiftPlayground: "Swift Playground"
+        case .blank: tr("Em branco")
+        case .viteReact: tr("Vite + React")
+        case .swiftView: tr("SwiftUI (uma view)")
+        case .astro: tr("Astro")
+        case .swiftPlayground: tr("Swift Playground")
         }
     }
 
     public var blurb: String {
         switch self {
-        case .blank: "index.html, CSS e JS. Sem build."
-        case .viteReact: "React 19 com TypeScript e Vite."
-        case .swiftView: "Um ContentView.swift para brincar no preview nativo."
-        case .astro: "Site estático com Astro."
-        case .swiftPlayground: "Pacote .swiftpm que abre no Swift Playgrounds."
+        case .blank: tr("index.html, CSS e JS. Sem build.")
+        case .viteReact: tr("React 19 com TypeScript e Vite.")
+        case .swiftView: tr("Um ContentView.swift para brincar no preview nativo.")
+        case .astro: tr("Site estático com Astro.")
+        case .swiftPlayground: tr("Pacote .swiftpm que abre no Swift Playgrounds.")
         }
     }
 
@@ -50,14 +51,16 @@ public enum Template: String, CaseIterable, Identifiable, Sendable {
     }
 
     static func readme(_ name: String, _ body: String) -> String {
-        "# \(name)\n\nCriado na Odete, direto no iPad.\n\n\(body)\n"
+        tr("# %1$@\n\nCriado na Odete, direto no iPad.\n\n%2$@\n", "\(name)", "\(body)")
     }
 
     static func blank(_ name: String) -> [String: String] {
         [
             "README.md": readme(
                 name,
-                "| arquivo | o que é |\n| --- | --- |\n| `index.html` | página do preview |\n| `src/style.css` | visual |\n| `src/main.js` | comportamento |"
+                tr(
+                    "| arquivo | o que é |\n| --- | --- |\n| `index.html` | página do preview |\n| `src/style.css` | visual |\n| `src/main.js` | comportamento |"
+                )
             ),
             "index.html": """
             <!doctype html>
@@ -99,7 +102,7 @@ public enum Template: String, CaseIterable, Identifiable, Sendable {
 
     static func viteReact(_ name: String) -> [String: String] {
         [
-            "README.md": readme(name, "`npm run dev` sobe o Vite. Edite `src/App.tsx`."),
+            "README.md": readme(name, tr("`npm run dev` sobe o Vite. Edite `src/App.tsx`.")),
             ".gitignore": "node_modules/\ndist/\n.DS_Store\n",
             "package.json": """
             {
@@ -135,7 +138,7 @@ public enum Template: String, CaseIterable, Identifiable, Sendable {
 
     static func astro(_ name: String) -> [String: String] {
         [
-            "README.md": readme(name, "`npm run dev` sobe o Astro. Páginas em `src/pages`."),
+            "README.md": readme(name, tr("`npm run dev` sobe o Astro. Páginas em `src/pages`.")),
             ".gitignore": "node_modules/\ndist/\n.astro/\n.DS_Store\n",
             "package.json": """
             {
@@ -196,7 +199,7 @@ public enum Template: String, CaseIterable, Identifiable, Sendable {
         [
             "README.md": readme(
                 name,
-                "Um arquivo SwiftUI. O Preview mostra a view na hora; para rodar de verdade, crie um pacote de app."
+                tr("Um arquivo SwiftUI. O Preview mostra a view na hora; para rodar de verdade, crie um pacote de app.")
             ),
             "ContentView.swift": contentView(name),
         ]
@@ -207,7 +210,7 @@ public enum Template: String, CaseIterable, Identifiable, Sendable {
         return [
             "README.md": readme(
                 name,
-                "Pacote de app para o Swift Playgrounds. Abra `\(ident).swiftpm` no Playgrounds para rodar."
+                tr("Pacote de app para o Swift Playgrounds. Abra `%1$@.swiftpm` no Playgrounds para rodar.", "\(ident)")
             ),
             "\(ident).swiftpm/Package.swift": """
             // swift-tools-version: 5.9

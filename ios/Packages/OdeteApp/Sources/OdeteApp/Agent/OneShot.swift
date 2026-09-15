@@ -1,12 +1,13 @@
 import Foundation
 import OdeteAgent
 import OdeteGit
+import OdeteI18n
 
 /// Chamadas de uma vez só ao modelo ativo (sem ferramentas): mensagem de commit, título de PR…
 extension AgentModel {
     struct NoAccount: LocalizedError {
         var errorDescription: String? {
-            "Conecte uma conta de IA em Ajustes → Contas de IA."
+            tr("Conecte uma conta de IA em Ajustes → Contas de IA.")
         }
     }
 
@@ -40,7 +41,10 @@ extension AgentModel {
         guard !text.isEmpty else { return "" }
         let skill = Skills.builtin.first { $0.id == "commit" }?.body ?? ""
         let msg = try await oneShot(
-            system: "Você escreve mensagens de commit. Responda só com a mensagem, sem aspas nem explicação.\n\(skill)",
+            system: tr(
+                "Você escreve mensagens de commit. Responda só com a mensagem, sem aspas nem explicação.\n%1$@",
+                "\(skill)"
+            ),
             user: "Diff staged:\n\n\(text)"
         )
         return msg.split(separator: "\n").first.map(String.init)?
@@ -56,14 +60,20 @@ extension AgentModel {
             }
         let branch = ws.git.current?.name ?? "branch"
         let raw = try await oneShot(
-            system: "Você escreve pull requests em PT-BR. Responda exatamente neste formato:\nTÍTULO: <uma linha>\nDESCRIÇÃO:\n<markdown curto: o que mudou, por quê, como testar>",
-            user: "Branch `\(branch)` para `\(base)`. Commits mais recentes primeiro:\n\(lines.joined(separator: "\n"))"
+            // Prompt e marcadores ficam fora do catálogo: o que sai daqui é lido por
+            // um parser, e `TÍTULO:` traduzido quebraria a leitura. Só o idioma da
+            // resposta segue os Ajustes.
+            system: "Você escreve pull requests em \(Texto.idioma.paraOModelo). "
+                + "Responda exatamente neste formato:\nTITLE: <uma linha>\nBODY:\n"
+                + "<markdown curto: o que mudou, por quê, como testar>",
+            user: "Branch `\(branch)` para `\(base)`. Commits mais recentes primeiro:\n"
+                + lines.joined(separator: "\n")
         )
         var title = ""
         var body = ""
-        if let r = raw.range(of: "TÍTULO:") {
+        if let r = raw.range(of: "TITLE:") {
             let rest = raw[r.upperBound...]
-            if let d = rest.range(of: "DESCRIÇÃO:") {
+            if let d = rest.range(of: "BODY:") {
                 title = rest[..<d.lowerBound].trimmingCharacters(in: .whitespacesAndNewlines)
                 body = rest[d.upperBound...].trimmingCharacters(in: .whitespacesAndNewlines)
             } else {

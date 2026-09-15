@@ -1,4 +1,5 @@
 import Foundation
+import OdeteI18n
 
 /// A parte do parser que lê expressões, da precedência ao literal. Mora aqui para o
 /// corpo do `Parser` caber numa leitura.
@@ -215,7 +216,7 @@ extension Parser {
                 advance(); break
             }
             if isEOF {
-                throw ParseError(line: l, message: "closure sem fechar")
+                throw ParseError(line: l, message: tr("closure sem fechar"))
             }
             try body.append(parseStmt())
             if at(";") {
@@ -271,7 +272,7 @@ extension Parser {
         case .punct("&"):
             advance(); return try parsePrimary()
         default:
-            throw ParseError(line: l, message: "não entendi '\(describe(cur))'")
+            throw ParseError(line: l, message: tr("não entendi '%1$@'", "\(describe(cur))"))
         }
     }
 

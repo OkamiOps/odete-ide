@@ -1,5 +1,6 @@
 import Clibgit2
 import Foundation
+import OdeteI18n
 
 /// Um trecho do blame: linhas contíguas vindas do mesmo commit.
 public struct BlameHunk: Sendable, Hashable, Identifiable {
@@ -110,14 +111,14 @@ public extension Repository {
             let uncommitted = sha.allSatisfy { $0 == "0" }
             // `git_blame_buffer` copia hunks sem assinatura; nesse caso o commit responde.
             let commit: Commit? = (sig == nil && !uncommitted) ? try? lookupCommit(sha) : nil
-            let author = sig.map { String(cString: $0.pointee.name) } ?? commit?.author.name ?? "não commitado"
+            let author = sig.map { String(cString: $0.pointee.name) } ?? commit?.author.name ?? tr("não commitado")
             let date = sig.map { Date(timeIntervalSince1970: TimeInterval($0.pointee.when.time)) } ?? commit?
                 .date ?? Date()
             let summary: String
             if let s = summaries[sha] {
                 summary = s
             } else if uncommitted {
-                summary = "alteração local"
+                summary = tr("alteração local")
                 summaries[sha] = summary
             } else {
                 summary = commit?.summary ?? (try? lookupCommit(sha).summary) ?? ""

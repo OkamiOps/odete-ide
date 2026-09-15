@@ -1,6 +1,7 @@
 import OdeteAccounts
 import OdeteCore
 import OdeteGit
+import OdeteI18n
 import OdeteUI
 import SwiftUI
 
@@ -18,23 +19,23 @@ struct ChangesCard: View {
         // quadrado, números na mesma linha e chevron no fim.
         VStack(alignment: .leading, spacing: 8) {
             SectionTitle(
-                "Alterações",
+                tr("Alterações"),
                 detail: git.isClean ? nil : "\(git.status.count)",
                 stat: git.isClean ? nil : git.lineStat
             ) {
-                Button("Mandar tudo para o stage", systemImage: "plus.circle") { git.stageAll() }
+                Button(tr("Mandar tudo para o stage"), systemImage: "plus.circle") { git.stageAll() }
                     .disabled(git.unstaged.isEmpty || git.busy)
-                Button("Tirar tudo do stage", systemImage: "minus.circle") { git.unstageAll() }
+                Button(tr("Tirar tudo do stage"), systemImage: "minus.circle") { git.unstageAll() }
                     .disabled(git.staged.isEmpty || git.busy)
                 Divider()
-                Button("Descartar tudo", systemImage: "arrow.uturn.backward", role: .destructive) {
+                Button(tr("Descartar tudo"), systemImage: "arrow.uturn.backward", role: .destructive) {
                     git.discard(git.unstaged.map(\.path))
                 }
                 .disabled(git.unstaged.isEmpty || git.busy)
             }
             if git.isClean {
                 CardList {
-                    Text("Nada mudou desde o último commit.")
+                    Text(tr("Nada mudou desde o último commit."))
                         .font(.subheadline).foregroundStyle(.secondary)
                         .padding(.horizontal, 12).padding(.vertical, 12)
                 }
@@ -126,16 +127,16 @@ struct ChangeRow: View {
             }
         }
         .contextMenu {
-            Button("Abrir no editor", systemImage: "doc.text") { ws.openFile(entry.path) }
+            Button(tr("Abrir no editor"), systemImage: "doc.text") { ws.openFile(entry.path) }
             Button(
-                staged ? "Tirar do stage" : "Mandar para o stage",
+                staged ? tr("Tirar do stage") : tr("Mandar para o stage"),
                 systemImage: staged ? "minus.circle" : "plus.circle"
             ) {
                 staged ? git.unstage([entry.path]) : git.stage([entry.path])
             }
-            Button("Histórico do arquivo", systemImage: "clock.arrow.circlepath") { ws.historyPath = entry.path }
+            Button(tr("Histórico do arquivo"), systemImage: "clock.arrow.circlepath") { ws.historyPath = entry.path }
             if !staged {
-                Button("Descartar alterações", systemImage: "arrow.uturn.backward", role: .destructive) {
+                Button(tr("Descartar alterações"), systemImage: "arrow.uturn.backward", role: .destructive) {
                     git.discard([entry.path])
                 }
             }
@@ -151,7 +152,7 @@ struct ChangeRow: View {
             Text(name).font(.subheadline).foregroundStyle(theme.fg)
                 .lineLimit(1).truncationMode(.middle).layoutPriority(1)
             if staged, !compacto {
-                Text("no stage").font(.caption2).foregroundStyle(theme.ok)
+                Text(tr("no stage")).font(.caption2).foregroundStyle(theme.ok)
             }
             if compacto {
                 Spacer(minLength: 0)
@@ -173,7 +174,7 @@ struct ChangeRow: View {
             .lineLimit(1)
             .fixedSize()
         } else if git.ehBinario(entry.path) {
-            Text("binário").font(.caption).foregroundStyle(theme.fgSubtle).lineLimit(1).fixedSize()
+            Text(tr("binário")).font(.caption).foregroundStyle(theme.fgSubtle).lineLimit(1).fixedSize()
         }
     }
 

@@ -1,4 +1,5 @@
 import Foundation
+import OdeteI18n
 
 /// `npm install` de verdade: resolve, baixa, extrai, grava lock e .bin.
 public struct Installer: Sendable {
@@ -212,13 +213,21 @@ public struct Installer: Sendable {
                    !pv.os
                    .contains("any")
                 {
-                    report.plataforma.append("\(w.name) (só \(pv.os.joined(separator: ",")))"); continue
+                    report.plataforma.append(tr(
+                        "%1$@ (só %2$@)",
+                        "\(w.name)",
+                        "\(pv.os.joined(separator: ","))"
+                    )); continue
                 }
                 if !pv.cpu.isEmpty,
                    !pv.cpu
                    .contains("arm64")
                 {
-                    report.plataforma.append("\(w.name) (só \(pv.cpu.joined(separator: ",")))"); continue
+                    report.plataforma.append(tr(
+                        "%1$@ (só %2$@)",
+                        "\(w.name)",
+                        "\(pv.cpu.joined(separator: ","))"
+                    )); continue
                 }
                 let native = pv.hasInstallScript || w.name.hasSuffix("-darwin-arm64") || w.name
                     .hasSuffix("-darwin-64") || w.name.contains("/darwin-") || w.name.hasPrefix("@esbuild/") || w.name
@@ -332,7 +341,7 @@ public struct Installer: Sendable {
                         guard let url = node.entry.resolved else { return (
                             key,
                             node,
-                            .failure(NpmError.tarball("sem URL para \(node.name)"))
+                            .failure(NpmError.tarball(tr("sem URL para %1$@", "\(node.name)")))
                         ) }
                         do { return try await (
                             key,
@@ -378,7 +387,11 @@ public struct Installer: Sendable {
         report.native = Array(Set(report.native)).sorted()
         report.nativosCobertos = Array(Set(report.nativosCobertos)).sorted()
     }
+}
 
+/// Fora do corpo da struct só para caber no limite de tamanho de tipo: são as duas
+/// etapas finais do install, e não dependem de mais nada da Installer.
+extension Installer {
     func writeBins(_ tree: [String: Node], _ report: inout Report) throws {
         let fm = FileManager.default
         for (key, node) in tree {
@@ -397,7 +410,11 @@ public struct Installer: Sendable {
                 } catch {
                     // Sem o atalho, o comando existe no disco mas não responde pelo nome,
                     // e o terminal diz só "comando não encontrado". Melhor dizer agora.
-                    report.avisos.append("não deu para criar o atalho de \(bname): \(error.localizedDescription)")
+                    report.avisos.append(tr(
+                        "não deu para criar o atalho de %1$@: %2$@",
+                        "\(bname)",
+                        "\(error.localizedDescription)"
+                    ))
                 }
             }
         }

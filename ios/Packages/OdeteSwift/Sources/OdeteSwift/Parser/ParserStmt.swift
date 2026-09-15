@@ -1,4 +1,5 @@
 import Foundation
+import OdeteI18n
 import SwiftUI
 
 /// Blocos e statements: o que fica entre chaves.
@@ -12,7 +13,7 @@ extension Parser {
                 advance(); return out
             }
             if isEOF {
-                throw ParseError(line: line, message: "bloco sem fechar")
+                throw ParseError(line: line, message: tr("bloco sem fechar"))
             }
             try out.append(parseStmt())
             if at(";") {

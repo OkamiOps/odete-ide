@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import OdeteI18n
 
 public struct TermLine: Identifiable, Sendable, Hashable {
     public enum Kind: Sendable { case input, out, err, ok, system }
@@ -37,7 +38,7 @@ public final class TerminalSession: Identifiable {
             }
         }
         if banner {
-            append(.system, "Odete · shell no iPad. Digite help.")
+            append(.system, tr("Odete · shell no iPad. Digite help."))
         }
     }
 

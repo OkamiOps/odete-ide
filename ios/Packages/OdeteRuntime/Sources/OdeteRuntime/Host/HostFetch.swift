@@ -1,5 +1,6 @@
 import Foundation
 import JavaScriptCore
+import OdeteI18n
 
 /// `fetch` e `http.request` cliente via URLSession. Resposta volta como base64.
 enum HostFetch {
@@ -9,7 +10,7 @@ enum HostFetch {
             -> Void = { [unowned rt] id, url, method, headers, bodyValue in
                 let bodyB64: String? = (bodyValue?.isString == true) ? bodyValue?.toString() : nil
                 guard let u = URL(string: url) else {
-                    rt.call("__odete_fetchFail", [id, "URL inválida: \(url)"])
+                    rt.call("__odete_fetchFail", [id, tr("URL inválida: %1$@", "\(url)")])
                     return
                 }
                 var req = URLRequest(url: u)

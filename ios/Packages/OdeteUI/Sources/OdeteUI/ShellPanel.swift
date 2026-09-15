@@ -1,3 +1,4 @@
+import OdeteI18n
 import SwiftUI
 
 /// Painel casca: usado enquanto a funcionalidade real não chega.
@@ -27,7 +28,7 @@ public struct ShellPanel: View {
                 .font(OdeteFont.ui(12))
                 .foregroundStyle(theme.fgMuted)
                 .multilineTextAlignment(.center)
-            Text("chega na Fase \(phase)")
+            Text(tr("chega na Fase %1$@", "\(phase)"))
                 .font(OdeteFont.mono(11))
                 .foregroundStyle(theme.accent)
                 .padding(.horizontal, 10)

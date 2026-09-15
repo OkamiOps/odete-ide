@@ -1,5 +1,6 @@
 import Foundation
 import OdeteCore
+import OdeteI18n
 import OdeteRuntime
 
 public struct Diagnostic: Sendable, Hashable, Codable, Identifiable {
@@ -141,7 +142,7 @@ public final class Esbuild: @unchecked Sendable {
 
     static func parseBuild(_ json: String) throws -> BuildResult {
         guard let obj = try JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any]
-        else { throw RuntimeError(message: "build: resposta inválida") }
+        else { throw RuntimeError(message: tr("build: resposta inválida")) }
         let files = ((obj["files"] as? [[String: Any]]) ?? []).map { (
             path: ($0["path"] as? String) ?? "",
             text: ($0["text"] as? String) ?? ""

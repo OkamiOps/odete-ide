@@ -1,4 +1,5 @@
 import Foundation
+import OdeteI18n
 
 /// OAuth PKCE com o client do Claude Code: abre o navegador, o usuário cola `code#state`.
 public struct ClaudeAuth: Sendable {
@@ -69,7 +70,7 @@ public struct ClaudeAuth: Sendable {
         }
         let j = jsonObject(data)
         guard let access = j["access_token"] as? String
-        else { throw AgentError.auth("Claude não devolveu access token") }
+        else { throw AgentError.auth(tr("Claude não devolveu access token")) }
         let exp = (j["expires_in"] as? Double) ?? 3600
         return TokenBundle(
             access: access,

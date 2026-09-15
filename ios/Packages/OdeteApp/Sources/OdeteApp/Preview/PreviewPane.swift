@@ -1,4 +1,5 @@
 import OdeteCore
+import OdeteI18n
 import OdetePreview
 import OdeteUI
 import SwiftUI
@@ -24,8 +25,8 @@ struct PreviewPane: View {
         @Bindable var pv = ws.preview
         return VStack(spacing: 0) {
             HStack(spacing: 6) {
-                HeaderButton("chevron.left", label: "Voltar") { pv.back() }.disabled(!pv.canGoBack)
-                HeaderButton(pv.loading ? "xmark" : "arrow.clockwise", label: "Recarregar") { pv.reload() }
+                HeaderButton("chevron.left", label: tr("Voltar")) { pv.back() }.disabled(!pv.canGoBack)
+                HeaderButton(pv.loading ? "xmark" : "arrow.clockwise", label: tr("Recarregar")) { pv.reload() }
                 TextField("odete://static/index.html", text: $urlText)
                     .font(OdeteFont.mono(11))
                     .textFieldStyle(.plain)
@@ -37,7 +38,7 @@ struct PreviewPane: View {
                     .padding(.horizontal, 12).frame(height: 32)
                     .glassEffect(.regular, in: Capsule())
                 Menu {
-                    Picker("Viewport", selection: Binding(get: { pv.viewport }, set: { pv.viewport = $0 })) {
+                    Picker(tr("Viewport"), selection: Binding(get: { pv.viewport }, set: { pv.viewport = $0 })) {
                         ForEach(Viewport.allCases) { v in
                             Label(v.medida.map { "\(v.label) · \($0)" } ?? v.label, systemImage: v.symbol).tag(v)
                         }
@@ -60,7 +61,7 @@ struct PreviewPane: View {
                             .background(theme.danger, in: Capsule()).offset(x: 2, y: 2)
                     }
                 }
-                HeaderButton("safari", label: "Abrir no Safari") { abrirNoSafari() }
+                HeaderButton("safari", label: tr("Abrir no Safari")) { abrirNoSafari() }
             }
             .padding(.horizontal, Metrics.s2)
             .frame(height: 48)
@@ -85,7 +86,7 @@ struct PreviewPane: View {
         .onChange(of: ws.run.servers.count) { _, _ in soltarServidorMorto() }
         .onChange(of: ws.preview.url) { _, new in urlText = new?.absoluteString ?? "" }
         .confirmationDialog(
-            "O servidor só continua no ar com a Odete à vista",
+            tr("O servidor só continua no ar com a Odete à vista"),
             isPresented: Binding(get: { avisoSafari != nil }, set: {
                 if !$0 {
                     avisoSafari = nil
@@ -93,24 +94,26 @@ struct PreviewPane: View {
             }),
             titleVisibility: .visible
         ) {
-            Button("Abrir assim mesmo") {
+            Button(tr("Abrir assim mesmo")) {
                 if let u = avisoSafari {
                     openURL(u)
                 }
                 avisoSafari = nil
             }
-            Button("Abrir e não avisar mais") {
+            Button(tr("Abrir e não avisar mais")) {
                 chrome.snapshot.avisoSafariVisto = true
                 if let u = avisoSafari {
                     openURL(u)
                 }
                 avisoSafari = nil
             }
-            Button("Cancelar", role: .cancel) { avisoSafari = nil }
+            Button(tr("Cancelar"), role: .cancel) { avisoSafari = nil }
         } message: {
             Text(
-                "Em tela cheia o iPad suspende a Odete e a página para de responder em poucos segundos. "
-                    + "Arraste o Safari para o lado (Split View) e o servidor continua servindo enquanto você testa."
+                tr(
+                    // swiftlint:disable:next line_length
+                    "Em tela cheia o iPad suspende a Odete e a página para de responder em poucos segundos. Arraste o Safari para o lado (Split View) e o servidor continua servindo enquanto você testa."
+                )
             )
         }
     }
@@ -229,8 +232,8 @@ struct PreviewConsole: View {
             HStack {
                 Text("CONSOLE").font(OdeteFont.label).tracking(1).foregroundStyle(theme.fgSubtle)
                 Spacer()
-                HeaderButton("trash", label: "Limpar console") { pv.clearConsole() }
-                HeaderButton("xmark", label: "Fechar console") { pv.consoleOpen = false }
+                HeaderButton("trash", label: tr("Limpar console")) { pv.clearConsole() }
+                HeaderButton("xmark", label: tr("Fechar console")) { pv.consoleOpen = false }
             }
             .padding(.horizontal, 10).frame(height: 32)
             .overlay(alignment: .top) { Rectangle().fill(theme.border).frame(height: 1) }
@@ -238,7 +241,7 @@ struct PreviewConsole: View {
                 ScrollPane {
                     LazyVStack(alignment: .leading, spacing: 2) {
                         if pv.console.isEmpty {
-                            Text("console.log do seu app aparece aqui.").font(OdeteFont.mono(11))
+                            Text(tr("console.log do seu app aparece aqui.")).font(OdeteFont.mono(11))
                                 .foregroundStyle(theme.fgSubtle)
                         }
                         ForEach(pv.console) { l in
@@ -253,7 +256,7 @@ struct PreviewConsole: View {
                                 Spacer()
                                 if let f = l.file {
                                     Button { open(f, l.line) } label: {
-                                        Text("\((f as NSString).lastPathComponent):\(l.line ?? 0)")
+                                        Text(tr("%1$@:%2$@", "\((f as NSString).lastPathComponent)", "\(l.line ?? 0)"))
                                             .font(OdeteFont.mono(10)).foregroundStyle(theme.fgSubtle)
                                     }
                                     .buttonStyle(.plain)

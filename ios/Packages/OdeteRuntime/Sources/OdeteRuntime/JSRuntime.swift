@@ -1,5 +1,6 @@
 import Foundation
 import JavaScriptCore
+import OdeteI18n
 
 /// Um contexto JavaScriptCore numa fila serial, com o objeto host `__odete` e o event loop.
 /// Tudo que toca `context` roda em `queue`.
@@ -25,7 +26,7 @@ final class JSRuntime: @unchecked Sendable {
     var transform: (@Sendable (String, String) throws -> String)? // (código, caminho) → CJS
 
     init(cwd: URL, env: [String: String], argv: [String]) {
-        queue = DispatchQueue(label: "odete.js.\(UUID().uuidString.prefix(6))", qos: .userInitiated)
+        queue = DispatchQueue(label: tr("odete.js.%1$@", "\(UUID().uuidString.prefix(6))"), qos: .userInitiated)
         context = JSContext()!
         host = JSValue(newObjectIn: context)
         self.cwd = cwd
@@ -87,7 +88,7 @@ final class JSRuntime: @unchecked Sendable {
             lastError = nil
             context.evaluateScript(src, withSourceURL: URL(string: "odete://node/\(name).js"))
             if let e = lastError {
-                lastError = nil; throw RuntimeError(message: "bootstrap \(name): \(e.message)")
+                lastError = nil; throw RuntimeError(message: tr("bootstrap %1$@: %2$@", "\(name)", "\(e.message)"))
             }
         }
     }

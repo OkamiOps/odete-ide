@@ -1,5 +1,6 @@
 import Foundation
 import OdeteGit
+import OdeteI18n
 
 /// `git` sobre o OdeteGit.
 struct GitCommand: ShellCommand {
@@ -13,13 +14,13 @@ struct GitCommand: ShellCommand {
         if sub == "init" {
             do {
                 _ = try Repository.initialize(at: ctx.root); io
-                    .out("Repositório iniciado em \(ctx.display(ctx.root))"); return 0
+                    .out(tr("Repositório iniciado em %1$@", "\(ctx.display(ctx.root))")); return 0
             } catch {
                 io.err(error.localizedDescription); return 1
             }
         }
         if sub == "clone" {
-            guard let url = rest.first else { io.err("git clone <url> [pasta]"); return 1 }
+            guard let url = rest.first else { io.err(tr("git clone <url> [pasta]")); return 1 }
             let name = rest.count > 1 ? rest[1] : (url.split(separator: "/").last.map { String($0).replacingOccurrences(
                 of: ".git",
                 with: ""
@@ -32,12 +33,12 @@ struct GitCommand: ShellCommand {
                             io.out("  \(p.received)/\(p.total)")
                         }
                     }
-                io.out("Clonado em \(ctx.display(dest))"); return 0
+                io.out(tr("Clonado em %1$@", "\(ctx.display(dest))")); return 0
             } catch { io.err(error.localizedDescription); return 1 }
         }
         guard Repository.isRepository(ctx.root),
               let repo = try? Repository.open(ctx.root)
-        else { io.err("fatal: não é um repositório git (rode git init)"); return 128 }
+        else { io.err(tr("fatal: não é um repositório git (rode git init)")); return 128 }
         let author = ctx.shell.services.author()
         do {
             switch sub {
@@ -45,14 +46,14 @@ struct GitCommand: ShellCommand {
                 let st = try await repo.status()
                 let head = await repo.headBranchName()
                 let branch = try await repo.currentBranch()?.name ?? head ?? "?"
-                io.out("Na branch \(branch)")
+                io.out(tr("Na branch %1$@", "\(branch)"))
                 if let ab = try await repo
                     .aheadBehind()
                 {
-                    io.out("  ↑\(ab.ahead) ↓\(ab.behind) em relação ao upstream")
+                    io.out(tr("  ↑%1$@ ↓%2$@ em relação ao upstream", "\(ab.ahead)", "\(ab.behind)"))
                 }
                 if st.isEmpty {
-                    io.out("nada a commitar, working tree limpa"); return 0
+                    io.out(tr("nada a commitar, working tree limpa")); return 0
                 }
                 let staged = st.filter { $0.staged != nil }, unstaged = st.filter { $0.unstaged != nil }
                 if !staged.isEmpty {
@@ -63,7 +64,7 @@ struct GitCommand: ShellCommand {
                 if !unstaged
                     .isEmpty
                 {
-                    io.out("Não staged:"); for e in unstaged {
+                    io.out(tr("Não staged:")); for e in unstaged {
                         io.out("  \(e.unstaged!.symbol)  \(e.path)")
                     }
                 }
@@ -78,7 +79,7 @@ struct GitCommand: ShellCommand {
                 // que ele tinha no índice; sem isso o comando não fazia nada.
                 if sub == "reset", rest.first == "--soft" {
                     try await repo.undoLastCommit()
-                    io.out("desfeito o último commit; o conteúdo ficou no stage")
+                    io.out(tr("desfeito o último commit; o conteúdo ficou no stage"))
                 } else if rest.first == "--staged" {
                     try await repo.unstage(Array(rest.dropFirst()))
                 } else if sub == "restore" {
@@ -102,7 +103,7 @@ struct GitCommand: ShellCommand {
                 if let i = rest.firstIndex(of: "-F"), i + 1 < rest.count {
                     let u = ctx.resolve(rest[i + 1])
                     guard let texto = try? String(contentsOf: u, encoding: .utf8) else {
-                        io.err("git: não achei o arquivo \(rest[i + 1])")
+                        io.err(tr("git: não achei o arquivo %1$@", "\(rest[i + 1])"))
                         return 1
                     }
                     partes.append(texto.trimmingCharacters(in: .whitespacesAndNewlines))
@@ -113,12 +114,22 @@ struct GitCommand: ShellCommand {
                 let msg = partes.joined(separator: "\n\n")
                 if rest.contains("--amend") {
                     let c = try await repo.amendLastCommit(message: msg.isEmpty ? nil : msg, author: author)
-                    try await io.out("[\(repo.currentBranch()?.name ?? "main") \(c.short)] \(c.summary)")
+                    try await io.out(tr(
+                        "[%1$@ %2$@] %3$@",
+                        "\(repo.currentBranch()?.name ?? "main")",
+                        "\(c.short)",
+                        "\(c.summary)"
+                    ))
                     return 0
                 }
-                guard !msg.isEmpty else { io.err("use git commit -m \"mensagem\""); return 1 }
+                guard !msg.isEmpty else { io.err(tr("use git commit -m \"mensagem\"")); return 1 }
                 let c = try await repo.commit(message: msg, author: author)
-                try await io.out("[\(repo.currentBranch()?.name ?? "main") \(c.short)] \(c.summary)")
+                try await io.out(tr(
+                    "[%1$@ %2$@] %3$@",
+                    "\(repo.currentBranch()?.name ?? "main")",
+                    "\(c.short)",
+                    "\(c.summary)"
+                ))
             case "log":
                 let n = rest.firstIndex(of: "-n")
                     .flatMap { $0 + 1 < rest.count ? Int(rest[$0 + 1]) : nil } ??
@@ -151,12 +162,12 @@ struct GitCommand: ShellCommand {
                 if rest.contains("-d") || rest.contains("-D"),
                    let n = rest.last
                 {
-                    try await repo.deleteBranch(n); io.out("branch \(n) apagada")
+                    try await repo.deleteBranch(n); io.out(tr("branch %1$@ apagada", "\(n)"))
                 } else if let n = rest.first,
                           !n
                           .hasPrefix("-")
                 {
-                    try await repo.createBranch(n, checkout: false); io.out("branch \(n) criada")
+                    try await repo.createBranch(n, checkout: false); io.out(tr("branch %1$@ criada", "\(n)"))
                 } else {
                     for b in try await repo
                         .branches(includeRemote: rest.contains("-a"))
@@ -169,31 +180,34 @@ struct GitCommand: ShellCommand {
                     try await repo.createBranch(
                         rest[1],
                         checkout: true
-                    ); io.out("Nova branch \(rest[1])")
+                    ); io.out(tr("Nova branch %1$@", "\(rest[1])"))
                 } else if let n = rest.first {
-                    try await repo.checkout(n); io.out("Agora em \(n)")
+                    try await repo.checkout(n); io.out(tr("Agora em %1$@", "\(n)"))
                 }
             case "merge":
-                guard let n = rest.first else { io.err("git merge <branch>"); return 1 }
+                guard let n = rest.first else { io.err(tr("git merge <branch>")); return 1 }
                 switch try await repo.merge(n, author: author) {
-                case .upToDate: io.out("Já atualizado.")
-                case let .fastForward(s): io.out("Fast-forward para \(s.prefix(7))")
-                case let .merged(s): io.out("Merge feito: \(s.prefix(7))")
+                case .upToDate: io.out(tr("Já atualizado."))
+                case let .fastForward(s): io.out(tr("Fast-forward para %1$@", "\(s.prefix(7))"))
+                case let .merged(s): io.out(tr("Merge feito: %1$@", "\(s.prefix(7))"))
                 case let .conflicts(p): io
-                    .err("CONFLITO em: \(p.joined(separator: ", ")). Resolva no editor e faça o commit."); return 1
+                    .err(tr(
+                        "CONFLITO em: %1$@. Resolva no editor e faça o commit.",
+                        "\(p.joined(separator: ", "))"
+                    )); return 1
                 }
             case "stash":
                 switch rest.first {
                 case nil, "push", "save": try await repo.stashPush(
                         message: rest.dropFirst().joined(separator: " "),
                         author: author
-                    ); io.out("stash guardado")
-                case "pop": try await repo.stashPop(0); io.out("stash aplicado")
-                case "drop": try await repo.stashDrop(0); io.out("stash apagado")
+                    ); io.out(tr("stash guardado"))
+                case "pop": try await repo.stashPop(0); io.out(tr("stash aplicado"))
+                case "drop": try await repo.stashDrop(0); io.out(tr("stash apagado"))
                 case "list": for s in try await repo.stashes() {
-                        io.out("stash@{\(s.index)}: \(s.message)")
+                        io.out(tr("stash@{%1$@}: %2$@", "\(s.index)", "\(s.message)"))
                     }
-                default: io.err("git stash [push|pop|drop|list]"); return 1
+                default: io.err(tr("git stash [push|pop|drop|list]")); return 1
                 }
             case "remote":
                 if rest.first == "add", rest.count >= 3 {
@@ -223,10 +237,10 @@ struct GitCommand: ShellCommand {
                     credentials: ctx.shell.services.credentials(url),
                     author: author
                 ) {
-                case .upToDate: io.out("Já atualizado.")
+                case .upToDate: io.out(tr("Já atualizado."))
                 case .fastForward: io.out("Fast-forward.")
-                case .merged: io.out("Merge feito.")
-                case let .conflicts(p): io.err("CONFLITO em: \(p.joined(separator: ", "))"); return 1
+                case .merged: io.out(tr("Merge feito."))
+                case let .conflicts(p): io.err(tr("CONFLITO em: %1$@", "\(p.joined(separator: ", "))")); return 1
                 }
             case "push":
                 // `git push -u origin minha-branch`: contando pela posição crua, o `-u`
@@ -243,7 +257,7 @@ struct GitCommand: ShellCommand {
                     .out(rest
                         .contains("--abbrev-ref") ? (repo.currentBranch()?.name ?? "HEAD") : (repo.headSha() ?? ""))
             default:
-                io.err("git: subcomando não suportado: \(sub)")
+                io.err(tr("git: subcomando não suportado: %1$@", "\(sub)"))
                 io.err("tenho: " + Self.suportados.joined(separator: ", "))
                 return 1
             }
@@ -275,12 +289,12 @@ struct GitCommand: ShellCommand {
 
     func imprimir(_ d: Diff, _ io: CommandIO) {
         if d.files.isEmpty {
-            io.out("sem diferenças")
+            io.out(tr("sem diferenças"))
         }
         for f in d.files {
-            io.out("--- a/\(f.oldPath ?? f.path)\n+++ b/\(f.path)")
+            io.out(tr("--- a/%1$@\n+++ b/%2$@", "\(f.oldPath ?? f.path)", "\(f.path)"))
             if f.isBinary {
-                io.out("arquivo binário")
+                io.out(tr("arquivo binário"))
                 continue
             }
             for h in f.hunks {

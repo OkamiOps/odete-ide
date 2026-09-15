@@ -1,4 +1,5 @@
 import OdeteCore
+import OdeteI18n
 import SwiftUI
 
 /// Barra de atividades vertical.
@@ -58,8 +59,8 @@ public struct Rail: View {
             }
             .buttonStyle(.plain)
             .hoverEffect(.highlight)
-            .accessibilityLabel("Projetos")
-            .help("Projetos")
+            .accessibilityLabel(tr("Projetos"))
+            .help(tr("Projetos"))
             fio
             ForEach(SidePanel.allCases, id: \.self) { p in
                 RailButton(
@@ -73,10 +74,10 @@ public struct Rail: View {
             }
             Spacer(minLength: 0)
             fio
-            RailButton(symbol: "gearshape", label: "Ajustes", on: false, ns: nil, action: onSettings)
+            RailButton(symbol: "gearshape", label: tr("Ajustes"), on: false, ns: nil, action: onSettings)
             RailButton(
                 symbol: "sparkles",
-                label: "Agente",
+                label: tr("Agente"),
                 on: agentVisible,
                 busy: agentBusy,
                 destaque: true,

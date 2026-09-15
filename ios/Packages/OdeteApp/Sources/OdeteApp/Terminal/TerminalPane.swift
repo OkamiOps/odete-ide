@@ -1,4 +1,5 @@
 import OdeteCore
+import OdeteI18n
 import OdeteShell
 import OdeteUI
 import SwiftUI
@@ -46,7 +47,7 @@ struct TerminalPane: View {
                                 onClose: { run.close(s) }
                             )
                         }
-                        HeaderButton("plus", label: "Nova aba") { run.newSession() }
+                        HeaderButton("plus", label: tr("Nova aba")) { run.newSession() }
                     }
                     .padding(.leading, 6)
                 }
@@ -56,7 +57,8 @@ struct TerminalPane: View {
                         ForEach(run.jobs) { j in
                             Button(role: .destructive) { j.kill(); run.pruneServers() } label: {
                                 Label(
-                                    "Parar [\(j.id)] \(j.command)" + (j.ports.isEmpty ? "" : " · :\(j.ports[0])"),
+                                    tr("Parar [%1$@] %2$@", "\(j.id)", "\(j.command)") +
+                                        (j.ports.isEmpty ? "" : " · :\(j.ports[0])"),
                                     systemImage: "stop.circle"
                                 )
                             }
@@ -64,7 +66,8 @@ struct TerminalPane: View {
                     } label: {
                         HStack(spacing: 4) {
                             Circle().fill(theme.ok).frame(width: 7, height: 7)
-                            Text("\(run.jobs.count) job\(run.jobs.count == 1 ? "" : "s")").font(OdeteFont.mono(11))
+                            Text(tr("%1$@ job%2$@", "\(run.jobs.count)", "\(run.jobs.count == 1 ? "" : "s")"))
+                                .font(OdeteFont.mono(11))
                         }
                         .foregroundStyle(theme.fgMuted)
                         .padding(.horizontal, 8).frame(height: 26)
@@ -73,12 +76,12 @@ struct TerminalPane: View {
                     .buttonStyle(.plain)
                 }
                 if let s = run.active, s.lines.contains(where: { $0.kind == .input }) {
-                    HeaderButton("sparkles", label: "Enviar último comando para a Odete") {
+                    HeaderButton("sparkles", label: tr("Enviar último comando para a Odete")) {
                         enviarUltimoBloco(s)
                     }
                 }
                 if let s = run.active, s.running != nil {
-                    HeaderButton("stop.fill", label: "Interromper (Ctrl+C)") { s.cancel() }
+                    HeaderButton("stop.fill", label: tr("Interromper (Ctrl+C)")) { s.cancel() }
                 }
                 if !ws.scripts.isEmpty {
                     Menu {
@@ -97,12 +100,12 @@ struct TerminalPane: View {
                             .contentShape(Rectangle())
                     }
                     .menuIndicator(.hidden)
-                    .accessibilityLabel("Scripts do projeto")
-                    .help("Scripts do package.json")
+                    .accessibilityLabel(tr("Scripts do projeto"))
+                    .help(tr("Scripts do package.json"))
                 }
-                HeaderButton("trash", label: "Limpar") { run.active?.clear() }
+                HeaderButton("trash", label: tr("Limpar")) { run.active?.clear() }
                 if sizeClass != .compact {
-                    HeaderButton("xmark", label: "Fechar terminal") { chrome.toggleTerm() }
+                    HeaderButton("xmark", label: tr("Fechar terminal")) { chrome.toggleTerm() }
                 }
             }
             .padding(.horizontal, 6)
@@ -133,7 +136,7 @@ struct TermTab: View {
             Text(session.title).font(OdeteFont.mono(11)).lineLimit(1)
             Button(action: onClose) { Image(systemName: "xmark").font(.system(size: 9, weight: .bold)) }
                 .buttonStyle(.plain).foregroundStyle(theme.fgSubtle)
-                .accessibilityLabel("Fechar aba")
+                .accessibilityLabel(tr("Fechar aba"))
         }
         .foregroundStyle(active ? theme.fg : theme.fgMuted)
         .padding(.horizontal, 10)
@@ -171,10 +174,10 @@ struct TerminalView: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .id(line.id)
                                 .contextMenu {
-                                    Button("Enviar para a Odete", systemImage: "sparkles") {
+                                    Button(tr("Enviar para a Odete"), systemImage: "sparkles") {
                                         enviar(linha: line)
                                     }
-                                    Button("Copiar linha", systemImage: "doc.on.doc") {
+                                    Button(tr("Copiar linha"), systemImage: "doc.on.doc") {
                                         UIPasteboard.general.string = line.text
                                     }
                                 }
@@ -188,7 +191,7 @@ struct TerminalView: View {
             }
             HStack(spacing: 8) {
                 Text(session.prompt).font(OdeteFont.mono(12)).foregroundStyle(theme.accent).lineLimit(1).fixedSize()
-                TextField("comando", text: $session.input)
+                TextField(tr("comando"), text: $session.input)
                     .font(OdeteFont.mono(12))
                     .foregroundStyle(theme.fg)
                     .textFieldStyle(.plain)

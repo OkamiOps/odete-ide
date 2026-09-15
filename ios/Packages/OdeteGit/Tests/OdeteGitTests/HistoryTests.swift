@@ -1,5 +1,6 @@
 import Foundation
 @testable import OdeteGit
+import OdeteI18n
 import Testing
 
 struct HistoryTests {
@@ -25,6 +26,6 @@ struct HistoryTests {
         #expect(blame.map { "\($0.startLine):\($0.lines)" } == ["1:2", "3:1", "4:1"])
         #expect(blame[0].summary == "primeiro" && blame[1].summary == "a de novo")
         #expect(blame[1].author == "Teste")
-        #expect(blame[2].isUncommitted && blame[2].author == "não commitado")
+        #expect(blame[2].isUncommitted && blame[2].author == tr("não commitado"))
     }
 }

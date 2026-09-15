@@ -1,4 +1,5 @@
 import OdeteCore
+import OdeteI18n
 import SwiftUI
 
 /// Ações do workspace expostas à barra de menus do iPadOS via `FocusedValue`.
@@ -28,57 +29,57 @@ public struct OdeteCommands: Commands {
 
     public var body: some Commands {
         CommandGroup(replacing: .newItem) {
-            Button("Novo arquivo") { a?.ws.createFile(near: a?.ws.selected) }
+            Button(tr("Novo arquivo")) { a?.ws.createFile(near: a?.ws.selected) }
                 .keyboardShortcut("n", modifiers: .command)
                 .disabled(a == nil)
-            Button("Salvar") { a?.ws.save() }
+            Button(tr("Salvar")) { a?.ws.save() }
                 .keyboardShortcut("s", modifiers: .command)
                 .disabled(a == nil)
-            Button("Salvar todos") { a?.ws.saveAll() }
+            Button(tr("Salvar todos")) { a?.ws.saveAll() }
                 .keyboardShortcut("s", modifiers: [.command, .option])
                 .disabled(a == nil)
             Divider()
-            Button("Fechar aba") {
+            Button(tr("Fechar aba")) {
                 if let p = a?.ws.active {
                     a?.ws.closeTab(p)
                 }
             }
             .keyboardShortcut("w", modifiers: .command)
             .disabled(a?.ws.active == nil)
-            Button("Voltar aos projetos") { a?.app.closeWorkspace() }
+            Button(tr("Voltar aos projetos")) { a?.app.closeWorkspace() }
                 .keyboardShortcut("h", modifiers: [.command, .shift])
                 .disabled(a == nil)
         }
         CommandMenu("Ver") {
-            Button("Sidebar") { a?.chrome.toggleSide() }.keyboardShortcut("b", modifiers: .command)
-            Button("Agente") { a?.chrome.toggleAgent() }.keyboardShortcut("i", modifiers: .command)
-            Button("Falar com o agente") {
+            Button(tr("Sidebar")) { a?.chrome.toggleSide() }.keyboardShortcut("b", modifiers: .command)
+            Button(tr("Agente")) { a?.chrome.toggleAgent() }.keyboardShortcut("i", modifiers: .command)
+            Button(tr("Falar com o agente")) {
                 if a?.chrome.snapshot.agentVisible == false {
                     a?.chrome.toggleAgent()
                 }
                 a?.ws.agent.focusRequest += 1
             }
             .keyboardShortcut("a", modifiers: [.command, .shift])
-            Button("Terminal") { a?.chrome.toggleTerm() }.keyboardShortcut("j", modifiers: .command)
+            Button(tr("Terminal")) { a?.chrome.toggleTerm() }.keyboardShortcut("j", modifiers: .command)
             Divider()
             ForEach(CenterMode.allCases, id: \.self) { m in
                 Button("Modo: \(m.label)") { a?.chrome.snapshot.center = m }
             }
             Divider()
-            Button("Restaurar layout") { a?.chrome.resetLayout() }
+            Button(tr("Restaurar layout")) { a?.chrome.resetLayout() }
         }
         CommandMenu("Ir") {
-            Button("Paleta de comandos") { a?.ws.paletteQuery = ">"; a?.ws.paletteOpen = true }
+            Button(tr("Paleta de comandos")) { a?.ws.paletteQuery = ">"; a?.ws.paletteOpen = true }
                 .keyboardShortcut("p", modifiers: [.command, .shift])
-            Button("Ir para arquivo") { a?.ws.paletteQuery = ""; a?.ws.paletteOpen = true }
+            Button(tr("Ir para arquivo")) { a?.ws.paletteQuery = ""; a?.ws.paletteOpen = true }
                 .keyboardShortcut("p", modifiers: .command)
-            Button("Ir para definição") { a?.ws.irParaDefinicao() }
+            Button(tr("Ir para definição")) { a?.ws.irParaDefinicao() }
                 .keyboardShortcut("j", modifiers: [.command, .control])
-            Button("Símbolo no projeto") { a?.ws.paletteQuery = "#"; a?.ws.paletteOpen = true }
+            Button(tr("Símbolo no projeto")) { a?.ws.paletteQuery = "#"; a?.ws.paletteOpen = true }
                 .keyboardShortcut("o", modifiers: [.command, .shift])
-            Button("Localizar no arquivo") { a?.ws.busca.abrir() }
+            Button(tr("Localizar no arquivo")) { a?.ws.busca.abrir() }
                 .keyboardShortcut("f", modifiers: .command)
-            Button("Buscar no projeto") { a?.chrome.snapshot.side = .search; a?.chrome.snapshot.sideOpen = true }
+            Button(tr("Buscar no projeto")) { a?.chrome.snapshot.side = .search; a?.chrome.snapshot.sideOpen = true }
                 .keyboardShortcut("f", modifiers: [.command, .shift])
             Divider()
             ForEach(SidePanel.allCases, id: \.self) { p in
@@ -86,7 +87,7 @@ public struct OdeteCommands: Commands {
             }
         }
         CommandGroup(replacing: .appSettings) {
-            Button("Ajustes…") { a?.chrome.settingsOpen = true }
+            Button(tr("Ajustes…")) { a?.chrome.settingsOpen = true }
                 .keyboardShortcut(",", modifiers: .command)
         }
     }

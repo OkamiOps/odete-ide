@@ -1,5 +1,6 @@
 import OdeteAgent
 import OdeteCore
+import OdeteI18n
 import OdeteUI
 import SwiftUI
 
@@ -38,7 +39,7 @@ struct PatchCard: View {
                                 .foregroundStyle(theme.fgSubtle)
                             Spacer()
                             if patch.hunks.count > 1 {
-                                Button("Aceitar hunk") { agent.acceptHunk(patch, h.id) }.font(.caption)
+                                Button(tr("Aceitar hunk")) { agent.acceptHunk(patch, h.id) }.font(.caption)
                                     .buttonStyle(.plain).foregroundStyle(theme.accent)
                             }
                         }
@@ -56,17 +57,17 @@ struct PatchCard: View {
         switch patch.status {
         case .pending:
             Button { agent.reject(patch) } label: { Image(systemName: "xmark").font(.system(size: 11, weight: .bold)) }
-                .buttonStyle(.glass).accessibilityLabel("Rejeitar")
+                .buttonStyle(.glass).accessibilityLabel(tr("Rejeitar"))
             Button { agent.accept(patch) } label: {
                 Image(systemName: "checkmark").font(.system(size: 11, weight: .bold))
             }.buttonStyle(.glassProminent)
-                .accessibilityLabel("Aceitar")
+                .accessibilityLabel(tr("Aceitar"))
         case .accepted:
-            Text("aceito").font(.caption).foregroundStyle(theme.ok)
-            Button("desfazer") { agent.undoPatch(patch) }.font(.caption).buttonStyle(.plain)
+            Text(tr("aceito")).font(.caption).foregroundStyle(theme.ok)
+            Button(tr("desfazer")) { agent.undoPatch(patch) }.font(.caption).buttonStyle(.plain)
                 .foregroundStyle(theme.fgSubtle)
-        case .rejected: Text("rejeitado").font(.caption).foregroundStyle(.secondary)
-        case .undone: Text("desfeito").font(.caption).foregroundStyle(.secondary)
+        case .rejected: Text(tr("rejeitado")).font(.caption).foregroundStyle(.secondary)
+        case .undone: Text(tr("desfeito")).font(.caption).foregroundStyle(.secondary)
         }
     }
 

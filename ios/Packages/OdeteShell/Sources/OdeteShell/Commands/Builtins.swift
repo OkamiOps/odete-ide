@@ -1,5 +1,6 @@
 import Foundation
 import OdeteCore
+import OdeteI18n
 
 struct Simple: ShellCommand {
     let name: String
@@ -48,7 +49,7 @@ enum Builtins {
         var out: [(String, String)] = []
         for a in args {
             guard let s = try? String(contentsOf: ctx.resolve(a), encoding: .utf8)
-            else { ctx.io.err("\(a): não existe"); return nil }
+            else { ctx.io.err(tr("%1$@: não existe", "\(a)")); return nil }
             out.append((a, s))
         }
         return out
@@ -60,13 +61,13 @@ enum Builtins {
 
     static let arquivos: [ShellCommand] = [
         Simple(name: "help", help: "lista os comandos") { _, ctx in
-            ctx.io.out("Comandos da Odete:")
+            ctx.io.out(tr("Comandos da Odete:"))
             for c in ctx.shell.commands
                 .sorted(by: { $0.name < $1.name })
             {
-                ctx.io.out("  \(c.name.padding(toLength: 8, withPad: " ", startingAt: 0)) \(c.help)")
+                ctx.io.out("  \(c.name.padding(toLength: 8, withPad: " ", startingAt: 0)) \(tr(c.help))")
             }
-            ctx.io.out("Também: | > >> < && || ; & e $VAR. Ctrl+C para o job atual.")
+            ctx.io.out(tr("Também: | > >> < && || ; & e $VAR. Ctrl+C para o job atual."))
             return 0
         },
         Simple(name: "pwd", help: "pasta atual") { _, ctx in ctx.io.out(ctx.display(ctx.cwd)); return 0 },
@@ -75,7 +76,7 @@ enum Builtins {
             if ctx.shell.setCwd(target) {
                 return 0
             }
-            ctx.io.err("cd: \(args.first ?? ""): não é uma pasta do projeto"); return 1
+            ctx.io.err(tr("cd: %1$@: não é uma pasta do projeto", "\(args.first ?? "")")); return 1
         },
         Simple(name: "ls", help: "lista arquivos") { args, ctx in
             let (f, rest) = flags(args)
@@ -84,7 +85,7 @@ enum Builtins {
                 let u = ctx.resolve(t)
                 var isDir: ObjCBool = false
                 guard FileManager.default.fileExists(atPath: u.path, isDirectory: &isDir)
-                else { ctx.io.err("ls: \(t): não existe"); return 1 }
+                else { ctx.io.err(tr("ls: %1$@: não existe", "\(t)")); return 1 }
                 if !isDir.boolValue {
                     ctx.io.out(t); continue
                 }
@@ -191,7 +192,7 @@ enum Builtins {
                 { try FileManager.default.createDirectory(
                     at: ctx.resolve(r),
                     withIntermediateDirectories: f.contains("p")
-                ) } catch { ctx.io.err("mkdir: \(r): \(error.localizedDescription)"); return 1 }
+                ) } catch { ctx.io.err(tr("mkdir: %1$@: %2$@", "\(r)", "\(error.localizedDescription)")); return 1 }
             }
             return 0
         },
@@ -218,26 +219,26 @@ enum Builtins {
                 guard FileManager.default.fileExists(atPath: u.path, isDirectory: &isDir)
                 else {
                     if !f.contains("f") {
-                        ctx.io.err("rm: \(r): não existe"); return 1
+                        ctx.io.err(tr("rm: %1$@: não existe", "\(r)")); return 1
                     }; continue
                 }
                 if isDir.boolValue, !f.contains("r") {
-                    ctx.io.err("rm: \(r): é uma pasta (use -r)"); return 1
+                    ctx.io.err(tr("rm: %1$@: é uma pasta (use -r)", "\(r)")); return 1
                 }
                 if u.standardizedFileURL.path == ctx.root.standardizedFileURL
                     .path
                 {
-                    ctx.io.err("rm: não vou apagar a raiz do projeto"); return 1
+                    ctx.io.err(tr("rm: não vou apagar a raiz do projeto")); return 1
                 }
                 do { try FileManager.default.removeItem(at: u) } catch {
-                    ctx.io.err("rm: \(r): \(error.localizedDescription)"); return 1
+                    ctx.io.err(tr("rm: %1$@: %2$@", "\(r)", "\(error.localizedDescription)")); return 1
                 }
             }
             return 0
         },
         Simple(name: "cp", help: "copia (-r)") { args, ctx in
             let (_, rest) = flags(args)
-            guard rest.count >= 2 else { ctx.io.err("cp: origem destino"); return 1 }
+            guard rest.count >= 2 else { ctx.io.err(tr("cp: origem destino")); return 1 }
             var dest = ctx.resolve(rest.last!)
             var isDir: ObjCBool = false
             let destIsDir = FileManager.default.fileExists(atPath: dest.path, isDirectory: &isDir) && isDir.boolValue
@@ -254,13 +255,13 @@ enum Builtins {
                             at: s,
                             to: d
                         )
-                } catch { ctx.io.err("cp: \(src): \(error.localizedDescription)"); return 1 }
+                } catch { ctx.io.err(tr("cp: %1$@: %2$@", "\(src)", "\(error.localizedDescription)")); return 1 }
             }
             dest = dest.standardizedFileURL
             return 0
         },
         Simple(name: "mv", help: "move ou renomeia") { args, ctx in
-            guard args.count >= 2 else { ctx.io.err("mv: origem destino"); return 1 }
+            guard args.count >= 2 else { ctx.io.err(tr("mv: origem destino")); return 1 }
             let dest = ctx.resolve(args.last!)
             var isDir: ObjCBool = false
             let destIsDir = FileManager.default.fileExists(atPath: dest.path, isDirectory: &isDir) && isDir.boolValue
@@ -277,13 +278,13 @@ enum Builtins {
                             at: s,
                             to: d
                         )
-                } catch { ctx.io.err("mv: \(src): \(error.localizedDescription)"); return 1 }
+                } catch { ctx.io.err(tr("mv: %1$@: %2$@", "\(src)", "\(error.localizedDescription)")); return 1 }
             }
             return 0
         },
         Simple(name: "grep", help: "busca texto (-i, -n, -r)") { args, ctx in
             let (f, rest) = flags(args)
-            guard let pattern = rest.first else { ctx.io.err("grep: padrão"); return 2 }
+            guard let pattern = rest.first else { ctx.io.err(tr("grep: padrão")); return 2 }
             let opts: String.CompareOptions = f.contains("i") ? [.caseInsensitive] : []
             var found = false
             func scan(_ label: String, _ text: String) {
@@ -305,7 +306,8 @@ enum Builtins {
                 let u = ctx.resolve(file)
                 var isDir: ObjCBool = false
                 if FileManager.default.fileExists(atPath: u.path, isDirectory: &isDir), isDir.boolValue {
-                    guard f.contains("r") else { ctx.io.err("grep: \(file): é uma pasta (use -r)"); continue }
+                    guard f.contains("r")
+                    else { ctx.io.err(tr("grep: %1$@: é uma pasta (use -r)", "\(file)")); continue }
                     for item in walk(u, skipNoise: true) {
                         if let s = try? String(contentsOf: item, encoding: .utf8) {
                             scan(ctx.display(item), s)
@@ -314,7 +316,7 @@ enum Builtins {
                 } else if let s = try? String(contentsOf: u, encoding: .utf8) {
                     scan(files.count > 1 ? file : "", s)
                 } else {
-                    ctx.io.err("grep: \(file): não existe")
+                    ctx.io.err(tr("grep: %1$@: não existe", "\(file)"))
                 }
             }
             return found ? 0 : 1
@@ -352,7 +354,7 @@ enum Builtins {
             }
             let base = ctx.resolve(start)
             guard FileManager.default.fileExists(atPath: base.path)
-            else { ctx.io.err("find: \(start): não existe"); return 1 }
+            else { ctx.io.err(tr("find: %1$@: não existe", "\(start)")); return 1 }
             let re = name
                 .map {
                     NSRegularExpression.escapedPattern(for: $0).replacingOccurrences(of: "\\*", with: ".*")

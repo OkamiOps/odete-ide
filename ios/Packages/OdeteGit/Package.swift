@@ -27,6 +27,9 @@ let package = Package(
                 .linkedLibrary("iconv"),
             ]
         ),
-        .testTarget(name: "OdeteGitTests", dependencies: ["OdeteGit"]),
+        .testTarget(
+            name: "OdeteGitTests",
+            dependencies: ["OdeteGit", .product(name: "OdeteI18n", package: "OdeteI18n")]
+        ),
     ]
 )

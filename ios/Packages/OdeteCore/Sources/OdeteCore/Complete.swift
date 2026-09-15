@@ -1,4 +1,5 @@
 import Foundation
+import OdeteI18n
 
 /// Uma sugestão do autocompletar.
 public struct Completion: Sendable, Hashable, Identifiable {

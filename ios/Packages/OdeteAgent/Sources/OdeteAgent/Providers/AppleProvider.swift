@@ -1,5 +1,6 @@
 import Foundation
 import FoundationModels
+import OdeteI18n
 
 /// O modelo de linguagem do sistema, no próprio aparelho.
 ///
@@ -45,7 +46,7 @@ public struct AppleProvider: Provider {
             case .modelNotReady:
                 "O modelo ainda está sendo baixado. Tente de novo daqui a pouco."
             @unknown default:
-                "O modelo do sistema não está disponível agora."
+                tr("O modelo do sistema não está disponível agora.")
             }
         }
     }
@@ -114,7 +115,7 @@ public struct AppleProvider: Provider {
             .map(String.init) ?? ""
         return """
         Você é a Odete, assistente de programação dentro de um editor no iPad.
-        Responda em português do Brasil, com objetividade, em no máximo dois parágrafos
+        Responda em \(Texto.idioma.paraOModelo), com objetividade, em no máximo dois parágrafos
         curtos ou uma lista curta. Use markdown. Quando não souber, diga que não sabe.
         Você não edita arquivos nem roda comandos: para isso a pessoa precisa de uma
         conta de IA com ferramentas. \(projeto)
@@ -128,7 +129,7 @@ public struct AppleProvider: Provider {
             switch m.role {
             case .user: partes.append("Pessoa: " + m.content)
             case .assistant where !m.content.isEmpty: partes.append("Odete: " + m.content)
-            case .tool: partes.append("Resultado de ferramenta: " + m.content.prefix(400))
+            case .tool: partes.append(tr("Resultado de ferramenta: ") + m.content.prefix(400))
             default: break
             }
         }

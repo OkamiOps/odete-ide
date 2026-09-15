@@ -1,4 +1,5 @@
 import OdeteCore
+import OdeteI18n
 import UIKit
 
 /// Minimapa do arquivo, colado na borda direita do editor.
@@ -102,7 +103,7 @@ final class MinimapView: UIView {
 
     @available(*, unavailable)
     required init?(coder _: NSCoder) {
-        fatalError("sem storyboard")
+        fatalError(tr("sem storyboard"))
     }
 
     override func draw(_ rect: CGRect) {

@@ -229,6 +229,7 @@ enum HttpParser {
 }
 
 import CryptoKit
+import OdeteI18n
 
 enum SHA1Digest {
     static func digest(_ s: String) -> [UInt8] {
@@ -259,7 +260,7 @@ enum HostHttp {
     ) {
         let (id, porta, restantes) = (t.id, t.porta, t.restantes)
         guard let server = try? HttpServer(id: id, port: porta, rt: rt) else {
-            avisar("não consegui abrir a porta \(porta)")
+            avisar(tr("não consegui abrir a porta %1$@", "\(porta)"))
             return
         }
         server.listener.stateUpdateHandler = { [weak server] state in
@@ -283,7 +284,7 @@ enum HostHttp {
                         avisar: avisar
                     )
                 } else if ocupada {
-                    avisar("porta \(porta) ocupada, e as \(21 - restantes) seguintes também")
+                    avisar(tr("porta %1$@ ocupada, e as %2$@ seguintes também", "\(porta)", "\(21 - restantes)"))
                 } else {
                     avisar(erro.localizedDescription)
                 }

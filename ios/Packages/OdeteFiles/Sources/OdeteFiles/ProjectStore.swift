@@ -1,5 +1,6 @@
 import Foundation
 import OdeteCore
+import OdeteI18n
 
 /// Projetos em `<root>/<name>`, com um `.odete/project.json` guardando id e datas.
 public struct ProjectStore: Sendable {
@@ -95,10 +96,10 @@ public struct ProjectStore: Sendable {
 
     @discardableResult
     public func duplicate(_ project: Project) throws -> Project {
-        var candidate = "\(project.name) cópia"
+        var candidate = tr("%1$@ cópia", "\(project.name)")
         var n = 2
         while FileManager.default.fileExists(atPath: root.appending(path: candidate).path) {
-            candidate = "\(project.name) cópia \(n)"
+            candidate = tr("%1$@ cópia %2$@", "\(project.name)", "\(n)")
             n += 1
         }
         let to = root.appending(path: candidate, directoryHint: .isDirectory)

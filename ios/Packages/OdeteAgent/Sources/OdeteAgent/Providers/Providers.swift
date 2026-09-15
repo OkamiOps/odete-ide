@@ -1,4 +1,5 @@
 import Foundation
+import OdeteI18n
 
 /// Provedor concreto: conta + sessão + formato.
 public struct HTTPProvider: Provider {
@@ -136,7 +137,7 @@ public struct HTTPProvider: Provider {
         if kind == .grok {
             return ModelList.grokCatalog
         }
-        throw AgentError.http(lastStatus, "não devolveu modelos")
+        throw AgentError.http(lastStatus, tr("não devolveu modelos"))
     }
 }
 

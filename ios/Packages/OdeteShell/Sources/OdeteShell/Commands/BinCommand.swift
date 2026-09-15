@@ -1,12 +1,13 @@
 import Foundation
 import OdeteBundler
+import OdeteI18n
 import OdeteNpm
 import OdeteRuntime
 
 /// Binários de `node_modules/.bin` e os que a Odete substitui (vite, next, astro, nest).
 struct BinCommand: ShellCommand {
     let name = "npx"
-    let help = "roda um binário de node_modules/.bin (vite, tsc, …)"
+    let help = tr("roda um binário de node_modules/.bin (vite, tsc, …)")
 
     /// Ferramentas que a Odete substitui por conta própria. Valem mesmo sem
     /// `node_modules`, e precisam responder pelo nome puro: `npm run dev` com
@@ -26,7 +27,7 @@ struct BinCommand: ShellCommand {
 
     func run(_ args: [String], _ ctx: CommandContext) async -> Int32 {
         let io = ctx.io
-        guard let bin = args.first else { io.err("npx <binário>"); return 1 }
+        guard let bin = args.first else { io.err(tr("npx <binário>")); return 1 }
         let rest = Array(args.dropFirst())
         switch bin {
         case "vite":
@@ -39,12 +40,12 @@ struct BinCommand: ShellCommand {
             return await devServer(ctx, preset: .vite, port: portArg(rest) ?? 5173, label: "vite")
         case "astro":
             if rest.first == "build" {
-                io.err("astro build ainda não roda no iPad; use astro dev"); return 1
+                io.err(tr("astro build ainda não roda no iPad; use astro dev")); return 1
             }
             return await devServer(ctx, preset: .astro, port: portArg(rest) ?? 4321, label: "astro dev")
         case "next":
             if rest.first == "build" {
-                io.err("next build ainda não roda no iPad; use next dev"); return 1
+                io.err(tr("next build ainda não roda no iPad; use next dev")); return 1
             }
             return await devServer(ctx, preset: .next, port: portArg(rest) ?? 3000, label: "next dev")
         case "nest":
@@ -56,20 +57,20 @@ struct BinCommand: ShellCommand {
                     k == .out ? io.out(t) : io.err(t)
                 }
             }
-            io.err("nest: use npm run start:dev com tsx, ou node src/main.ts"); return 1
+            io.err(tr("nest: use npm run start:dev com tsx, ou node src/main.ts")); return 1
         case "serve", "http-server": return await serveStatic(ctx, dir: rest.first { !$0.hasPrefix("-") } ?? ".")
         case "tsx", "ts-node":
             return await NodeCommand().run(rest, ctx)
         default:
             guard let file = Self.binPath(bin, root: ctx.root)
-            else { io.err("npx: \(bin) não está em node_modules/.bin (rode npm install)"); return 127 }
+            else { io.err(tr("npx: %1$@ não está em node_modules/.bin (rode npm install)", "\(bin)")); return 127 }
             if file.pathExtension == "node" || (try? Data(contentsOf: file))?.prefix(4) == Data([
                 0xCF,
                 0xFA,
                 0xED,
                 0xFE,
             ]) {
-                io.err("\(bin) é um binário nativo e não roda no iPad"); return 126
+                io.err(tr("%1$@ é um binário nativo e não roda no iPad", "\(bin)")); return 126
             }
             return await NodeCommand.runProcess(
                 NodeCommand.Alvo(code: nil, file: file, argv: rest, label: ([bin] + rest).joined(separator: " ")),
@@ -91,7 +92,7 @@ struct BinCommand: ShellCommand {
     func devServer(_ ctx: CommandContext, preset: DevServer.Preset, port: Int, label: String) async -> Int32 {
         let io = ctx.io
         if let existing = ctx.shell.devServer {
-            io.out("dev server já está em http://127.0.0.1:\(existing.port)")
+            io.out(tr("dev server já está em http://127.0.0.1:%1$@", "\(existing.port)"))
             ctx.shell.services.onServer(existing.port, label)
             return 0
         }
@@ -99,15 +100,15 @@ struct BinCommand: ShellCommand {
         // segundo `npm run dev` subia um servidor inteiro numa porta vizinha — dois
         // esbuild na memória e um preview apontando para o que não recarrega.
         if let jaTem = ctx.shell.services.servidorAtivo?() {
-            io.out("dev server já está em http://127.0.0.1:\(jaTem.porta) (\(jaTem.comando))")
-            io.out("  kill all para derrubar antes de subir outro")
+            io.out(tr("dev server já está em http://127.0.0.1:%1$@ (%2$@)", "\(jaTem.porta)", "\(jaTem.comando)"))
+            io.out(tr("  kill all para derrubar antes de subir outro"))
             ctx.shell.services.onServer(jaTem.porta, jaTem.comando)
             return 0
         }
         let dev = DevServer(root: ctx.root) { kind, text in kind == .out ? io.out(text) : io.err(text) }
         dev.onDiagnostics = ctx.shell.services.onDiagnostics
         do {
-            io.out("  \(label): carregando esbuild…")
+            io.out(tr("  %1$@: carregando esbuild…", "\(label)"))
             try await dev.start(port: port, preset: preset)
         } catch { io.err("\(label): \(error.localizedDescription)"); return 1 }
         ctx.shell.devServer = dev
@@ -117,11 +118,14 @@ struct BinCommand: ShellCommand {
         {
             io
                 .err(
-                    "aviso: \(missing.keys.sorted().joined(separator: ", ")) não instalados; o preview vai buscar no esm.sh"
+                    tr(
+                        "aviso: %1$@ não instalados; o preview vai buscar no esm.sh",
+                        "\(missing.keys.sorted().joined(separator: ", "))"
+                    )
                 )
         }
         let job = ctx.shell.registerJob(label, ports: [dev.port]) { dev.stop(); ctx.shell.devServer = nil }
-        io.out("  ➜  Local:   http://127.0.0.1:\(dev.port)/   (job \(job.id))")
+        io.out(tr("  ➜  Local:   http://127.0.0.1:%1$@/   (job %2$@)", "\(dev.port)", "\(job.id)"))
         return 0
     }
 
@@ -130,14 +134,15 @@ struct BinCommand: ShellCommand {
         let es = ctx.shell.esbuildEngine()
         let index = ctx.root.appending(path: "index.html")
         guard let html = try? String(contentsOf: index, encoding: .utf8)
-        else { io.err("vite build: sem index.html"); return 1 }
+        else { io.err(tr("vite build: sem index.html")); return 1 }
         let entries = html.matches(of: /<script\s+type="module"\s+src="([^"]+)"/)
             .map { String($0.1).replacingOccurrences(
                 of: "^/",
                 with: "",
                 options: .regularExpression
             ) }
-        guard !entries.isEmpty else { io.err("vite build: nenhum <script type=module src> no index.html"); return 1 }
+        guard !entries.isEmpty
+        else { io.err(tr("vite build: nenhum <script type=module src> no index.html")); return 1 }
         do {
             let r = try await es.build(entries: entries, dev: false, minify: true)
             for d in r.diagnostics {
@@ -186,9 +191,9 @@ struct BinCommand: ShellCommand {
                     )
                 }
             }
-            io.out("✓ build em dist/")
+            io.out(tr("✓ build em dist/"))
             return 0
-        } catch { io.err("vite build: \(error.localizedDescription)"); return 1 }
+        } catch { io.err(tr("vite build: %1$@", "\(error.localizedDescription)")); return 1 }
     }
 
     func serveStatic(_ ctx: CommandContext, dir: String) async -> Int32 {
@@ -197,7 +202,7 @@ struct BinCommand: ShellCommand {
         let dev = DevServer(root: base) { k, t in k == .out ? io.out(t) : io.err(t) }
         do { try await dev.start(port: 4173, preset: .plain) } catch { io.err(error.localizedDescription); return 1 }
         let job = ctx.shell.registerJob("serve \(dir)", ports: [dev.port]) { dev.stop() }
-        io.out("  ➜  http://127.0.0.1:\(dev.port)/   (job \(job.id))")
+        io.out(tr("  ➜  http://127.0.0.1:%1$@/   (job %2$@)", "\(dev.port)", "\(job.id)"))
         return 0
     }
 }

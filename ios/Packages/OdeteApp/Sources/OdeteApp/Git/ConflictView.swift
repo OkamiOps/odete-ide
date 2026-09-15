@@ -1,4 +1,5 @@
 import OdeteCore
+import OdeteI18n
 import OdeteUI
 import SwiftUI
 
@@ -69,10 +70,11 @@ struct ConflictView: View {
         VStack(spacing: 0) {
             HStack {
                 Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(theme.danger)
-                Text("Conflito em \(path)").font(OdeteFont.ui(13, weight: .medium)).foregroundStyle(theme.fg)
+                Text(tr("Conflito em %1$@", "\(path)")).font(OdeteFont.ui(13, weight: .medium))
+                    .foregroundStyle(theme.fg)
                 Spacer()
-                Button("Editar como texto") { ws.forceTextEdit.insert(path) }.font(OdeteFont.ui(12))
-                Button { apply() } label: { Label("Marcar resolvido", systemImage: "checkmark") }
+                Button(tr("Editar como texto")) { ws.forceTextEdit.insert(path) }.font(OdeteFont.ui(12))
+                Button { apply() } label: { Label(tr("Marcar resolvido"), systemImage: "checkmark") }
                     .buttonStyle(.glassProminent)
                     .disabled(parsed.map { choices.count < $0.blocks.count } ?? true)
             }
@@ -112,13 +114,13 @@ struct ConflictView: View {
                 choices[b.id] = b.theirs
             }
             HStack(spacing: 8) {
-                Button("Ambos (meu, deles)") { choices[b.id] = b.ours + b.theirs }.font(OdeteFont.ui(11))
-                Button("Ambos (deles, meu)") { choices[b.id] = b.theirs + b.ours }.font(OdeteFont.ui(11))
+                Button(tr("Ambos (meu, deles)")) { choices[b.id] = b.ours + b.theirs }.font(OdeteFont.ui(11))
+                Button(tr("Ambos (deles, meu)")) { choices[b.id] = b.theirs + b.ours }.font(OdeteFont.ui(11))
                 Spacer()
                 if chosen !=
                     nil
                 {
-                    Label("escolhido", systemImage: "checkmark.circle.fill").font(OdeteFont.ui(11))
+                    Label(tr("escolhido"), systemImage: "checkmark.circle.fill").font(OdeteFont.ui(11))
                         .foregroundStyle(theme.ok)
                 }
             }
@@ -136,7 +138,7 @@ struct ConflictView: View {
             HStack {
                 Text(title).font(OdeteFont.ui(11, weight: .medium)).foregroundStyle(color)
                 Spacer()
-                Button(on ? "escolhido" : "manter este") { pick() }.font(OdeteFont.ui(11)).buttonStyle(.glass)
+                Button(on ? "escolhido" : tr("manter este")) { pick() }.font(OdeteFont.ui(11)).buttonStyle(.glass)
             }
             .padding(.horizontal, 10).frame(height: 32)
             ForEach(Array(lines.enumerated()), id: \.offset) { _, l in

@@ -1,4 +1,5 @@
 import Foundation
+import OdeteI18n
 
 /// Device flow do GitHub. `clientId` é público (OAuth App da Odete); sem client secret.
 public struct GitHubDeviceFlow: Sendable {
@@ -78,7 +79,7 @@ public struct GitHubDeviceFlow: Sendable {
 
     public static func parsePoll(_ data: Data) -> Poll {
         guard let j = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-        else { return .failed("resposta inválida") }
+        else { return .failed(tr("resposta inválida")) }
         if let t = j["access_token"] as? String {
             return .token(t)
         }
@@ -86,7 +87,7 @@ public struct GitHubDeviceFlow: Sendable {
         case "authorization_pending": return .pending
         case "slow_down": return .slowDown
         case let e?: return .failed((j["error_description"] as? String) ?? e)
-        default: return .failed("resposta inválida")
+        default: return .failed(tr("resposta inválida"))
         }
     }
 
@@ -104,7 +105,7 @@ public struct GitHubDeviceFlow: Sendable {
             case let .failed(m): throw GitHubError.auth(m)
             }
         }
-        throw GitHubError.auth("código expirou")
+        throw GitHubError.auth(tr("código expirou"))
     }
 }
 

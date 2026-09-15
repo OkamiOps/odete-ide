@@ -1,4 +1,5 @@
 import OdeteCore
+import OdeteI18n
 import OdeteUI
 import SwiftUI
 
@@ -26,7 +27,7 @@ struct CommandPalette: View {
             PaletteItem(
                 id: ">save",
                 kind: .command,
-                title: "Salvar arquivo",
+                title: tr("Salvar arquivo"),
                 detail: "",
                 symbol: "square.and.arrow.down",
                 shortcut: "⌘S"
@@ -34,7 +35,7 @@ struct CommandPalette: View {
             PaletteItem(
                 id: ">saveall",
                 kind: .command,
-                title: "Salvar todos",
+                title: tr("Salvar todos"),
                 detail: "",
                 symbol: "square.and.arrow.down.on.square",
                 shortcut: nil
@@ -42,7 +43,7 @@ struct CommandPalette: View {
             PaletteItem(
                 id: ">new",
                 kind: .command,
-                title: "Novo arquivo",
+                title: tr("Novo arquivo"),
                 detail: "",
                 symbol: "doc.badge.plus",
                 shortcut: nil
@@ -50,7 +51,7 @@ struct CommandPalette: View {
             PaletteItem(
                 id: ">side",
                 kind: .command,
-                title: "Alternar sidebar",
+                title: tr("Alternar sidebar"),
                 detail: "",
                 symbol: "sidebar.left",
                 shortcut: "⌘B"
@@ -58,7 +59,7 @@ struct CommandPalette: View {
             PaletteItem(
                 id: ">term",
                 kind: .command,
-                title: "Alternar terminal",
+                title: tr("Alternar terminal"),
                 detail: "",
                 symbol: "terminal",
                 shortcut: "⌘J"
@@ -66,7 +67,7 @@ struct CommandPalette: View {
             PaletteItem(
                 id: ">agent",
                 kind: .command,
-                title: "Alternar agente",
+                title: tr("Alternar agente"),
                 detail: "",
                 symbol: "sparkles",
                 shortcut: "⌘I"
@@ -74,7 +75,7 @@ struct CommandPalette: View {
             PaletteItem(
                 id: ">search",
                 kind: .command,
-                title: "Buscar no projeto",
+                title: tr("Buscar no projeto"),
                 detail: "",
                 symbol: "magnifyingglass",
                 shortcut: "⇧⌘F"
@@ -82,7 +83,7 @@ struct CommandPalette: View {
             PaletteItem(
                 id: ">settings",
                 kind: .command,
-                title: "Ajustes",
+                title: tr("Ajustes"),
                 detail: "",
                 symbol: "gearshape",
                 shortcut: "⌘,"
@@ -90,7 +91,7 @@ struct CommandPalette: View {
             PaletteItem(
                 id: ">closetab",
                 kind: .command,
-                title: "Fechar aba",
+                title: tr("Fechar aba"),
                 detail: "",
                 symbol: "xmark",
                 shortcut: "⌘W"
@@ -98,7 +99,7 @@ struct CommandPalette: View {
             PaletteItem(
                 id: ">hub",
                 kind: .command,
-                title: "Voltar aos projetos",
+                title: tr("Voltar aos projetos"),
                 detail: "",
                 symbol: "square.grid.2x2",
                 shortcut: nil
@@ -117,7 +118,7 @@ struct CommandPalette: View {
                 id: ">theme.\($0.id.rawValue)",
                 kind: .command,
                 title: "Tema: \($0.label)",
-                detail: $0.blurb,
+                detail: tr($0.blurb),
                 symbol: "paintpalette",
                 shortcut: nil
             )
@@ -144,7 +145,7 @@ struct CommandPalette: View {
                 id: "@\($0.line)",
                 kind: .symbol,
                 title: $0.name,
-                detail: "\($0.kind.rawValue) · linha \($0.line)",
+                detail: tr("%1$@ · linha %2$@", "\($0.kind.rawValue)", "\($0.line)"),
                 symbol: $0.kind.symbol,
                 shortcut: nil
             )
@@ -199,7 +200,7 @@ struct CommandPalette: View {
                     .hasPrefix("@") ? "at" : "magnifyingglass")
                     .foregroundStyle(theme.fgSubtle)
                 TextField(
-                    "arquivo, > comando, @ símbolo",
+                    tr("arquivo, > comando, @ símbolo"),
                     text: Binding(get: { ws.paletteQuery }, set: { ws.paletteQuery = $0; selection = 0 })
                 )
                 .focused($focused)
@@ -211,7 +212,7 @@ struct CommandPalette: View {
                 .onKeyPress(.downArrow) { selection = min(selection + 1, items.count - 1); return .handled }
                 .onKeyPress(.upArrow) { selection = max(selection - 1, 0); return .handled }
                 .onKeyPress(.escape) { close(); return .handled }
-                Text("esc").font(OdeteFont.mono(10)).foregroundStyle(theme.fgSubtle)
+                Text(tr("esc")).font(OdeteFont.mono(10)).foregroundStyle(theme.fgSubtle)
                     .padding(.horizontal, 6).padding(.vertical, 2)
                     .background(theme.bgSubtle, in: RoundedRectangle(cornerRadius: 5))
             }
@@ -249,7 +250,7 @@ struct CommandPalette: View {
                             .id(it.id)
                         }
                         if items.isEmpty {
-                            Text("nada").font(OdeteFont.ui(12)).foregroundStyle(theme.fgSubtle).padding(16)
+                            Text(tr("nada")).font(OdeteFont.ui(12)).foregroundStyle(theme.fgSubtle).padding(16)
                         }
                     }
                     .padding(.vertical, 6)

@@ -1,4 +1,5 @@
 import OdeteCore
+import OdeteI18n
 import OdeteUI
 import SwiftUI
 
@@ -40,21 +41,21 @@ struct StatusBar: View {
                     chrome.snapshot.side = .git
                     chrome.snapshot.sideOpen = true
                 }
-                .help("Git · abrir painel")
+                .help(tr("Git · abrir painel"))
             }
             item(
                 symbol: errors.errors > 0 ? "xmark.octagon" : errors
                     .warnings > 0 ? "exclamationmark.triangle" : "checkmark.circle",
                 text: errors.errors == 0 && errors
-                    .warnings == 0 ? (roomy ? "sem problemas" : nil) : "\(errors.errors) ⊗ \(errors.warnings) △",
+                    .warnings == 0 ? (roomy ? tr("sem problemas") : nil) : "\(errors.errors) ⊗ \(errors.warnings) △",
                 tint: errors.errors > 0 ? theme.danger : errors.warnings > 0 ? theme.accent : theme.ok
             ) {
                 chrome.snapshot.side = .problems
                 chrome.snapshot.sideOpen = true
             }
-            .help("Problemas")
+            .help(tr("Problemas"))
             if ws.agent.running {
-                item(symbol: "sparkles", text: "agente trabalhando", tint: theme.accent) {
+                item(symbol: "sparkles", text: tr("agente trabalhando"), tint: theme.accent) {
                     chrome.snapshot.agentVisible = true
                 }
                 .symbolEffect(.pulse)
@@ -67,7 +68,7 @@ struct StatusBar: View {
                 ) {
                     chrome.snapshot.center = .preview
                 }
-                .help("Servidores no ar · abrir preview")
+                .help(tr("Servidores no ar · abrir preview"))
             }
             Spacer(minLength: Metrics.s2)
             if let path = ws.active, ws.naoEhTexto.contains(path) {
@@ -84,21 +85,22 @@ struct StatusBar: View {
                 .padding(.horizontal, 8).frame(height: 22)
             } else if let path = ws.active {
                 let (line, col) = cursor(in: path)
-                item(text: "Ln \(line), Col \(col)") { ws.paletteOpen = true; ws.paletteQuery = "@" }
-                    .help("Ir para símbolo")
+                item(text: tr("Ln %1$@, Col %2$@", "\(line)", "\(col)")) { ws.paletteOpen = true; ws.paletteQuery = "@"
+                }
+                .help(tr("Ir para símbolo"))
                 if nivel != .minimo {
                     Menu {
                         ForEach([2, 4, 8], id: \.self) { w in
                             Button { chrome.snapshot.editor.tabWidth = w } label: {
                                 Label(
-                                    "\(w) espaços",
+                                    tr("%1$@ espaços", "\(w)"),
                                     systemImage: w == chrome.snapshot.editor.tabWidth ? "checkmark" : ""
                                 )
                             }
                         }
                         Divider()
-                        Toggle("Mostrar espaços", isOn: $chrome.snapshot.editor.showWhitespace)
-                        Toggle("Guias de indentação", isOn: $chrome.snapshot.editor.indentGuides)
+                        Toggle(tr("Mostrar espaços"), isOn: $chrome.snapshot.editor.showWhitespace)
+                        Toggle(tr("Guias de indentação"), isOn: $chrome.snapshot.editor.indentGuides)
                     } label: {
                         label(text: roomy ? "Espaços: \(chrome.snapshot.editor.tabWidth)"
                             : "⇥\(chrome.snapshot.editor.tabWidth)")
@@ -124,13 +126,13 @@ struct StatusBar: View {
                 .hoverEffect(.highlight)
             }
             item(symbol: "gearshape", text: nil) { chrome.settingsOpen = true }
-                .help("Ajustes")
+                .help(tr("Ajustes"))
         }
         .fixedSize(horizontal: true, vertical: false)
     }
 
     var branchText: String {
-        var s = ws.git.current?.name ?? ws.git.headName ?? "sem branch"
+        var s = ws.git.current?.name ?? ws.git.headName ?? tr("sem branch")
         if !ws.git.isClean {
             s += "*"
         }
@@ -158,7 +160,7 @@ struct StatusBar: View {
     /// "PNG", "PDF", "SQLITE" — o que o visualizador está mostrando.
     func extensao(_ path: String) -> String {
         let e = (path as NSString).pathExtension
-        return e.isEmpty ? "binário" : e.uppercased()
+        return e.isEmpty ? tr("binário") : e.uppercased()
     }
 
     func medida(_ path: String) -> String? {

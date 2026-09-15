@@ -1,4 +1,5 @@
 import OdeteCore
+import OdeteI18n
 import SwiftUI
 
 /// Barra de abas do editor. Toque seleciona; o "x" fecha; ponto indica alteração.
@@ -87,7 +88,7 @@ struct TabItem: View {
                 .opacity(on || hover || tab.isDirty ? 1 : 0.35)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(tab.isDirty ? "Fechar (não salvo)" : "Fechar")
+            .accessibilityLabel(tab.isDirty ? tr("Fechar (não salvo)") : "Fechar")
             .padding(.trailing, 4)
         }
         // Aba ativa é uma cápsula preenchida. O traço no topo ficava solto, começando e

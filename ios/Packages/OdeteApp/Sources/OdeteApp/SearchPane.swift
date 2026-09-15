@@ -1,5 +1,6 @@
 import OdeteCore
 import OdeteFiles
+import OdeteI18n
 import OdeteUI
 import SwiftUI
 
@@ -33,11 +34,14 @@ struct SearchPane: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            PaneHeader("Busca", detail: hits.isEmpty ? nil : "\(hits.count) em \(grouped.count) arquivos")
+            PaneHeader(
+                "Busca",
+                detail: hits.isEmpty ? nil : tr("%1$@ em %2$@ arquivos", "\(hits.count)", "\(grouped.count)")
+            )
             VStack(spacing: 8) {
                 HStack(spacing: 8) {
                     Image(systemName: "magnifyingglass").foregroundStyle(theme.fgSubtle)
-                    TextField("buscar no projeto", text: $query)
+                    TextField(tr("buscar no projeto"), text: $query)
                         .focused($focused)
                         .textFieldStyle(.plain)
                         .font(OdeteFont.mono(13))
@@ -49,7 +53,7 @@ struct SearchPane: View {
                             Image(systemName: "xmark.circle.fill").foregroundStyle(theme.fgSubtle)
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("Limpar busca")
+                        .accessibilityLabel(tr("Limpar busca"))
                     }
                 }
                 .padding(.horizontal, 10)
@@ -60,7 +64,7 @@ struct SearchPane: View {
                 if trocarAberto {
                     HStack(spacing: 8) {
                         Image(systemName: "arrow.2.squarepath").foregroundStyle(theme.fgSubtle)
-                        TextField("trocar por", text: $troca)
+                        TextField(tr("trocar por"), text: $troca)
                             .textFieldStyle(.plain)
                             .font(OdeteFont.mono(13))
                             .autocorrectionDisabled()
@@ -72,14 +76,14 @@ struct SearchPane: View {
                     .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(theme.border))
                 }
                 HStack(spacing: 6) {
-                    chip("Aa", on: $caseSensitive, label: "Distinguir maiúsculas")
-                    chip(".*", on: $regex, label: "Expressão regular")
-                    chip("↔", on: $trocarAberto, label: "Substituir")
+                    chip("Aa", on: $caseSensitive, label: tr("Distinguir maiúsculas"))
+                    chip(".*", on: $regex, label: tr("Expressão regular"))
+                    chip("↔", on: $trocarAberto, label: tr("Substituir"))
                     Spacer()
                     if searching {
                         ProgressView().controlSize(.small)
                     } else if trocarAberto, !hits.isEmpty {
-                        Button("Trocar tudo") { confirmandoTroca = true }
+                        Button(tr("Trocar tudo")) { confirmandoTroca = true }
                             .font(.caption.weight(.medium))
                             .buttonStyle(.glass)
                             .controlSize(.small)
@@ -93,7 +97,7 @@ struct SearchPane: View {
             .padding(10)
             .overlay(alignment: .bottom) { Rectangle().fill(theme.border).frame(height: 1) }
             if hits.isEmpty, !query.isEmpty, !searching {
-                Text("nada encontrado").font(OdeteFont.ui(12)).foregroundStyle(theme.fgSubtle).padding(16)
+                Text(tr("nada encontrado")).font(OdeteFont.ui(12)).foregroundStyle(theme.fgSubtle).padding(16)
                 Spacer()
             } else {
                 ScrollPane {
@@ -110,9 +114,9 @@ struct SearchPane: View {
                             .frame(height: 30)
                             .background(theme.bgSubtle.opacity(0.5))
                             .contextMenu {
-                                Button("Abrir", systemImage: "doc.text") { ws.open(g.path, line: g.hits[0].line) }
+                                Button(tr("Abrir"), systemImage: "doc.text") { ws.open(g.path, line: g.hits[0].line) }
                                 if trocarAberto {
-                                    Button("Trocar só neste arquivo", systemImage: "arrow.2.squarepath") {
+                                    Button(tr("Trocar só neste arquivo"), systemImage: "arrow.2.squarepath") {
                                         trocar(em: [g.path])
                                     }
                                 }
@@ -140,14 +144,14 @@ struct SearchPane: View {
             }
         }
         .confirmationDialog(
-            "Trocar \(hits.count) ocorrência(s) em \(grouped.count) arquivo(s)?",
+            tr("Trocar %1$@ ocorrência(s) em %2$@ arquivo(s)?", "\(hits.count)", "\(grouped.count)"),
             isPresented: $confirmandoTroca,
             titleVisibility: .visible
         ) {
-            Button("Trocar tudo", role: .destructive) { trocar(em: grouped.map(\.path)) }
-            Button("Cancelar", role: .cancel) {}
+            Button(tr("Trocar tudo"), role: .destructive) { trocar(em: grouped.map(\.path)) }
+            Button(tr("Cancelar"), role: .cancel) {}
         } message: {
-            Text("Isto grava nos arquivos. O desfazer da árvore não cobre troca em massa: confira no git depois.")
+            Text(tr("Isto grava nos arquivos. O desfazer da árvore não cobre troca em massa: confira no git depois."))
         }
         .onChange(of: query) { _, _ in schedule() }
         .onChange(of: regex) { _, _ in run() }
@@ -172,8 +176,8 @@ struct SearchPane: View {
             ws.reload()
             ws.git.scheduleRefresh()
             recado = r.trocas == 0
-                ? "nada foi trocado"
-                : "\(r.trocas) troca(s) em \(r.arquivos) arquivo(s)"
+                ? tr("nada foi trocado")
+                : tr("%1$@ troca(s) em %2$@ arquivo(s)", "\(r.trocas)", "\(r.arquivos)")
             run()
         } catch {
             ws.error = error.localizedDescription

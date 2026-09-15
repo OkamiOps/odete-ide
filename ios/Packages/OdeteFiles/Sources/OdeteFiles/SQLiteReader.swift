@@ -1,4 +1,5 @@
 import Foundation
+import OdeteI18n
 import SQLite3
 
 /// Uma tabela do banco e quantas linhas ela tem.
@@ -57,7 +58,7 @@ public final class SQLiteReader: @unchecked Sendable {
         var ponteiro: OpaquePointer?
         let flags = (escrita ? SQLITE_OPEN_READWRITE : SQLITE_OPEN_READONLY) | SQLITE_OPEN_NOMUTEX
         guard sqlite3_open_v2(arquivo.path, &ponteiro, flags, nil) == SQLITE_OK, let ponteiro else {
-            let msg = ponteiro.map { String(cString: sqlite3_errmsg($0)) } ?? "não é um banco SQLite"
+            let msg = ponteiro.map { String(cString: sqlite3_errmsg($0)) } ?? tr("não é um banco SQLite")
             sqlite3_close(ponteiro)
             throw Falha.naoAbriu(msg)
         }
@@ -67,7 +68,7 @@ public final class SQLiteReader: @unchecked Sendable {
         guard sqlite3_exec(ponteiro, "SELECT count(*) FROM sqlite_master", nil, nil, nil) == SQLITE_OK else {
             sqlite3_close(ponteiro)
             db = nil
-            throw Falha.naoAbriu("não é um banco SQLite")
+            throw Falha.naoAbriu(tr("não é um banco SQLite"))
         }
         editavel = escrita
     }
@@ -76,11 +77,11 @@ public final class SQLiteReader: @unchecked Sendable {
     public init(script: String) throws {
         var ponteiro: OpaquePointer?
         guard sqlite3_open_v2(":memory:", &ponteiro, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, nil) == SQLITE_OK,
-              let ponteiro else { throw Falha.naoAbriu("não consegui abrir um banco em memória") }
+              let ponteiro else { throw Falha.naoAbriu(tr("não consegui abrir um banco em memória")) }
         db = ponteiro
         var erro: UnsafeMutablePointer<CChar>?
         if sqlite3_exec(ponteiro, script, nil, nil, &erro) != SQLITE_OK {
-            let msg = erro.map { String(cString: $0) } ?? "SQL inválido"
+            let msg = erro.map { String(cString: $0) } ?? tr("SQL inválido")
             sqlite3_free(erro)
             sqlite3_close(ponteiro)
             db = nil
@@ -129,7 +130,7 @@ public final class SQLiteReader: @unchecked Sendable {
     /// Roda um comando que muda o banco. Devolve o erro do SQLite, se houver.
     @discardableResult
     public func executar(_ sql: String, _ valores: [String?] = []) -> String? {
-        guard let db, editavel else { return "banco aberto só para leitura" }
+        guard let db, editavel else { return tr("banco aberto só para leitura") }
         var st: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &st, nil) == SQLITE_OK, let st else {
             return String(cString: sqlite3_errmsg(db))

@@ -1,6 +1,7 @@
 import OdeteAccounts
 import OdeteCore
 import OdeteGit
+import OdeteI18n
 import OdeteUI
 import SwiftUI
 
@@ -23,9 +24,9 @@ struct HistoryCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            SectionTitle("Histórico", detail: git.log.isEmpty ? nil : "\(git.log.count)") {
+            SectionTitle(tr("Histórico"), detail: git.log.isEmpty ? nil : "\(git.log.count)") {
                 if git.compareA != nil || git.compareB != nil {
-                    Button("Limpar comparação", systemImage: "xmark") { git.compareA = nil; git.compareB = nil }
+                    Button(tr("Limpar comparação"), systemImage: "xmark") { git.compareA = nil; git.compareB = nil }
                 }
                 if git.log.count > 5 {
                     Button(
@@ -38,7 +39,7 @@ struct HistoryCard: View {
             }
             CardList {
                 if git.log.isEmpty {
-                    Text("Nenhum commit ainda.").font(.subheadline).foregroundStyle(.secondary)
+                    Text(tr("Nenhum commit ainda.")).font(.subheadline).foregroundStyle(.secondary)
                         .padding(.horizontal, 12).padding(.vertical, 12)
                 }
                 ForEach(Array(shown.enumerated()), id: \.element.id) { i, c in
@@ -92,9 +93,9 @@ struct HistoryCard: View {
         }
         .buttonStyle(.plain)
         .contextMenu {
-            Button("Comparar como A", systemImage: "a.circle") { git.compareA = c.id; compare() }
-            Button("Comparar como B", systemImage: "b.circle") { git.compareB = c.id; compare() }
-            Button("Copiar SHA", systemImage: "doc.on.doc") { UIPasteboard.general.string = c.id }
+            Button(tr("Comparar como A"), systemImage: "a.circle") { git.compareA = c.id; compare() }
+            Button(tr("Comparar como B"), systemImage: "b.circle") { git.compareB = c.id; compare() }
+            Button(tr("Copiar SHA"), systemImage: "doc.on.doc") { UIPasteboard.general.string = c.id }
         }
     }
 
@@ -103,7 +104,7 @@ struct HistoryCard: View {
             Text("A \(git.compareA.map { String($0.prefix(7)) } ?? "—")")
             Text("B \(git.compareB.map { String($0.prefix(7)) } ?? "—")")
             Spacer(minLength: 0)
-            Button("limpar") { git.compareA = nil; git.compareB = nil }
+            Button(tr("limpar")) { git.compareA = nil; git.compareB = nil }
         }
         .font(.caption2).monospaced().foregroundStyle(.secondary)
         .padding(.horizontal, 12).padding(.vertical, 8)
@@ -140,10 +141,10 @@ struct BranchesCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            SectionTitle("Branches", detail: "\(locals.count)") {
-                Button("Nova branch…", systemImage: "plus") { newBranch = ""; askingBranch = true }
+            SectionTitle(tr("Branches"), detail: "\(locals.count)") {
+                Button(tr("Nova branch…"), systemImage: "plus") { newBranch = ""; askingBranch = true }
                     .disabled(git.busy)
-                Button("Guardar stash…", systemImage: "tray.and.arrow.down") { stashMsg = ""; askingStash = true }
+                Button(tr("Guardar stash…"), systemImage: "tray.and.arrow.down") { stashMsg = ""; askingStash = true }
                     .disabled(git.busy || git.isClean)
             }
             CardList {
@@ -154,14 +155,14 @@ struct BranchesCard: View {
                     DisclosureGroup {
                         ForEach(remotes) { b in branchRow(b, first: true) }
                     } label: {
-                        Text("Remotas").font(.footnote).foregroundStyle(.secondary)
+                        Text(tr("Remotas")).font(.footnote).foregroundStyle(.secondary)
                     }
                     .padding(.horizontal, 12).padding(.vertical, 8)
                     .overlay(alignment: .top) { Rectangle().fill(theme.separator).frame(height: 0.5) }
                 }
             }
             if !git.stashes.isEmpty {
-                SectionTitle("Stash", detail: "\(git.stashes.count)")
+                SectionTitle(tr("Stash"), detail: "\(git.stashes.count)")
                 CardList {
                     ForEach(Array(git.stashes.enumerated()), id: \.element.id) { i, st in
                         stashRow(st, first: i == 0)
@@ -169,15 +170,15 @@ struct BranchesCard: View {
                 }
             }
         }
-        .alert("Nova branch", isPresented: $askingBranch) {
-            TextField("nome", text: $newBranch)
-            Button("Criar e trocar") { git.createBranch(newBranch.trimmingCharacters(in: .whitespaces)) }
-            Button("Cancelar", role: .cancel) {}
+        .alert(tr("Nova branch"), isPresented: $askingBranch) {
+            TextField(tr("nome"), text: $newBranch)
+            Button(tr("Criar e trocar")) { git.createBranch(newBranch.trimmingCharacters(in: .whitespaces)) }
+            Button(tr("Cancelar"), role: .cancel) {}
         }
-        .alert("Guardar stash", isPresented: $askingStash) {
-            TextField("mensagem", text: $stashMsg)
-            Button("Guardar") { git.stashPush(stashMsg) }
-            Button("Cancelar", role: .cancel) {}
+        .alert(tr("Guardar stash"), isPresented: $askingStash) {
+            TextField(tr("mensagem"), text: $stashMsg)
+            Button(tr("Guardar")) { git.stashPush(stashMsg) }
+            Button(tr("Cancelar"), role: .cancel) {}
         }
     }
 
@@ -199,7 +200,7 @@ struct BranchesCard: View {
                 Text(b.name).font(.subheadline).foregroundStyle(theme.fg).lineLimit(1).truncationMode(.middle)
                 Spacer(minLength: 4)
                 if b.isHead {
-                    Text("atual").font(.caption2).foregroundStyle(theme.accent)
+                    Text(tr("atual")).font(.caption2).foregroundStyle(theme.accent)
                 } else {
                     Image(systemName: "chevron.right").font(.caption2.bold()).foregroundStyle(theme.fgSubtle)
                 }
@@ -216,10 +217,10 @@ struct BranchesCard: View {
         }
         .contextMenu {
             if !b.isHead {
-                Button("Trocar para \(b.name)", systemImage: "arrow.right.circle") { git.checkout(b.name) }
-                Button("Merge de \(b.name)", systemImage: "arrow.triangle.merge") { git.merge(b.name) }
+                Button(tr("Trocar para %1$@", "\(b.name)"), systemImage: "arrow.right.circle") { git.checkout(b.name) }
+                Button(tr("Merge de %1$@", "\(b.name)"), systemImage: "arrow.triangle.merge") { git.merge(b.name) }
                 if !b.isRemote {
-                    Button("Apagar \(b.name)", systemImage: "trash", role: .destructive) {
+                    Button(tr("Apagar %1$@", "\(b.name)"), systemImage: "trash", role: .destructive) {
                         git.deleteBranch(b.name)
                     }
                 }
@@ -237,7 +238,7 @@ struct BranchesCard: View {
                 Text(st.message.isEmpty ? "stash @\(st.index)" : st.message)
                     .font(.subheadline).foregroundStyle(theme.fg).lineLimit(1)
                 Spacer(minLength: 4)
-                Text("aplicar").font(.caption2).foregroundStyle(theme.accent)
+                Text(tr("aplicar")).font(.caption2).foregroundStyle(theme.accent)
             }
             .padding(.horizontal, 12)
             .frame(height: 40)
@@ -250,8 +251,8 @@ struct BranchesCard: View {
             }
         }
         .contextMenu {
-            Button("Aplicar", systemImage: "tray.and.arrow.up") { git.stashPop(st.index) }
-            Button("Apagar", systemImage: "trash", role: .destructive) { git.stashDrop(st.index) }
+            Button(tr("Aplicar"), systemImage: "tray.and.arrow.up") { git.stashPop(st.index) }
+            Button(tr("Apagar"), systemImage: "trash", role: .destructive) { git.stashDrop(st.index) }
         }
     }
 }
@@ -264,8 +265,8 @@ struct ConflictsCard: View {
     }
 
     var body: some View {
-        GitCard(title: "Conflitos", trailing: "\(git.conflicts.count)") {
-            Text("Resolva cada arquivo no editor e faça o commit de merge.").font(OdeteFont.ui(12))
+        GitCard(title: tr("Conflitos"), trailing: "\(git.conflicts.count)") {
+            Text(tr("Resolva cada arquivo no editor e faça o commit de merge.")).font(OdeteFont.ui(12))
                 .foregroundStyle(theme.fgMuted)
             ForEach(git.conflicts, id: \.self) { p in
                 Button { ws.openFile(p) } label: {
@@ -280,7 +281,7 @@ struct ConflictsCard: View {
                 }
                 .buttonStyle(.plain)
             }
-            GitButton(title: "Abortar merge", symbol: "xmark", disabled: git.busy) { git.abortMerge() }
+            GitButton(title: tr("Abortar merge"), symbol: "xmark", disabled: git.busy) { git.abortMerge() }
         }
     }
 }

@@ -1,5 +1,6 @@
 import Clibgit2
 import Foundation
+import OdeteI18n
 
 public extension Repository {
     /// Faz merge de `name` (branch local ou remota) na branch atual.
@@ -20,7 +21,7 @@ public extension Repository {
         var pref = git_merge_preference_t(0)
         var heads: [OpaquePointer?] = [their]
         try heads.withUnsafeMutableBufferPointer { buf in
-            try check(git_merge_analysis(&analysis, &pref, repo, buf.baseAddress, 1), "análise do merge")
+            try check(git_merge_analysis(&analysis, &pref, repo, buf.baseAddress, 1), tr("análise do merge"))
         }
         if analysis.rawValue & GIT_MERGE_ANALYSIS_UP_TO_DATE.rawValue != 0 {
             return .upToDate
@@ -64,7 +65,7 @@ public extension Repository {
         if !conflicts.isEmpty {
             return .conflicts(conflicts)
         }
-        let sha = try finishMerge(message: "Merge \(label)", author: author, theirs: theirOid)
+        let sha = try finishMerge(message: tr("Merge %1$@", "\(label)"), author: author, theirs: theirOid)
         return .merged(sha)
     }
 
@@ -92,7 +93,7 @@ public extension Repository {
         try withIndex { idx in
             git_index_conflict_remove(idx, path)
             try check(git_index_add_bypath(idx, path), "resolver \(path)")
-            try check(git_index_write(idx), "índice")
+            try check(git_index_write(idx), tr("índice"))
         }
     }
 
@@ -107,7 +108,7 @@ public extension Repository {
             throw GitError(
                 kind: .conflict,
                 code: -1,
-                message: "há conflitos para resolver"
+                message: tr("há conflitos para resolver")
             )
         }
         var theirOid = theirs ?? git_oid()
@@ -116,12 +117,12 @@ public extension Repository {
         }
         let treeOid = try withIndex { idx -> git_oid in
             var o = git_oid()
-            try check(git_index_write_tree(&o, idx), "árvore")
+            try check(git_index_write_tree(&o, idx), tr("árvore"))
             return o
         }
         var tOid = treeOid
         var tree: OpaquePointer?
-        try check(git_tree_lookup(&tree, repo, &tOid), "árvore")
+        try check(git_tree_lookup(&tree, repo, &tOid), tr("árvore"))
         defer { git_tree_free(tree) }
         var headOid = git_oid()
         try check(git_reference_name_to_id(&headOid, repo, "HEAD"), "HEAD")
@@ -136,7 +137,10 @@ public extension Repository {
         defer { buf.deallocate() }
         buf[0] = p1; buf[1] = p2
         var oid = git_oid()
-        try check(git_commit_create(&oid, repo, "HEAD", sig, sig, "UTF-8", message, tree, 2, buf), "commit de merge")
+        try check(
+            git_commit_create(&oid, repo, "HEAD", sig, sig, "UTF-8", message, tree, 2, buf),
+            tr("commit de merge")
+        )
         git_repository_state_cleanup(repo)
         return Self.hex(oid)
     }

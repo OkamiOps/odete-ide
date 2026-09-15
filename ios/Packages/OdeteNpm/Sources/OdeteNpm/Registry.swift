@@ -1,5 +1,6 @@
 import CryptoKit
 import Foundation
+import OdeteI18n
 
 public struct PackumentVersion: Sendable, Hashable {
     public var version: Version
@@ -26,7 +27,7 @@ public struct Packument: Sendable, Hashable {
 
     public static func parse(_ data: Data) throws -> Packument {
         guard let j = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let name = j["name"] as? String else { throw NpmError.registry("packument inválido") }
+              let name = j["name"] as? String else { throw NpmError.registry(tr("packument inválido")) }
         var out: [Version: PackumentVersion] = [:]
         for (k, v) in (j["versions"] as? [String: Any]) ?? [:] {
             guard let ver = Version(k), let m = v as? [String: Any], let dist = m["dist"] as? [String: Any],
@@ -78,11 +79,11 @@ public enum NpmError: LocalizedError, Sendable {
     public var errorDescription: String? {
         switch self {
         case let .registry(m): "registro: \(m)"
-        case let .notFound(n): "pacote não encontrado: \(n)"
-        case let .noVersion(n, r): "nenhuma versão de \(n) satisfaz \(r)"
+        case let .notFound(n): tr("pacote não encontrado: %1$@", "\(n)")
+        case let .noVersion(n, r): tr("nenhuma versão de %1$@ satisfaz %2$@", "\(n)", "\(r)")
         case let .tarball(m): "tarball: \(m)"
         case let .io(m): m
-        case let .native(n): "\(n) tem código nativo e não roda no iPad"
+        case let .native(n): tr("%1$@ tem código nativo e não roda no iPad", "\(n)")
         }
     }
 }
@@ -129,7 +130,11 @@ public struct HTTPRegistry: RegistryClient {
         if code == 404 {
             throw NpmError.notFound(name)
         }
-        guard (200 ..< 300).contains(code) else { throw NpmError.registry("HTTP \(code) para \(name)") }
+        guard (200 ..< 300).contains(code) else { throw NpmError.registry(tr(
+            "HTTP %1$@ para %2$@",
+            "\(code)",
+            "\(name)"
+        )) }
         return try Packument.parse(data)
     }
 
@@ -151,7 +156,11 @@ public struct HTTPRegistry: RegistryClient {
         // que talvez esteja certo.
         guard let obtido else { return }
         guard obtido == esperado else {
-            throw NpmError.tarball("o conteúdo de \(nome) não bate com o integrity declarado (\(algoritmo))")
+            throw NpmError.tarball(tr(
+                "o conteúdo de %1$@ não bate com o integrity declarado (%2$@)",
+                "\(nome)",
+                "\(algoritmo)"
+            ))
         }
     }
 
@@ -170,10 +179,10 @@ public struct HTTPRegistry: RegistryClient {
             }
             try? FileManager.default.removeItem(at: file)
         }
-        guard let u = URL(string: url) else { throw NpmError.tarball("URL inválida \(url)") }
+        guard let u = URL(string: url) else { throw NpmError.tarball(tr("URL inválida %1$@", "\(url)")) }
         let (data, resp) = try await session.data(from: u)
         guard (200 ..< 300).contains((resp as? HTTPURLResponse)?.statusCode ?? 0)
-        else { throw NpmError.tarball("HTTP ao baixar \(url)") }
+        else { throw NpmError.tarball(tr("HTTP ao baixar %1$@", "\(url)")) }
         try Self.conferir(data, contra: integrity, nome: url)
         try? FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
         try? data.write(to: file, options: .atomic)

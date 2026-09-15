@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 public struct PackumentVersion: Sendable, Hashable {
@@ -132,6 +133,28 @@ public struct HTTPRegistry: RegistryClient {
         return try Packument.parse(data)
     }
 
+    /// Confere o pacote baixado contra o `integrity` que o registro e o lock declaram.
+    ///
+    /// O valor já vinha do registro e era guardado no lock, mas ninguém comparava: download
+    /// corrompido ou registro trocado instalava calado dentro do projeto.
+    static func conferir(_ data: Data, contra integrity: String?, nome: String) throws {
+        guard let integrity, let corte = integrity.firstIndex(of: "-") else { return }
+        let algoritmo = String(integrity[..<corte])
+        let esperado = String(integrity[integrity.index(after: corte)...])
+        let obtido: String? = switch algoritmo {
+        case "sha512": Data(SHA512.hash(data: data)).base64EncodedString()
+        case "sha256": Data(SHA256.hash(data: data)).base64EncodedString()
+        case "sha1": Data(Insecure.SHA1.hash(data: data)).base64EncodedString()
+        default: nil
+        }
+        // Algoritmo que não conhecemos não vira erro: seria travar a instalação por algo
+        // que talvez esteja certo.
+        guard let obtido else { return }
+        guard obtido == esperado else {
+            throw NpmError.tarball("o conteúdo de \(nome) não bate com o integrity declarado (\(algoritmo))")
+        }
+    }
+
     public func tarball(_ url: String, integrity: String?) async throws -> Data {
         let key = (integrity ?? url).replacingOccurrences(of: "/", with: "_").replacingOccurrences(of: "+", with: "-")
             .replacingOccurrences(
@@ -140,12 +163,18 @@ public struct HTTPRegistry: RegistryClient {
             )
         let file = cacheDir.appending(path: key + ".tgz")
         if let d = try? Data(contentsOf: file) {
-            return d
+            // Cache também passa pela conferência: arquivo pode ter sido truncado na
+            // gravação ou mexido depois.
+            if (try? Self.conferir(d, contra: integrity, nome: url)) != nil {
+                return d
+            }
+            try? FileManager.default.removeItem(at: file)
         }
         guard let u = URL(string: url) else { throw NpmError.tarball("URL inválida \(url)") }
         let (data, resp) = try await session.data(from: u)
         guard (200 ..< 300).contains((resp as? HTTPURLResponse)?.statusCode ?? 0)
         else { throw NpmError.tarball("HTTP ao baixar \(url)") }
+        try Self.conferir(data, contra: integrity, nome: url)
         try? FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
         try? data.write(to: file, options: .atomic)
         return data

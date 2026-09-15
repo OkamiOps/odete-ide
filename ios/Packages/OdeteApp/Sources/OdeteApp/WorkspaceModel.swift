@@ -32,6 +32,8 @@ public final class WorkspaceModel {
     /// Arquivo do painel da direita no modo Dois. Sem isto ele mostrava sempre a primeira
     /// aba que não fosse a ativa, e não havia como escolher o que comparar.
     public var secondary: String?
+    /// Última ação de arquivo, para o desfazer da árvore.
+    public var ultimaAcao: AcaoArquivo?
     public var error: String?
     public var stack: Stack = .html
     public var externalChange = false
@@ -369,15 +371,65 @@ public final class WorkspaceModel {
         } catch { self.error = error.localizedDescription }
     }
 
-    public func rename(_ path: String, to newName: String) {
+    public func rename(_ path: String, to newName: String, registrando: Bool = true) {
         do {
             let dest = try ops.rename(path, to: newName)
             remap(path, to: dest)
+            if registrando {
+                ultimaAcao = .renomeado(de: path, para: dest)
+            }
             reload()
         } catch { self.error = error.localizedDescription }
     }
 
-    public func move(_ path: String, into folder: String) {
+    /// O que dá para desfazer em arquivo. Só a última ação: mais que isso, com o disco
+    /// mudando por fora, vira promessa que não dá para cumprir.
+    public enum AcaoArquivo {
+        case movido(de: String, para: String)
+        case renomeado(de: String, para: String)
+        case apagado(path: String, lixo: URL?)
+
+        public var descricao: String {
+            switch self {
+            case let .movido(de, _): "mover \(nome(de))"
+            case let .renomeado(de, _): "renomear \(nome(de))"
+            case let .apagado(path, _): "apagar \(nome(path))"
+            }
+        }
+
+        public var podeDesfazer: Bool {
+            if case let .apagado(_, lixo) = self {
+                return lixo != nil
+            }
+            return true
+        }
+
+        private func nome(_ p: String) -> String {
+            p.split(separator: "/").last.map(String.init) ?? p
+        }
+    }
+
+    /// Desfaz a última ação de arquivo: tirar do lugar por engano, ou apagar sem querer,
+    /// deixa de ser definitivo.
+    public func desfazerArquivo() {
+        guard let a = ultimaAcao else { return }
+        ultimaAcao = nil
+        switch a {
+        case let .movido(de, para):
+            let pasta = de.split(separator: "/").dropLast().joined(separator: "/")
+            move(para, into: pasta, registrando: false)
+        case let .renomeado(de, para):
+            rename(para, to: de.split(separator: "/").last.map(String.init) ?? de, registrando: false)
+        case let .apagado(path, lixo):
+            guard let lixo else { return }
+            do {
+                try ops.restore(from: lixo, to: path)
+                reload()
+            } catch { self.error = error.localizedDescription }
+        }
+    }
+
+    public func move(_ path: String, into folder: String, registrando: Bool = true) {
         let name = path.split(separator: "/").last.map(String.init) ?? path
         let dest = folder.isEmpty ? name : "\(folder)/\(name)"
         guard dest != path else { return }
@@ -385,13 +437,17 @@ public final class WorkspaceModel {
             try ops.move(path, to: dest)
             remap(path, to: dest)
             expanded.insert(folder)
+            if registrando {
+                ultimaAcao = .movido(de: path, para: dest)
+            }
             reload()
         } catch { self.error = error.localizedDescription }
     }
 
     public func delete(_ path: String) {
         do {
-            try ops.delete(path)
+            let lixo = try ops.delete(path)
+            ultimaAcao = .apagado(path: path, lixo: lixo)
             for t in tabs where t.path == path || t.path.hasPrefix(path + "/") {
                 closeTab(t.path, force: true)
             }

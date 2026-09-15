@@ -68,9 +68,41 @@ public struct FileOps: Sendable {
         try FileManager.default.moveItem(at: url(rel), to: to)
     }
 
-    public func delete(_ rel: String) throws {
+    /// Manda para a lixeira e devolve onde foi parar, para dar para desfazer.
+    ///
+    /// `removeItem` apagava de vez: arquivo que o git não rastreia sumia sem volta, e o
+    /// apagar mora num menu de toque longo, fácil de acertar sem querer.
+    @discardableResult
+    public func delete(_ rel: String) throws -> URL? {
         guard exists(rel) else { throw FileError.notFound(rel) }
-        try FileManager.default.removeItem(at: url(rel))
+        let alvo = try url(rel)
+        var lixo: NSURL?
+        do {
+            try FileManager.default.trashItem(at: alvo, resultingItemURL: &lixo)
+            return lixo as URL?
+        } catch {
+            // Volume sem lixeira: guarda em .odete/lixeira, que dá na mesma para desfazer.
+            let pasta = root.appending(path: ".odete/lixeira", directoryHint: .isDirectory)
+            try? FileManager.default.createDirectory(at: pasta, withIntermediateDirectories: true)
+            let destino = pasta.appending(path: "\(Int(Date().timeIntervalSince1970))-\(alvo.lastPathComponent)")
+            do {
+                try FileManager.default.moveItem(at: alvo, to: destino)
+                return destino
+            } catch {
+                try FileManager.default.removeItem(at: alvo)
+                return nil
+            }
+        }
+    }
+
+    /// Traz de volta o que foi para a lixeira.
+    public func restore(from lixo: URL, to rel: String) throws {
+        let destino = try url(rel)
+        try FileManager.default.createDirectory(
+            at: destino.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try FileManager.default.moveItem(at: lixo, to: destino)
     }
 
     /// Data de modificação, para saber quando um arquivo aberto mudou por fora.

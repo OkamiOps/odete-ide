@@ -71,7 +71,54 @@ enum SSE {
 }
 
 /// POST com corpo JSON e leitura do SSE, com erro HTTP legível.
+///
+/// Tenta de novo quando a falha é do tipo que passa: limite de uso, erro de servidor e
+/// conexão que caiu antes de a resposta começar. Num iPad em wifi de casa isso acontece
+/// o tempo todo, e uma falha dessas matava o turno inteiro na primeira tentativa.
 func openSSE(
+    _ http: HTTPClient,
+    url: URL,
+    headers: [String: String],
+    body: [String: Any],
+    tentativas: Int = 3,
+    espera: @Sendable (Double) async throws -> Void = { try await Task.sleep(for: .seconds($0)) }
+) async throws -> AsyncThrowingStream<String, Error> {
+    var tentativa = 0
+    while true {
+        do {
+            return try await abrirSSE(http, url: url, headers: headers, body: body)
+        } catch {
+            tentativa += 1
+            guard tentativa < tentativas, let pausa = pausaAntesDeTentarDeNovo(error, tentativa) else { throw error }
+            try await espera(pausa)
+        }
+    }
+}
+
+/// Quanto esperar antes da próxima tentativa, ou nada quando não vale insistir.
+func pausaAntesDeTentarDeNovo(_ error: Error, _ tentativa: Int) -> Double? {
+    // 1 s, 3 s, 7 s. Sem sorteio: em app de uma pessoa só não existe rebanho para dispersar.
+    let escada = [1.0, 3.0, 7.0]
+    let pausa = escada[min(tentativa - 1, escada.count - 1)]
+    if let e = error as? AgentError {
+        switch e {
+        case let .http(code, _) where code == 429 || (500 ... 504).contains(code): return pausa
+        case let .transport(texto) where texto.contains("cancel") == false: return pausa
+        default: return nil
+        }
+    }
+    if let u = error as? URLError {
+        switch u.code {
+        case .timedOut, .networkConnectionLost, .cannotConnectToHost, .dnsLookupFailed,
+             .notConnectedToInternet, .cannotFindHost, .resourceUnavailable:
+            return pausa
+        default: return nil
+        }
+    }
+    return nil
+}
+
+private func abrirSSE(
     _ http: HTTPClient,
     url: URL,
     headers: [String: String],

@@ -87,6 +87,9 @@ struct FileTreeView: View {
                 .disabled(ws.active == nil)
             Button("Recolher tudo", systemImage: "arrow.down.right.and.arrow.up.left") { recolherTudo() }
             Divider()
+            if let a = ws.ultimaAcao, a.podeDesfazer {
+                Button("Desfazer \(a.descricao)", systemImage: "arrow.uturn.backward") { ws.desfazerArquivo() }
+            }
             Button("Recarregar", systemImage: "arrow.clockwise") { ws.reload() }
         } label: {
             Image(systemName: "ellipsis")
@@ -419,6 +422,9 @@ struct FileRow: View {
             }
             Divider()
             Button("Apagar", systemImage: "trash", role: .destructive) { deleting = node.path }
+            if let a = ws.ultimaAcao, a.podeDesfazer {
+                Button("Desfazer \(a.descricao)", systemImage: "arrow.uturn.backward") { ws.desfazerArquivo() }
+            }
         }
     }
 

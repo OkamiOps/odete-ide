@@ -57,6 +57,27 @@ struct WorkspaceModelTests {
         #expect(ws.text(for: "index.html") == "<h1>meu texto</h1>\n")
     }
 
+    /// Apagar vai para a lixeira e volta; mover e renomear também desfazem.
+    @Test func apagarMoverERenomearDesfazem() throws {
+        let (ws, _, root) = try make()
+        ws.delete("index.html")
+        #expect(!FileManager.default.fileExists(atPath: root.appending(path: "index.html").path))
+        #expect(ws.ultimaAcao?.podeDesfazer == true)
+        ws.desfazerArquivo()
+        #expect(FileManager.default.fileExists(atPath: root.appending(path: "index.html").path))
+
+        ws.createFolder(near: nil, name: "lib")
+        ws.move("src/main.js", into: "lib")
+        #expect(ws.tree.allFiles().map(\.path).contains("lib/main.js"))
+        ws.desfazerArquivo()
+        #expect(ws.tree.allFiles().map(\.path).contains("src/main.js"))
+
+        ws.rename("src/main.js", to: "app.js")
+        #expect(ws.tree.allFiles().map(\.path).contains("src/app.js"))
+        ws.desfazerArquivo()
+        #expect(ws.tree.allFiles().map(\.path).contains("src/main.js"))
+    }
+
     @Test func dirtyAndSave() throws {
         let (ws, chrome, root) = try make()
         chrome.snapshot.editor.autoSave = false

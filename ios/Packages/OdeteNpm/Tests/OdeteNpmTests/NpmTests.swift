@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import OdeteCore
 @testable import OdeteNpm
@@ -225,5 +226,35 @@ struct RegistryURLTests {
         #expect(r.packumentURL("react").absoluteString == "https://registry.npmjs.org/react")
         #expect(r.packumentURL("@vitejs/plugin-react")
             .absoluteString == "https://registry.npmjs.org/@vitejs%2Fplugin-react")
+    }
+}
+
+/// O pacote baixado tem que bater com o `integrity` do registro.
+struct IntegridadeTests {
+    let dados = Data("conteúdo do tarball".utf8)
+
+    func integridade(_ algoritmo: String) -> String {
+        switch algoritmo {
+        case "sha512": "sha512-" + Data(SHA512.hash(data: dados)).base64EncodedString()
+        case "sha1": "sha1-" + Data(Insecure.SHA1.hash(data: dados)).base64EncodedString()
+        default: "sha256-" + Data(SHA256.hash(data: dados)).base64EncodedString()
+        }
+    }
+
+    @Test func passaQuandoBate() throws {
+        for a in ["sha512", "sha256", "sha1"] {
+            try HTTPRegistry.conferir(dados, contra: integridade(a), nome: "x")
+        }
+    }
+
+    @Test func falhaQuandoNaoBate() {
+        #expect(throws: NpmError.self) {
+            try HTTPRegistry.conferir(Data("outra coisa".utf8), contra: integridade("sha512"), nome: "x")
+        }
+    }
+
+    @Test func semIntegridadeOuComAlgoritmoDesconhecidoNaoTrava() throws {
+        try HTTPRegistry.conferir(dados, contra: nil, nome: "x")
+        try HTTPRegistry.conferir(dados, contra: "sha999-abc", nome: "x")
     }
 }

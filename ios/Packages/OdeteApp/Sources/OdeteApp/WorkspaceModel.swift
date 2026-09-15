@@ -27,6 +27,9 @@ public final class WorkspaceModel {
     /// Scripts do package.json, na ordem em que estão escritos. Antes só existiam para
     /// quem lembrasse de digitar `npm run` no terminal.
     public private(set) var scripts: [(nome: String, comando: String)] = []
+    /// Pacotes que dá para importar: o que o package.json declara mais o que está
+    /// instalado em node_modules. É o que o autocompletar do `from "…"` oferece.
+    public private(set) var packages: [String] = []
     public var tabs: [EditorTab] = []
     public var active: String?
     public var buffers: [String: String] = [:]
@@ -137,6 +140,7 @@ public final class WorkspaceModel {
             let pkg = try? Data(contentsOf: root.appending(path: "package.json"))
             stack = Stack.detect(paths: filePaths, packageJSON: pkg)
             scripts = Self.lerScripts(pkg)
+            packages = Self.lerPacotes(pkg, root: root)
             preencherAbertas()
             reloadTick += 1
         } catch {
@@ -212,6 +216,35 @@ public final class WorkspaceModel {
         return (e, w)
     }
 
+    /// Dependências declaradas mais o que está de fato em node_modules, incluindo
+    /// escopos (`@vitejs/plugin-react`). Uma leitura de diretório, não a árvore inteira.
+    nonisolated static func lerPacotes(_ pkg: Data?, root: URL) -> [String] {
+        var nomes = Set<String>()
+        if let pkg, let obj = try? JSONSerialization.jsonObject(with: pkg) as? [String: Any] {
+            for chave in ["dependencies", "devDependencies", "peerDependencies"] {
+                for nome in (obj[chave] as? [String: String] ?? [:]).keys {
+                    nomes.insert(nome)
+                }
+            }
+        }
+        let nm = root.appending(path: "node_modules", directoryHint: .isDirectory)
+        let fm = FileManager.default
+        for item in (try? fm.contentsOfDirectory(at: nm, includingPropertiesForKeys: nil)) ?? [] {
+            let nome = item.lastPathComponent
+            if nome.hasPrefix(".") {
+                continue
+            }
+            if nome.hasPrefix("@") {
+                for dentro in (try? fm.contentsOfDirectory(at: item, includingPropertiesForKeys: nil)) ?? [] {
+                    nomes.insert("\(nome)/\(dentro.lastPathComponent)")
+                }
+            } else {
+                nomes.insert(nome)
+            }
+        }
+        return nomes.sorted()
+    }
+
     /// Depois de remontar a árvore, as pastas pesadas que estavam abertas voltam a ser
     /// lidas: sem isto elas apareciam abertas e vazias depois de qualquer mudança.
     func preencherAbertas() {
@@ -258,12 +291,14 @@ public final class WorkspaceModel {
             let caminhos = arvore.allFiles().map(\.path).filter { !Ignore.isNoisePath($0) }
             let stack = Stack.detect(paths: caminhos, packageJSON: pkg)
             let scripts = Self.lerScripts(pkg)
+            let pacotes = Self.lerPacotes(pkg, root: raiz)
             await MainActor.run {
                 guard let self else { return }
                 self.tree = arvore
                 self.filePaths = caminhos
                 self.stack = stack
                 self.scripts = scripts
+                self.packages = pacotes
                 self.preencherAbertas()
                 self.reloadTick += 1
             }

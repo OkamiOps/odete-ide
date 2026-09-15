@@ -59,3 +59,39 @@ struct CompleteTests {
         #expect(ctx?.prefix == "bar" && ctx?.start == 4)
     }
 }
+
+/// `from "re…"` tem que oferecer os pacotes instalados: é para isso que serve enxergar
+/// node_modules na hora de escrever o import.
+struct CompleteImportTests {
+    let pacotes = ["react", "react-dom", "@vitejs/plugin-react", "vite"]
+
+    func sugestoes(_ texto: String) -> [String] {
+        Complete.suggestions(
+            text: texto,
+            cursor: texto.count,
+            language: .tsx,
+            files: ["src/App.tsx", "src/lib/util.ts"],
+            currentPath: "src/main.tsx",
+            packages: pacotes
+        ).map(\.label)
+    }
+
+    @Test func oferecePacoteInstalado() {
+        #expect(sugestoes("import x from \"re").contains("react"))
+        #expect(sugestoes("import x from \"re").contains("react-dom"))
+    }
+
+    @Test func ofereceEscopo() {
+        #expect(sugestoes("import x from \"@vitejs/").contains("plugin-react"))
+    }
+
+    @Test func caminhoRelativoNaoVirapacote() {
+        let s = sugestoes("import x from \"./")
+        #expect(!s.contains("react"))
+        #expect(s.contains("App.tsx") || s.contains("lib/"))
+    }
+
+    @Test func srcDeHtmlNaoOferecePacote() {
+        #expect(!sugestoes("<script src=\"re").contains("react"))
+    }
+}

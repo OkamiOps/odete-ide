@@ -314,7 +314,8 @@ public struct CodeEditorView: UIViewRepresentable {
                 cursor: cursor,
                 language: parent.language,
                 files: source.files,
-                currentPath: source.path
+                currentPath: source.path,
+                packages: source.packages
             )
             guard !items.isEmpty else {
                 hidePopup()

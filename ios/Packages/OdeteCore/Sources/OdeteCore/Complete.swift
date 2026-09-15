@@ -37,6 +37,8 @@ public struct CompletionContext: Sendable, Hashable {
     /// Offset (em `Character`s) onde o prefixo começa.
     public var start: Int
     public var mode: Mode
+    /// Verdadeiro quando o trecho é um import de módulo (`from "…"`), e não um `src=`.
+    public var modulo = false
 }
 
 public enum Complete {
@@ -114,12 +116,15 @@ public enum Complete {
         // Caminho: dentro de aspas depois de from / import( / require( / src= / href=, ou começando com ./ ../ @/
         var q = end - 1
         var pathStart: Int?
+        var moduloAqui = false
         while q >= 0, chars[q] != "\n" {
             if chars[q] == "\"" || chars[q] == "'" || chars[q] == "`" {
                 let inside = String(chars[(q + 1) ..< end])
                 let before = String(chars[max(0, q - 12) ..< q])
-                let looksImport = before.contains("from ") || before.contains("import(") || before.contains("require(")
-                    || before.contains("import ") || before.contains("src=") || before.contains("href=")
+                let ehModulo = before.contains("from ") || before.contains("import(") || before
+                    .contains("require(") || before.contains("import ")
+                let looksImport = ehModulo || before.contains("src=") || before.contains("href=")
+                moduloAqui = ehModulo
                 if looksImport || inside.hasPrefix("./") || inside.hasPrefix("../") || inside.hasPrefix("@/") || inside
                     .hasPrefix("/")
                 {
@@ -134,7 +139,12 @@ public enum Complete {
             guard !inside.contains(" ") else { return nil }
             let slash = inside.lastIndex(of: "/").map { inside.distance(from: inside.startIndex, to: $0) + 1 } ?? 0
             let prefix = String(inside.dropFirst(slash))
-            return CompletionContext(prefix: prefix, start: ps + slash, mode: .path(String(inside.prefix(slash))))
+            return CompletionContext(
+                prefix: prefix,
+                start: ps + slash,
+                mode: .path(String(inside.prefix(slash))),
+                modulo: moduloAqui
+            )
         }
         var s = end
         while s > 0, isWord(chars[s - 1]) {
@@ -157,19 +167,39 @@ public enum Complete {
         language: Language,
         files: [String] = [],
         currentPath: String = "",
+        packages: [String] = [],
         limit: Int = 8
     ) -> [Completion] {
         guard let ctx = context(text: text, cursor: cursor) else { return [] }
         switch ctx.mode {
         case let .path(dir):
-            return paths(dir: dir, prefix: ctx.prefix, files: files, currentPath: currentPath, limit: limit)
+            return paths(
+                dir: dir,
+                prefix: ctx.prefix,
+                files: files,
+                currentPath: currentPath,
+                // Pacote instalado só faz sentido num import sem caminho: `from "re…"`.
+                // Com `./`, `/` ou `@/` a pessoa está apontando para dentro do projeto.
+                packages: ctx.modulo && !dir.hasPrefix(".") && !dir.hasPrefix("/") && !dir.hasPrefix("@/")
+                    ? packages : [],
+                dir: dir,
+                limit: limit
+            )
         case .word:
             guard ctx.prefix.count >= 2 else { return [] }
             return words(text: text, cursor: cursor, prefix: ctx.prefix, language: language, limit: limit)
         }
     }
 
-    static func paths(dir: String, prefix: String, files: [String], currentPath: String, limit: Int) -> [Completion] {
+    static func paths(
+        dir: String,
+        prefix: String,
+        files: [String],
+        currentPath: String,
+        packages: [String] = [],
+        dir base0: String = "",
+        limit: Int
+    ) -> [Completion] {
         let base: String
         if dir.hasPrefix("@/") {
             base = "src/" + dir.dropFirst(2)
@@ -188,6 +218,15 @@ public enum Complete {
         }
         var seen = Set<String>()
         var out: [Completion] = []
+        // Pacotes instalados primeiro: é o que se procura quando se escreve `from "`.
+        // Sem isto, ver node_modules na árvore não ajudava a escrever o import.
+        for nome in packages {
+            let alvo = base0.isEmpty ? nome : String(nome.dropFirst(min(base0.count, nome.count)))
+            guard nome.hasPrefix(base0), !alvo.isEmpty,
+                  prefix.isEmpty || alvo.lowercased().hasPrefix(prefix.lowercased()),
+                  seen.insert(alvo).inserted else { continue }
+            out.append(Completion(label: alvo, insert: alvo, kind: .path, detail: "pacote"))
+        }
         for f in files where f != currentPath {
             let rel: Substring
             if base.isEmpty {

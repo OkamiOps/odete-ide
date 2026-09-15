@@ -57,9 +57,12 @@ public struct EditorIssue: Sendable, Hashable, Identifiable {
 /// Fonte do autocompletar: caminhos do projeto e o arquivo aberto.
 public struct CompletionSource: Sendable, Hashable {
     public var files: [String]
+    /// Pacotes instalados, para completar `from "…"`.
+    public var packages: [String]
     public var path: String
-    public init(files: [String], path: String) {
+    public init(files: [String], packages: [String] = [], path: String) {
         self.files = files
+        self.packages = packages
         self.path = path
     }
 }

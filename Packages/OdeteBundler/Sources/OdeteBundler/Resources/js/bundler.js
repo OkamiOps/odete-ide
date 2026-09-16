@@ -25,6 +25,12 @@
     setup(build) {
       build.onResolve({ filter: /.*/ }, (args) => {
         if (/^(https?:|data:|node:)/.test(args.path)) return { path: args.path, external: true };
+        // Externos pedidos por quem chamou: no render do Next o React precisa ser o
+        // mesmo do servidor, e `next/*` é atendido por substitutos nossos. Empacotar
+        // uma segunda cópia do React quebra hooks e contexto.
+        if (opts.external && opts.external.some((e) => e.endsWith("/*") ? args.path.startsWith(e.slice(0, -1)) : args.path === e)) {
+          return { path: args.path, external: true };
+        }
         if (args.path.startsWith("virtual:") ) return { path: args.path, namespace: "virtual" };
         const importer = args.importer || path.join(root, "index.js");
         // condição browser: tenta "browser"/"import" antes de "require"

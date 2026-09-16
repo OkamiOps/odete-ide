@@ -1,6 +1,6 @@
 import Foundation
-import OdeteNpm
 import OdeteBundler
+import OdeteNpm
 import OdeteRuntime
 import Testing
 

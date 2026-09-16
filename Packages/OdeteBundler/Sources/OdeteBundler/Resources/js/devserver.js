@@ -93,6 +93,81 @@
     return "não encontrado: " + p + extra;
   }
 
+  // ---- páginas do Next ----
+  // O `require` do runtime resolve node_modules e transpila TSX, então a página do
+  // projeto e o React dele são carregados direto, a partir da raiz do projeto.
+  let ctxNext = null;
+  function contextoNext() {
+    if (ctxNext) return ctxNext;
+    const req = globalThis.__odete_makeRequire(path.join(state.root, "__odete_next__.js"));
+    const React = req("react");
+    const servidor = req("react-dom/server");
+    ctxNext = { React, servidor, req, carrega: carregaNext };
+    return ctxNext;
+  }
+
+  // Cada página vira um pacote CJS só, com React e `next/*` de fora.
+  //
+  // Transpilar arquivo a arquivo não fecha: `__transformCJS` é assíncrono e o `require`
+  // dentro do módulo é síncrono. Empacotando, tudo o que é relativo já entra junto e o
+  // `__req` só precisa atender o que ficou de fora — e é aí que o React continua sendo
+  // um só, o do servidor, senão hook e contexto quebram com duas cópias.
+  const pacoteNext = new Map();
+  async function carregaNext(arquivo) {
+    const mt = fs.statSync(arquivo).mtimeMs;
+    const cache = pacoteNext.get(arquivo);
+    if (cache && cache.mt === mt) return cache.exports;
+    const r = await globalThis.__build({
+      root: state.root, entries: [path.relative(state.root, arquivo)],
+      format: "cjs", platform: "node", dev: true, outdir: "__odete_next",
+      external: ["react", "react-dom", "react/jsx-runtime", "react/jsx-dev-runtime", "next/*"],
+    });
+    if (!r.ok) throw new Error((r.errors[0] && r.errors[0].text) || "build da página falhou");
+    const saida = r.files.find((f) => f.path.endsWith(".js"));
+    if (!saida) throw new Error("build da página não produziu JS");
+    const mod = { exports: {} };
+    const ctx = contextoNext();
+    const req = (spec) => {
+      if (spec.startsWith("next/")) return substitutoNext(spec, ctx.React);
+      return ctx.req(spec);
+    };
+    const fn = (0, eval)("(function (module, exports, require) {" + saida.text + "\n})\n//# sourceURL=" + arquivo);
+    fn(mod, mod.exports, req);
+    pacoteNext.set(arquivo, { mt, exports: mod.exports });
+    return mod.exports;
+  }
+
+  // `next/link` e `next/image` existem para o roteador e o otimizador do Next, que aqui
+  // não existem: viram a marcação que eles produziriam.
+  function substitutoNext(spec, React) {
+    const nome = spec.slice("next/".length);
+    if (nome === "link") {
+      const Link = (props) => {
+        const { href, children, prefetch, replace, scroll, shallow, locale, ...resto } = props || {};
+        return React.createElement("a", Object.assign({ href: typeof href === "string" ? href : "#" }, resto), children);
+      };
+      return { __esModule: true, default: Link };
+    }
+    if (nome === "image") {
+      const Img = (props) => {
+        const { src, alt, width, height, priority, quality, fill, loader, placeholder, ...resto } = props || {};
+        return React.createElement("img", Object.assign({
+          src: typeof src === "object" && src ? src.src : src, alt: alt || "", width, height,
+        }, resto));
+      };
+      return { __esModule: true, default: Img };
+    }
+    if (nome === "head") {
+      const Head = (props) => React.createElement(React.Fragment, null, props && props.children);
+      return { __esModule: true, default: Head };
+    }
+    throw new Error("Odete ainda não tem substituto para " + spec);
+  }
+
+  function faltaReact(e) {
+    return /Cannot find module '(react|react-dom)/.test(String(e && e.message));
+  }
+
   // ---- páginas .astro ----
   // Carrega um .astro como módulo, compilando na hora e resolvendo os imports dele —
   // inclusive outros .astro, que são componentes e layouts. Cache por mtime, para
@@ -161,15 +236,30 @@
         if ([".ts", ".tsx", ".jsx", ".mts"].includes(ext)) { const b = await bundle(path.relative(state.root, f)); return send(res, 200, MIME[".js"], b.js); }
         return send(res, 200, MIME[ext] || "application/octet-stream", fs.readFileSync(f));
       }
-      // páginas de framework, antes do fallback: um projeto Astro não tem index.html
+      // páginas de framework, antes do fallback: nem Astro nem Next têm index.html
       const pagina = paginaAstro(p);
       if (pagina) return send(res, 200, MIME[".html"], await renderizaAstro(pagina));
+      const rotaNext = globalThis.__next && globalThis.__next.rota(fs, path, state.root, p);
+      if (rotaNext) {
+        try {
+          const corpo = await globalThis.__next.renderiza(contextoNext(), rotaNext, url);
+          const doc = "<!doctype html><html><head>" + importMap() + CLIENT +
+            "</head><body>" + corpo + "</body></html>";
+          return send(res, 200, MIME[".html"], doc);
+        } catch (e) {
+          if (faltaReact(e)) {
+            return send(res, 500, "text/plain; charset=utf-8",
+              "O projeto é Next mas react e react-dom não estão instalados.\nRode npm install no terminal.");
+          }
+          throw e;
+        }
+      }
       // SPA fallback
       const index = path.join(state.root, "index.html");
       if (!path.extname(p) && fs.existsSync(index)) return send(res, 200, MIME[".html"], html(index));
       send(res, 404, "text/plain; charset=utf-8", recado404(p));
     } catch (e) {
-      send(res, 500, "text/plain; charset=utf-8", String(e && e.stack || e));
+      send(res, 500, "text/plain; charset=utf-8", String((e && e.message) || e) + "\n\n" + String((e && e.stack) || ""));
     }
   }
 

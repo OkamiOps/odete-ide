@@ -25,7 +25,7 @@ public final class DevServer: @unchecked Sendable {
         let js = Bundle.module.url(forResource: "js", withExtension: nil)!
         // O compilador de .astro vem antes: o servidor chama `__astroCompila` ao servir
         // uma rota de `src/pages`.
-        for arquivo in ["astro.js", "devserver.js"] {
+        for arquivo in ["astro.js", "next.js", "devserver.js"] {
             try await esbuild.engine.evaluate(
                 String(contentsOf: js.appending(path: arquivo), encoding: .utf8),
                 name: arquivo

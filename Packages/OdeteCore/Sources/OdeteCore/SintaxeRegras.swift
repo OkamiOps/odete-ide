@@ -13,9 +13,17 @@ import OdeteI18n
 extension Sintaxe {
     /// Linguagens onde toda instrução termina em `;`.
     ///
-    /// Rust fica de fora de propósito: lá a última expressão de um bloco é o valor de
-    /// retorno e não leva `;`, e distinguir isso sem parser daria falso a cada função.
-    static let pedemPontoEVirgula: Set<Language> = [.c, .cpp, .csharp, .java, .php]
+    /// Rust entra com uma ressalva própria: lá a última expressão de um bloco é o valor
+    /// de retorno e não leva `;`. Mas essa expressão está sempre **colada no `}`** — e é
+    /// isso que dá para checar sem parser: falta `;` quando a linha seguinte não é o
+    /// fecho do bloco.
+    static let pedemPontoEVirgula: Set<Language> = [.c, .cpp, .csharp, .java, .php, .rust]
+
+    /// Começos de linha que, em Rust, nunca pedem `;`.
+    private static let aberturasRust = [
+        "fn", "impl", "trait", "mod", "pub", "struct", "enum", "match", "loop", "unsafe",
+        "where", "use", "extern", "type", "const", "static", "async", "macro_rules",
+    ]
 
     /// Começo de linha que nunca precisa de `;`.
     private static let aberturas = [
@@ -92,6 +100,7 @@ extension Sintaxe {
         }
         guard pedemPontoEVirgula.contains(language) else { return [] }
         let linhas = mascara(text: text, language: language).components(separatedBy: "\n")
+        let listas = dentroDeLista(linhas)
         var out: [LintIssue] = []
         for (i, bruta) in linhas.enumerated() {
             let linha = bruta.trimmingCharacters(in: .whitespaces)
@@ -101,9 +110,23 @@ extension Sintaxe {
                 continue
             }
             let primeira = linha.split(separator: " ").first.map(String.init) ?? linha
-            let palavra = primeira.prefix { $0.isLetter || $0 == "_" }
-            if aberturas.contains(String(palavra)) {
+            let palavra = String(primeira.prefix { $0.isLetter || $0 == "_" })
+            if aberturas.contains(palavra) {
                 continue
+            }
+            if language == .rust {
+                if aberturasRust.contains(palavra) {
+                    continue
+                }
+                // Atributo (`#[derive(...)]`) e braço de `match` (`A => b`).
+                if linha.hasPrefix("#[") || linha.contains("=>") {
+                    continue
+                }
+                // A expressão de retorno está sempre colada no `}` que fecha o bloco. Se
+                // a próxima linha não é esse fecho, então era instrução e faltou o `;`.
+                if proximaComeca(linhas, depoisDe: i, com: ["}"]) {
+                    continue
+                }
             }
             // Cabeçalho de bloco: `if (x)`, `while (y)` e o `for` de três partes terminam
             // em `)` e a instrução vem na linha de baixo.
@@ -117,9 +140,9 @@ extension Sintaxe {
             if proximaComeca(linhas, depoisDe: i, com: continuacoes) {
                 continue
             }
-            // Corpo de `enum` e de inicializador de vetor: lá a separação é vírgula, e a
+            // Inicializador de vetor e corpo de `enum`: lá a separação é vírgula, e a
             // falta dela é outra regra.
-            if dentroDeLista(linhas, ate: i) {
+            if listas[i] {
                 continue
             }
             out.append(aviso(
@@ -145,16 +168,42 @@ extension Sintaxe {
         return false
     }
 
-    /// Está dentro de `[` ou de `{` que é lista de valores, e não bloco de instruções?
+    /// Para cada linha: ela está dentro de uma lista de valores?
     ///
-    /// Aproximação de propósito: conta os colchetes abertos até aqui. Vetor literal em
-    /// várias linhas é o caso que faria a regra do `;` disparar à toa.
-    private static func dentroDeLista(_ linhas: [String], ate i: Int) -> Bool {
-        var colchetes = 0
-        for l in linhas[0 ..< i] {
-            colchetes += l.filter { $0 == "[" }.count - l.filter { $0 == "]" }.count
+    /// Numa linguagem de chaves, `{` é quase sempre bloco de instruções — mas não quando
+    /// vem depois de `=` ou de `]`, que é o inicializador de vetor (`int[] n = { 1, 2 }`,
+    /// `new String[] { "a", "b" }`). Ali dentro a separação é vírgula e não `;`, e as
+    /// duas regras precisam saber disso: uma para não cobrar, a outra para cobrar.
+    static func dentroDeLista(_ linhas: [String]) -> [Bool] {
+        var out: [Bool] = []
+        // Cada elemento diz se aquele nível aberto é lista de valores.
+        var pilha: [Bool] = []
+        for bruta in linhas {
+            out.append(pilha.contains(true))
+            var antes = ""
+            for c in bruta {
+                switch c {
+                case "[":
+                    pilha.append(true)
+                case "{":
+                    let cauda = antes.trimmingCharacters(in: .whitespaces)
+                    pilha.append(cauda.hasSuffix("=") || cauda.hasSuffix("]") || cauda.hasSuffix(","))
+                case "(":
+                    pilha.append(false)
+                case "]", "}", ")":
+                    if !pilha.isEmpty {
+                        pilha.removeLast()
+                    }
+                default:
+                    break
+                }
+                antes.append(c)
+            }
+            // A linha que abre a lista já conta como dentro, para o item da linha de
+            // baixo ser medido certo.
+            out[out.count - 1] = out[out.count - 1] || pilha.contains(true)
         }
-        return colchetes > 0
+        return out
     }
 
     // MARK: - vírgula
@@ -168,16 +217,32 @@ extension Sintaxe {
         "for ", "if ", "else", "elif ", "in ", "and ", "or ", "not ", "as ", "async ", "await ",
     ]
 
+    /// Onde `[` e `{` são sempre lista de valores, e nunca bloco de instruções.
+    ///
+    /// Em Lua o bloco é `do … end`, então `{` só pode ser tabela; em TOML e Python, o
+    /// mesmo. Nas linguagens de chaves só o `[` é seguro, porque ali `{` é bloco.
+    private static func gruposDeDados(_ language: Language) -> Set<Character>? {
+        switch language {
+        case .python, .lua, .toml: ["(", "[", "{"]
+        case .c, .cpp, .csharp, .java, .rust: ["["]
+        default: nil
+        }
+    }
+
     public static func virgula(text: String, language: Language) -> [LintIssue] {
-        guard language == .python else { return [] }
+        guard let grupos = gruposDeDados(language) else { return [] }
+        let fechas: Set<Character> = [")", "]", "}"]
         let linhas = mascara(text: text, language: language).components(separatedBy: "\n")
+        // Nas linguagens de chaves, quem diz se aqui é lista é a leitura de contexto: o
+        // `{` de `new String[] {` é dado, o `{` de `void f() {` é bloco.
+        let porContexto = pedemPontoEVirgula.contains(language) ? dentroDeLista(linhas) : []
         var out: [LintIssue] = []
         var profundidade = 0
         for (i, bruta) in linhas.enumerated() {
             let linha = bruta.trimmingCharacters(in: .whitespaces)
-            let dentro = profundidade > 0
-            profundidade += bruta.filter { "([{".contains($0) }.count
-            profundidade -= bruta.filter { ")]}".contains($0) }.count
+            let dentro = porContexto.isEmpty ? profundidade > 0 : porContexto[i]
+            profundidade += bruta.filter { grupos.contains($0) }.count
+            profundidade -= bruta.filter { fechas.contains($0) }.count
             profundidade = max(0, profundidade)
             guard dentro, let ultimo = linha.last else { continue }
             // Item que já termina em vírgula, ou linha que abre ou fecha o grupo.
@@ -203,10 +268,17 @@ extension Sintaxe {
             }
             // Compreensão e gerador: `v` / `for v in xs` / `if cond` são uma expressão só,
             // quebrada em linhas, e não itens de uma lista.
-            if proximaComeca(linhas, depoisDe: i, com: Self.continuamEmPython) {
-                continue
+            if language == .python {
+                if proximaComeca(linhas, depoisDe: i, com: Self.continuamEmPython) {
+                    continue
+                }
+                if Self.continuamEmPython.contains(where: { linha.hasPrefix($0) }) {
+                    continue
+                }
             }
-            if Self.continuamEmPython.contains(where: { linha.hasPrefix($0) }) {
+            // Numa linguagem de chaves o `[` pode ser índice no meio de uma instrução que
+            // termina em `;`: ali a separação não é vírgula.
+            if ultimo == ";" {
                 continue
             }
             out.append(aviso("falta-virgula", tr("falta `,` entre os itens"), i + 1, bruta.count, 1))

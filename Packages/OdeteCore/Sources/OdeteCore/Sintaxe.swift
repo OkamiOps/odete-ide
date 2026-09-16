@@ -167,12 +167,23 @@ public enum Sintaxe {
             }
             // comentário de bloco
             for par in d.bloco where casa(par.abre, em: i) {
+                let inicio = (linha, coluna)
                 anda(par.abre.count, escondendo: true)
                 while i < chars.count, !casa(par.fecha, em: i) {
                     anda(1, escondendo: true)
                 }
                 if i < chars.count {
                     anda(par.fecha.count, escondendo: true)
+                } else {
+                    // Comentário que engole o resto do arquivo. O editor mostra tudo
+                    // apagado e não diz por quê — daqui em diante nada mais é código.
+                    out.append(aviso(
+                        "comentario-aberto",
+                        tr("`%1$@` aberto aqui e sem `%2$@`", par.abre, par.fecha),
+                        inicio.0,
+                        inicio.1,
+                        par.abre.count
+                    ))
                 }
                 continue laco
             }

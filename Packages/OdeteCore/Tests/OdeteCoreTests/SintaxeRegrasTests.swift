@@ -253,3 +253,192 @@ struct SintaxeRegrasTests {
         #expect(erros("public class Loja {\n}\n", .java, path: "src/Loja.java").isEmpty)
     }
 }
+
+/// O que faltava fechar: `;` em Rust, vírgula fora do Python, e comentário de bloco que
+/// engole o resto do arquivo.
+struct SintaxeRestoTests {
+    func erros(_ texto: String, _ lang: Language) -> [LintIssue] {
+        Lint.rules(text: texto, language: lang).filter { $0.severity == .error }
+    }
+
+    func descricao(_ texto: String, _ lang: Language) -> String {
+        erros(texto, lang).map { "l\($0.line) \($0.rule)" }.joined(separator: " | ")
+    }
+
+    // MARK: - Rust
+
+    @Test func rustCobraOPontoEVirgula() {
+        let achados = erros("""
+        fn main() {
+            let x = 1
+            println!("{}", x);
+        }
+        """, .rust)
+        #expect(achados.contains { $0.rule == "falta-ponto-e-virgula" }, "não cobrou o `;` em Rust")
+        #expect(achados.first?.line == 2)
+    }
+
+    /// O ponto que me fez pular Rust antes: a última expressão do bloco é o retorno e
+    /// não leva `;`. Ela está sempre colada no `}`.
+    @Test func expressaoDeRetornoDeRustNaoPedePontoEVirgula() {
+        let codigo = """
+        fn dobro(x: i32) -> i32 {
+            x * 2
+        }
+
+        fn escolhe(x: i32) -> i32 {
+            if x > 0 {
+                x
+            } else {
+                -x
+            }
+        }
+        """
+        #expect(erros(codigo, .rust).isEmpty, "acusou o retorno implícito: \(descricao(codigo, .rust))")
+    }
+
+    @Test func rustValidoNaoAcusaNada() {
+        let codigo = """
+        use std::collections::HashMap;
+        use std::fmt;
+
+        #[derive(Debug, Clone, PartialEq)]
+        pub struct Item {
+            pub nome: String,
+            pub preco: f64,
+        }
+
+        impl fmt::Display for Item {
+            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                write!(f, "{} ({})", self.nome, self.preco)
+            }
+        }
+
+        pub enum Estado {
+            Aberto,
+            Fechado,
+        }
+
+        const NOMES: [&str; 3] = [
+            "um",
+            "dois",
+            "tres",
+        ];
+
+        pub fn total(itens: &[Item]) -> f64 {
+            let mut soma = 0.0;
+            for i in itens {
+                soma += i.preco;
+            }
+            let rotulo = match itens.len() {
+                0 => "vazio",
+                1 => "um",
+                _ => "varios",
+            };
+            println!("{}", rotulo);
+            let mapa: HashMap<String, f64> = itens
+                .iter()
+                .map(|i| (i.nome.clone(), i.preco))
+                .collect();
+            soma + mapa.len() as f64
+        }
+        """
+        #expect(erros(codigo, .rust).isEmpty, "acusou erro em Rust válido: \(descricao(codigo, .rust))")
+    }
+
+    // MARK: - vírgula fora do Python
+
+    @Test func virgulaQueFaltaEmListaDeOutrasLinguagens() {
+        let rust = """
+        const N: [&str; 3] = [
+            "um"
+            "dois",
+            "tres",
+        ];
+        """
+        #expect(erros(rust, .rust).contains { $0.rule == "falta-virgula" }, "Rust: \(descricao(rust, .rust))")
+
+        let java = """
+        class A {
+            int[] n = {
+                1,
+                2
+            };
+            String[] s = new String[] {
+                "a"
+                "b",
+            };
+        }
+        """
+        #expect(erros(java, .java).contains { $0.rule == "falta-virgula" }, "Java: \(descricao(java, .java))")
+
+        let lua = """
+        local t = {
+            um = 1
+            dois = 2,
+        }
+        """
+        #expect(erros(lua, .lua).contains { $0.rule == "falta-virgula" }, "Lua: \(descricao(lua, .lua))")
+
+        let toml = """
+        nomes = [
+          "um"
+          "dois",
+        ]
+        """
+        #expect(erros(toml, .toml).contains { $0.rule == "falta-virgula" }, "TOML: \(descricao(toml, .toml))")
+    }
+
+    @Test func luaValidoNaoAcusaNada() {
+        let codigo = """
+        -- config
+        local M = {}
+
+        local cores = {
+            fundo = "#000",
+            frente = "#fff",
+        }
+
+        function M.pinta(nome)
+            if cores[nome] then
+                return cores[nome]
+            end
+            return nil
+        end
+
+        return M
+        """
+        #expect(erros(codigo, .lua).isEmpty, "acusou erro em Lua válido: \(descricao(codigo, .lua))")
+    }
+
+    @Test func tomlValidoNaoAcusaNada() {
+        let codigo = """
+        [pacote]
+        nome = "odete"
+        versao = "1.0"
+        autores = ["Marcos"]
+
+        [dependencias]
+        serde = { version = "1", features = ["derive"] }
+
+        [[bin]]
+        nome = "odete"
+        caminho = "src/main.rs"
+        """
+        #expect(erros(codigo, .toml).isEmpty, "acusou erro em TOML válido: \(descricao(codigo, .toml))")
+    }
+
+    // MARK: - comentário
+
+    @Test func comentarioDeBlocoQueNuncaFecha() {
+        let achados = erros("int main(void) {\n  /* começa e some\n  return 0;\n}\n", .c)
+        #expect(achados.contains { $0.rule == "comentario-aberto" }, "o comentário engoliu o arquivo calado")
+        #expect(achados.first { $0.rule == "comentario-aberto" }?.line == 2, "apontou a linha errada")
+        // E, de quebra, a chave de `main` fica aberta: o comentário comeu o `}`.
+        #expect(achados.contains { $0.rule == "sem-fechamento" })
+    }
+
+    @Test func comentarioFechadoNaoEhErro() {
+        #expect(erros("int main(void) {\n  /* ok */\n  return 0;\n}\n", .c).isEmpty)
+    }
+}

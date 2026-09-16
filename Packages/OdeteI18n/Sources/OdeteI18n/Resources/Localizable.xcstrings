@@ -17137,6 +17137,34 @@
         }
       }
     },
+    "`%1$@` aberto aqui e sem `%2$@`": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`%1$@` opened here with no `%2$@`"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`%1$@` hier geöffnet, ohne `%2$@`"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`%1$@` ouvert ici, sans `%2$@`"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`%1$@` abierto aquí y sin `%2$@`"
+          }
+        }
+      }
+    },
     "`%1$@` aberto aqui e sem `end`": {
       "localizations": {
         "en": {

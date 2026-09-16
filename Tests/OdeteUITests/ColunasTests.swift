@@ -54,6 +54,8 @@ final class ColunasTests: XCTestCase {
         let centro = app.otherElements["colunaCentral"]
         XCTAssertTrue(centro.waitForExistence(timeout: 8), "não achei a coluna central")
 
+        // Deixa em paisagem, que é como se usa iPad. O laço abaixo passa por retrato e
+        // pelas duas paisagens: as três precisam dar a mesma conta.
         defer { XCUIDevice.shared.orientation = .landscapeLeft }
         for orientacao in [UIDeviceOrientation.portrait, .landscapeLeft, .landscapeRight] {
             XCUIDevice.shared.orientation = orientacao

@@ -20,6 +20,44 @@ struct ParserErrosTests {
         }
     }
 
+    /// Dizer "não entendo este trecho" é pouco. Quando inserir uma ficha só deixa a
+    /// árvore inteira limpa, o recado passa a ser qual ficha falta — e quem confere é o
+    /// parser, que analisou de novo, não um palpite.
+    @Test func oConsertoDeUmaFichaDizOQueFalta() {
+        let casos: [(Language, String, String, Int)] = [
+            (.rust, "fn soma(a: i32) -> i32 {\n    let t = a + 1\n    t\n}\n", ";", 2),
+            (.c, "int main(void) {\n  int x = 1\n  return x;\n}\n", ";", 2),
+            (.java, "class A {\n  void f() {\n    int x = 1\n    g(x);\n  }\n}\n", ";", 3),
+            (.python, "d = {\n    \"a\": 1\n    \"b\": 2,\n}\n", ",", 2),
+            (.json, "{\n  \"a\": 1\n  \"b\": 2\n}\n", ",", 2),
+            // Fechamento de bloco aponta a linha **depois** do corpo: é onde se digita o
+            // `end`, e não no fim da última instrução.
+            (.ruby, "def f(x)\n  x + 1\n", "end", 3),
+            (.lua, "local function f(x)\n  return x\n", "end", 3),
+        ]
+        for (lang, codigo, ficha, linha) in casos {
+            let achados = erros(codigo, lang)
+            #expect(
+                achados.first?.rule == "falta-simbolo",
+                "\(lang.rawValue): ficou no recado genérico — \(descricao(codigo, lang))"
+            )
+            #expect(
+                achados.first?.message.contains(ficha) == true,
+                "\(lang.rawValue): não disse que falta `\(ficha)` — \(descricao(codigo, lang))"
+            )
+            #expect(
+                achados.first?.line == linha,
+                "\(lang.rawValue): esperava linha \(linha), veio \(descricao(codigo, lang))"
+            )
+        }
+    }
+
+    /// O conserto não pode inventar: código correto continua sem recado.
+    @Test func oConsertoNaoDisparaEmCodigoCerto() {
+        #expect(erros("fn f(x: i32) -> i32 {\n    x + 1\n}\n", .rust).isEmpty)
+        #expect(erros("d = {\n    \"a\": 1,\n}\n", .python).isEmpty)
+    }
+
     /// A gramática diz **qual** símbolo falta, com a posição. É isso no lugar de eu
     /// escrever uma regra por linguagem.
     @Test func oParserDizQualSimboloFalta() {

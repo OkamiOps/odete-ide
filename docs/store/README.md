@@ -67,6 +67,11 @@ Texto para o campo "Notes" da submissão. A primeira parte é a que importa: a d
 > **On the local web server.** `npm run dev` binds a server to 127.0.0.1 so the Preview pane
 > can load the user's project. It is not reachable from outside the device.
 >
+> **On the Preview pane.** It is not a browser. Its navigation policy allows only the app's
+> own `odete://` scheme and `localhost`/`127.0.0.1`, which is where the user's dev server
+> listens. Any other address is refused in the pane; a link the user taps opens in Safari
+> instead. That is why the app declares no unrestricted web access.
+>
 > **Test account.** None needed. Everything except the AI agent works with no sign-in at all;
 > for the agent, any OpenAI-compatible API key can be pasted in Settings → AI accounts.
 

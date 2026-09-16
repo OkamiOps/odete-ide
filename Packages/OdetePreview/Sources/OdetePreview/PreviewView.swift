@@ -1,3 +1,4 @@
+import OdeteI18n
 import SwiftUI
 import WebKit
 
@@ -144,10 +145,56 @@ public struct PreviewView: UIViewRepresentable {
             for nav: WKNavigationAction,
             windowFeatures: WKWindowFeatures
         ) -> WKWebView? {
+            // target="_blank": mesma regra do resto — dentro do projeto carrega aqui,
+            // fora vai para o Safari.
             if let u = nav.request.url {
-                wv.load(URLRequest(url: u))
+                if Self.doProjeto(u) {
+                    wv.load(URLRequest(url: u))
+                } else {
+                    Task { @MainActor in self.model.pedidoExterno = u }
+                }
             }
             return nil
+        }
+
+        /// O painel serve ao projeto da pessoa: o esquema interno e o servidor de
+        /// desenvolvimento, que só escuta em 127.0.0.1.
+        ///
+        /// Tudo que não é isso sai para o Safari em vez de navegar aqui dentro. Sem esta
+        /// regra o painel seguia qualquer link e virava um navegador sem limite, o que é
+        /// "acesso irrestrito à web" para a App Store e levava o app inteiro a 17+ — um
+        /// preço alto, e injusto, para uma ferramenta de programação.
+        nonisolated static func doProjeto(_ u: URL) -> Bool {
+            if u.scheme == StaticScheme.scheme {
+                return true
+            }
+            if u.scheme == "about" || u.scheme == "data" || u.scheme == "blob" {
+                return true
+            }
+            guard u.scheme == "http" || u.scheme == "https", let h = u.host?.lowercased() else {
+                return false
+            }
+            return h == "localhost" || h == "127.0.0.1" || h == "::1" || h == "[::1]"
+        }
+
+        public func webView(
+            _ wv: WKWebView,
+            decidePolicyFor nav: WKNavigationAction
+        ) async -> WKNavigationActionPolicy {
+            guard let u = nav.request.url else { return .allow }
+            if Self.doProjeto(u) {
+                return .allow
+            }
+            // Só o que a pessoa tocou vai para o Safari; um redirecionamento de terceiro
+            // não abre outro app sozinho.
+            if nav.navigationType == .linkActivated {
+                await MainActor.run { self.model.pedidoExterno = u }
+            } else {
+                await MainActor.run {
+                    self.model.log(.info, tr("fora do projeto, não carregado: %1$@", "\(u.absoluteString)"))
+                }
+            }
+            return .cancel
         }
     }
 }

@@ -19629,6 +19629,34 @@
         }
       }
     },
+    "fora do projeto, não carregado: %1$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "outside the project, not loaded: %1$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "außerhalb des Projekts, nicht geladen: %1$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "hors du projet, non chargé : %1$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "fuera del proyecto, no cargado: %1$@"
+          }
+        }
+      }
+    },
     "fora do subconjunto: %1$@": {
       "localizations": {
         "en": {

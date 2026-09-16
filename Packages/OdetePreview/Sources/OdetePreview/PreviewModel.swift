@@ -86,6 +86,9 @@ public final class PreviewModel {
     public var backTick = 0
     /// Ligado pela PreviewView: tira um print da página.
     public var snapshotter: (@MainActor (@escaping @MainActor (UIImage?) -> Void) -> Void)?
+    /// Um link que aponta para fora do projeto. O painel é o preview do que a pessoa
+    /// está escrevendo, não um navegador: sair dali é sair para o Safari.
+    public var pedidoExterno: URL?
     private var seq = 0
 
     public init(root: URL) {

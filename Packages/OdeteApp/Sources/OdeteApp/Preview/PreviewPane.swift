@@ -85,6 +85,12 @@ struct PreviewPane: View {
         }
         .onChange(of: ws.run.servers.count) { _, _ in soltarServidorMorto() }
         .onChange(of: ws.preview.url) { _, new in urlText = new?.absoluteString ?? "" }
+        // Link para fora do projeto: o painel não navega para lá, o Safari abre.
+        .onChange(of: ws.preview.pedidoExterno) { _, u in
+            guard let u else { return }
+            ws.preview.pedidoExterno = nil
+            openURL(u)
+        }
         .confirmationDialog(
             tr("O servidor só continua no ar com a Odete à vista"),
             isPresented: Binding(get: { avisoSafari != nil }, set: {

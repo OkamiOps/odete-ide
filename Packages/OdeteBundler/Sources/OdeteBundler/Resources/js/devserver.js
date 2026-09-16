@@ -283,14 +283,18 @@
   }
 
   // ---- Server Actions ----
+  // O corpo só pode ser lido uma vez: o fluxo termina e a segunda leitura esperaria
+  // para sempre por um "end" que já passou. Quem pedir de novo recebe o mesmo texto.
   function corpoDoPedido(req) {
-    return new Promise((resolve) => {
+    if (req.__odeteCorpo) return req.__odeteCorpo;
+    req.__odeteCorpo = new Promise((resolve) => {
       const partes = [];
       req.on("data", (c) => partes.push(Buffer.from(c)));
       req.on("end", () => resolve(Buffer.concat(partes).toString("utf8")));
       req.on("error", () => resolve(""));
       req.resume();
     });
+    return req.__odeteCorpo;
   }
 
   // O formulário chega urlencoded, e o `<input type="file">` não atravessa isso. Quem
@@ -354,6 +358,37 @@
       if (nav) return { naoachou: true };
       return { erro: String((e && e.message) || e) };
     }
+  }
+
+  // Monta o documento de uma rota do Next: corpo renderizado, metadata, fontes e o
+  // script das ilhas quando a rota tem alguma.
+  async function paginaNext(rotaNext, p, url) {
+    const usadas = new Set();
+    globalThis.__next.instalaIlhas(contextoNext().React, usadas);
+    const { corpo, cabeca } = await globalThis.__next.renderiza(contextoNext(), rotaNext, url);
+    ilhasDaRota.set(p, [...usadas]);
+    const hidrata = usadas.size
+      ? '<script type="module" src="/@odete/ilhas' + encodeURI(p) + '"></script>'
+      : "";
+    return "<!doctype html><html><head>" + cabeca + importMap() +
+      globalThis.__next.cabecalhoDeFontes() + CLIENT +
+      "</head><body>" + corpo + hidrata + "</body></html>";
+  }
+
+  // `not-found.tsx` e `error.tsx` são páginas do projeto: se existirem, é o que a
+  // pessoa quer ver. Se não, sobra o recado da Odete, que pelo menos diz o que faltou.
+  async function enviaEspecial(res, p, url, nome, status, extras, erro) {
+    const alvo = globalThis.__next.especial(fs, path, state.root, p, nome);
+    if (alvo) {
+      try {
+        if (erro) alvo.props = { error: erro, reset: () => {} };
+        return send(res, status, MIME[".html"], await paginaNext(alvo, p, url), extras);
+      } catch (e) { /* a página de erro também falhou: cai no recado */ }
+    }
+    const texto = nome === "not-found"
+      ? recado404(p)
+      : String((erro && erro.message) || erro || "erro") + "\n\n" + String((erro && erro.stack) || "");
+    return send(res, status, "text/plain; charset=utf-8", texto, extras);
   }
 
   function faltaReact(e) {
@@ -475,6 +510,27 @@
           globalThis.__next.instalaAcoes();
           globalThis.__next.rotaDasAcoes(p);
 
+          // Route Handler não é página: devolve o que a função devolveu.
+          if (rotaNext.tipo === "handler") {
+            const host = (req.headers && req.headers.host) || "localhost:" + state.port;
+            const pedido = globalThis.__next.pedidoNext(
+              "http://" + host + req.url, req.method, req.headers || {}
+            );
+            pedido.text = async () => await corpoDoPedido(req);
+            pedido.json = async () => JSON.parse(await pedido.text());
+            pedido.formData = async () => camposDoCorpo(await pedido.text());
+            const r = await globalThis.__next.rodaHandler(contextoNext(), rotaNext, pedido);
+            const cab = (extras || []).concat(r.cabecalhos);
+            if (!r.cabecalhos.some(([k]) => k === "content-type")) {
+              cab.push(["content-type", "application/json; charset=utf-8"]);
+            }
+            res.writeHead(r.status, Object.fromEntries(
+              cab.concat([["cache-control", "no-store"]]).map(([k, v]) => [k, v])
+            ));
+            return res.end(r.corpo);
+          }
+
+
           // `<form action={acaoDeServidor}>` posta para a própria rota, com a
           // identidade da ação num campo oculto que o React escreveu no render. Roda a
           // ação antes e devolve a página já com o efeito dela.
@@ -493,22 +549,12 @@
                 return send(res, 303, "text/plain; charset=utf-8", "",
                   (extras || []).concat([["location", r.redireciona]]));
               }
-              if (r.naoachou) return send(res, 404, "text/plain; charset=utf-8", recado404(p), extras);
+              if (r.naoachou) return await enviaEspecial(res, p, url, "not-found", 404, extras, null);
               if (r.erro) return send(res, 500, "text/plain; charset=utf-8", r.erro, extras);
             }
           }
 
-          const usadas = new Set();
-          globalThis.__next.instalaIlhas(contextoNext().React, usadas);
-          const corpo = await globalThis.__next.renderiza(contextoNext(), rotaNext, url);
-          ilhasDaRota.set(p, [...usadas]);
-          const hidrata = usadas.size
-            ? '<script type="module" src="/@odete/ilhas' + encodeURI(p) + '"></script>'
-            : "";
-          const doc = "<!doctype html><html><head>" + importMap() +
-            globalThis.__next.cabecalhoDeFontes() + CLIENT +
-            "</head><body>" + corpo + hidrata + "</body></html>";
-          return send(res, 200, MIME[".html"], doc, extras);
+          return send(res, 200, MIME[".html"], await paginaNext(rotaNext, p, url), extras);
         } catch (e) {
           // `redirect()` e `notFound()` do Next chegam aqui lançados, de dentro do render.
           const nav = globalThis.__next.leErroDeNavegacao(e);
@@ -516,17 +562,20 @@
             return send(res, nav.status, "text/plain; charset=utf-8", "",
               (extras || []).concat([["location", nav.destino]]));
           }
-          if (nav) return send(res, 404, "text/plain; charset=utf-8", recado404(p), extras);
+          if (nav) return await enviaEspecial(res, p, url, "not-found", 404, extras, e);
           if (faltaReact(e)) {
             return send(res, 500, "text/plain; charset=utf-8",
               "O projeto é Next mas react e react-dom não estão instalados.\nRode npm install no terminal.");
           }
-          throw e;
+          return await enviaEspecial(res, p, url, "error", 500, extras, e);
         }
       }
       // SPA fallback
       const index = path.join(state.root, "index.html");
       if (!path.extname(p) && fs.existsSync(index)) return send(res, 200, MIME[".html"], html(index), extras);
+      if (!path.extname(p) && ehProjetoNext()) {
+        return await enviaEspecial(res, p, url, "not-found", 404, extras, null);
+      }
       send(res, 404, "text/plain; charset=utf-8", recado404(p));
     } catch (e) {
       send(res, 500, "text/plain; charset=utf-8", String((e && e.message) || e) + "\n\n" + String((e && e.stack) || ""));

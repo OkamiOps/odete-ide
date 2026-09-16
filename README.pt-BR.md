@@ -311,10 +311,12 @@ Ditos sem rodeio, porque um README que só lista vitórias é um folheto:
 
 - `astro build` e `next build` ainda não rodam — Astro e Next só em modo dev
 - Páginas Astro renderizam; ilha com hidratação, MDX e content collections não
-- Next renderiza no servidor, hidrata componente `'use client'` e roda middleware,
-  `next/font` e Server Actions. Fica de fora: `useActionState` mostra o estado inicial até
-  a ilha hidratar (o `renderToString` não aceita receber o postback), envio de arquivo por
-  formulário, e `'use server'` escrito dentro do componente em vez do topo do arquivo
+- Next roda o App Router (segmento dinâmico, catch-all, grupo de rota, route handler,
+  `metadata`, `not-found`, `error`) e o Pages Router, hidrata componente `'use client'` e roda
+  middleware, `next/font` e Server Actions. Fica de fora: `useActionState` mostra o estado
+  inicial até a ilha hidratar (o `renderToString` não aceita receber o postback), envio de
+  arquivo por formulário, `'use server'` escrito dentro do componente em vez do topo do
+  arquivo, rota paralela (`@slot`), e navegação no cliente — link recarrega a página
 - Sem SourceKit, então sem autocomplete de Swift; `GeometryReader` e `Canvas` não estão no subconjunto do preview
 - O completion não navega com as setas — Tab/Enter pega o primeiro item, ou toque
 - Dois agentes em paralelo, MCP e voz não foram feitos

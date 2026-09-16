@@ -20,41 +20,183 @@
     return null;
   }
 
-  // App Router: `app/page.tsx` é `/`, `app/blog/page.tsx` é `/blog`, e cada nível pode
-  // ter um `layout` que embrulha o de dentro.
-  function rotaDoApp(fs, path, root, p) {
-    const base = path.join(root, "app");
-    if (!fs.existsSync(base)) return null;
-    const partes = p.split("/").filter(Boolean);
-    const dir = path.join(base, ...partes);
-    if (!dir.startsWith(base)) return null;
-    const pagina = achaArquivo(fs, path, dir, "page");
-    if (!pagina) return null;
-    const layouts = [];
-    let atual = base;
-    const camadas = [atual].concat(partes.map((_, i) => path.join(base, ...partes.slice(0, i + 1))));
-    for (const c of camadas) {
-      const l = achaArquivo(fs, path, c, "layout");
-      if (l) layouts.push(l);
-    }
-    return { tipo: "app", pagina, layouts };
+  function ehPasta(fs, f) {
+    try { return fs.statSync(f).isDirectory(); } catch (e) { return false; }
   }
 
-  // Pages Router: `pages/index.tsx` é `/`, `pages/sobre.tsx` é `/sobre`, e `_app` embrulha.
+  function pastasEm(fs, dir) {
+    try { return fs.readdirSync(dir); } catch (e) { return []; }
+  }
+
+  // Pastas do App Router que não são segmento de URL:
+  //   `(loja)` agrupa sem aparecer no caminho
+  //   `[id]` pega um segmento, `[...resto]` pega o que sobrar, `[[...resto]]` pode não pegar nada
+  //   `@slot` é paralelo, e o que a Odete faz com ele é ignorar
+  function classifica(nome) {
+    if (/^\(.+\)$/.test(nome)) return { tipo: "grupo" };
+    let m = /^\[\[\.\.\.(.+)\]\]$/.exec(nome);
+    if (m) return { tipo: "resto", nome: m[1], opcional: true };
+    m = /^\[\.\.\.(.+)\]$/.exec(nome);
+    if (m) return { tipo: "resto", nome: m[1], opcional: false };
+    m = /^\[(.+)\]$/.exec(nome);
+    if (m) return { tipo: "um", nome: m[1] };
+    return { tipo: "literal" };
+  }
+
+  function dinamicosEm(fs, path, dir) {
+    const out = { grupos: [], um: [], resto: [] };
+    for (const nome of pastasEm(fs, dir)) {
+      if (!ehPasta(fs, path.join(dir, nome))) continue;
+      const c = classifica(nome);
+      if (c.tipo === "grupo") out.grupos.push(nome);
+      else if (c.tipo === "um") out.um.push({ pasta: nome, nome: c.nome });
+      else if (c.tipo === "resto") out.resto.push({ pasta: nome, nome: c.nome, opcional: c.opcional });
+    }
+    return out;
+  }
+
+  // Caminha a árvore casando segmento a segmento, literal antes de dinâmico — que é a
+  // ordem de precedência do Next. Vai acumulando os layouts de fora para dentro e os
+  // parâmetros que os segmentos dinâmicos capturaram.
+  function achaNaArvore(fs, path, dir, partes, camadas, params, alvo) {
+    const meu = achaArquivo(fs, path, dir, "layout");
+    const cam = meu ? camadas.concat([meu]) : camadas;
+    const dins = dinamicosEm(fs, path, dir);
+
+    if (!partes.length) {
+      const f = achaArquivo(fs, path, dir, alvo);
+      if (f) return { arquivo: f, layouts: cam, params, pasta: dir };
+      for (const g of dins.grupos) {
+        const r = achaNaArvore(fs, path, path.join(dir, g), [], cam, params, alvo);
+        if (r) return r;
+      }
+      for (const d of dins.resto) {
+        if (!d.opcional) continue;
+        const r = achaNaArvore(fs, path, path.join(dir, d.pasta), [], cam, assign(params, d.nome, []), alvo);
+        if (r) return r;
+      }
+      return null;
+    }
+
+    const cabeca = partes[0], resto = partes.slice(1);
+    const literal = path.join(dir, cabeca);
+    if (ehPasta(fs, literal) && classifica(cabeca).tipo === "literal") {
+      const r = achaNaArvore(fs, path, literal, resto, cam, params, alvo);
+      if (r) return r;
+    }
+    for (const g of dins.grupos) {
+      const r = achaNaArvore(fs, path, path.join(dir, g), partes, cam, params, alvo);
+      if (r) return r;
+    }
+    for (const d of dins.um) {
+      const r = achaNaArvore(fs, path, path.join(dir, d.pasta), resto, cam, assign(params, d.nome, cabeca), alvo);
+      if (r) return r;
+    }
+    for (const d of dins.resto) {
+      const r = achaNaArvore(fs, path, path.join(dir, d.pasta), [], cam, assign(params, d.nome, partes), alvo);
+      if (r) return r;
+    }
+    return null;
+  }
+
+  function assign(o, k, v) {
+    const novo = {};
+    for (const x of Object.keys(o)) novo[x] = o[x];
+    novo[k] = v;
+    return novo;
+  }
+
+  // App Router: `app/page.tsx` é `/`, `app/blog/page.tsx` é `/blog`, `app/blog/[slug]`
+  // é qualquer coisa abaixo de /blog, e cada nível pode ter um `layout` que embrulha o
+  // de dentro. `app/api/x/route.ts` não é página: é função por método HTTP.
+  function rotaDoApp(fs, path, root, p, alvo) {
+    const base = path.join(root, "app");
+    if (!ehPasta(fs, base)) return null;
+    const r = achaNaArvore(fs, path, base, p.split("/").filter(Boolean), [], {}, alvo || "page");
+    if (!r) return null;
+    return {
+      tipo: alvo === "route" ? "handler" : "app",
+      pagina: r.arquivo, layouts: r.layouts, params: r.params, pasta: r.pasta,
+    };
+  }
+
+  // Pages Router: `pages/index.tsx` é `/`, `pages/sobre.tsx` é `/sobre`,
+  // `pages/post/[id].tsx` casa /post/o-que-for, e `_app` embrulha.
   function rotaDasPages(fs, path, root, p) {
     const base = path.join(root, "pages");
-    if (!fs.existsSync(base)) return null;
-    const rel = p.replace(/^\/+|\/+$/g, "");
-    const alvo = rel === "" ? "index" : rel;
-    let pagina = achaArquivo(fs, path, base, alvo);
-    if (!pagina) pagina = achaArquivo(fs, path, path.join(base, alvo), "index");
-    if (!pagina) return null;
+    if (!ehPasta(fs, base)) return null;
+    const partes = p.split("/").filter(Boolean);
+    const achado = procuraPages(fs, path, base, partes, {});
+    if (!achado) return null;
     const app = achaArquivo(fs, path, base, "_app");
-    return { tipo: "pages", pagina, layouts: app ? [app] : [] };
+    return { tipo: "pages", pagina: achado.arquivo, layouts: app ? [app] : [], params: achado.params };
+  }
+
+  function procuraPages(fs, path, dir, partes, params) {
+    if (!partes.length) {
+      const f = achaArquivo(fs, path, dir, "index");
+      return f ? { arquivo: f, params } : null;
+    }
+    const cabeca = partes[0], resto = partes.slice(1);
+    if (!resto.length) {
+      const f = achaArquivo(fs, path, dir, cabeca);
+      if (f) return { arquivo: f, params };
+    }
+    const sub = path.join(dir, cabeca);
+    if (ehPasta(fs, sub)) {
+      const r = procuraPages(fs, path, sub, resto, params);
+      if (r) return r;
+    }
+    // dinâmicos: pasta [id]/ ou arquivo [id].tsx
+    for (const nome of pastasEm(fs, dir)) {
+      const c = classifica(nome.replace(/\.(tsx|jsx|ts|js|mjs)$/, ""));
+      if (c.tipo === "literal" || c.tipo === "grupo") continue;
+      const cheio = path.join(dir, nome);
+      if (ehPasta(fs, cheio)) {
+        const p2 = c.tipo === "resto" ? assign(params, c.nome, partes) : assign(params, c.nome, cabeca);
+        const r = procuraPages(fs, path, cheio, c.tipo === "resto" ? [] : resto, p2);
+        if (r) return r;
+      } else if (!resto.length || c.tipo === "resto") {
+        const p2 = c.tipo === "resto" ? assign(params, c.nome, partes) : assign(params, c.nome, cabeca);
+        return { arquivo: cheio, params: p2 };
+      }
+    }
+    return null;
   }
 
   function rota(fs, path, root, p) {
-    return rotaDoApp(fs, path, root, p) || rotaDasPages(fs, path, root, p);
+    return rotaDoApp(fs, path, root, p, "route") ||
+      rotaDoApp(fs, path, root, p, "page") ||
+      rotaDasPages(fs, path, root, p);
+  }
+
+  // `not-found.tsx` e `error.tsx` valem do segmento para dentro; quando a página falha,
+  // sobe-se procurando o mais próximo.
+  function especial(fs, path, root, p, nome) {
+    const base = path.join(root, "app");
+    if (!ehPasta(fs, base)) return null;
+    const partes = p.split("/").filter(Boolean);
+    for (let i = partes.length; i >= 0; i--) {
+      const dir = path.join(base, ...partes.slice(0, i));
+      if (!dir.startsWith(base)) continue;
+      const f = achaArquivo(fs, path, dir, nome);
+      if (f) return { tipo: "app", pagina: f, layouts: i === 0 ? layoutsAte(fs, path, base, []) : layoutsAte(fs, path, base, partes.slice(0, i)), params: {} };
+    }
+    return null;
+  }
+
+  function layoutsAte(fs, path, base, partes) {
+    const out = [];
+    let dir = base;
+    const l0 = achaArquivo(fs, path, dir, "layout");
+    if (l0) out.push(l0);
+    for (const parte of partes) {
+      dir = path.join(dir, parte);
+      if (!ehPasta(fs, dir)) break;
+      const l = achaArquivo(fs, path, dir, "layout");
+      if (l) out.push(l);
+    }
+    return out;
   }
 
   // ---- render ----
@@ -89,12 +231,21 @@
     const Page = pagina.default || pagina;
     if (typeof Page !== "function") throw new Error(rota.pagina + " não exporta um componente");
 
-    const props = rota.tipo === "pages" ? { } : { params: {}, searchParams: {} };
+    const busca = {};
+    if (url && url.searchParams) for (const [k, v] of url.searchParams) busca[k] = v;
+    // No Next 15 `params` e `searchParams` são promessas. Um objeto comum atende os
+    // dois jeitos: `await params` devolve o próprio objeto, e `params.id` também lê.
+    const params = rota.params || {};
+    let props = rota.tipo === "pages" ? {} : { params, searchParams: busca };
+    // `error.tsx` não recebe params: recebe o erro e o botão de tentar de novo.
+    if (rota.props) props = Object.assign({}, props, rota.props);
     let el = React.createElement(Page, props);
 
+    const metas = [];
     // layouts de fora para dentro: o primeiro da lista é o mais externo
     for (let i = rota.layouts.length - 1; i >= 0; i--) {
       const m = await req(rota.layouts[i]);
+      metas.unshift(m);
       const L = m.default || m;
       if (typeof L !== "function") continue;
       el = rota.tipo === "pages"
@@ -102,9 +253,55 @@
         : React.createElement(L, { children: el });
       if (rota.tipo === "pages") break; // _app já recebe a página inteira
     }
+    metas.push(pagina);
 
     const pronta = await resolveServidor(React, el, { profundidade: 0 });
-    return servidor.renderToString(pronta);
+    const corpo = servidor.renderToString(pronta);
+    return { corpo, cabeca: await cabecaDeMetadata(metas, props) };
+  }
+
+  // `metadata` (objeto) e `generateMetadata` (função) de cada camada, do layout de fora
+  // para a página; o de dentro ganha.
+  async function cabecaDeMetadata(modulos, props) {
+    let junto = {};
+    for (const m of modulos) {
+      if (!m) continue;
+      let meta = null;
+      if (typeof m.generateMetadata === "function") meta = await m.generateMetadata(props);
+      else if (m.metadata && typeof m.metadata === "object") meta = m.metadata;
+      if (meta) for (const k of Object.keys(meta)) junto[k] = meta[k];
+    }
+    const partes = [];
+    const esc = (v) => String(v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+    const titulo = typeof junto.title === "object" && junto.title
+      ? (junto.title.absolute || junto.title.default || junto.title.template)
+      : junto.title;
+    if (titulo) partes.push("<title>" + esc(titulo) + "</title>");
+    if (junto.description) partes.push('<meta name="description" content="' + esc(junto.description) + '">');
+    if (junto.keywords) partes.push('<meta name="keywords" content="' + esc([].concat(junto.keywords).join(", ")) + '">');
+    if (junto.openGraph && junto.openGraph.title) {
+      partes.push('<meta property="og:title" content="' + esc(junto.openGraph.title) + '">');
+    }
+    if (junto.openGraph && junto.openGraph.description) {
+      partes.push('<meta property="og:description" content="' + esc(junto.openGraph.description) + '">');
+    }
+    return partes.join("");
+  }
+
+  // Route Handler: `app/api/x/route.ts` exporta uma função por método. O que ela
+  // devolve é uma Response — a do `next/server` ou uma feita à mão com status e corpo.
+  async function rodaHandler(ctx, rota, pedido) {
+    const mod = await ctx.carrega(rota.pagina);
+    const fn = mod[pedido.method] || mod[pedido.method.toUpperCase()];
+    if (typeof fn !== "function") {
+      return { status: 405, cabecalhos: [["allow", Object.keys(mod).filter((k) => /^[A-Z]+$/.test(k)).join(", ")]], corpo: "" };
+    }
+    const r = await fn(pedido, { params: rota.params || {} });
+    if (r == null) return { status: 204, cabecalhos: [], corpo: "" };
+    if (typeof r === "string") return { status: 200, cabecalhos: [["content-type", "text/plain; charset=utf-8"]], corpo: r };
+    const lido = leResposta(r);
+    if (lido) return { status: lido.status, cabecalhos: lido.cabecalhos.concat(lido.biscoitos.map((c) => ["set-cookie", c])), corpo: lido.corpo || "" };
+    return { status: 200, cabecalhos: [["content-type", "application/json; charset=utf-8"]], corpo: JSON.stringify(r) };
   }
 
   // ---- ilhas ----
@@ -553,6 +750,7 @@
     moduloNextServer, pedidoNext, casaMatcher, leResposta, regexDoMatcher,
     instalaAcoes, rotaDasAcoes, acaoPorId, moduloNavegacao, moduloCache,
     leErroDeNavegacao, CAMPO, CAMPO_LIGADOS,
+    rotaDoApp, rotaDasPages, especial, cabecaDeMetadata, rodaHandler,
   };
   if (typeof module !== "undefined" && module.exports) module.exports = raiz.__next;
 })(typeof globalThis !== "undefined" ? globalThis : this);

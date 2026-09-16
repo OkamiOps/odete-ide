@@ -18,6 +18,9 @@ public struct RootView: View {
     private let store: StateStore
 
     public init() {
+        // Todo campo de texto do app ganha a barra com o botão de recolher o teclado.
+        // Uma vez, aqui, em vez de um botão por tela — ver `Teclado`.
+        Teclado.instalaBarra()
         let store = StateStore()
         self.store = store
         var snap = store.load()

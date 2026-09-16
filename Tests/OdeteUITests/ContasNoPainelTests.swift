@@ -40,8 +40,9 @@ final class ContasNoPainelTests: XCTestCase {
             gerenciar.waitForExistence(timeout: 6),
             "o popover abriu vazio: nada para tocar"
         )
-        XCTAssertTrue(gerenciar.isHittable, "o conteúdo do popover não é alcançável")
-
-        sleep(8)
+        // No iPhone o popover vira sheet e sobe animado: perguntar por `isHittable` no
+        // instante seguinte ao toque pega a animação no meio.
+        let alcancavel = expectation(for: NSPredicate(format: "isHittable == true"), evaluatedWith: gerenciar)
+        wait(for: [alcancavel], timeout: 6)
     }
 }

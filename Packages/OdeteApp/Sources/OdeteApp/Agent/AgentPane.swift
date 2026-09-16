@@ -223,6 +223,8 @@ struct ModelMenu: View {
 /// onde o e-mail quebrava no meio e o ícone do Grok parecia um erro.
 struct ContasPopover: View {
     @Environment(\.theme) private var theme
+    /// No iPhone isto vira folha, e folha não tem 280 pt de largura.
+    @Environment(\.horizontalSizeClass) private var largura
     let agent: AgentModel
     var escolher: (AIAccount) -> Void
     var gerenciar: () -> Void
@@ -278,10 +280,21 @@ struct ContasPopover: View {
         // não tem tamanho próprio. Com `idealWidth`/`idealHeight` o popover abria com
         // altura zero — só a setinha aparecia no topo do painel, e não dava para clicar
         // em nada. Era esse o bug de "clico em Sem conta e não acontece nada".
-        .frame(width: 280, height: altura)
+        //
+        // A medida vale para o popover do iPad. Na folha do iPhone ela é o que estragava:
+        // 280 pt encravados numa tela de 393, presos no canto.
+        .frame(width: compacto ? nil : 280, height: compacto ? nil : altura)
+        .frame(maxWidth: compacto ? .infinity : nil, maxHeight: compacto ? .infinity : nil)
         .background(theme.bg)
-        // No iPhone o popover vira folha sozinho, e a folha é melhor lá.
-        .presentationCompactAdaptation(horizontal: .popover, vertical: .sheet)
+        // Em largura compacta isto é folha. Dizer `.popover` aqui — que era o que estava
+        // escrito — mandava o iPhone manter o popover, e no iPhone ele abria preso ao
+        // botão, alto demais para caber: o conteúdo existia e não dava para tocar.
+        .presentationCompactAdaptation(.sheet)
+        .presentationDetents([.medium, .large])
+    }
+
+    var compacto: Bool {
+        largura == .compact
     }
 
     /// Acompanha o número de contas, senão sobra um vazio embaixo — com teto, para uma

@@ -1,3 +1,4 @@
+import OdeteI18n
 import Runestone
 import UIKit
 
@@ -43,9 +44,19 @@ final class KeyboardBar: UIInputView {
         stack.spacing = 6
         stack.translatesAutoresizingMaskIntoConstraints = false
         scroll.addSubview(stack)
+        // Recolher o teclado fica fora da rolagem, encostado na borda. Dentro dela era o
+        // último de dezesseis: no iPhone quem quisesse fechar o teclado tinha que arrastar
+        // a barra inteira até o fim para achar o botão.
+        let recolher = botao(title: "", symbol: "keyboard.chevron.compact.down") { [weak self] in
+            self?.textView?.resignFirstResponder()
+        }
+        recolher.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(recolher)
         NSLayoutConstraint.activate([
+            recolher.trailingAnchor.constraint(equalTo: safeAreaLayoutGuide.trailingAnchor, constant: -8),
+            recolher.centerYAnchor.constraint(equalTo: centerYAnchor),
             scroll.leadingAnchor.constraint(equalTo: leadingAnchor),
-            scroll.trailingAnchor.constraint(equalTo: trailingAnchor),
+            scroll.trailingAnchor.constraint(equalTo: recolher.leadingAnchor, constant: -4),
             scroll.topAnchor.constraint(equalTo: topAnchor),
             scroll.bottomAnchor.constraint(equalTo: bottomAnchor),
             stack.leadingAnchor.constraint(equalTo: scroll.contentLayoutGuide.leadingAnchor, constant: 8),
@@ -70,27 +81,33 @@ final class KeyboardBar: UIInputView {
             ("", "f.cursive", { [weak self] in self?.onDefinition() }),
             ("", "sparkles", { [weak self] in self?.onSendSelection() }),
             ("", "square.and.arrow.down", { [weak self] in self?.onSave() }),
-            ("", "keyboard.chevron.compact.down", { [weak self] in self?.textView?.resignFirstResponder() }),
         ]
         for (title, symbol, action) in items {
-            var cfg = UIButton.Configuration.glass()
-            cfg.cornerStyle = .medium
-            cfg.contentInsets = NSDirectionalEdgeInsets(top: 4, leading: 10, bottom: 4, trailing: 10)
-            if let symbol {
-                cfg.image = UIImage(
-                    systemName: symbol,
-                    withConfiguration: UIImage.SymbolConfiguration(pointSize: 14, weight: .medium)
-                )
-            } else {
-                cfg.attributedTitle = AttributedString(
-                    title,
-                    attributes: AttributeContainer().font(.monospacedSystemFont(ofSize: 14, weight: .medium))
-                )
-            }
-            let b = UIButton(configuration: cfg, primaryAction: UIAction { _ in action() })
-            b.widthAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
-            stack.addArrangedSubview(b)
+            stack.addArrangedSubview(botao(title: title, symbol: symbol, action: action))
         }
+    }
+
+    private func botao(title: String, symbol: String?, action: @escaping () -> Void) -> UIButton {
+        var cfg = UIButton.Configuration.glass()
+        cfg.cornerStyle = .medium
+        cfg.contentInsets = NSDirectionalEdgeInsets(top: 4, leading: 10, bottom: 4, trailing: 10)
+        if let symbol {
+            cfg.image = UIImage(
+                systemName: symbol,
+                withConfiguration: UIImage.SymbolConfiguration(pointSize: 14, weight: .medium)
+            )
+        } else {
+            cfg.attributedTitle = AttributedString(
+                title,
+                attributes: AttributeContainer().font(.monospacedSystemFont(ofSize: 14, weight: .medium))
+            )
+        }
+        let b = UIButton(configuration: cfg, primaryAction: UIAction { _ in action() })
+        b.widthAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
+        if symbol == "keyboard.chevron.compact.down" {
+            b.accessibilityLabel = tr("Esconder o teclado")
+        }
+        return b
     }
 
     private func wrap(_ l: String, _ r: String) {

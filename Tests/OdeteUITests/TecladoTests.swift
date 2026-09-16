@@ -36,4 +36,38 @@ final class TecladoTests: XCTestCase {
             "a barra de abas continua coberta: a pessoa segue presa"
         )
     }
+
+    /// O bug não era só do agente: busca, renomear, mensagem de commit, URL do remoto,
+    /// célula do banco — em toda parte se digita, e em nenhuma dava para fechar o
+    /// teclado. A barra acessória vale para qualquer campo, e este teste pega um
+    /// `TextField` comum para provar que não é caso especial do compositor.
+    @MainActor
+    func testQualquerCampoDeTextoTemComoRecolherOTeclado() throws {
+        let app = XCUIApplication()
+        app.launch()
+
+        let arquivos = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Files")).firstMatch
+        let arquivosPt = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Arquivos")).firstMatch
+        let aba = arquivos.exists ? arquivos : arquivosPt
+        try XCTSkipUnless(aba.waitForExistence(timeout: 12), "sem barra de abas: layout largo")
+        aba.tap()
+
+        let campo = app.textFields.firstMatch
+        try XCTSkipUnless(campo.waitForExistence(timeout: 8), "nenhum campo de texto nesta aba")
+        campo.tap()
+        XCTAssertTrue(app.keyboards.element.waitForExistence(timeout: 6), "o teclado não subiu")
+
+        let esconder = app.buttons["Hide the keyboard"].firstMatch.exists
+            ? app.buttons["Hide the keyboard"].firstMatch
+            : app.buttons["Esconder o teclado"].firstMatch
+        XCTAssertTrue(
+            esconder.waitForExistence(timeout: 4),
+            "campo de texto comum ficou sem jeito de recolher o teclado"
+        )
+        esconder.tap()
+        XCTAssertFalse(
+            app.keyboards.element.waitForExistence(timeout: 2),
+            "o teclado continua na tela depois de pedir para recolher"
+        )
+    }
 }

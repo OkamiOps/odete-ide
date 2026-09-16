@@ -25,7 +25,7 @@ struct WorkspaceView: View {
             } else if portrait {
                 portraitLayout(width: geo.size.width)
             } else {
-                padLayout
+                padLayout(size: geo.size)
             }
         }
         .overlay {
@@ -72,30 +72,37 @@ struct WorkspaceView: View {
         .animation(.snappy(duration: 0.2), value: chrome.snapshot.agentVisible)
     }
 
-    var padLayout: some View {
-        GeometryReader { geo in
-            // Os máximos saem da tela, não de constantes. Antes a largura desenhada
-            // era cortada por um segundo limite e a alça continuava andando sozinha
-            // depois que o painel já tinha parado.
-            let livre = geo.size.width - Metrics.railWidth - 24
-            let agenteAberto = chrome.snapshot.agentVisible
-            let sideMax = max(Metrics.minSide, livre - Metrics.minCenter - (agenteAberto ? Metrics.minAgent : 0))
-            let sideW = chrome.snapshot.sideOpen ? clamp(chrome.snapshot.sideWidth, Metrics.minSide, sideMax) : 0
-            let agentMax = max(Metrics.minAgent, livre - sideW - Metrics.minCenter)
-            let agentW = agenteAberto ? clamp(chrome.snapshot.agentWidth, Metrics.minAgent, agentMax) : 0
-            columns(narrow: false, medidas: Medidas(
-                side: sideW,
-                sideMax: sideMax,
-                agent: agentW,
-                agentMax: agentMax,
-                termMax: max(Metrics.minTerm, geo.size.height - Metrics.minCenter)
-            ))
-        }
-        // Sem isto sobra uma faixa preta na altura do relógio, acima das abas.
-        .background(theme.surface.ignoresSafeArea())
+    /// Um `GeometryReader` só, o de fora, e a animação por dentro dele.
+    ///
+    /// Antes havia um segundo `GeometryReader` aqui, com as animações de recolher
+    /// envolvendo-o. Quem decide entre colunas e abas é a medida de fora; quem decide a
+    /// largura de cada coluna era a de dentro — e animar o que contém um leitor de
+    /// geometria faz a medida de dentro andar junto com a animação. Recolher um lado
+    /// deixava as duas medidas discordando: o rail do iPad desenhado por causa da medida
+    /// de fora, e as colunas espremidas pela de dentro, com o resto da tela preto.
+    func padLayout(size: CGSize) -> some View {
+        // Os máximos saem da tela, não de constantes. Antes a largura desenhada
+        // era cortada por um segundo limite e a alça continuava andando sozinha
+        // depois que o painel já tinha parado.
+        let livre = size.width - Metrics.railWidth - 24
+        let agenteAberto = chrome.snapshot.agentVisible
+        let sideMax = max(Metrics.minSide, livre - Metrics.minCenter - (agenteAberto ? Metrics.minAgent : 0))
+        let sideW = chrome.snapshot.sideOpen ? clamp(chrome.snapshot.sideWidth, Metrics.minSide, sideMax) : 0
+        let agentMax = max(Metrics.minAgent, livre - sideW - Metrics.minCenter)
+        let agentW = agenteAberto ? clamp(chrome.snapshot.agentWidth, Metrics.minAgent, agentMax) : 0
+        return columns(narrow: false, medidas: Medidas(
+            side: sideW,
+            sideMax: sideMax,
+            agent: agentW,
+            agentMax: agentMax,
+            termMax: max(Metrics.minTerm, size.height - Metrics.minCenter)
+        ))
+        .frame(width: size.width, height: size.height)
         .animation(.snappy(duration: 0.2), value: chrome.snapshot.sideOpen)
         .animation(.snappy(duration: 0.2), value: chrome.snapshot.agentVisible)
         .animation(.snappy(duration: 0.2), value: chrome.snapshot.termVisible)
+        // Sem isto sobra uma faixa preta na altura do relógio, acima das abas.
+        .background(theme.surface.ignoresSafeArea())
     }
 
     /// Ligação que já entrega e guarda o valor dentro dos limites desta tela: sem isso
@@ -166,6 +173,10 @@ struct WorkspaceView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .clipped()
+            // Identificada para o teste poder medir a largura dela: o bug de recolher os
+            // dois lados e a coluna não crescer só aparece na medida.
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("colunaCentral")
             if chrome.snapshot.agentVisible, !narrow {
                 Splitter(
                     value: preso($chrome.snapshot.agentWidth, Metrics.minAgent, m.agentMax),

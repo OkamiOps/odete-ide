@@ -238,7 +238,7 @@ struct SettingsShell: View {
                     }
                     .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
                     .listRowBackground(Color.clear)
-                } header: { header("Tema") }
+                } header: { header(tr("Tema")) }
                 Section {
                     Stepper(value: $chrome.snapshot.editor.fontSize, in: 10 ... 22, step: 1) {
                         LabeledContent(tr("Tamanho da fonte")) {
@@ -249,12 +249,12 @@ struct SettingsShell: View {
                     Toggle(tr("Salvar automaticamente"), isOn: $chrome.snapshot.editor.autoSave)
                     Toggle(tr("Quebrar linhas"), isOn: $chrome.snapshot.editor.wrap)
                     Toggle(tr("Números de linha"), isOn: $chrome.snapshot.editor.lineNumbers)
-                } header: { header("Editor") }
+                } header: { header(tr("Editor")) }
                 Section {
                     Toggle(tr("Agente"), isOn: $chrome.snapshot.agentVisible)
                     Toggle(tr("Terminal"), isOn: $chrome.snapshot.termVisible)
                     Button(tr("Restaurar layout")) { chrome.resetLayout() }
-                } header: { header("Layout") }
+                } header: { header(tr("Layout")) }
                 Section {
                     Toggle(tr("Projetos no iCloud Drive"), isOn: Binding(
                         get: { chrome.snapshot.projectsInCloud },
@@ -274,7 +274,7 @@ struct SettingsShell: View {
                         )
                     )
                     .font(OdeteFont.ui(11)).foregroundStyle(theme.fgMuted)
-                } header: { header("Sistema") }
+                } header: { header(tr("Sistema")) }
                 Section { AccountsSettings() } header: { header(tr("Contas e Git")) }
                 Section { AIAccountsSettings() } header: { header(tr("Contas de IA")) }
             }

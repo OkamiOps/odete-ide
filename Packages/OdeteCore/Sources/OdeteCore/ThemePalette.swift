@@ -41,13 +41,13 @@ public struct ThemePalette: Hashable, Sendable, Identifiable {
 
     public static let all: [ThemePalette] = [
         ThemePalette(
-            id: .odete, label: "Odete", blurb: "Noite da marca.", dark: true,
+            id: .odete, label: "Odete", blurb: chave("Noite da marca."), dark: true,
             bg: "#08080a", bgElevated: "#101014", bgSubtle: "#18181e",
             fg: "#eeeef2", fgMuted: "#9a9aa4", fgSubtle: "#6e6e78",
             border: "#2a2a32", borderStrong: "#3c3c46", accent: "#4fd4ea", accentFg: "#071014", syntax: .base
         ),
         ThemePalette(
-            id: .catppuccin, label: "Catppuccin", blurb: "Mocha.", dark: true,
+            id: .catppuccin, label: "Catppuccin", blurb: chave("Mocha."), dark: true,
             bg: "#1e1e2e", bgElevated: "#181825", bgSubtle: "#313244",
             fg: "#cdd6f4", fgMuted: "#a6adc8", fgSubtle: "#6c7086",
             border: "#313244", borderStrong: "#45475a", accent: "#cba6f7", accentFg: "#1e1e2e",
@@ -61,7 +61,7 @@ public struct ThemePalette: Hashable, Sendable, Identifiable {
             )
         ),
         ThemePalette(
-            id: .latte, label: "Latte", blurb: "Catppuccin claro.", dark: false,
+            id: .latte, label: "Latte", blurb: chave("Catppuccin claro."), dark: false,
             bg: "#eff1f5", bgElevated: "#e6e9ef", bgSubtle: "#dce0e8",
             fg: "#4c4f69", fgMuted: "#6c6f85", fgSubtle: "#9ca0b0",
             border: "#ccd0da", borderStrong: "#bcc0cc", accent: "#8839ef", accentFg: "#eff1f5",
@@ -75,7 +75,7 @@ public struct ThemePalette: Hashable, Sendable, Identifiable {
             )
         ),
         ThemePalette(
-            id: .darcula, label: "Darcula", blurb: "JetBrains.", dark: true,
+            id: .darcula, label: "Darcula", blurb: chave("JetBrains."), dark: true,
             bg: "#2b2b2b", bgElevated: "#3c3f41", bgSubtle: "#313335",
             fg: "#a9b7c6", fgMuted: "#808080", fgSubtle: "#606366",
             border: "#323232", borderStrong: "#4b4f51", accent: "#cc7832", accentFg: "#2b2b2b",
@@ -89,7 +89,7 @@ public struct ThemePalette: Hashable, Sendable, Identifiable {
             )
         ),
         ThemePalette(
-            id: .cursor, label: "Cursor", blurb: "Laranja.", dark: true,
+            id: .cursor, label: "Cursor", blurb: chave("Laranja."), dark: true,
             bg: "#181818", bgElevated: "#1f1f1f", bgSubtle: "#262626",
             fg: "#e4e4e4", fgMuted: "#a1a1a1", fgSubtle: "#737373",
             border: "#2a2a2a", borderStrong: "#3f3f3f", accent: "#f54e00", accentFg: "#ffffff",
@@ -103,7 +103,7 @@ public struct ThemePalette: Hashable, Sendable, Identifiable {
             )
         ),
         ThemePalette(
-            id: .claude, label: "Claude", blurb: "Terracota.", dark: false,
+            id: .claude, label: "Claude", blurb: chave("Terracota."), dark: false,
             bg: "#faf9f5", bgElevated: "#f5f0e8", bgSubtle: "#efe8dc",
             fg: "#3d3929", fgMuted: "#6b6456", fgSubtle: "#9a9284",
             border: "#e6dcc8", borderStrong: "#d4c7ae", accent: "#cc785c", accentFg: "#ffffff",
@@ -117,31 +117,31 @@ public struct ThemePalette: Hashable, Sendable, Identifiable {
             )
         ),
         ThemePalette(
-            id: .linear, label: "Linear", blurb: "Índigo.", dark: true,
+            id: .linear, label: "Linear", blurb: chave("Índigo."), dark: true,
             bg: "#010102", bgElevated: "#141516", bgSubtle: "#1c1d1f",
             fg: "#f1f2f4", fgMuted: "#8a8f98", fgSubtle: "#62666d",
             border: "#23252a", borderStrong: "#33363d", accent: "#5e6ad2", accentFg: "#ffffff", syntax: .base
         ),
         ThemePalette(
-            id: .github, label: "GitHub", blurb: "Dark dimmed.", dark: true,
+            id: .github, label: "GitHub", blurb: chave("Dark dimmed."), dark: true,
             bg: "#0d1117", bgElevated: "#161b22", bgSubtle: "#21262d",
             fg: "#e6edf3", fgMuted: "#8b949e", fgSubtle: "#6e7681",
             border: "#30363d", borderStrong: "#484f58", accent: "#2f81f7", accentFg: "#ffffff", syntax: .base
         ),
         ThemePalette(
-            id: .okami, label: "Okami", blurb: "Brasa.", dark: true,
+            id: .okami, label: "Okami", blurb: chave("Brasa."), dark: true,
             bg: "#060609", bgElevated: "#0b0b12", bgSubtle: "#14141f",
             fg: "#f4efe8", fgMuted: "#a39b92", fgSubtle: "#6f6a64",
             border: "#1c1c28", borderStrong: "#2c2c3c", accent: "#ff7a3d", accentFg: "#160800", syntax: .base
         ),
         ThemePalette(
-            id: .volt, label: "Volt", blurb: "Verde elétrico.", dark: true,
+            id: .volt, label: "Volt", blurb: chave("Verde elétrico."), dark: true,
             bg: "#101010", bgElevated: "#1a1a1a", bgSubtle: "#222222",
             fg: "#ececec", fgMuted: "#9a9a9a", fgSubtle: "#6a6a6a",
             border: "#2a2a2a", borderStrong: "#3a3a3a", accent: "#00d992", accentFg: "#052016", syntax: .base
         ),
         ThemePalette(
-            id: .colo, label: "Colo", blurb: "Nome antigo, mesma noite.", dark: true,
+            id: .colo, label: "Colo", blurb: chave("Nome antigo, mesma noite."), dark: true,
             bg: "#08080a", bgElevated: "#101014", bgSubtle: "#18181e",
             fg: "#eeeef2", fgMuted: "#9a9aa4", fgSubtle: "#6e6e78",
             border: "#2a2a32", borderStrong: "#3c3c46", accent: "#4fd4ea", accentFg: "#071014", syntax: .base

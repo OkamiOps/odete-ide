@@ -117,7 +117,7 @@ struct CommandPalette: View {
             PaletteItem(
                 id: ">theme.\($0.id.rawValue)",
                 kind: .command,
-                title: "Tema: \($0.label)",
+                title: tr("Tema: %1$@", $0.label),
                 detail: tr($0.blurb),
                 symbol: "paintpalette",
                 shortcut: nil

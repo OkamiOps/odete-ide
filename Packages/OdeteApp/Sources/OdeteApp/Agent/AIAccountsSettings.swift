@@ -231,7 +231,7 @@ struct ClaudeConnectSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button(tr("Cancelar")) { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(busy ? "Conectando…" : "Conectar") { connect() }.disabled(pasted.isEmpty || busy)
+                    Button(busy ? tr("Conectando…") : tr("Conectar")) { connect() }.disabled(pasted.isEmpty || busy)
                 }
             }
         }

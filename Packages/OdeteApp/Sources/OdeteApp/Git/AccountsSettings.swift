@@ -122,7 +122,7 @@ struct AccountsSettings: View {
                 principal(tr("Entrar com GitHub"), acao: startDeviceFlow)
                 secundaria("Adicionar por token", detalhe: tr("GitHub, GitLab, Gitea ou qualquer host"))
             } else {
-                principal("Adicionar conta por token") { adding = true }
+                principal(tr("Adicionar conta por token")) { adding = true }
                 Text(tr("GitHub, GitLab, Gitea ou qualquer host que aceite token de acesso pessoal."))
                     .font(.caption).foregroundStyle(theme.fgSubtle)
                     .fixedSize(horizontal: false, vertical: true)

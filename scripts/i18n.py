@@ -18,8 +18,31 @@ import sys
 RAIZ = pathlib.Path(__file__).resolve().parent.parent
 CATALOGO = RAIZ / 'Packages/OdeteI18n/Sources/OdeteI18n/Resources/Localizable.xcstrings'
 IDIOMAS = ['en', 'de', 'fr', 'es']
-CHAMADA = re.compile(r'\btr\(\s*"((?:[^"\\]|\\.)*)"')
+# `tr("…")` traduz na hora; `chave("…")` só marca uma frase que vai ser traduzida
+# mais tarde, quando ela chega a uma tela por variável. As duas viram chave.
+CHAMADA = re.compile(r'\b(?:tr|chave)\(\s*"((?:[^"\\]|\\.)*)"')
 PLACEHOLDER = re.compile(r'%\d+\$@')
+
+
+ESCAPES = {'\\"': '"', '\\\\': '\\', '\\n': '\n', '\\t': '\t'}
+
+
+def sem_escape(literal: str) -> str:
+    """O texto como o Swift entrega em execução, não como ele aparece no fonte.
+
+    No código a frase é `\\"Swift Playground\\"`; em execução a chave chega
+    `"Swift Playground"`. Comparar a versão escapada com o catálogo faz o script
+    cobrar uma chave que nunca existiu e não ver a que existe.
+    """
+    fora: list[str] = []
+    i = 0
+    while i < len(literal):
+        par = literal[i:i + 2]
+        if par in ESCAPES:
+            fora.append(ESCAPES[par]); i += 2
+        else:
+            fora.append(literal[i]); i += 1
+    return ''.join(fora)
 
 
 def chaves_do_codigo() -> dict[str, str]:
@@ -28,9 +51,12 @@ def chaves_do_codigo() -> dict[str, str]:
     for f in sorted((RAIZ / 'Packages').rglob('*.swift')):
         if '/.build/' in str(f) or '/Tests/' in str(f):
             continue
-        src = f.read_text(encoding='utf-8')
+        # Linha de comentário não é código: um `tr("…")` citado numa explicação
+        # viraria uma chave fantasma que nunca aparece na tela de ninguém.
+        linhas = f.read_text(encoding='utf-8').splitlines(keepends=True)
+        src = ''.join(' ' * len(l) if l.lstrip().startswith('//') else l for l in linhas)
         for m in CHAMADA.finditer(src):
-            achadas.setdefault(m.group(1), f'{f.relative_to(RAIZ)}:{src.count(chr(10), 0, m.start()) + 1}')
+            achadas.setdefault(sem_escape(m.group(1)), f'{f.relative_to(RAIZ)}:{src.count(chr(10), 0, m.start()) + 1}')
     return achadas
 
 

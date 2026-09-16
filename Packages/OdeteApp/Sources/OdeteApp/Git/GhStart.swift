@@ -120,7 +120,7 @@ struct GhStart: View {
                 VStack(alignment: .leading, spacing: 12) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(tr("Nome do repositório")).font(.caption).foregroundStyle(theme.fgMuted)
-                        TextField("meu-projeto", text: $nome)
+                        TextField(tr("meu-projeto"), text: $nome)
                             .textFieldStyle(.plain).font(OdeteFont.mono(13)).foregroundStyle(theme.fg)
                             .textInputAutocapitalization(.never).autocorrectionDisabled()
                             .padding(.horizontal, 10).frame(height: 36)

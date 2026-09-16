@@ -158,7 +158,7 @@ struct HistorySheet: View {
             }
             .filter { !$0.isEmpty }
             .joined(separator: " ")
-        let prefixo = m.role == .user ? "você: " : ""
+        let prefixo = m.role == .user ? tr("você: ") : ""
         return prefixo + String(texto.prefix(120))
     }
 

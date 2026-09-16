@@ -214,7 +214,7 @@ struct ModelMenu: View {
     }
 
     var subtitle: String {
-        guard let a = agent.account else { return "conectar" }
+        guard let a = agent.account else { return tr("conectar") }
         return a.login.isEmpty ? a.kind.vendor : a.login
     }
 }

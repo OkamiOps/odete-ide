@@ -16,3 +16,6 @@ xcuserdata/
 # sobras de execução
 *.log
 tmp/
+
+# Python
+__pycache__/

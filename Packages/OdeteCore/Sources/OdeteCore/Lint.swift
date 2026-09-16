@@ -69,21 +69,31 @@ public enum Lint {
     }
 
     private static let jsRules: [Rule] = [
-        Rule(id: "no-debugger", rx: re(#"(?<![\w$.])debugger\b"#), message: "`debugger` esquecido", severity: .warning),
+        Rule(
+            id: "no-debugger",
+            rx: re(#"(?<![\w$.])debugger\b"#),
+            message: chave("`debugger` esquecido"),
+            severity: .warning
+        ),
         Rule(
             id: "no-console",
             rx: re(#"(?<![\w$.])console\.(log|debug|info)\("#),
-            message: "console.log no código",
+            message: chave("console.log no código"),
             severity: .info
         ),
         Rule(
             id: "no-var",
             rx: re(#"(?<![\w$.])var\s+[A-Za-z_$]"#),
-            message: "Use `let` ou `const` em vez de `var`",
+            message: chave("Use `let` ou `const` em vez de `var`"),
             severity: .warning
         ),
-        Rule(id: "eqeqeq", rx: re(#"[^=!<>]==[^=]|!=[^=]"#), message: "Prefira `===` / `!==`", severity: .warning),
-        Rule(id: "no-alert", rx: re(#"(?<![\w$.])alert\("#), message: "`alert` trava a página", severity: .info),
+        Rule(
+            id: "eqeqeq",
+            rx: re(#"[^=!<>]==[^=]|!=[^=]"#),
+            message: chave("Prefira `===` / `!==`"),
+            severity: .warning
+        ),
+        Rule(id: "no-alert", rx: re(#"(?<![\w$.])alert\("#), message: chave("`alert` trava a página"), severity: .info),
     ]
 
     private static func js(_ text: String) -> [LintIssue] {
@@ -167,7 +177,7 @@ public enum Lint {
             if depth < 0 {
                 out.append(LintIssue(
                     rule: "css-brace",
-                    message: "`}` sem abertura",
+                    message: chave("`}` sem abertura"),
                     severity: .error,
                     line: i + 1,
                     column: 1,
@@ -178,7 +188,7 @@ public enum Lint {
             if let r = line.range(of: "!important") {
                 out.append(LintIssue(
                     rule: "no-important",
-                    message: "`!important` dificulta sobrescrever",
+                    message: chave("`!important` dificulta sobrescrever"),
                     severity: .info,
                     line: i + 1,
                     column: line.distance(from: line.startIndex, to: r.lowerBound) + 1,
@@ -189,7 +199,7 @@ public enum Lint {
         if depth > 0, let last = text.components(separatedBy: "\n").indices.last {
             out.append(LintIssue(
                 rule: "css-brace",
-                message: "`{` sem fechamento",
+                message: chave("`{` sem fechamento"),
                 severity: .error,
                 line: last + 1,
                 column: 1,
@@ -200,9 +210,14 @@ public enum Lint {
     }
 
     private static let swiftRules: [Rule] = [
-        Rule(id: "no-force-try", rx: re(#"\btry!"#), message: "`try!` derruba o app se falhar", severity: .warning),
-        Rule(id: "no-print", rx: re(#"(?<![\w.])print\("#), message: "`print` esquecido", severity: .info),
-        Rule(id: "todo", rx: re(#"//\s*(TODO|FIXME)\b"#), message: "Pendência marcada", severity: .info),
+        Rule(
+            id: "no-force-try",
+            rx: re(#"\btry!"#),
+            message: chave("`try!` derruba o app se falhar"),
+            severity: .warning
+        ),
+        Rule(id: "no-print", rx: re(#"(?<![\w.])print\("#), message: chave("`print` esquecido"), severity: .info),
+        Rule(id: "todo", rx: re(#"//\s*(TODO|FIXME)\b"#), message: chave("Pendência marcada"), severity: .info),
     ]
 
     private static func swift(_ text: String) -> [LintIssue] {

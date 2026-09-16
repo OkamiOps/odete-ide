@@ -241,7 +241,7 @@ struct FileTreeView: View {
         VStack(spacing: 8) {
             Image(systemName: busca.isEmpty ? "folder" : "magnifyingglass")
                 .font(.system(size: 26)).foregroundStyle(theme.fgSubtle)
-            Text(busca.isEmpty ? "Pasta vazia" : tr("Nada com \"%1$@\"", "\(busca)"))
+            Text(busca.isEmpty ? tr("Pasta vazia") : tr("Nada com \"%1$@\"", "\(busca)"))
                 .font(OdeteFont.ui(13, weight: .medium)).foregroundStyle(theme.fgMuted)
             if busca.isEmpty {
                 Text(tr("O botão de novo arquivo fica aqui em cima."))

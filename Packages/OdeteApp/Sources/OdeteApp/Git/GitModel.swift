@@ -290,7 +290,7 @@ public final class GitModel {
         let author = author
         run("merge…") { repo in
             switch try await repo.merge(name, author: author) {
-            case .upToDate: "já atualizado"
+            case .upToDate: tr("já atualizado")
             case .fastForward: "fast-forward"
             case .merged: "merge feito"
             case let .conflicts(p): tr("conflitos em %1$@ arquivo(s)", "\(p.count)")
@@ -339,7 +339,7 @@ public final class GitModel {
         let author = author
         run("pull…") { repo in
             switch try await repo.pull(credentials: cred, author: author) {
-            case .upToDate: "já atualizado"
+            case .upToDate: tr("já atualizado")
             case .fastForward: "pull: fast-forward"
             case .merged: "pull: merge feito"
             case let .conflicts(p): tr("pull: conflitos em %1$@ arquivo(s)", "\(p.count)")

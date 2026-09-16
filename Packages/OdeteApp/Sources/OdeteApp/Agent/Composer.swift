@@ -218,7 +218,7 @@ struct Composer: View {
 
     /// Nome curto: na barra cabe o essencial, o resto está no menu.
     var nomeModelo: String {
-        guard agent.account != nil else { return "conectar" }
+        guard agent.account != nil else { return tr("conectar") }
         let cheio = agent.models.first { $0.id == agent.model }?.label ?? agent.model
         let primeiro = cheio.split(separator: "·").first.map {
             $0.trimmingCharacters(in: .whitespaces)
@@ -351,7 +351,7 @@ struct MentionMenu: View {
                 .buttonStyle(.plain)
             }
             if options.isEmpty {
-                Text(kind == .file ? "nenhum arquivo" : "nenhuma skill").font(.footnote)
+                Text(kind == .file ? tr("nenhum arquivo") : tr("nenhuma skill")).font(.footnote)
                     .foregroundStyle(.secondary).padding(.horizontal, 12).frame(height: 38)
             }
         }

@@ -121,7 +121,7 @@ struct SwiftPreviewPane: View {
         } else {
             VStack(spacing: 12) {
                 Image(systemName: "swift").font(.system(size: 34)).foregroundStyle(theme.fgSubtle)
-                Text(program == nil ? "Nenhum arquivo Swift" : "Nenhuma View encontrada").font(OdeteFont.ui(
+                Text(program == nil ? tr("Nenhum arquivo Swift") : tr("Nenhuma View encontrada")).font(OdeteFont.ui(
                     14,
                     weight: .medium
                 )).foregroundStyle(theme.fg)

@@ -94,7 +94,7 @@ struct PullRequestsCard: View {
     }
 
     var body: some View {
-        GitCard(title: tr("Pull requests"), trailing: loading ? "…" : "\(pulls.count) abertos") {
+        GitCard(title: tr("Pull requests"), trailing: loading ? "…" : tr("%1$@ abertos", "\(pulls.count)")) {
             if let recado {
                 // "GitHub 404: Not Found" no meio do painel não diz o que fazer.
                 Text(recado).font(.caption).foregroundStyle(theme.fgMuted)
@@ -426,7 +426,7 @@ struct CreatePR: View {
             if let error {
                 Text(error).foregroundStyle(.red)
             }
-            Button(sending ? "Enviando…" : "Criar pull request") {
+            Button(sending ? tr("Enviando…") : tr("Criar pull request")) {
                 sending = true
                 Task {
                     do { _ = try await api.createPull(

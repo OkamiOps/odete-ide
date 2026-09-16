@@ -21,6 +21,21 @@ public func tr(_ chave: String, _ args: any CVarArg...) -> String {
     return String(format: Texto.chave(chave), locale: Texto.idioma.locale, arguments: args)
 }
 
+/// Marca uma frase que só vai ser traduzida mais tarde, em outro lugar.
+///
+/// Algumas frases não moram na tela que as desenha: o texto de um tema e a mensagem de
+/// uma regra do lint vivem numa tabela estática, e a tela faz `tr(tema.blurb)`. Quem
+/// procura `tr("…")` no código nunca encontra essas frases, e elas ficam em português
+/// nos outros quatro idiomas sem ninguém notar — foi exatamente o que aconteceu com os
+/// onze temas e as onze regras do lint.
+///
+/// Em tempo de execução isto não faz nada: devolve a frase como veio. Serve para o
+/// `make i18n` enxergar a chave e cobrar tradução dela.
+@inlinable
+public func chave(_ frase: String) -> String {
+    frase
+}
+
 /// A tabela e o idioma em vigor. Fica fora de qualquer ator: o shell, o git e o agente
 /// escrevem texto para a pessoa de dentro dos atores deles, e um `await` em cada frase
 /// não é uma opção.

@@ -1,6 +1,34 @@
 {
   "sourceLanguage": "pt-BR",
   "strings": {
+    "\n… (ainda rodando após 5 min)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "\n… (still running after 5 min)"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "\n… (läuft nach 5 min noch)"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "\n… (tourne encore après 5 min)"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "\n… (todavía corriendo después de 5 min)"
+          }
+        }
+      }
+    },
     "  %1$@: carregando esbuild…": {
       "localizations": {
         "en": {
@@ -169,30 +197,30 @@
         }
       }
     },
-    " O usuário está falando do projeto \\\"%1$@\\\".": {
+    " O usuário está falando do projeto \"%1$@\".": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": " The user is talking about the \\\"%1$@\\\" project."
+            "value": " The user is talking about the \"%1$@\" project."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": " Der Nutzer spricht über das Projekt \\\"%1$@\\\"."
+            "value": " Der Nutzer spricht über das Projekt \"%1$@\"."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": " L’utilisateur parle du projet \\\"%1$@\\\"."
+            "value": " L’utilisateur parle du projet \"%1$@\"."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": " El usuario está hablando del proyecto \\\"%1$@\\\"."
+            "value": " El usuario está hablando del proyecto \"%1$@\"."
           }
         }
       }
@@ -225,30 +253,30 @@
         }
       }
     },
-    "# %1$@\\n\\nCriado na Odete, direto no iPad.\\n\\n%2$@\\n": {
+    "# %1$@\n\nCriado na Odete, direto no iPad.\n\n%2$@\n": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "# %1$@\\n\\nMade in Odete, right on the iPad.\\n\\n%2$@\\n"
+            "value": "# %1$@\n\nMade in Odete, right on the iPad.\n\n%2$@\n"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "# %1$@\\n\\nIn Odete erstellt, direkt auf dem iPad.\\n\\n%2$@\\n"
+            "value": "# %1$@\n\nIn Odete erstellt, direkt auf dem iPad.\n\n%2$@\n"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "# %1$@\\n\\nCréé dans Odete, directement sur l’iPad.\\n\\n%2$@\\n"
+            "value": "# %1$@\n\nCréé dans Odete, directement sur l’iPad.\n\n%2$@\n"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "# %1$@\\n\\nCreado en Odete, directo en el iPad.\\n\\n%2$@\\n"
+            "value": "# %1$@\n\nCreado en Odete, directo en el iPad.\n\n%2$@\n"
           }
         }
       }
@@ -305,6 +333,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "%1$@ (solo %2$@)"
+          }
+        }
+      }
+    },
+    "%1$@ abertos": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ open"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ offen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ ouvertes"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ abiertas"
           }
         }
       }
@@ -1037,86 +1093,86 @@
         }
       }
     },
-    "--- a/%1$@\\n+++ /dev/null\\n": {
+    "--- a/%1$@\n+++ /dev/null\n": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "--- a/%1$@\\n+++ /dev/null\\n"
+            "value": "--- a/%1$@\n+++ /dev/null\n"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "--- a/%1$@\\n+++ /dev/null\\n"
+            "value": "--- a/%1$@\n+++ /dev/null\n"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "--- a/%1$@\\n+++ /dev/null\\n"
+            "value": "--- a/%1$@\n+++ /dev/null\n"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "--- a/%1$@\\n+++ /dev/null\\n"
+            "value": "--- a/%1$@\n+++ /dev/null\n"
           }
         }
       }
     },
-    "--- a/%1$@\\n+++ b/%2$@": {
+    "--- a/%1$@\n+++ b/%2$@": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "--- a/%1$@\\n+++ b/%2$@"
+            "value": "--- a/%1$@\n+++ b/%2$@"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "--- a/%1$@\\n+++ b/%2$@"
+            "value": "--- a/%1$@\n+++ b/%2$@"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "--- a/%1$@\\n+++ b/%2$@"
+            "value": "--- a/%1$@\n+++ b/%2$@"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "--- a/%1$@\\n+++ b/%2$@"
+            "value": "--- a/%1$@\n+++ b/%2$@"
           }
         }
       }
     },
-    "--- a/%1$@\\n+++ b/%2$@\\n": {
+    "--- a/%1$@\n+++ b/%2$@\n": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "--- a/%1$@\\n+++ b/%2$@\\n"
+            "value": "--- a/%1$@\n+++ b/%2$@\n"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "--- a/%1$@\\n+++ b/%2$@\\n"
+            "value": "--- a/%1$@\n+++ b/%2$@\n"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "--- a/%1$@\\n+++ b/%2$@\\n"
+            "value": "--- a/%1$@\n+++ b/%2$@\n"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "--- a/%1$@\\n+++ b/%2$@\\n"
+            "value": "--- a/%1$@\n+++ b/%2$@\n"
           }
         }
       }
@@ -1261,30 +1317,30 @@
         }
       }
     },
-    "1. Abra a página da Anthropic e entre com a conta Pro/Max.\\n2. Copie o código que aparece no fim.\\n3. Cole aqui.": {
+    "1. Abra a página da Anthropic e entre com a conta Pro/Max.\n2. Copie o código que aparece no fim.\n3. Cole aqui.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "1. Open the Anthropic page and sign in with your Pro/Max account.\\n2. Copy the code shown at the end.\\n3. Paste it here."
+            "value": "1. Open the Anthropic page and sign in with your Pro/Max account.\n2. Copy the code shown at the end.\n3. Paste it here."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "1. Öffne die Anthropic-Seite und melde dich mit dem Pro/Max-Konto an.\\n2. Kopiere den Code, der am Ende erscheint.\\n3. Füge ihn hier ein."
+            "value": "1. Öffne die Anthropic-Seite und melde dich mit dem Pro/Max-Konto an.\n2. Kopiere den Code, der am Ende erscheint.\n3. Füge ihn hier ein."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "1. Ouvre la page Anthropic et connecte-toi avec le compte Pro/Max.\\n2. Copie le code affiché à la fin.\\n3. Colle-le ici."
+            "value": "1. Ouvre la page Anthropic et connecte-toi avec le compte Pro/Max.\n2. Copie le code affiché à la fin.\n3. Colle-le ici."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "1. Abre la página de Anthropic e inicia sesión con la cuenta Pro/Max.\\n2. Copia el código que aparece al final.\\n3. Pégalo aquí."
+            "value": "1. Abre la página de Anthropic e inicia sesión con la cuenta Pro/Max.\n2. Copia el código que aparece al final.\n3. Pégalo aquí."
           }
         }
       }
@@ -2073,6 +2129,34 @@
         }
       }
     },
+    "Adicionar conta por token": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add account with a token"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Konto per Token hinzufügen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajouter un compte par jeton"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Añadir cuenta con token"
+          }
+        }
+      }
+    },
     "Adicionar outra conta": {
       "localizations": {
         "en": {
@@ -2521,6 +2605,34 @@
         }
       }
     },
+    "Apagar \"%1$@\"?": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete \"%1$@\"?"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "\"%1$@\" löschen?"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprimer \"%1$@\" ?"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Eliminar \"%1$@\"?"
+          }
+        }
+      }
+    },
     "Apagar %1$@": {
       "localizations": {
         "en": {
@@ -2545,34 +2657,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Eliminar %1$@"
-          }
-        }
-      }
-    },
-    "Apagar \\\"%1$@\\\"?": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Delete \\\"%1$@\\\"?"
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "\\\"%1$@\\\" löschen?"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Supprimer \\\"%1$@\\\" ?"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "¿Eliminar \\\"%1$@\\\"?"
           }
         }
       }
@@ -3389,6 +3473,34 @@
         }
       }
     },
+    "Brasa.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ember."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Glut."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Braise."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Brasa."
+          }
+        }
+      }
+    },
     "Build": {
       "localizations": {
         "en": {
@@ -3609,6 +3721,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Cancelar"
+          }
+        }
+      }
+    },
+    "Catppuccin claro.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Catppuccin, light."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Catppuccin, hell."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Catppuccin, clair."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Catppuccin claro."
           }
         }
       }
@@ -4309,6 +4449,62 @@
           "stringUnit": {
             "state": "translated",
             "value": "Conectadas"
+          }
+        }
+      }
+    },
+    "Conectando…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connecting…"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verbinde…"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connexion…"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conectando…"
+          }
+        }
+      }
+    },
+    "Conectar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verbinden"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connecter"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conectar"
           }
         }
       }
@@ -5489,6 +5685,34 @@
         }
       }
     },
+    "Criar pull request": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create pull request"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pull Request erstellen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Créer une pull request"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Crear pull request"
+          }
+        }
+      }
+    },
     "Crie em github.com → Settings → Developer settings → Tokens, com escopo repo (e workflow para Actions).": {
       "localizations": {
         "en": {
@@ -5513,6 +5737,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Créalo en github.com → Settings → Developer settings → Tokens, con alcance repo (y workflow para Actions)."
+          }
+        }
+      }
+    },
+    "Crie um projeto com o template \"Swift Playground\" para ter um .swiftpm que o Swift Playgrounds abre e compila. Este projeto tem só arquivos .swift soltos, que o preview mostra mas não compila.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create a project with the \"Swift Playground\" template to get a .swiftpm that Swift Playgrounds opens and compiles. This project only has loose .swift files, which the preview renders but does not compile."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Erstellen Sie ein Projekt mit der Vorlage \"Swift Playground\", um ein .swiftpm zu erhalten, das Swift Playgrounds öffnet und kompiliert. Dieses Projekt hat nur lose .swift-Dateien, die die Vorschau zeigt, aber nicht kompiliert."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Créez un projet avec le modèle \"Swift Playground\" pour obtenir un .swiftpm que Swift Playgrounds ouvre et compile. Ce projet ne contient que des fichiers .swift isolés, que l’aperçu affiche mais ne compile pas."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Crea un proyecto con la plantilla \"Swift Playground\" para tener un .swiftpm que Swift Playgrounds abre y compila. Este proyecto solo tiene archivos .swift sueltos, que la vista previa muestra pero no compila."
           }
         }
       }
@@ -5625,6 +5877,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Código"
+          }
+        }
+      }
+    },
+    "Dark dimmed.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dark dimmed."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dark dimmed."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dark dimmed."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dark dimmed."
           }
         }
       }
@@ -6385,6 +6665,34 @@
         }
       }
     },
+    "Em tela cheia o iPad suspende a Odete e a página para de responder em poucos segundos. Arraste o Safari para o lado (Split View) e o servidor continua servindo enquanto você testa.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In full screen the iPad suspends Odete and the page stops responding within seconds. Drag Safari to the side (Split View) and the server keeps serving while you test."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Im Vollbild setzt das iPad Odete aus, und die Seite reagiert nach wenigen Sekunden nicht mehr. Ziehen Sie Safari zur Seite (Split View), dann liefert der Server weiter, während Sie testen."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En plein écran, l’iPad suspend Odete et la page cesse de répondre en quelques secondes. Faites glisser Safari sur le côté (Split View) et le serveur continue de répondre pendant vos tests."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "En pantalla completa el iPad suspende Odete y la página deja de responder en pocos segundos. Arrastra Safari a un lado (Split View) y el servidor sigue sirviendo mientras pruebas."
+          }
+        }
+      }
+    },
     "Endereço e chave do serviço.": {
       "localizations": {
         "en": {
@@ -6525,30 +6833,58 @@
         }
       }
     },
-    "Entre no ChatGPT e digite o código. Se pedir, ligue \\\"Device code\\\" em Ajustes → Segurança.": {
+    "Entre no ChatGPT e digite o código. Se pedir, ligue \"Device code\" em Ajustes → Segurança.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Sign in to ChatGPT and type the code. If it asks, turn on \\\"Device code\\\" in Settings → Security."
+            "value": "Sign in to ChatGPT and type the code. If it asks, turn on \"Device code\" in Settings → Security."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Melde dich bei ChatGPT an und gib den Code ein. Falls gefragt, schalte \\\"Device code\\\" unter Einstellungen → Sicherheit ein."
+            "value": "Melde dich bei ChatGPT an und gib den Code ein. Falls gefragt, schalte \"Device code\" unter Einstellungen → Sicherheit ein."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Connecte-toi à ChatGPT et saisis le code. Si on te le demande, active \\\"Device code\\\" dans Réglages → Sécurité."
+            "value": "Connecte-toi à ChatGPT et saisis le code. Si on te le demande, active \"Device code\" dans Réglages → Sécurité."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Inicia sesión en ChatGPT y escribe el código. Si lo pide, activa \\\"Device code\\\" en Ajustes → Seguridad."
+            "value": "Inicia sesión en ChatGPT y escribe el código. Si lo pide, activa \"Device code\" en Ajustes → Seguridad."
+          }
+        }
+      }
+    },
+    "Enviando…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sending…"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sende…"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Envoi…"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enviando…"
           }
         }
       }
@@ -8625,6 +8961,34 @@
         }
       }
     },
+    "JetBrains.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "JetBrains."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "JetBrains."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "JetBrains."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "JetBrains."
+          }
+        }
+      }
+    },
     "Já atualizado.": {
       "localizations": {
         "en": {
@@ -8705,6 +9069,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ya existe: %1$@"
+          }
+        }
+      }
+    },
+    "Laranja.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Orange."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Orange."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Orange."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Naranja."
           }
         }
       }
@@ -9381,6 +9773,34 @@
         }
       }
     },
+    "Mocha.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mocha."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mocha."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mocha."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mocha."
+          }
+        }
+      }
+    },
     "Modelo": {
       "localizations": {
         "en": {
@@ -9633,30 +10053,30 @@
         }
       }
     },
-    "Nada com \\\"%1$@\\\"": {
+    "Nada com \"%1$@\"": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Nothing with \\\"%1$@\\\""
+            "value": "Nothing with \"%1$@\""
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Nichts mit \\\"%1$@\\\""
+            "value": "Nichts mit \"%1$@\""
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Rien avec \\\"%1$@\\\""
+            "value": "Rien avec \"%1$@\""
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Nada con \\\"%1$@\\\""
+            "value": "Nada con \"%1$@\""
           }
         }
       }
@@ -9801,6 +10221,34 @@
         }
       }
     },
+    "Nenhum arquivo Swift": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No Swift file"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keine Swift-Datei"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucun fichier Swift"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ningún archivo Swift"
+          }
+        }
+      }
+    },
     "Nenhum commit ainda.": {
       "localizations": {
         "en": {
@@ -9909,6 +10357,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ninguna"
+          }
+        }
+      }
+    },
+    "Nenhuma View encontrada": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No View found"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keine View gefunden"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucune View trouvée"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ninguna View encontrada"
           }
         }
       }
@@ -10025,6 +10501,34 @@
         }
       }
     },
+    "Noite da marca.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The brand's night."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Nacht der Marke."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La nuit de la marque."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La noche de la marca."
+          }
+        }
+      }
+    },
     "Nome": {
       "localizations": {
         "en": {
@@ -10049,6 +10553,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Nombre"
+          }
+        }
+      }
+    },
+    "Nome antigo, mesma noite.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Old name, same night."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alter Name, dieselbe Nacht."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ancien nom, même nuit."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nombre antiguo, la misma noche."
           }
         }
       }
@@ -10637,6 +11169,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "No hay compilador Swift en el iPad. El Preview muestra el subconjunto de SwiftUI al instante;"
+          }
+        }
+      }
+    },
+    "Não staged": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unstaged"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nicht gestaged"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non indexé"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sin preparar"
           }
         }
       }
@@ -11705,6 +12265,34 @@
         }
       }
     },
+    "Pasta vazia": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Empty folder"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leerer Ordner"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dossier vide"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Carpeta vacía"
+          }
+        }
+      }
+    },
     "Patch do agente: +%1$@ −%2$@": {
       "localizations": {
         "en": {
@@ -11729,6 +12317,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Patch del agente: +%1$@ −%2$@"
+          }
+        }
+      }
+    },
+    "Pendência marcada": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Marked as pending"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Als offen markiert"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Marqué comme à faire"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Marcado como pendiente"
           }
         }
       }
@@ -11869,6 +12485,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Plan"
+          }
+        }
+      }
+    },
+    "Prefira `===` / `!==`": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prefer `===` / `!==`"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`===` / `!==` bevorzugen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Préférez `===` / `!==`"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prefiere `===` / `!==`"
           }
         }
       }
@@ -12657,30 +13301,30 @@
         }
       }
     },
-    "Redireciona a execução agora. Interrompe o plano anterior e segue isto:\\n\\n%1$@": {
+    "Redireciona a execução agora. Interrompe o plano anterior e segue isto:\n\n%1$@": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Redirects the run now. Drop the previous plan and follow this:\\n\\n%1$@"
+            "value": "Redirects the run now. Drop the previous plan and follow this:\n\n%1$@"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Lenkt die Ausführung jetzt um. Bricht den alten Plan ab und folgt dem hier:\\n\\n%1$@"
+            "value": "Lenkt die Ausführung jetzt um. Bricht den alten Plan ab und folgt dem hier:\n\n%1$@"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Redirige l’exécution maintenant. Interromps le plan précédent et suis ceci :\\n\\n%1$@"
+            "value": "Redirige l’exécution maintenant. Interromps le plan précédent et suis ceci :\n\n%1$@"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Redirige la ejecución ahora. Interrumpe el plan anterior y sigue esto:\\n\\n%1$@"
+            "value": "Redirige la ejecución ahora. Interrumpe el plan anterior y sigue esto:\n\n%1$@"
           }
         }
       }
@@ -13973,6 +14617,34 @@
         }
       }
     },
+    "Staged": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Staged"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gestaged"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Indexé"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preparado"
+          }
+        }
+      }
+    },
     "Staged (HEAD → índice)": {
       "localizations": {
         "en": {
@@ -14505,6 +15177,34 @@
         }
       }
     },
+    "Tema: %1$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Theme: %1$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thema: %1$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thème : %1$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tema: %1$@"
+          }
+        }
+      }
+    },
     "Tentar de novo": {
       "localizations": {
         "en": {
@@ -14585,6 +15285,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Terminal con pipes, jobs y dev server"
+          }
+        }
+      }
+    },
+    "Terracota.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terracotta."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terrakotta."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terre cuite."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terracota."
           }
         }
       }
@@ -14921,6 +15649,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Reemplazar todo"
+          }
+        }
+      }
+    },
+    "Tudo": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alles"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tout"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Todo"
           }
         }
       }
@@ -15345,6 +16101,34 @@
         }
       }
     },
+    "Use `let` ou `const` em vez de `var`": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use `let` or `const` instead of `var`"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`let` oder `const` statt `var` verwenden"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Utilisez `let` ou `const` au lieu de `var`"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usa `let` o `const` en vez de `var`"
+          }
+        }
+      }
+    },
     "Vale para escrever arquivos e rodar comandos no terminal.": {
       "localizations": {
         "en": {
@@ -15569,6 +16353,34 @@
         }
       }
     },
+    "Verde elétrico.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Electric green."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elektrisches Grün."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vert électrique."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verde eléctrico."
+          }
+        }
+      }
+    },
     "Versionar %1$@": {
       "localizations": {
         "en": {
@@ -15653,30 +16465,30 @@
         }
       }
     },
-    "Você escreve mensagens de commit. Responda só com a mensagem, sem aspas nem explicação.\\n%1$@": {
+    "Você escreve mensagens de commit. Responda só com a mensagem, sem aspas nem explicação.\n%1$@": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "You write commit messages. Reply with the message only, no quotes and no explanation.\\n%1$@"
+            "value": "You write commit messages. Reply with the message only, no quotes and no explanation.\n%1$@"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Du schreibst commit-Nachrichten. Antworte nur mit der Nachricht, ohne Anführungszeichen und ohne Erklärung.\\n%1$@"
+            "value": "Du schreibst commit-Nachrichten. Antworte nur mit der Nachricht, ohne Anführungszeichen und ohne Erklärung.\n%1$@"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Tu écris des messages de commit. Réponds seulement avec le message, sans guillemets ni explication.\\n%1$@"
+            "value": "Tu écris des messages de commit. Réponds seulement avec le message, sans guillemets ni explication.\n%1$@"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Escribes mensajes de commit. Responde solo con el mensaje, sin comillas ni explicación.\\n%1$@"
+            "value": "Escribes mensajes de commit. Responde solo con el mensaje, sin comillas ni explicación.\n%1$@"
           }
         }
       }
@@ -15905,34 +16717,6 @@
         }
       }
     },
-    "\\n… (ainda rodando após 5 min)": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "\\n… (still running after 5 min)"
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "\\n… (läuft nach 5 min noch)"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "\\n… (tourne encore après 5 min)"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "\\n… (todavía corriendo después de 5 min)"
-          }
-        }
-      }
-    },
     "_sem descrição_": {
       "localizations": {
         "en": {
@@ -15957,6 +16741,90 @@
           "stringUnit": {
             "state": "translated",
             "value": "_sin descripción_"
+          }
+        }
+      }
+    },
+    "`!important` dificulta sobrescrever": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`!important` makes overriding hard"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`!important` erschwert das Überschreiben"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`!important` complique la surcharge"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`!important` dificulta sobrescribir"
+          }
+        }
+      }
+    },
+    "`alert` trava a página": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`alert` freezes the page"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`alert` blockiert die Seite"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`alert` bloque la page"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`alert` bloquea la página"
+          }
+        }
+      }
+    },
+    "`debugger` esquecido": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`debugger` left behind"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`debugger` vergessen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`debugger` oublié"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`debugger` olvidado"
           }
         }
       }
@@ -16013,6 +16881,118 @@
           "stringUnit": {
             "state": "translated",
             "value": "`npm run dev` levanta Vite. Edita `src/App.tsx`."
+          }
+        }
+      }
+    },
+    "`print` esquecido": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`print` left behind"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`print` vergessen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`print` oublié"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`print` olvidado"
+          }
+        }
+      }
+    },
+    "`try!` derruba o app se falhar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`try!` crashes the app if it fails"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`try!` lässt die App abstürzen, wenn es fehlschlägt"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`try!` fait planter l’app en cas d’échec"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`try!` tumba la app si falla"
+          }
+        }
+      }
+    },
+    "`{` sem fechamento": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`{` never closed"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`{` ohne schließende Klammer"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`{` jamais fermée"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`{` sin cierre"
+          }
+        }
+      }
+    },
+    "`}` sem abertura": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`}` with nothing opening it"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`}` ohne öffnende Klammer"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`}` sans ouverture"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`}` sin apertura"
           }
         }
       }
@@ -17389,6 +18369,34 @@
         }
       }
     },
+    "conectar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "connect"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "verbinden"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "connecter"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "conectar"
+          }
+        }
+      }
+    },
     "conflitos em %1$@ arquivo(s)": {
       "localizations": {
         "en": {
@@ -17441,6 +18449,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "el console.log de tu app aparece aquí."
+          }
+        }
+      }
+    },
+    "console.log no código": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "console.log in the code"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "console.log im Code"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "console.log dans le code"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "console.log en el código"
           }
         }
       }
@@ -17837,58 +18873,58 @@
         }
       }
     },
-    "device %1$@. Ative \\\"Device code\\\" em ChatGPT → Ajustes → Segurança.": {
+    "device %1$@. Ative \"Device code\" em ChatGPT → Ajustes → Segurança.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "device %1$@. Turn on \\\"Device code\\\" in ChatGPT → Settings → Security."
+            "value": "device %1$@. Turn on \"Device code\" in ChatGPT → Settings → Security."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "device %1$@. Schalte \\\"Device code\\\" in ChatGPT → Einstellungen → Sicherheit ein."
+            "value": "device %1$@. Schalte \"Device code\" in ChatGPT → Einstellungen → Sicherheit ein."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "device %1$@. Active \\\"Device code\\\" dans ChatGPT → Réglages → Sécurité."
+            "value": "device %1$@. Active \"Device code\" dans ChatGPT → Réglages → Sécurité."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "device %1$@. Activa \\\"Device code\\\" en ChatGPT → Ajustes → Seguridad."
+            "value": "device %1$@. Activa \"Device code\" en ChatGPT → Ajustes → Seguridad."
           }
         }
       }
     },
-    "diff --git a/%1$@ b/%2$@\\n": {
+    "diff --git a/%1$@ b/%2$@\n": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "diff --git a/%1$@ b/%2$@\\n"
+            "value": "diff --git a/%1$@ b/%2$@\n"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "diff --git a/%1$@ b/%2$@\\n"
+            "value": "diff --git a/%1$@ b/%2$@\n"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "diff --git a/%1$@ b/%2$@\\n"
+            "value": "diff --git a/%1$@ b/%2$@\n"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "diff --git a/%1$@ b/%2$@\\n"
+            "value": "diff --git a/%1$@ b/%2$@\n"
           }
         }
       }
@@ -19097,6 +20133,34 @@
         }
       }
     },
+    "já atualizado": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "already up to date"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "bereits aktuell"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "déjà à jour"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ya actualizado"
+          }
+        }
+      }
+    },
     "já existe um projeto chamado %1$@": {
       "localizations": {
         "en": {
@@ -19317,6 +20381,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "mensaje"
+          }
+        }
+      }
+    },
+    "meu-projeto": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "my-project"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "mein-projekt"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "mon-projet"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "mi-proyecto"
           }
         }
       }
@@ -19713,6 +20805,34 @@
         }
       }
     },
+    "nenhum arquivo": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "no files"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "keine Dateien"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "aucun fichier"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ningún archivo"
+          }
+        }
+      }
+    },
     "nenhum job": {
       "localizations": {
         "en": {
@@ -19793,6 +20913,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "ninguna ejecución"
+          }
+        }
+      }
+    },
+    "nenhuma skill": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "no skills"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "keine Skills"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "aucune skill"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ninguna skill"
           }
         }
       }
@@ -20133,30 +21281,30 @@
         }
       }
     },
-    "npm: script \\\"%1$@\\\" não existe em package.json": {
+    "npm: script \"%1$@\" não existe em package.json": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "npm: script \\\"%1$@\\\" doesn't exist in package.json"
+            "value": "npm: script \"%1$@\" doesn't exist in package.json"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "npm: script \\\"%1$@\\\" gibt es nicht in package.json"
+            "value": "npm: script \"%1$@\" gibt es nicht in package.json"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "npm: le script \\\"%1$@\\\" n’existe pas dans package.json"
+            "value": "npm: le script \"%1$@\" n’existe pas dans package.json"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "npm: el script \\\"%1$@\\\" no existe en package.json"
+            "value": "npm: el script \"%1$@\" no existe en package.json"
           }
         }
       }
@@ -21085,6 +22233,34 @@
         }
       }
     },
+    "paleta": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "palette"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Palette"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "palette"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "paleta"
+          }
+        }
+      }
+    },
     "para compilar e rodar de verdade, abra o pacote .swiftpm no Swift Playgrounds (botão no Preview).": {
       "localizations": {
         "en": {
@@ -21813,6 +22989,34 @@
         }
       }
     },
+    "salvar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "save"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "sichern"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "enregistrer"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "guardar"
+          }
+        }
+      }
+    },
     "sem URL para %1$@": {
       "localizations": {
         "en": {
@@ -22233,6 +23437,34 @@
         }
       }
     },
+    "sidebar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "sidebar"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seitenleiste"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "barre latérale"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "barra lateral"
+          }
+        }
+      }
+    },
     "stash apagado": {
       "localizations": {
         "en": {
@@ -22485,6 +23717,34 @@
         }
       }
     },
+    "terminal": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "terminal"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminal"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "terminal"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "terminal"
+          }
+        }
+      }
+    },
     "todos os arquivos": {
       "localizations": {
         "en": {
@@ -22625,30 +23885,30 @@
         }
       }
     },
-    "use git commit -m \\\"mensagem\\\"": {
+    "use git commit -m \"mensagem\"": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "use git commit -m \\\"message\\\""
+            "value": "use git commit -m \"message\""
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "nimm git commit -m \\\"Nachricht\\\""
+            "value": "nimm git commit -m \"Nachricht\""
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "utilise git commit -m \\\"message\\\""
+            "value": "utilise git commit -m \"message\""
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "usa git commit -m \\\"mensaje\\\""
+            "value": "usa git commit -m \"mensaje\""
           }
         }
       }
@@ -22793,6 +24053,34 @@
         }
       }
     },
+    "você: ": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "you: "
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sie: "
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "vous : "
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "tú: "
+          }
+        }
+      }
+    },
     "xAI não devolveu access token": {
       "localizations": {
         "en": {
@@ -22905,30 +24193,58 @@
         }
       }
     },
-    "| arquivo | o que é |\\n| --- | --- |\\n| `index.html` | página do preview |\\n| `src/style.css` | visual |\\n| `src/main.js` | comportamento |": {
+    "| arquivo | o que é |\n| --- | --- |\n| `index.html` | página do preview |\n| `src/style.css` | visual |\n| `src/main.js` | comportamento |": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "| file | what it is |\\n| --- | --- |\\n| `index.html` | preview page |\\n| `src/style.css` | looks |\\n| `src/main.js` | behavior |"
+            "value": "| file | what it is |\n| --- | --- |\n| `index.html` | preview page |\n| `src/style.css` | looks |\n| `src/main.js` | behavior |"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "| Datei | was es ist |\\n| --- | --- |\\n| `index.html` | Seite des Previews |\\n| `src/style.css` | Optik |\\n| `src/main.js` | Verhalten |"
+            "value": "| Datei | was es ist |\n| --- | --- |\n| `index.html` | Seite des Previews |\n| `src/style.css` | Optik |\n| `src/main.js` | Verhalten |"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "| fichier | ce que c’est |\\n| --- | --- |\\n| `index.html` | page du preview |\\n| `src/style.css` | visuel |\\n| `src/main.js` | comportement |"
+            "value": "| fichier | ce que c’est |\n| --- | --- |\n| `index.html` | page du preview |\n| `src/style.css` | visuel |\n| `src/main.js` | comportement |"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "| archivo | qué es |\\n| --- | --- |\\n| `index.html` | página del preview |\\n| `src/style.css` | aspecto |\\n| `src/main.js` | comportamiento |"
+            "value": "| archivo | qué es |\n| --- | --- |\n| `index.html` | página del preview |\n| `src/style.css` | aspecto |\n| `src/main.js` | comportamiento |"
+          }
+        }
+      }
+    },
+    "Índigo.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Indigo."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Indigo."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Indigo."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Índigo."
           }
         }
       }

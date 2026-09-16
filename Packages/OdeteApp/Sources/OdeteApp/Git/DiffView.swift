@@ -75,9 +75,9 @@ struct DiffPane: View {
 
     var sourceLabel: String {
         switch git.diffSource {
-        case .headToWorkdir: "Tudo"
-        case .workdir: "Não staged"
-        case .index: "Staged"
+        case .headToWorkdir: tr("Tudo")
+        case .workdir: tr("Não staged")
+        case .index: tr("Staged")
         case let .commit(s): "commit \(s.prefix(7))"
         case let .commits(a, b): "\(a.prefix(7)) → \(b.prefix(7))"
         }

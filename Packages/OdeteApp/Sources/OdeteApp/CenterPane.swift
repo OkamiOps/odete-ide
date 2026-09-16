@@ -446,7 +446,7 @@ struct EmptyEditor: View {
             Button { ws.createFile(near: nil) } label: { Label(tr("Novo arquivo"), systemImage: "doc.badge.plus") }
                 .buttonStyle(.glass)
             HStack(spacing: 14) {
-                key("⌘P", "paleta"); key("⌘S", "salvar"); key("⌘B", "sidebar"); key("⌘J", "terminal")
+                key("⌘P", tr("paleta")); key("⌘S", tr("salvar")); key("⌘B", tr("sidebar")); key("⌘J", tr("terminal"))
             }
             .padding(.top, 8)
         }

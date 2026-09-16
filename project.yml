@@ -13,7 +13,7 @@ settings:
     IPHONEOS_DEPLOYMENT_TARGET: "26.0"
     TARGETED_DEVICE_FAMILY: "1,2"
     MARKETING_VERSION: "1.0"
-    CURRENT_PROJECT_VERSION: "1"
+    CURRENT_PROJECT_VERSION: "2"
     CODE_SIGN_STYLE: Automatic
     CODE_SIGNING_ALLOWED: "NO"
     DEVELOPMENT_TEAM: ""
@@ -66,6 +66,11 @@ targets:
       properties:
         CFBundleDisplayName: Odete
         CFBundleName: Odete
+        # Sem estas duas o XcodeGen escreve "1.0"/"1" fixos no Info.plist, e mexer em
+        # MARKETING_VERSION/CURRENT_PROJECT_VERSION acima não muda nada — o .ipa sai com
+        # o número velho e o App Store Connect recusa como build repetido.
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         # No topo do Info.plist, e não só dentro de CFBundleIcons: o actool escreve o
         # aninhado, e a validação da App Store cobra este. Sem ele o upload volta com
         # ITMS-90713 depois de vinte minutos de espera.

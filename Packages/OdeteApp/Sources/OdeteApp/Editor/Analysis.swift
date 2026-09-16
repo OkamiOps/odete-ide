@@ -58,7 +58,14 @@ extension WorkspaceModel {
         }
         Task.detached(priority: .utility) { [weak self] in
             let esboco = Outline.items(text: text, language: lang)
-            let regras = Lint.rules(text: text, language: lang, path: path)
+            // Quando a linguagem tem gramática, quem confere a sintaxe é o parser dela.
+            let doParser = ParserErros.problemas(text: text, language: lang)
+            let regras = doParser + Lint.rules(
+                text: text,
+                language: lang,
+                path: path,
+                sintaxeDeFora: ParserErros.temParser(lang)
+            )
             let elos = await Self.elos(text: text, language: lang, path: path, model: self)
             await MainActor.run {
                 guard let self, self.buffers[path] == text else { return }

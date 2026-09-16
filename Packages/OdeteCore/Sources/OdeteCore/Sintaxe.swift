@@ -356,7 +356,9 @@ public enum Sintaxe {
     /// O que dá para conferir em Python sem interpretador: a linha que pede bloco e não
     /// termina em `:`, e tabulação misturada com espaço na indentação — que é erro de
     /// sintaxe de verdade em Python, e invisível na tela.
-    public static func python(text texto: String) -> [LintIssue] {
+    /// Com `soRecuo`, fica só o que o parser não vê: espaço misturado com tabulação é
+    /// erro de Python e a gramática aceita, porque para ela os dois são espaço em branco.
+    public static func python(text texto: String, soRecuo: Bool = false) -> [LintIssue] {
         var out: [LintIssue] = []
         let pedemBloco = [
             "def ", "class ", "if ", "elif ", "else", "for ", "while ", "try", "except",
@@ -381,7 +383,7 @@ public enum Sintaxe {
             }
             // Dentro de parênteses `for` e `if` são compreensão, não bloco: ali não vai
             // `:` nenhum. Foi este o falso positivo que o teste de código válido pegou.
-            guard !dentroDeParenteses else { continue }
+            guard !soRecuo, !dentroDeParenteses else { continue }
             let corpo = linha.trimmingCharacters(in: .whitespaces)
             guard !corpo.isEmpty,
                   pedemBloco.contains(where: { corpo.hasPrefix($0) || corpo == String($0.dropLast()) }),

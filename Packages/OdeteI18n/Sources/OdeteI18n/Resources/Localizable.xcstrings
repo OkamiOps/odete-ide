@@ -19629,6 +19629,34 @@
         }
       }
     },
+    "erro de sintaxe: o analisador não entende este trecho": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "syntax error: the parser can't make sense of this"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Syntaxfehler: der Parser versteht diese Stelle nicht"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "erreur de syntaxe : l’analyseur ne comprend pas ce passage"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "error de sintaxis: el analizador no entiende este fragmento"
+          }
+        }
+      }
+    },
     "erro do modelo": {
       "localizations": {
         "en": {
@@ -19961,6 +19989,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "falló: %1$@: %2$@"
+          }
+        }
+      }
+    },
+    "falta `%1$@` aqui": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "missing `%1$@` here"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "hier fehlt `%1$@`"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "il manque `%1$@` ici"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "falta `%1$@` aquí"
           }
         }
       }

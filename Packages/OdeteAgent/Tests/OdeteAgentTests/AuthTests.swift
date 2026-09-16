@@ -121,3 +121,63 @@ struct AuthTests {
         #expect(store.accounts.first { $0.kind == .grok }?.needsReconnect == true)
     }
 }
+
+/// O device flow sobrevive à ida ao Safari.
+///
+/// Autorizar exige sair do app, e o iPad pode descartar a Odete enquanto isso. Se na
+/// volta a tela pedir outro código, a autorização que a pessoa acabou de dar fica órfã
+/// e a conta nunca conecta — foi o que acontecia com Grok e ChatGPT.
+/// Serializada de propósito: todos os casos mexem no mesmo UserDefaults, e em paralelo
+/// um limpa o que o outro acabou de guardar.
+@Suite(.serialized)
+struct DevicePendenteTests {
+    func exemplo(_ codigo: String = "ABCD-1234", expiraEm: Int = 900) -> DeviceStart {
+        DeviceStart(
+            userCode: codigo,
+            verificationURL: URL(string: "https://auth.openai.com/codex/device")!,
+            interval: 5,
+            expiresIn: expiraEm,
+            handle: "handle-1"
+        )
+    }
+
+    @Test func retomaOMesmoCodigo() {
+        DevicePendente.limpar()
+        let s = exemplo()
+        DevicePendente.guardar(s, kind: "codex")
+        let voltou = DevicePendente.retomar(kind: "codex")
+        #expect(voltou?.userCode == s.userCode)
+        #expect(voltou?.handle == s.handle)
+        DevicePendente.limpar()
+    }
+
+    @Test func naoMisturaProvedores() {
+        DevicePendente.limpar()
+        DevicePendente.guardar(exemplo(), kind: "codex")
+        #expect(DevicePendente.retomar(kind: "grok") == nil)
+        DevicePendente.limpar()
+    }
+
+    @Test func codigoVencidoNaoVolta() {
+        DevicePendente.limpar()
+        DevicePendente.guardar(exemplo(expiraEm: -1), kind: "codex")
+        #expect(DevicePendente.retomar(kind: "codex") == nil)
+        DevicePendente.limpar()
+    }
+
+    @Test func retomaComOPrazoQueSobra() {
+        DevicePendente.limpar()
+        DevicePendente.guardar(exemplo(expiraEm: 900), kind: "codex")
+        let voltou = DevicePendente.retomar(kind: "codex")
+        // o que sobra, não os 900 originais
+        #expect((voltou?.expiresIn ?? 0) <= 900)
+        #expect((voltou?.expiresIn ?? 0) > 800)
+        DevicePendente.limpar()
+    }
+
+    @Test func limparApaga() {
+        DevicePendente.guardar(exemplo(), kind: "codex")
+        DevicePendente.limpar()
+        #expect(DevicePendente.retomar(kind: "codex") == nil)
+    }
+}

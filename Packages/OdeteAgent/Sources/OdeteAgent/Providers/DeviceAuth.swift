@@ -12,6 +12,55 @@ public struct DeviceStart: Sendable, Equatable {
 
 public enum PollResult: Sendable, Equatable { case pending, slowDown, tokens(TokenBundle) }
 
+extension DeviceStart: Codable {}
+
+/// O device flow em andamento, guardado fora da tela que o mostra.
+///
+/// Autorizar exige sair da Odete para o Safari, e o iPad pode descartar a Odete
+/// enquanto isso — ela é um app grande. Na volta a tela nasce do zero, e sem isto ela
+/// pede outro código: o que a pessoa acabou de aprovar vira órfão e a conta nunca
+/// conecta. Guardado aqui, a tela retoma o mesmo código e o poll continua de onde
+/// parou.
+///
+/// Não é segredo de longo prazo — o código expira em minutos e só vale junto com uma
+/// aprovação que a pessoa dá na conta dela — mas some assim que é usado ou vence.
+public enum DevicePendente {
+    private static let chave = "odete.deviceflow"
+
+    private struct Guardado: Codable {
+        var kind: String
+        var start: DeviceStart
+        var expiraEm: Date
+    }
+
+    public static func guardar(_ start: DeviceStart, kind: String) {
+        let g = Guardado(
+            kind: kind,
+            start: start,
+            expiraEm: Date(timeIntervalSinceNow: Double(start.expiresIn))
+        )
+        guard let dados = try? JSONEncoder().encode(g) else { return }
+        UserDefaults.standard.set(dados, forKey: chave)
+    }
+
+    /// O fluxo pendente deste provedor, se ainda der tempo de autorizar.
+    public static func retomar(kind: String) -> DeviceStart? {
+        guard let dados = UserDefaults.standard.data(forKey: chave),
+              let g = try? JSONDecoder().decode(Guardado.self, from: dados),
+              g.kind == kind, g.expiraEm > Date()
+        else { return nil }
+        // O prazo que sobra, não o prazo original: quem retoma não ganha a janela inteira
+        // de novo, senão a tela fica esperando depois de o código já ter vencido.
+        var start = g.start
+        start.expiresIn = Int(g.expiraEm.timeIntervalSinceNow)
+        return start
+    }
+
+    public static func limpar() {
+        UserDefaults.standard.removeObject(forKey: chave)
+    }
+}
+
 public protocol DeviceAuth: Sendable {
     func start() async throws -> DeviceStart
     func poll(_ start: DeviceStart) async throws -> PollResult

@@ -263,10 +263,14 @@ struct DeviceCodeSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
     @Environment(\.theme) private var theme
+    @Environment(\.scenePhase) private var fase
     let kind: ProviderKind
     @State private var start: DeviceStart?
     @State private var error: String?
     @State private var task: Task<Void, Never>?
+    /// Ligado quando o app volta do Safari, para o poll não esperar o intervalo inteiro
+    /// depois de a pessoa já ter autorizado.
+    @State private var conferirAgora = false
 
     var auth: any DeviceAuth {
         kind == .grok ? GrokDeviceAuth() : OpenAIDeviceAuth()
@@ -302,7 +306,7 @@ struct DeviceCodeSheet: View {
                 if let error {
                     Text(error).font(.footnote).foregroundStyle(theme.danger)
                         .multilineTextAlignment(.center).fixedSize(horizontal: false, vertical: true)
-                    Button(tr("Tentar de novo")) { begin() }.buttonStyle(.glass)
+                    Button(tr("Tentar de novo")) { begin(forcando: true) }.buttonStyle(.glass)
                 }
                 Spacer(minLength: 0)
             }
@@ -313,12 +317,25 @@ struct DeviceCodeSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(tr("Cancelar")) { task?.cancel(); dismiss() }
+                    // Cancelar encerra a tentativa: o código guardado sai junto, senão a
+                    // próxima abertura retomaria um código que a pessoa já desistiu de usar.
+                    Button(tr("Cancelar")) {
+                        task?.cancel()
+                        DevicePendente.limpar()
+                        dismiss()
+                    }
                 }
             }
         }
         .presentationSizing(.form)
         .onAppear { begin() }
+        // Voltar do Safari reativa a cena. Aqui isso só acelera o próximo poll — pedir
+        // outro código seria jogar fora a autorização que a pessoa acabou de dar.
+        .onChange(of: fase) { _, nova in
+            if nova == .active, start != nil {
+                conferirAgora = true
+            }
+        }
         .onDisappear { task?.cancel() }
     }
 
@@ -347,22 +364,42 @@ struct DeviceCodeSheet: View {
         .background(theme.bgElevated, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
-    func begin() {
+    /// Pede um código e fica esperando a autorização.
+    ///
+    /// Só pede código novo quando não há nenhum em andamento. A tela reaparece toda vez
+    /// que o app volta do Safari — que é justamente onde a pessoa autorizou — e pedir
+    /// outro código ali jogava fora a autorização recém-dada e o poll dela junto: o
+    /// código na tela nunca era o mesmo que tinha sido aprovado, e a conta nunca
+    /// conectava. `forcando` existe só para o botão "Tentar de novo".
+    func begin(forcando: Bool = false) {
+        guard forcando || task == nil else { return }
         error = nil
         start = nil
+        conferirAgora = false
         task?.cancel()
+        if forcando {
+            DevicePendente.limpar()
+        }
         task = Task {
             do {
-                let s = try await auth.start()
+                // Retomar o código que já está esperando autorização, quando existe um.
+                let s: DeviceStart
+                if let pendente = DevicePendente.retomar(kind: kind.rawValue) {
+                    s = pendente
+                } else {
+                    s = try await auth.start()
+                    DevicePendente.guardar(s, kind: kind.rawValue)
+                }
                 start = s
                 var interval = s.interval
                 let deadline = Date(timeIntervalSinceNow: Double(s.expiresIn))
                 while !Task.isCancelled, Date() < deadline {
-                    try await Task.sleep(for: .seconds(interval))
+                    try await espera(interval)
                     switch try await auth.poll(s) {
                     case .pending: continue
                     case .slowDown: interval += 5
                     case let .tokens(t):
+                        DevicePendente.limpar()
                         let existing = store.accounts(of: kind).first
                         try store.add(existing ?? AIAccount(kind: kind, login: t.accountId ?? ""), tokens: t)
                         dismiss()
@@ -370,9 +407,23 @@ struct DeviceCodeSheet: View {
                     }
                 }
                 if !Task.isCancelled {
+                    DevicePendente.limpar()
                     error = tr("o código expirou; comece de novo")
                 }
             } catch is CancellationError {} catch { self.error = error.localizedDescription }
+        }
+    }
+
+    /// Espera até o próximo poll, mas corta a espera quando o app volta do Safari.
+    /// Sem isso a pessoa autoriza e ainda fica olhando o "aguardando" por um intervalo
+    /// inteiro, achando que não funcionou.
+    func espera(_ segundos: Int) async throws {
+        for _ in 0 ..< max(1, segundos) {
+            if conferirAgora {
+                conferirAgora = false
+                return
+            }
+            try await Task.sleep(for: .seconds(1))
         }
     }
 }

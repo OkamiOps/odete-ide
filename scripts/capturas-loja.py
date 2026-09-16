@@ -87,6 +87,65 @@ def texto_centrado(d, y, txt, f, cor):
     return y1 - y0
 
 
+# O print é de verdade, e o cabeçalho do agente mostra a conta de quem capturou. Publicar
+# isso seria expor um endereço pessoal na App Store, então o texto sai aqui, na origem —
+# e não no resultado final, senão voltaria na próxima geração.
+CONTA = 'you@example.com'
+CONTA_ORIGINAL = 'msant262@gmail.com'
+# cabeçalho do painel do agente, no print já girado para paisagem
+JANELA_CONTA = (1815, 112, 2080, 152)
+
+
+def sem_conta(print_: Image.Image) -> Image.Image:
+    """Troca o e-mail da conta conectada por um genérico, quando ele aparece."""
+    x0, y0, x1, y1 = JANELA_CONTA
+    px = print_.load()
+    pontos = [
+        (x, y)
+        for y in range(y0, y1)
+        for x in range(x0, x1)
+        if (lambda r, g, b: abs(r - g) < 14 and abs(g - b) < 14 and 110 < (r + g + b) // 3 < 205)(
+            *px[x, y]
+        )
+    ]
+    if not pontos:
+        return print_  # tela sem o painel do agente
+    # só as linhas com densidade de texto: a borda do "Grok" logo acima também é cinza,
+    # e sem esse filtro ela entra no retângulo e o cálculo do tamanho sai errado
+    por_linha: dict[int, int] = {}
+    for _, y in pontos:
+        por_linha[y] = por_linha.get(y, 0) + 1
+    linhas = [y for y, n in por_linha.items() if n >= 20]
+    if not linhas:
+        return print_
+    ty0, ty1 = min(linhas), max(linhas)
+    xs = [x for x, y in pontos if ty0 <= y <= ty1]
+    tx0, tx1 = min(xs), max(xs)
+    if not (170 <= tx1 - tx0 <= 270 and 12 <= ty1 - ty0 <= 26):
+        return print_
+
+    # a cor do texto é o cinza mais claro do bloco; o fundo vem da linha logo acima
+    cor = max(px[x, y] for x, y in pontos)
+    fundo_y = ty0 - 5
+    d = ImageDraw.Draw(print_)
+    for x in range(tx0 - 4, tx1 + 5):
+        d.line((x, ty0 - 4, x, ty1 + 9), fill=px[x, fundo_y])
+
+    # o corpo é o mesmo; o tamanho vem de casar a largura do texto que estava ali
+    alvo = tx1 - tx0
+    tam = min(
+        range(14, 32),
+        key=lambda s: abs(d.textlength(CONTA_ORIGINAL, font=fonte('IBMPlexSans-Regular.ttf', s))
+                          - alvo),
+    )
+    f = fonte('IBMPlexSans-Regular.ttf', tam)
+    # posicionar pelo retângulo do texto que estava ali: assim os dois compartilham a
+    # linha de base, em vez de o novo descer porque tem letras com altura diferente
+    bx0, by0, _, _ = d.textbbox((0, 0), CONTA_ORIGINAL, font=f)
+    d.text((tx0 - bx0, ty0 - by0), CONTA, font=f, fill=cor)
+    return print_
+
+
 def compoe(origem: str, titulo: str, apoio: str, saida: pathlib.Path) -> None:
     im = fundo()
     d = ImageDraw.Draw(im)
@@ -94,7 +153,7 @@ def compoe(origem: str, titulo: str, apoio: str, saida: pathlib.Path) -> None:
     h = texto_centrado(im and d, 150, titulo, fonte('IBMPlexSans-SemiBold.ttf', 104), CLARO)
     texto_centrado(d, 150 + h + 46, apoio, fonte('IBMPlexSans-Regular.ttf', 52), MUDO)
 
-    print_ = Image.open(ORIG / origem).rotate(-90, expand=True)
+    print_ = sem_conta(Image.open(ORIG / origem).convert('RGB').rotate(-90, expand=True))
     apar = moldura(print_, round(LARG * 0.72))
     som = sombra(apar)
     # centrado no espaço que sobra abaixo do texto, com folga igual em cima e embaixo

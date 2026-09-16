@@ -1,4 +1,5 @@
 import Foundation
+import OdeteCore
 import OdeteI18n
 import Synchronization
 
@@ -8,11 +9,14 @@ public struct LoopConfig: Sendable {
     public var model: String
     public var effort: String
     public var conversationId: String
-    /// Oito não dava para um fluxo de git inteiro: criar branch, editar, commitar, dar
-    /// push, abrir o PR e conferir já passa disso, e cada tentativa que falha come uma
-    /// rodada. O teto continua existindo para caso perdido não virar conta alta — e
-    /// parar aqui não é erro, é um ponto de retomada com botão.
-    public var maxRounds = 20
+    /// Teto de rodadas de ferramenta.
+    ///
+    /// Vinte era pouco para uma ferramenta de desenvolvimento: uma landing page inteira,
+    /// um refactor ou um fluxo de git completo passam disso com facilidade, e parar no
+    /// meio obrigava a pessoa a ficar mandando "continua". O teto existe só para um caso
+    /// perdido não virar conta alta — quem interrompe de verdade é o botão de parar, que
+    /// está sempre à mão e é o freio que a pessoa controla.
+    public var maxRounds = 200
     public init(mode: AgentMode, permit: PermitMode, model: String, effort: String = "", conversationId: String = "") {
         self.mode = mode; self.permit = permit; self.model = model; self.effort = effort; self
             .conversationId = conversationId
@@ -106,7 +110,16 @@ public final class AgentLoop: @unchecked Sendable {
 
     func systemPrompt(mode: AgentMode, userText: String) -> String {
         let skills = Skills.prompt(all: Skills.all(host: host), userText: userText)
-        return Prompts.build(mode: mode, fileList: host.allPaths(), extras: [skills, Rules.prompt(host: host)])
+        // A pilha entra sempre, sem a pessoa pedir: as skills são opt-in (`/nome`), e
+        // esperar que alguém digite "isto é Astro" num projeto que o próprio Hub criou
+        // a partir do modelo Astro não faz sentido.
+        let caminhos = host.allPaths()
+        let pilha = Stack.detect(paths: caminhos, packageJSON: host.read("package.json").map { Data($0.utf8) })
+        return Prompts.build(
+            mode: mode,
+            fileList: caminhos,
+            extras: [pilha.regrasParaOAgente, skills, Rules.prompt(host: host)]
+        )
     }
 
     private func loop(

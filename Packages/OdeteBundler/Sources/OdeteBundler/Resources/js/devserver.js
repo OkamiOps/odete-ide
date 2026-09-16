@@ -71,6 +71,28 @@
     return src;
   }
 
+  // Um 404 seco não diz nada a quem acabou de subir o servidor e vê a tela em branco.
+  // A Odete serve estáticos e bundles; ela ainda não compila páginas de framework, e o
+  // caso mais comum de bater aqui é justamente um projeto Astro ou Next, onde a rota
+  // mora em src/pages ou app/ em vez de um arquivo na raiz.
+  function recado404(p) {
+    const tem = (r) => { try { return fs.existsSync(path.join(state.root, r)); } catch (e) { return false; } };
+    let extra = "";
+    if (state.preset === "astro" || tem("src/pages")) {
+      extra = "\n\nEste é um projeto Astro: a rota " + p + " viria de src/pages" +
+        (p === "/" ? "/index.astro" : p + ".astro") +
+        ".\nA Odete serve estáticos e bundles, mas ainda não compila páginas .astro." +
+        "\nPara ver algo no Preview agora, ponha um index.html em public/.";
+    } else if (state.preset === "next" || tem("app") || tem("pages")) {
+      extra = "\n\nEste é um projeto Next: a Odete ainda não renderiza rotas de app/ ou pages/." +
+        "\nPara ver algo no Preview agora, ponha um index.html em public/.";
+    } else if (!tem("index.html")) {
+      extra = "\n\nNão há index.html na raiz nem em public/. O Preview serve os arquivos do projeto;" +
+        "\ncrie um index.html para ter uma página.";
+    }
+    return "não encontrado: " + p + extra;
+  }
+
   function send(res, status, type, body) { res.writeHead(status, { "content-type": type, "cache-control": "no-store", "access-control-allow-origin": "*" }); res.end(body); }
 
   async function handle(req, res) {
@@ -94,7 +116,7 @@
       // SPA fallback
       const index = path.join(state.root, "index.html");
       if (!path.extname(p) && fs.existsSync(index)) return send(res, 200, MIME[".html"], html(index));
-      send(res, 404, "text/plain; charset=utf-8", "não encontrado: " + p);
+      send(res, 404, "text/plain; charset=utf-8", recado404(p));
     } catch (e) {
       send(res, 500, "text/plain; charset=utf-8", String(e && e.stack || e));
     }

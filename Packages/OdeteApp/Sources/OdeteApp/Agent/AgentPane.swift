@@ -86,7 +86,7 @@ struct AgentPane: View {
     func patchBar(_ ag: AgentModel) -> some View {
         let n = ag.pendingPatches.count
         return ViewThatFits(in: .horizontal) {
-            linhaDoPatch(ag, n == 1 ? "1 patch pendente" : "\(n) patches pendentes")
+            linhaDoPatch(ag, n == 1 ? tr("1 patch pendente") : tr("%1$@ patches pendentes", "\(n)"))
             linhaDoPatch(ag, n == 1 ? "1 pendente" : "\(n) pendentes")
             linhaDoPatch(ag, "\(n)")
         }
@@ -274,14 +274,21 @@ struct ContasPopover: View {
             }
             .padding(14)
         }
-        // Mais largo que isto e a coluna do agente corta a coluna da direita do cartão.
-        // A altura acompanha o número de contas, senão sobra um vazio embaixo.
-        .frame(idealWidth: 280, idealHeight: altura)
+        // Medida exata, não ideal: dentro de um popover o conteúdo é um ScrollView, que
+        // não tem tamanho próprio. Com `idealWidth`/`idealHeight` o popover abria com
+        // altura zero — só a setinha aparecia no topo do painel, e não dava para clicar
+        // em nada. Era esse o bug de "clico em Sem conta e não acontece nada".
+        .frame(width: 280, height: altura)
         .background(theme.bg)
+        // No iPhone o popover vira folha sozinho, e a folha é melhor lá.
+        .presentationCompactAdaptation(horizontal: .popover, vertical: .sheet)
     }
 
+    /// Acompanha o número de contas, senão sobra um vazio embaixo — com teto, para uma
+    /// lista longa rolar em vez de passar da tela.
     var altura: CGFloat {
         let contas = agent.accounts.accounts.count
-        return 28 + (contas == 0 ? 52 : 32 + CGFloat(contas) * 50) + 14 + 44
+        let pedida = 28 + (contas == 0 ? 52 : 32 + CGFloat(contas) * 50) + 14 + 44
+        return min(pedida, 460)
     }
 }

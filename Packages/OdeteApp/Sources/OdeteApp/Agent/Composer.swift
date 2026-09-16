@@ -122,16 +122,32 @@ struct Composer: View {
         .padding(.horizontal, 12)
     }
 
+    /// Tira o foco de quem estiver com ele. O campo é um `UITextView`, então quem
+    /// desiste do primeiro respondedor é o UIKit, não um `@FocusState`.
+    func escondeTeclado() {
+        UIApplication.shared.sendAction(
+            #selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil
+        )
+    }
+
     /// Uma linha só: anexar, ditar, modo, e no canto o modelo, o contexto e o enviar.
     func controles(modoComTexto: Bool) -> some View {
         HStack(spacing: 3) {
             iconeBotao("plus", label: tr("Contexto")) { contexto = true }
             iconeBotao(
                 ditado.running ? "mic.fill" : "mic",
-                label: ditado.running ? "Parar ditado" : "Ditar",
+                label: ditado.running ? tr("Parar ditado") : tr("Ditar"),
                 cor: ditado.running ? theme.accent : theme.fgMuted
             ) { ditado.toggle(atual: agent.draft) }
             modoMenu(comTexto: modoComTexto)
+            // Só com o teclado à vista, e só onde ele estorva: no iPhone ele cobre a
+            // barra de abas e não havia como sair da tela do agente. Arrastar a conversa
+            // também fecha, mas isso é um gesto que ninguém adivinha.
+            if focused {
+                iconeBotao("keyboard.chevron.compact.down", label: tr("Esconder o teclado")) {
+                    escondeTeclado()
+                }
+            }
             Spacer(minLength: 6)
             // Sem prioridade o espaçador come a largura do nome e sobra só "…". Na versão
             // apertada o esforço também sai: ele está a um toque, no mesmo popover.

@@ -25,6 +25,9 @@ struct ChatList: View {
                 }
                 .padding(12)
             }
+            // No iPhone o teclado tapa a barra de abas, e sem isto não havia como sair
+            // da tela do agente: arrastar a conversa para baixo agora fecha o teclado.
+            .scrollDismissesKeyboard(.interactively)
             .onChange(of: agent.items.count) { withAnimation(.snappy(duration: 0.15)) { proxy.scrollTo(
                 "end",
                 anchor: .bottom

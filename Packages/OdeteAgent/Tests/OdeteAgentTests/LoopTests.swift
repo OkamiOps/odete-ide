@@ -362,10 +362,13 @@ func runAll(
         #expect(r.history.contains { $0.role == .tool && $0.content == "usuário recusou esta ação" })
     }
 
-    @Test func tetoPadraoCabeUmFluxoDeGit() {
-        // Branch, edição, commit, push, abrir PR e conferir já passa de oito rodadas, e
-        // cada tentativa que falha come uma.
-        #expect(LoopConfig(mode: .build, permit: .ask, model: "m").maxRounds >= 15)
+    @Test func tetoPadraoCabeUmTrabalhoDeVerdade() {
+        // Uma landing page inteira, um refactor ou um fluxo de git completo passam de
+        // vinte rodadas com facilidade, e cada tentativa que falha come uma. Parar no
+        // meio obrigava a pessoa a ficar mandando "continua" numa ferramenta de
+        // desenvolvimento. O teto só existe para caso perdido não virar conta alta;
+        // quem interrompe de verdade é o botão de parar.
+        #expect(LoopConfig(mode: .build, permit: .ask, model: "m").maxRounds >= 100)
     }
 
     @Test func roundCapAndStop() async throws {

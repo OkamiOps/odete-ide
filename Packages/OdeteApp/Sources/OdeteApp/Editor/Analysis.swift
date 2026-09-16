@@ -58,7 +58,7 @@ extension WorkspaceModel {
         }
         Task.detached(priority: .utility) { [weak self] in
             let esboco = Outline.items(text: text, language: lang)
-            let regras = Lint.rules(text: text, language: lang)
+            let regras = Lint.rules(text: text, language: lang, path: path)
             let elos = await Self.elos(text: text, language: lang, path: path, model: self)
             await MainActor.run {
                 guard let self, self.buffers[path] == text else { return }

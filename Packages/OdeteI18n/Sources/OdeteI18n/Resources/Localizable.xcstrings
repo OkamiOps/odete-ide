@@ -17137,6 +17137,62 @@
         }
       }
     },
+    "`%1$@` aberto aqui e sem `end`": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`%1$@` opened here and missing its `end`"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`%1$@` hier geöffnet, `end` fehlt"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`%1$@` ouvert ici et sans `end`"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`%1$@` abierto aquí y sin `end`"
+          }
+        }
+      }
+    },
+    "`%1$@` aparece duas vezes neste objeto": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`%1$@` appears twice in this object"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`%1$@` kommt in diesem Objekt zweimal vor"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`%1$@` apparaît deux fois dans cet objet"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`%1$@` aparece dos veces en este objeto"
+          }
+        }
+      }
+    },
     "`%1$@` fecha o `%2$@` da linha %3$@": {
       "localizations": {
         "en": {
@@ -17333,6 +17389,34 @@
         }
       }
     },
+    "`end` sem bloco aberto": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`end` with no block open"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`end` ohne offenen Block"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`end` sans bloc ouvert"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`end` sin bloque abierto"
+          }
+        }
+      }
+    },
     "`npm run dev` sobe o Astro. Páginas em `src/pages`.": {
       "localizations": {
         "en": {
@@ -17441,62 +17525,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "`try!` tumba la app si falla"
-          }
-        }
-      }
-    },
-    "`{` sem fechamento": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "`{` never closed"
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "`{` ohne schließende Klammer"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "`{` jamais fermée"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "`{` sin cierre"
-          }
-        }
-      }
-    },
-    "`}` sem abertura": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "`}` with nothing opening it"
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "`}` ohne öffnende Klammer"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "`}` sans ouverture"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "`}` sin apertura"
           }
         }
       }
@@ -19909,6 +19937,34 @@
         }
       }
     },
+    "falta `,` entre os itens": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "missing `,` between the items"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "zwischen den Einträgen fehlt `,`"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "il manque `,` entre les éléments"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "falta `,` entre los elementos"
+          }
+        }
+      }
+    },
     "falta `:` no fim desta linha": {
       "localizations": {
         "en": {
@@ -19933,6 +19989,62 @@
           "stringUnit": {
             "state": "translated",
             "value": "falta `:` al final de esta línea"
+          }
+        }
+      }
+    },
+    "falta `;` fechando o comando anterior": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "missing `;` closing the previous statement"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "es fehlt `;` am Ende der vorherigen Anweisung"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "il manque `;` pour fermer l’instruction précédente"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "falta `;` cerrando el comando anterior"
+          }
+        }
+      }
+    },
+    "falta `;` no fim desta linha": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "missing `;` at the end of this line"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "am Zeilenende fehlt `;`"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "il manque `;` à la fin de cette ligne"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "falta `;` al final de esta línea"
           }
         }
       }
@@ -22481,6 +22593,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "el servidor en :%1$@ no sobrevivió a que la app pasara a segundo plano"
+          }
+        }
+      }
+    },
+    "o tipo público `%1$@` precisa estar em %2$@.java": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "the public type `%1$@` must live in %2$@.java"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "der öffentliche Typ `%1$@` muss in %2$@.java stehen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "le type public `%1$@` doit être dans %2$@.java"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "el tipo público `%1$@` tiene que estar en %2$@.java"
           }
         }
       }

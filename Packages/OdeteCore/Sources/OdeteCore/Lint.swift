@@ -30,7 +30,7 @@ public enum Lint {
     /// Mesmo num arquivo pequeno, passar disso não informa mais nada.
     public static let tetoDeAvisos = 100
 
-    public static func rules(text: String, language: Language) -> [LintIssue] {
+    public static func rules(text: String, language: Language, path: String = "") -> [LintIssue] {
         // O JSON escapa do teto de tamanho: é uma análise só e o resultado é no máximo
         // um erro — justamente o que se quer saber de um `package-lock.json` enorme.
         if language != .json, text.utf8.count > Limites.arquivoGrande {
@@ -42,9 +42,13 @@ public enum Lint {
         // `}` sobrando num arquivo Rust não aparecia em lugar nenhum.
         var achados = Sintaxe.problemas(text: text, language: language)
         achados += Sintaxe.marcacao(text: text, language: language)
+        achados += Sintaxe.pontoEVirgula(text: text, language: language)
+        achados += Sintaxe.virgula(text: text, language: language)
+        achados += Sintaxe.fimDeBloco(text: text, language: language)
+        achados += Sintaxe.nomeDoTipo(text: text, language: language, path: path)
         switch language {
         case .javascript, .jsx, .typescript, .tsx: achados += js(text)
-        case .json: achados += json(text)
+        case .json: achados += json(text) + Sintaxe.chavesRepetidas(text: text)
         case .css, .scss: achados += css(text)
         case .swift: achados += swift(text)
         case .python: achados += Sintaxe.python(text: text)

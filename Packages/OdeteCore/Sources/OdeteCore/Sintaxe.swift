@@ -106,13 +106,30 @@ public enum Sintaxe {
 
     /// Confere delimitadores e textos que não terminam.
     public static func problemas(text: String, language: Language) -> [LintIssue] {
-        guard let d = dialeto(language) else { return [] }
+        analise(text: text, language: language).problemas
+    }
+
+    /// O texto com comentário e conteúdo de string trocados por espaço, do mesmo
+    /// tamanho e com as quebras de linha no lugar.
+    ///
+    /// É o que deixa uma regra de linha ser escrita sem medo: procurar `;` no fim da
+    /// linha só faz sentido sobre o que é código. Sem a máscara, um `;` dentro de um
+    /// comentário contaria, e um `{` dentro de uma string viraria bloco.
+    public static func mascara(text: String, language: Language) -> String {
+        analise(text: text, language: language).mascara
+    }
+
+    /// Uma passagem só: enquanto anda pelo texto sabendo o que é código, aproveita e
+    /// guarda as duas coisas que interessam depois.
+    public static func analise(text: String, language: Language) -> (problemas: [LintIssue], mascara: String) {
+        guard let d = dialeto(language) else { return ([], text) }
         var out: [LintIssue] = []
         var pilha: [(abre: String, linha: Int, coluna: Int)] = []
         let fechaDe = Dictionary(uniqueKeysWithValues: d.pares.map { ($0.abre, $0.fecha) })
         let abreDe = Dictionary(uniqueKeysWithValues: d.pares.map { ($0.fecha, $0.abre) })
 
         let chars = Array(text)
+        var visivel = chars
         var i = 0, linha = 1, coluna = 1
 
         func casa(_ token: String, em j: Int) -> Bool {
@@ -124,13 +141,17 @@ public enum Sintaxe {
             return true
         }
 
-        func anda(_ n: Int) {
+        /// `escondendo` apaga o trecho da máscara: é comentário ou miolo de string.
+        func anda(_ n: Int, escondendo: Bool = false) {
             for k in 0 ..< n where i + k < chars.count {
                 if chars[i + k] == "\n" {
                     linha += 1
                     coluna = 1
                 } else {
                     coluna += 1
+                    if escondendo {
+                        visivel[i + k] = " "
+                    }
                 }
             }
             i += n
@@ -140,18 +161,18 @@ public enum Sintaxe {
             // comentário de linha
             for marca in d.linha where casa(marca, em: i) {
                 while i < chars.count, chars[i] != "\n" {
-                    anda(1)
+                    anda(1, escondendo: true)
                 }
                 continue laco
             }
             // comentário de bloco
             for par in d.bloco where casa(par.abre, em: i) {
-                anda(par.abre.count)
+                anda(par.abre.count, escondendo: true)
                 while i < chars.count, !casa(par.fecha, em: i) {
-                    anda(1)
+                    anda(1, escondendo: true)
                 }
                 if i < chars.count {
-                    anda(par.fecha.count)
+                    anda(par.fecha.count, escondendo: true)
                 }
                 continue laco
             }
@@ -161,9 +182,9 @@ public enum Sintaxe {
                 anda(marca.count)
                 while i < chars.count, !casa(marca, em: i) {
                     if let esc = d.escape, chars[i] == esc {
-                        anda(1)
+                        anda(1, escondendo: true)
                     }
-                    anda(1)
+                    anda(1, escondendo: true)
                 }
                 if i >= chars.count {
                     out.append(aviso(
@@ -185,14 +206,14 @@ public enum Sintaxe {
                 var fechou = false
                 while i < chars.count, chars[i] != "\n" {
                     if let esc = d.escape, chars[i] == esc, i + 1 < chars.count {
-                        anda(2); continue
+                        anda(2, escondendo: true); continue
                     }
                     if chars[i] == aspa {
                         anda(1)
                         fechou = true
                         break
                     }
-                    anda(1)
+                    anda(1, escondendo: true)
                 }
                 if !fechou {
                     out.append(aviso(
@@ -244,10 +265,10 @@ public enum Sintaxe {
                 1
             ))
         }
-        return out.sorted { ($0.line, $0.column) < ($1.line, $1.column) }
+        return (out.sorted { ($0.line, $0.column) < ($1.line, $1.column) }, String(visivel))
     }
 
-    private static func aviso(_ regra: String, _ msg: String, _ l: Int, _ c: Int, _ n: Int) -> LintIssue {
+    static func aviso(_ regra: String, _ msg: String, _ l: Int, _ c: Int, _ n: Int) -> LintIssue {
         LintIssue(rule: regra, message: msg, severity: .error, line: l, column: c, length: n)
     }
 
@@ -327,49 +348,37 @@ public enum Sintaxe {
     public static func python(text texto: String) -> [LintIssue] {
         var out: [LintIssue] = []
         let pedemBloco = [
-            "def ",
-            "class ",
-            "if ",
-            "elif ",
-            "else",
-            "for ",
-            "while ",
-            "try",
-            "except",
-            "finally",
-            "with ",
+            "def ", "class ", "if ", "elif ", "else", "for ", "while ", "try", "except",
+            "finally", "with ",
         ]
-        for (i, bruta) in texto.components(separatedBy: "\n").enumerated() {
-            guard let corte = bruta.range(of: "#")?.lowerBound else {
-                conferePython(bruta, i, pedemBloco, &out)
-                continue
+        var profundidade = 0
+        for (i, linha) in mascara(text: texto, language: .python).components(separatedBy: "\n").enumerated() {
+            let dentroDeParenteses = profundidade > 0
+            profundidade += linha.filter { "([{".contains($0) }.count
+            profundidade -= linha.filter { ")]}".contains($0) }.count
+            profundidade = max(0, profundidade)
+
+            let recuo = linha.prefix { $0 == " " || $0 == "\t" }
+            if recuo.contains("\t"), recuo.contains(" ") {
+                out.append(aviso(
+                    "py-recuo",
+                    tr("espaço e tabulação misturados no recuo"),
+                    i + 1,
+                    1,
+                    recuo.count
+                ))
             }
-            conferePython(String(bruta[..<corte]), i, pedemBloco, &out)
+            // Dentro de parênteses `for` e `if` são compreensão, não bloco: ali não vai
+            // `:` nenhum. Foi este o falso positivo que o teste de código válido pegou.
+            guard !dentroDeParenteses else { continue }
+            let corpo = linha.trimmingCharacters(in: .whitespaces)
+            guard !corpo.isEmpty,
+                  pedemBloco.contains(where: { corpo.hasPrefix($0) || corpo == String($0.dropLast()) }),
+                  !corpo.hasSuffix(":"), !corpo.hasSuffix("\\"),
+                  corpo.filter({ $0 == "(" }).count == corpo.filter({ $0 == ")" }).count
+            else { continue }
+            out.append(aviso("py-dois-pontos", tr("falta `:` no fim desta linha"), i + 1, linha.count, 1))
         }
         return out
-    }
-
-    private static func conferePython(_ linha: String, _ i: Int, _ pedemBloco: [String], _ out: inout [LintIssue]) {
-        let recuo = linha.prefix { $0 == " " || $0 == "\t" }
-        if recuo.contains("\t"), recuo.contains(" ") {
-            out.append(aviso(
-                "py-recuo",
-                tr("espaço e tabulação misturados no recuo"),
-                i + 1,
-                1,
-                recuo.count
-            ))
-        }
-        let corpo = linha.trimmingCharacters(in: .whitespaces)
-        guard !corpo.isEmpty, pedemBloco.contains(where: { corpo.hasPrefix($0) || corpo == String($0.dropLast()) }),
-              !corpo.hasSuffix(":"), !corpo.hasSuffix("\\"), !corpo.contains("#")
-        else { return }
-        // Linha que continua (parêntese aberto) é caso normal; só reclama do que fecha.
-        guard corpo.filter({ $0 == "(" }).count == corpo.filter({ $0 == ")" }).count else { return }
-        out.append(aviso("py-dois-pontos", tr("falta `:` no fim desta linha"), i + 1, linha.count, 1))
-    }
-
-    private static func chaveTr(_ frase: String) -> String {
-        tr(frase)
     }
 }

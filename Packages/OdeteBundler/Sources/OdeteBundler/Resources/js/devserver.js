@@ -79,13 +79,12 @@
     const tem = (r) => { try { return fs.existsSync(path.join(state.root, r)); } catch (e) { return false; } };
     let extra = "";
     if (state.preset === "astro" || tem("src/pages")) {
-      extra = "\n\nEste é um projeto Astro: a rota " + p + " viria de src/pages" +
-        (p === "/" ? "/index.astro" : p + ".astro") +
-        ".\nA Odete serve estáticos e bundles, mas ainda não compila páginas .astro." +
-        "\nPara ver algo no Preview agora, ponha um index.html em public/.";
+      extra = "\n\nEste é um projeto Astro: a rota " + p + " sai de src/pages" +
+        (p === "/" ? "/index.astro" : p + ".astro") + ", e esse arquivo não existe.";
     } else if (state.preset === "next" || tem("app") || tem("pages")) {
-      extra = "\n\nEste é um projeto Next: a Odete ainda não renderiza rotas de app/ ou pages/." +
-        "\nPara ver algo no Preview agora, ponha um index.html em public/.";
+      extra = "\n\nEste é um projeto Next: a rota " + p + " sai de app" +
+        (p === "/" ? "/page" : p + "/page") + " ou de pages" + (p === "/" ? "/index" : p) +
+        " (.tsx, .jsx, .ts ou .js), e nenhum desses arquivos existe.";
     } else if (!tem("index.html")) {
       extra = "\n\nNão há index.html na raiz nem em public/. O Preview serve os arquivos do projeto;" +
         "\ncrie um index.html para ter uma página.";
@@ -174,6 +173,9 @@
   // não existem: viram a marcação que eles produziriam.
   function substitutoNext(spec, React) {
     const nome = spec.slice("next/".length);
+    if (nome === "server") return globalThis.__next.moduloNextServer();
+    if (nome === "font/google") return globalThis.__next.moduloFonteGoogle();
+    if (nome === "font/local") return globalThis.__next.moduloFonteLocal();
     if (nome === "link") {
       const Link = (props) => {
         const { href, children, prefetch, replace, scroll, shallow, locale, ...resto } = props || {};
@@ -195,6 +197,87 @@
       return { __esModule: true, default: Head };
     }
     throw new Error("Odete ainda não tem substituto para " + spec);
+  }
+
+  // `localFont({ src: "./Inter.woff2" })` é relativo ao arquivo que chamou, e depois de
+  // empacotar não existe mais "arquivo que chamou". Então procura-se: os lugares óbvios
+  // primeiro, e só então o arquivo pelo nome, dentro do projeto e fora de node_modules.
+  function achaArquivoDeFonte(spec) {
+    const limpo = String(spec).replace(/^\.\//, "").replace(/^\/+/, "");
+    const diretos = ["", "public", "app", "src", "src/app", "styles", "fonts", "assets"];
+    for (const d of diretos) {
+      const f = path.join(state.root, d, limpo);
+      if (f.startsWith(state.root) && fs.existsSync(f) && fs.statSync(f).isFile()) return f;
+    }
+    const alvo = limpo.split("/").pop();
+    const fila = [state.root];
+    for (let n = 0; fila.length && n < 4000; n++) {
+      const dir = fila.shift();
+      let itens = [];
+      try { itens = fs.readdirSync(dir); } catch (e) { continue; }
+      for (const item of itens) {
+        if (item === "node_modules" || item[0] === ".") continue;
+        const f = path.join(dir, item);
+        let st;
+        try { st = fs.statSync(f); } catch (e) { continue; }
+        if (st.isDirectory()) fila.push(f);
+        else if (item === alvo) return f;
+      }
+    }
+    return null;
+  }
+
+  // A URL pela qual o navegador pega a fonte: os estáticos saem de public/ e da raiz,
+  // então basta o caminho relativo — sem o "public/" quando ela mora lá.
+  globalThis.__odeteArquivoDeFonte = (spec) => {
+    const f = achaArquivoDeFonte(spec);
+    if (!f) return null;
+    let rel = path.relative(state.root, f);
+    if (rel.startsWith("public/")) rel = rel.slice("public/".length);
+    return "/" + rel.split(path.sep).join("/");
+  };
+
+  // ---- middleware ----
+  // Roda antes de qualquer rota: pode responder, redirecionar, reescrever o caminho ou
+  // só deixar passar (acrescentando cabeçalhos ao que vier depois).
+  function ehProjetoNext() {
+    if (state.preset === "next") return true;
+    for (const d of ["app", "pages"]) {
+      try { if (fs.statSync(path.join(state.root, d)).isDirectory()) return true; } catch (e) { /* segue */ }
+    }
+    return false;
+  }
+
+  // Só em projeto Next: um `src/middleware.ts` num projeto Vite é código da pessoa, não
+  // um gancho do servidor, e rodá-lo em toda requisição seria surpresa ruim.
+  function arquivoMiddleware() {
+    if (!ehProjetoNext()) return null;
+    for (const base of [state.root, path.join(state.root, "src")]) {
+      for (const e of [".ts", ".tsx", ".js", ".mjs"]) {
+        const f = path.join(base, "middleware" + e);
+        try { if (fs.existsSync(f) && fs.statSync(f).isFile()) return f; } catch (err) { /* segue */ }
+      }
+    }
+    return null;
+  }
+
+  async function rodaMiddleware(arquivo, req, url) {
+    const mod = await carregaNext(arquivo);
+    const fn = mod.middleware || mod.default;
+    if (typeof fn !== "function") return null;
+    if (!globalThis.__next.casaMatcher(mod.config, url.pathname)) return null;
+    const host = (req.headers && req.headers.host) || "localhost:" + state.port;
+    const pedido = globalThis.__next.pedidoNext("http://" + host + req.url, req.method, req.headers || {});
+    return globalThis.__next.leResposta(await fn(pedido));
+  }
+
+  function enviaDoMiddleware(res, r) {
+    const h = { "cache-control": "no-store" };
+    for (const [k, v] of r.cabecalhos) h[k] = v;
+    if (r.biscoitos.length) h["set-cookie"] = r.biscoitos;
+    if (r.corpo != null && !h["content-type"]) h["content-type"] = "text/plain; charset=utf-8";
+    res.writeHead(r.status, h);
+    res.end(r.corpo == null ? "" : r.corpo);
   }
 
   function faltaReact(e) {
@@ -249,15 +332,39 @@
     return html.includes("</head>") ? html.replace("</head>", head + "</head>") : head + html;
   }
 
-  function send(res, status, type, body) { res.writeHead(status, { "content-type": type, "cache-control": "no-store", "access-control-allow-origin": "*" }); res.end(body); }
+  function send(res, status, type, body, extras) {
+    const h = { "content-type": type, "cache-control": "no-store", "access-control-allow-origin": "*" };
+    if (extras) for (const [k, v] of extras) h[k] = v;
+    res.writeHead(status, h);
+    res.end(body);
+  }
 
   async function handle(req, res) {
-    const url = new URL(req.url, "http://x");
+    let url = new URL(req.url, "http://x");
     let p = decodeURIComponent(url.pathname);
     try {
       if (p.startsWith("/@odete/js/")) { const b = await bundle(p.slice(11)); return send(res, 200, MIME[".js"], b.js); }
       if (p.startsWith("/@odete/css/")) { const b = await bundle(p.slice(12)); return send(res, 200, MIME[".css"], b.css); }
       if (p === "/@odete/diag") return send(res, 200, "application/json", JSON.stringify(state.diagnostics));
+
+      // O middleware vem antes de tudo que é do projeto — e depois do que é da Odete,
+      // porque recarregar a página não pode depender de passar pelo middleware.
+      let extras = null;
+      const mw = globalThis.__next && !p.startsWith("/@odete/") && arquivoMiddleware();
+      if (mw) {
+        const r = await rodaMiddleware(mw, req, url);
+        if (r && (r.acao === "resposta" || r.acao === "redireciona")) return enviaDoMiddleware(res, r);
+        if (r && r.acao === "reescreve" && r.destino) {
+          url = new URL(r.destino, "http://x");
+          p = decodeURIComponent(url.pathname);
+        }
+        if (r) {
+          extras = r.cabecalhos.filter(([k]) => k !== "location");
+          for (const c of r.biscoitos) extras.push(["set-cookie", c]);
+          if (!extras.length) extras = null;
+        }
+      }
+
       // estáticos: public/ primeiro, depois raiz
       for (const base of [path.join(state.root, "public"), state.root]) {
         let f = path.join(base, p);
@@ -265,13 +372,13 @@
         if (fs.existsSync(f) && fs.statSync(f).isDirectory()) f = path.join(f, "index.html");
         if (!fs.existsSync(f)) continue;
         const ext = path.extname(f).toLowerCase();
-        if (ext === ".html") return send(res, 200, MIME[".html"], html(f));
-        if ([".ts", ".tsx", ".jsx", ".mts"].includes(ext)) { const b = await bundle(path.relative(state.root, f)); return send(res, 200, MIME[".js"], b.js); }
-        return send(res, 200, MIME[ext] || "application/octet-stream", fs.readFileSync(f));
+        if (ext === ".html") return send(res, 200, MIME[".html"], html(f), extras);
+        if ([".ts", ".tsx", ".jsx", ".mts"].includes(ext)) { const b = await bundle(path.relative(state.root, f)); return send(res, 200, MIME[".js"], b.js, extras); }
+        return send(res, 200, MIME[ext] || "application/octet-stream", fs.readFileSync(f), extras);
       }
       // páginas de framework, antes do fallback: nem Astro nem Next têm index.html
       const pagina = paginaAstro(p);
-      if (pagina) return send(res, 200, MIME[".html"], await renderizaAstro(pagina));
+      if (pagina) return send(res, 200, MIME[".html"], await renderizaAstro(pagina), extras);
       if (p.startsWith("/@odete/ilhas/")) {
         const rota = decodeURIComponent(p.slice("/@odete/ilhas".length)) || "/";
         const js = await pacoteDeIlhas(rota);
@@ -287,9 +394,10 @@
           const hidrata = usadas.size
             ? '<script type="module" src="/@odete/ilhas' + encodeURI(p) + '"></script>'
             : "";
-          const doc = "<!doctype html><html><head>" + importMap() + CLIENT +
+          const doc = "<!doctype html><html><head>" + importMap() +
+            globalThis.__next.cabecalhoDeFontes() + CLIENT +
             "</head><body>" + corpo + hidrata + "</body></html>";
-          return send(res, 200, MIME[".html"], doc);
+          return send(res, 200, MIME[".html"], doc, extras);
         } catch (e) {
           if (faltaReact(e)) {
             return send(res, 500, "text/plain; charset=utf-8",
@@ -300,7 +408,7 @@
       }
       // SPA fallback
       const index = path.join(state.root, "index.html");
-      if (!path.extname(p) && fs.existsSync(index)) return send(res, 200, MIME[".html"], html(index));
+      if (!path.extname(p) && fs.existsSync(index)) return send(res, 200, MIME[".html"], html(index), extras);
       send(res, 404, "text/plain; charset=utf-8", recado404(p));
     } catch (e) {
       send(res, 500, "text/plain; charset=utf-8", String((e && e.message) || e) + "\n\n" + String((e && e.stack) || ""));

@@ -139,6 +139,316 @@
     };
   }
 
-  raiz.__next = { rota, renderiza, resolveServidor, instalaIlhas };
+
+  // ---- next/font ----
+  // A fonte é criada no topo do módulo, quando a rota carrega, e não a cada render. O
+  // registro é do processo, e o <head> das páginas do projeto leva o que estiver
+  // registrado — um pouco mais do que o Next mandaria em cada rota, e muito menos do
+  // que não ter fonte nenhuma.
+  const fontes = { links: new Map(), regras: new Map() };
+
+  function apelido(s) {
+    return String(s).replace(/[^A-Za-z0-9]+/g, "_").replace(/^_+|_+$/g, "").toLowerCase();
+  }
+
+  function comAspas(f) {
+    return /^[A-Za-z0-9-]+$/.test(f) ? f : "'" + String(f).replace(/'/g, "") + "'";
+  }
+
+  function familiaCSS(familia, o) {
+    const lista = [comAspas(familia)].concat([].concat(o.fallback || []).map(comAspas));
+    lista.push(o.generico || "sans-serif");
+    return lista.join(", ");
+  }
+
+  // O que o Next devolve: `className` para aplicar a fonte, `variable` para quem prefere
+  // a custom property, e `style` para quem aplica direto no elemento.
+  function resultadoFonte(familia, o, antes) {
+    const classe = "__odete_fonte_" + apelido(familia);
+    const fam = familiaCSS(familia, o);
+    let css = (antes || "") + "." + classe + "{font-family:" + fam;
+    if (o.weight && !Array.isArray(o.weight)) css += ";font-weight:" + o.weight;
+    if (o.style && !Array.isArray(o.style)) css += ";font-style:" + o.style;
+    css += "}";
+    let variavel = "";
+    if (o.variable) {
+      variavel = classe + "_var";
+      css += "." + variavel + "{" + o.variable + ":" + fam + "}";
+    }
+    fontes.regras.set(classe, css);
+    return { className: classe, variable: variavel, style: { fontFamily: fam } };
+  }
+
+  function urlGoogle(familia, o) {
+    const pesos = [].concat(o.weight || []).map(String).filter((w) => w && w !== "variable");
+    const estilos = [].concat(o.style || []).map(String);
+    const nome = familia.replace(/ /g, "+");
+    let eixo = "";
+    if (estilos.indexOf("italic") >= 0) {
+      const ps = pesos.length ? pesos : ["400"];
+      const its = estilos.indexOf("normal") >= 0 || estilos.length > 1 ? [0, 1] : [1];
+      const pares = [];
+      for (const i of its) for (const w of ps) pares.push(i + "," + w);
+      eixo = ":ital,wght@" + pares.sort().join(";");
+    } else if (pesos.length) {
+      eixo = ":wght@" + pesos.slice().sort().join(";");
+    }
+    return "https://fonts.googleapis.com/css2?family=" + nome + eixo + "&display=" + (o.display || "swap");
+  }
+
+  function fonteGoogle(exportado, opcoes) {
+    const o = opcoes || {};
+    const familia = String(exportado).replace(/_/g, " ");
+    fontes.links.set(familia, urlGoogle(familia, o));
+    return resultadoFonte(familia, o);
+  }
+
+  const FORMATO = { woff2: "woff2", woff: "woff", ttf: "truetype", otf: "opentype", eot: "embedded-opentype" };
+
+  function fonteLocal(opcoes) {
+    const o = opcoes || {};
+    const entradas = [].concat(o.src || []);
+    const primeiro = typeof entradas[0] === "string" ? entradas[0] : (entradas[0] && entradas[0].path) || "fonte";
+    const familia = o.family || "Odete " + apelido(primeiro.split("/").pop().replace(/\.[^.]+$/, ""));
+    const faces = [];
+    for (const e of entradas) {
+      const caminho = typeof e === "string" ? e : e && e.path;
+      if (!caminho) continue;
+      const url = typeof raiz.__odeteArquivoDeFonte === "function" ? raiz.__odeteArquivoDeFonte(caminho) : null;
+      if (!url) continue;
+      const ext = (url.split(".").pop() || "").toLowerCase();
+      faces.push(
+        "@font-face{font-family:" + comAspas(familia) + ";src:url('" + url + "')" +
+        (FORMATO[ext] ? " format('" + FORMATO[ext] + "')" : "") +
+        ";font-weight:" + ((typeof e === "object" && e.weight) || o.weight || "400") +
+        ";font-style:" + ((typeof e === "object" && e.style) || o.style || "normal") +
+        ";font-display:" + (o.display || "swap") + "}"
+      );
+    }
+    return resultadoFonte(familia, o, faces.join(""));
+  }
+
+  // `next/font/google` exporta uma função por família, e não dá para saber quais antes
+  // de ver o import. Um Proxy no *protótipo* resolve qualquer nome — e no protótipo
+  // porque o interop CJS do esbuild copia as próprias chaves do módulo, que num Proxy
+  // vazio são nenhuma; pelo protótipo a busca cai no trap e o nome aparece.
+  function moduloFonteGoogle() {
+    return Object.create(new Proxy({}, {
+      get(_, nome) {
+        if (typeof nome !== "string") return undefined;
+        if (nome === "__esModule") return true;
+        return (opcoes) => fonteGoogle(nome, opcoes);
+      },
+      has() { return true; },
+    }));
+  }
+
+  function moduloFonteLocal() {
+    return { __esModule: true, default: fonteLocal };
+  }
+
+  function cabecalhoDeFontes() {
+    let s = "";
+    for (const u of fontes.links.values()) s += '<link rel="stylesheet" href="' + u.replace(/&/g, "&amp;") + '">';
+    const css = [...fontes.regras.values()].join("");
+    if (css) s += "<style>" + css + "</style>";
+    return s;
+  }
+
+  // ---- next/server e middleware ----
+  // O middleware do Next roda antes da rota e decide: segue, redireciona, reescreve ou
+  // responde ele mesmo. Isso não depende do runtime da Vercel, só de rodar a função e
+  // ler o que ela devolveu — então roda aqui.
+  class Cabecalhos {
+    constructor(init) {
+      this._ = new Map();
+      if (init instanceof Cabecalhos) { for (const [k, v] of init._) this._.set(k, v); }
+      else if (Array.isArray(init)) { for (const par of init) this.set(par[0], par[1]); }
+      else if (init && typeof init.forEach === "function") { init.forEach((v, k) => this.set(k, v)); }
+      else if (init && typeof init === "object") { for (const k of Object.keys(init)) this.set(k, init[k]); }
+    }
+    set(k, v) { this._.set(String(k).toLowerCase(), String(v)); return this; }
+    append(k, v) {
+      const c = String(k).toLowerCase(), a = this._.get(c);
+      this._.set(c, a == null ? String(v) : a + ", " + v);
+      return this;
+    }
+    get(k) { const v = this._.get(String(k).toLowerCase()); return v === undefined ? null : v; }
+    has(k) { return this._.has(String(k).toLowerCase()); }
+    delete(k) { this._.delete(String(k).toLowerCase()); return this; }
+    forEach(f, t) { for (const [k, v] of this._) f.call(t, v, k, this); }
+    entries() { return this._.entries(); }
+    keys() { return this._.keys(); }
+    values() { return this._.values(); }
+    [Symbol.iterator]() { return this._.entries(); }
+  }
+
+  class Biscoitos {
+    constructor(dono) { this.dono = dono; this.lista = []; }
+    set(nome, valor, opcoes) {
+      if (nome && typeof nome === "object") { opcoes = nome; valor = nome.value; nome = nome.name; }
+      const o = opcoes || {};
+      let s = encodeURIComponent(nome) + "=" + encodeURIComponent(valor == null ? "" : valor);
+      s += "; Path=" + (o.path || "/");
+      if (o.maxAge != null) s += "; Max-Age=" + o.maxAge;
+      if (o.expires) s += "; Expires=" + new Date(o.expires).toUTCString();
+      if (o.domain) s += "; Domain=" + o.domain;
+      if (o.httpOnly) s += "; HttpOnly";
+      if (o.secure) s += "; Secure";
+      if (o.sameSite) s += "; SameSite=" + o.sameSite;
+      this.lista.push(s);
+      return this.dono;
+    }
+    delete(nome) { return this.set(nome, "", { maxAge: 0 }); }
+    getAll() { return this.lista.slice(); }
+  }
+
+  function biscoitosDoPedido(cabecalho) {
+    const mapa = new Map();
+    for (const parte of String(cabecalho || "").split(";")) {
+      const i = parte.indexOf("=");
+      if (i < 0) continue;
+      const n = parte.slice(0, i).trim();
+      if (n) mapa.set(n, decodeURIComponent(parte.slice(i + 1).trim()));
+    }
+    return {
+      get: (n) => (mapa.has(n) ? { name: n, value: mapa.get(n) } : undefined),
+      getAll: () => [...mapa].map(([name, value]) => ({ name, value })),
+      has: (n) => mapa.has(n),
+      size: mapa.size,
+    };
+  }
+
+  const ACAO = "__odeteAcao";
+
+  class RespostaNext {
+    constructor(corpo, init) {
+      const o = init || {};
+      this.body = corpo == null ? null : corpo;
+      this.status = o.status || 200;
+      this.statusText = o.statusText || "";
+      this.headers = o.headers instanceof Cabecalhos ? o.headers : new Cabecalhos(o.headers);
+      this.cookies = new Biscoitos(this);
+      this.destino = null;
+      this[ACAO] = "resposta";
+    }
+    static next(init) { const r = new RespostaNext(null, init); r[ACAO] = "segue"; return r; }
+    static redirect(url, init) {
+      const st = typeof init === "number" ? init : (init && init.status) || 307;
+      const r = new RespostaNext(null, typeof init === "object" ? init : null);
+      r[ACAO] = "redireciona"; r.destino = String(url); r.status = st;
+      r.headers.set("location", r.destino);
+      return r;
+    }
+    static rewrite(url, init) {
+      const r = new RespostaNext(null, init);
+      r[ACAO] = "reescreve"; r.destino = String(url);
+      return r;
+    }
+    static json(dados, init) {
+      const r = new RespostaNext(JSON.stringify(dados), init);
+      r.headers.set("content-type", "application/json; charset=utf-8");
+      return r;
+    }
+  }
+
+  function pedidoNext(href, metodo, cabecalhos) {
+    const u = new URL(href);
+    u.clone = () => pedidoNext(String(u), metodo, cabecalhos).nextUrl;
+    return {
+      url: String(u),
+      nextUrl: u,
+      method: (metodo || "GET").toUpperCase(),
+      headers: new Cabecalhos(cabecalhos),
+      cookies: biscoitosDoPedido((cabecalhos || {}).cookie),
+      ip: "127.0.0.1",
+      geo: {},
+    };
+  }
+
+  function moduloNextServer() {
+    return {
+      __esModule: true,
+      NextResponse: RespostaNext,
+      NextRequest: function NextRequest(href, init) {
+        return pedidoNext(String(href), (init || {}).method, (init || {}).headers);
+      },
+      Headers: Cabecalhos,
+      userAgent: (req) => ({ ua: (req && req.headers && req.headers.get("user-agent")) || "" }),
+      userAgentFromString: (s) => ({ ua: s || "" }),
+      ImageResponse: function () { throw new Error("Odete ainda não gera ImageResponse"); },
+    };
+  }
+
+  // `config.matcher` é path-to-regexp. Aqui entra o pedaço que projeto de verdade usa:
+  // `:nome` e seus modificadores, e grupo `( ... )` copiado como regex — é assim que o
+  // matcher padrão do Next, `/((?!api|_next).*)`, funciona.
+  function regexDoMatcher(padrao) {
+    let re = "", i = 0;
+    while (i < padrao.length) {
+      const c = padrao[i];
+      if (c === "(") {
+        let n = 1, j = i + 1;
+        while (j < padrao.length && n > 0) {
+          if (padrao[j] === "\\") j++;
+          else if (padrao[j] === "(") n++;
+          else if (padrao[j] === ")") n--;
+          j++;
+        }
+        re += padrao.slice(i, j); i = j; continue;
+      }
+      // "/:resto*" casa também sem a barra: /blog/:p* pega /blog.
+      const opcional = /^\/:([A-Za-z0-9_]+)([*?])/.exec(padrao.slice(i));
+      if (opcional) {
+        re += opcional[2] === "*" ? "(?:/(.*))?" : "(?:/([^/]*))?";
+        i += opcional[0].length; continue;
+      }
+      const nomeado = /^:([A-Za-z0-9_]+)([*+?]?)/.exec(padrao.slice(i));
+      if (nomeado) {
+        re += nomeado[2] === "*" ? "(.*)" : nomeado[2] === "+" ? "(.+)" : nomeado[2] === "?" ? "([^/]*)" : "([^/]+)";
+        i += nomeado[0].length; continue;
+      }
+      re += c.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      i++;
+    }
+    return new RegExp("^" + re + "$");
+  }
+
+  function casaMatcher(config, p) {
+    const m = config && config.matcher;
+    if (m == null) return true;
+    const lista = [].concat(m)
+      .map((x) => (typeof x === "string" ? x : x && (x.source || x.matcher)))
+      .filter((x) => typeof x === "string");
+    if (!lista.length) return true;
+    for (const padrao of lista) {
+      try { if (regexDoMatcher(padrao).test(p)) return true; } catch (e) { /* padrão fora do que a gente lê */ }
+    }
+    return false;
+  }
+
+  // O que o devserver precisa saber do que o middleware devolveu, sem conhecer as
+  // classes daqui.
+  function leResposta(r) {
+    if (r == null) return null;
+    const acao = r[ACAO] || (typeof r.status === "number" || r.body != null ? "resposta" : null);
+    if (!acao) return null;
+    const cabecalhos = [];
+    if (r.headers && typeof r.headers.forEach === "function") r.headers.forEach((v, k) => cabecalhos.push([k, v]));
+    return {
+      acao,
+      status: r.status || 200,
+      destino: r.destino || null,
+      corpo: r.body == null ? null : String(r.body),
+      cabecalhos,
+      biscoitos: r.cookies && typeof r.cookies.getAll === "function" ? r.cookies.getAll() : [],
+    };
+  }
+
+  raiz.__next = {
+    rota, renderiza, resolveServidor, instalaIlhas,
+    moduloFonteGoogle, moduloFonteLocal, cabecalhoDeFontes,
+    moduloNextServer, pedidoNext, casaMatcher, leResposta, regexDoMatcher,
+  };
   if (typeof module !== "undefined" && module.exports) module.exports = raiz.__next;
 })(typeof globalThis !== "undefined" ? globalThis : this);

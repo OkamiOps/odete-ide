@@ -315,6 +315,9 @@ Kurzbefehle sind auch verdrahtet: *Projekt öffnen*, *Befehl ausführen*, *Odete
 Ehrlich benannt, denn eine README, die nur Erfolge auflistet, ist eine Broschüre:
 
 - `astro build` und `next build` laufen noch nicht — Astro und Next nur im Dev-Modus
+- Astro-Seiten werden gerendert; Islands mit Hydration, MDX und Content Collections nicht
+- Next-Seiten werden serverseitig gerendert; Interaktivität im Client, Server Actions,
+  Middleware und `next/font` fehlen noch
 - Kein SourceKit, also keine Swift-Autovervollständigung; `GeometryReader` und `Canvas` sind nicht in der Preview-Teilmenge
 - Die Vervollständigung lässt sich nicht mit Pfeiltasten durchgehen — Tab/Enter nimmt den ersten Eintrag, oder antippen
 - Zwei Agenten parallel, MCP und Sprachsteuerung sind nicht gebaut

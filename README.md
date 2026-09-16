@@ -311,6 +311,9 @@ Shortcuts are wired up too: *Open project*, *Run command*, *Ask Odete*, *New pro
 Stated plainly, because a README that only lists wins is a brochure:
 
 - `astro build` and `next build` don't run yet — Astro and Next are dev-mode only
+- Astro pages render, but islands with hydration, MDX and content collections don't
+- Next pages render on the server; client interactivity, Server Actions, middleware and
+  `next/font` are not wired yet
 - No SourceKit, so no Swift autocomplete; `GeometryReader` and `Canvas` aren't in the preview subset
 - Completion doesn't navigate with arrow keys — Tab/Enter takes the first item, or tap
 - Two agents in parallel, MCP and voice are not built

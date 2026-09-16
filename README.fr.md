@@ -318,6 +318,9 @@ Les Raccourcis sont branchés aussi : *Ouvrir un projet*, *Lancer une commande*,
 Dit franchement, parce qu’un README qui ne liste que les victoires est une brochure :
 
 - `astro build` et `next build` ne tournent pas encore — Astro et Next sont en mode dev uniquement
+- Les pages Astro s’affichent ; les îlots avec hydratation, MDX et les content collections non
+- Les pages Next sont rendues côté serveur ; l’interactivité client, les Server Actions,
+  le middleware et `next/font` ne sont pas encore branchés
 - Pas de SourceKit, donc pas d’autocomplétion Swift ; `GeometryReader` et `Canvas` ne sont pas dans le sous-ensemble de l’aperçu
 - La complétion ne se navigue pas aux flèches — Tab/Entrée prend le premier élément, ou touche l’écran
 - Deux agents en parallèle, MCP et la voix ne sont pas faits

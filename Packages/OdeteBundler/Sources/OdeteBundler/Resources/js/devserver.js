@@ -113,6 +113,10 @@
   // `__req` só precisa atender o que ficou de fora — e é aí que o React continua sendo
   // um só, o do servidor, senão hook e contexto quebram com duas cópias.
   const pacoteNext = new Map();
+  // Mapa da rota para os módulos de cliente que ela usa, preenchido no render e lido
+  // quando o navegador pede o pacote de hidratação.
+  const ilhasDaRota = new Map();
+  const ilhasDoBuild = {};
   async function carregaNext(arquivo) {
     const mt = fs.statSync(arquivo).mtimeMs;
     const cache = pacoteNext.get(arquivo);
@@ -121,6 +125,7 @@
       root: state.root, entries: [path.relative(state.root, arquivo)],
       format: "cjs", platform: "node", dev: true, outdir: "__odete_next",
       external: ["react", "react-dom", "react/jsx-runtime", "react/jsx-dev-runtime", "next/*"],
+      ilhas: ilhasDoBuild,
     });
     if (!r.ok) throw new Error((r.errors[0] && r.errors[0].text) || "build da página falhou");
     const saida = r.files.find((f) => f.path.endsWith(".js"));
@@ -135,6 +140,34 @@
     fn(mod, mod.exports, req);
     pacoteNext.set(arquivo, { mt, exports: mod.exports });
     return mod.exports;
+  }
+
+  // O pacote que o navegador baixa para hidratar: só os componentes de cliente daquela
+  // rota, não a página inteira. O servidor já mandou o HTML pronto.
+  async function pacoteDeIlhas(rota) {
+    const ids = ilhasDaRota.get(rota) || [];
+    if (!ids.length) return "// sem ilhas nesta rota";
+    const entradas = ids.map((id) => {
+      const [modulo, exportado] = id.split("#");
+      const abs = path.join(state.root, modulo);
+      const nome = exportado === "default" ? "default" : exportado;
+      return { id, abs, nome };
+    });
+    const importa = entradas.map((e, i) =>
+      `import { ${e.nome} as __c${i} } from ${JSON.stringify("odete-real:" + e.abs)};`).join("\n");
+    const mapa = entradas.map((e, i) => `  ${JSON.stringify(e.id)}: __c${i},`).join("\n");
+    const virtual = `${importa}\nexport const MODULOS = {\n${mapa}\n};\n`;
+    const r = await globalThis.__build({
+      root: state.root, entries: ["__odete_ilhas_entrada.js"], format: "esm", platform: "browser",
+      dev: true, outdir: "__odete_ilhas", externalMissing: true,
+      virtuais: {
+        "__odete_ilhas_entrada.js": globalThis.__ilhasClienteJS,
+        "virtual:odete-ilhas": virtual,
+      },
+    });
+    if (!r.ok) throw new Error((r.errors[0] && r.errors[0].text) || "build das ilhas falhou");
+    const saida = r.files.find((f) => f.path.endsWith(".js"));
+    return saida ? saida.text : "// build das ilhas não produziu JS";
   }
 
   // `next/link` e `next/image` existem para o roteador e o otimizador do Next, que aqui
@@ -239,12 +272,23 @@
       // páginas de framework, antes do fallback: nem Astro nem Next têm index.html
       const pagina = paginaAstro(p);
       if (pagina) return send(res, 200, MIME[".html"], await renderizaAstro(pagina));
+      if (p.startsWith("/@odete/ilhas/")) {
+        const rota = decodeURIComponent(p.slice("/@odete/ilhas".length)) || "/";
+        const js = await pacoteDeIlhas(rota);
+        return send(res, 200, MIME[".js"], js);
+      }
       const rotaNext = globalThis.__next && globalThis.__next.rota(fs, path, state.root, p);
       if (rotaNext) {
         try {
+          const usadas = new Set();
+          globalThis.__next.instalaIlhas(contextoNext().React, usadas);
           const corpo = await globalThis.__next.renderiza(contextoNext(), rotaNext, url);
+          ilhasDaRota.set(p, [...usadas]);
+          const hidrata = usadas.size
+            ? '<script type="module" src="/@odete/ilhas' + encodeURI(p) + '"></script>'
+            : "";
           const doc = "<!doctype html><html><head>" + importMap() + CLIENT +
-            "</head><body>" + corpo + "</body></html>";
+            "</head><body>" + corpo + hidrata + "</body></html>";
           return send(res, 200, MIME[".html"], doc);
         } catch (e) {
           if (faltaReact(e)) {

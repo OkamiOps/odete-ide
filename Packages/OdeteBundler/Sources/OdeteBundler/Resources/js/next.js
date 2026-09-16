@@ -107,6 +107,38 @@
     return servidor.renderToString(pronta);
   }
 
-  raiz.__next = { rota, renderiza, resolveServidor };
+  // ---- ilhas ----
+  // Um componente de cliente renderiza normalmente no servidor, mas embrulhado numa
+  // marca que carrega o módulo e as props. O navegador acha essas marcas e hidrata só
+  // elas — o resto da página é HTML e continua sendo HTML.
+  function instalaIlhas(React, coletadas) {
+    raiz.__odeteIlha = function (modulo, exportado, Componente) {
+      if (typeof Componente !== "function") return Componente;
+      const Ilha = function (props) {
+        const semFilhos = {};
+        let temFilhos = false;
+        for (const k of Object.keys(props || {})) {
+          if (k === "children") { temFilhos = true; continue; }
+          semFilhos[k] = props[k];
+        }
+        let dados = null;
+        try { dados = JSON.stringify(semFilhos); } catch (e) { dados = null; }
+        const id = modulo + "#" + exportado;
+        coletadas.add(id);
+        // Props que não atravessam JSON, ou filhos vindos do servidor, tornam a
+        // hidratação insegura: melhor a ilha ficar estática do que remontar errado.
+        const podeHidratar = dados !== null && !temFilhos;
+        return React.createElement(
+          "odete-ilha",
+          podeHidratar ? { "data-ilha": id, "data-props": dados } : { "data-ilha": id, "data-estatica": "1" },
+          React.createElement(Componente, props)
+        );
+      };
+      Ilha.displayName = "Ilha(" + exportado + ")";
+      return Ilha;
+    };
+  }
+
+  raiz.__next = { rota, renderiza, resolveServidor, instalaIlhas };
   if (typeof module !== "undefined" && module.exports) module.exports = raiz.__next;
 })(typeof globalThis !== "undefined" ? globalThis : this);

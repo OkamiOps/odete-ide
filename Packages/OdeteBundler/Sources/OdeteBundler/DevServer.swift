@@ -25,6 +25,13 @@ public final class DevServer: @unchecked Sendable {
         let js = Bundle.module.url(forResource: "js", withExtension: nil)!
         // O compilador de .astro vem antes: o servidor chama `__astroCompila` ao servir
         // uma rota de `src/pages`.
+        // O runtime das ilhas não roda aqui: ele é o texto que vai ser empacotado para o
+        // navegador quando uma rota tiver componente de cliente.
+        let ilhas = try String(contentsOf: js.appending(path: "ilhas-cliente.js"), encoding: .utf8)
+        try await esbuild.engine.evaluate(
+            "globalThis.__ilhasClienteJS = \(Self.comoLiteralJS(ilhas));",
+            name: "ilhas-cliente-fonte.js"
+        )
         for arquivo in ["astro.js", "next.js", "devserver.js"] {
             try await esbuild.engine.evaluate(
                 String(contentsOf: js.appending(path: arquivo), encoding: .utf8),
@@ -36,6 +43,13 @@ public final class DevServer: @unchecked Sendable {
         self.port = (obj?["port"] as? Int) ?? port
         watcher = DirectoryWatcherLite(url: root) { [weak self] in self?.invalidate() }
         watcher?.start()
+    }
+
+    /// Texto virando literal de JS, sem depender de escape à mão.
+    static func comoLiteralJS(_ s: String) -> String {
+        let dados = try? JSONSerialization.data(withJSONObject: [s], options: [])
+        let json = dados.map { String(decoding: $0, as: UTF8.self) } ?? "[\"\"]"
+        return String(json.dropFirst().dropLast())
     }
 
     /// Limpa o cache de bundles e manda reload aos clientes.

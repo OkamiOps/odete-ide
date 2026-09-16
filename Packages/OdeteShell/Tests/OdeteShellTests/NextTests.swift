@@ -108,3 +108,86 @@ struct NextTests {
         #expect(html.contains("npm install"), "não explicou o que falta: \(html.prefix(300))")
     }
 }
+
+/// Hidratação: a página tem que responder a clique, não só aparecer.
+///
+/// Um módulo que começa com "use client" roda nos dois lados. No servidor ele renderiza
+/// dentro de uma marca; no navegador só ele é baixado e hidratado, e o resto da página
+/// continua sendo HTML.
+struct NextIlhasTests {
+    func projeto(_ arquivos: [String: String]) async throws -> URL? {
+        let raiz = FileManager.default.temporaryDirectory
+            .appending(path: "odete-ilha-\(UUID().uuidString)", directoryHint: .isDirectory)
+        let fm = FileManager.default
+        for (caminho, corpo) in arquivos {
+            let f = raiz.appending(path: caminho)
+            try fm.createDirectory(at: f.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try corpo.write(to: f, atomically: true, encoding: .utf8)
+        }
+        try #"{"name":"app","dependencies":{"react":"19.2.0","react-dom":"19.2.0"}}"#
+            .write(to: raiz.appending(path: "package.json"), atomically: true, encoding: .utf8)
+        guard let rep = try? await Installer(project: raiz, registry: HTTPRegistry())
+            .install(add: [.init("react@19.2.0"), .init("react-dom@19.2.0")]),
+            !rep.installed.isEmpty
+        else { return nil }
+        return raiz
+    }
+
+    static let contador = """
+    "use client";
+    import { useState } from "react";
+    export default function Contador({ inicio }: { inicio: number }) {
+      const [n, setN] = useState(inicio);
+      return <button onClick={() => setN(n + 1)}>{n} toques</button>;
+    }
+    """
+
+    @Test func componenteDeClienteVirilhaEHidrata() async throws {
+        guard let raiz = try await projeto([
+            "app/Contador.tsx": Self.contador,
+            "app/page.tsx": """
+            import Contador from "./Contador";
+            export default function Page() {
+              return <main><h1>estatico</h1><Contador inicio={7} /></main>;
+            }
+            """,
+        ]) else { return }
+        let dev = DevServer(root: raiz)
+        try await dev.start(port: 20000 + Int.random(in: 0 ..< 20000), preset: .next)
+        defer { dev.stop() }
+
+        let (d, _) = try await URLSession.shared.data(from: dev.url)
+        let html = String(decoding: d, as: UTF8.self)
+        // o servidor renderizou o componente de cliente, dentro da marca
+        #expect(html.contains("<odete-ilha"), "faltou a marca da ilha: \(html.prefix(400))")
+        // O React separa nós de texto no SSR: `{n} toques` sai como `7<!-- --> toques`.
+        #expect(html.contains("7") && html.contains("toques"), "o componente não renderizou no servidor")
+        #expect(html.contains("app/Contador.tsx#default"), "a marca não diz qual módulo montar")
+        #expect(
+            html.contains(#"data-props="{&quot;inicio&quot;:7}""#) || html.contains("inicio"),
+            "as props não foram junto"
+        )
+        // e a página pede o pacote de hidratação
+        #expect(html.contains("/@odete/ilhas/"), "não pediu o pacote das ilhas")
+
+        let (j, jr) = try await URLSession.shared.data(from: dev.url.appending(path: "@odete/ilhas/"))
+        #expect((jr as? HTTPURLResponse)?.value(forHTTPHeaderField: "content-type")?.contains("javascript") == true)
+        let js = String(decoding: j, as: UTF8.self)
+        #expect(js.contains("hydrateRoot"), "o pacote não hidrata: \(js.prefix(300))")
+        #expect(js.contains("toques"), "o componente de cliente não entrou no pacote")
+    }
+
+    /// Página sem componente de cliente não baixa JS nenhum.
+    @Test func paginaEstaticaNaoBaixaJS() async throws {
+        guard let raiz = try await projeto([
+            "app/page.tsx": "export default function P() { return <p>so html</p>; }",
+        ]) else { return }
+        let dev = DevServer(root: raiz)
+        try await dev.start(port: 20000 + Int.random(in: 0 ..< 20000), preset: .next)
+        defer { dev.stop() }
+        let (d, _) = try await URLSession.shared.data(from: dev.url)
+        let html = String(decoding: d, as: UTF8.self)
+        #expect(html.contains("<p>so html</p>"))
+        #expect(!html.contains("/@odete/ilhas/"), "pediu hidratação sem precisar")
+    }
+}

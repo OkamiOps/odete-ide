@@ -24,6 +24,23 @@
     name: "odete-fs",
     setup(build) {
       build.onResolve({ filter: /.*/ }, (args) => {
+        // O arquivo real por trás de uma ilha. Precisa ser tratado aqui, e não num
+        // `onResolve` próprio: o genérico é registrado primeiro e engoliria o prefixo.
+        if (args.path.startsWith("odete-real:")) {
+          return { path: args.path.slice("odete-real:".length), namespace: "odete-real" };
+        }
+        // Módulos que só existem em memória: a entrada das ilhas e o mapa delas são
+        // gerados por rota, e não faz sentido escrever isso no projeto de quem usa.
+        // O ponto de entrada chega como caminho absoluto, porque o esbuild junta com a
+        // raiz antes de resolver; os imports de dentro chegam como foram escritos.
+        if (opts.virtuais) {
+          const chave = Object.prototype.hasOwnProperty.call(opts.virtuais, args.path)
+            ? args.path
+            : path.relative(root, args.path);
+          if (Object.prototype.hasOwnProperty.call(opts.virtuais, chave)) {
+            return { path: chave, namespace: "odete-virtual" };
+          }
+        }
         if (/^(https?:|data:|node:)/.test(args.path)) return { path: args.path, external: true };
         // Externos pedidos por quem chamou: no render do Next o React precisa ser o
         // mesmo do servidor, e `next/*` é atendido por substitutos nossos. Empacotar
@@ -43,13 +60,57 @@
         if (r.startsWith("node:")) return { path: r, external: true };
         return { path: r, namespace: "file" };
       });
+      // Fronteira de cliente: um módulo que começa com "use client" roda nos dois lados.
+      // No servidor ele vira uma ilha — o componente real renderiza dentro de uma marca
+      // que diz ao navegador qual módulo montar ali e com que props. Sem isso o Preview
+      // mostra a página certa e ela não responde a clique nenhum.
+      build.onLoad({ filter: /.*/, namespace: "odete-virtual" }, (args) => ({
+        contents: opts.virtuais[args.path], loader: "js", resolveDir: root,
+      }));
+      build.onLoad({ filter: /.*/, namespace: "odete-real" }, (args) => ({
+        contents: fs.readFileSync(args.path, "utf8"), loader: loaderFor(args.path), resolveDir: path.dirname(args.path),
+      }));
       build.onLoad({ filter: /.*/, namespace: "file" }, (args) => {
+        if (opts.ilhas && /\.(tsx|jsx|ts|js|mjs)$/i.test(args.path)) {
+          const src = fs.readFileSync(args.path, "utf8");
+          if (/^\s*(["'])use client\1\s*;?/.test(src)) {
+            const rel = path.relative(root, args.path);
+            const nomes = exportadosDe(src);
+            opts.ilhas[rel] = nomes;
+            const linhas = [`import * as __real from ${JSON.stringify("odete-real:" + args.path)};`];
+            for (const n of nomes) {
+              const alvo = `__real[${JSON.stringify(n)}]`;
+              const marca = `globalThis.__odeteIlha(${JSON.stringify(rel)}, ${JSON.stringify(n)}, ${alvo})`;
+              linhas.push(n === "default" ? `export default ${marca};` : `export const ${n} = ${marca};`);
+            }
+            return { contents: linhas.join("\n"), loader: "js", resolveDir: path.dirname(args.path) };
+          }
+        }
+        return carregaArquivo(args);
+      });
+      const carregaArquivo = (args) => {
         const loader = loaderFor(args.path);
         if (loader === "dataurl" || loader === "binary" || loader === "file") return { contents: fs.readFileSync(args.path), loader: loader === "file" ? "dataurl" : loader, resolveDir: path.dirname(args.path) };
         return { contents: fs.readFileSync(args.path, "utf8"), loader, resolveDir: path.dirname(args.path) };
-      });
+      };
     },
   });
+
+  // Nomes exportados, para a ilha reexportar os mesmos. Cobre o que um componente de
+  // cliente usa: `export default`, `export function X`, `export const X`.
+  function exportadosDe(src) {
+    const nomes = new Set();
+    if (/^\s*export\s+default\b/m.test(src)) nomes.add("default");
+    for (const m of src.matchAll(/^\s*export\s+(?:async\s+)?function\s+([A-Za-z_$][\w$]*)/gm)) nomes.add(m[1]);
+    for (const m of src.matchAll(/^\s*export\s+(?:const|let|var)\s+([A-Za-z_$][\w$]*)/gm)) nomes.add(m[1]);
+    for (const m of src.matchAll(/^\s*export\s*\{([^}]*)\}/gm)) {
+      for (const parte of m[1].split(",")) {
+        const nome = parte.trim().split(/\s+as\s+/).pop().trim();
+        if (nome) nomes.add(nome);
+      }
+    }
+    return [...nomes];
+  }
 
   globalThis.__transform = async (code, options) => {
     await ready;

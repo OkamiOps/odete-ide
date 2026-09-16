@@ -36,14 +36,22 @@ public enum Lint {
         if language != .json, text.utf8.count > Limites.arquivoGrande {
             return []
         }
-        let achados: [LintIssue] = switch language {
-        case .javascript, .jsx, .typescript, .tsx: js(text)
-        case .json: json(text)
-        case .css: css(text)
-        case .swift: swift(text)
-        default: []
+        // Duas camadas: o que é erro de sintaxe em qualquer linguagem de chaves —
+        // delimitador que não fecha, texto que não termina — e as regras de estilo, que
+        // são por linguagem. Antes só existia a segunda, e só para quatro linguagens: um
+        // `}` sobrando num arquivo Rust não aparecia em lugar nenhum.
+        var achados = Sintaxe.problemas(text: text, language: language)
+        achados += Sintaxe.marcacao(text: text, language: language)
+        switch language {
+        case .javascript, .jsx, .typescript, .tsx: achados += js(text)
+        case .json: achados += json(text)
+        case .css, .scss: achados += css(text)
+        case .swift: achados += swift(text)
+        case .python: achados += Sintaxe.python(text: text)
+        case .yaml: achados += yaml(text)
+        default: break
         }
-        return cortar(achados)
+        return cortar(achados.sorted { ($0.line, $0.column) < ($1.line, $1.column) })
     }
 
     /// Guarda os primeiros e diz quantos ficaram de fora, em vez de mentir o total.
@@ -169,41 +177,38 @@ public enum Lint {
         }
     }
 
+    /// Só estilo: as chaves agora são conferidas pelo `Sintaxe`, que aponta a coluna e a
+    /// linha onde abriu. Deixar as duas contando daria dois recados do mesmo erro.
     private static func css(_ text: String) -> [LintIssue] {
         var out: [LintIssue] = []
-        var depth = 0
         for (i, line) in text.components(separatedBy: "\n").enumerated() {
-            depth += line.filter { $0 == "{" }.count - line.filter { $0 == "}" }.count
-            if depth < 0 {
-                out.append(LintIssue(
-                    rule: "css-brace",
-                    message: chave("`}` sem abertura"),
-                    severity: .error,
-                    line: i + 1,
-                    column: 1,
-                    length: line.count
-                ))
-                depth = 0
-            }
-            if let r = line.range(of: "!important") {
-                out.append(LintIssue(
-                    rule: "no-important",
-                    message: chave("`!important` dificulta sobrescrever"),
-                    severity: .info,
-                    line: i + 1,
-                    column: line.distance(from: line.startIndex, to: r.lowerBound) + 1,
-                    length: 10
-                ))
-            }
-        }
-        if depth > 0, let last = text.components(separatedBy: "\n").indices.last {
+            guard let r = line.range(of: "!important") else { continue }
             out.append(LintIssue(
-                rule: "css-brace",
-                message: chave("`{` sem fechamento"),
+                rule: "no-important",
+                message: tr(chave("`!important` dificulta sobrescrever")),
+                severity: .info,
+                line: i + 1,
+                column: line.distance(from: line.startIndex, to: r.lowerBound) + 1,
+                length: 10
+            ))
+        }
+        return out
+    }
+
+    /// Tabulação no recuo é erro de YAML, e é invisível na tela — o arquivo simplesmente
+    /// não carrega, sem dizer por quê.
+    private static func yaml(_ text: String) -> [LintIssue] {
+        var out: [LintIssue] = []
+        for (i, linha) in text.components(separatedBy: "\n").enumerated() {
+            let recuo = linha.prefix { $0 == " " || $0 == "\t" }
+            guard recuo.contains("\t") else { continue }
+            out.append(LintIssue(
+                rule: "yaml-tab",
+                message: tr("YAML não aceita tabulação no recuo"),
                 severity: .error,
-                line: last + 1,
+                line: i + 1,
                 column: 1,
-                length: 1
+                length: recuo.count
             ))
         }
         return out

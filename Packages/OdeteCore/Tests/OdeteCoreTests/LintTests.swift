@@ -23,9 +23,12 @@ struct LintTests {
         #expect(Lint.rules(text: "{\"a\": [1, 2]}", language: .json).isEmpty)
     }
 
+    /// A chave que não fecha passou a vir do `Sintaxe`, que aponta a linha onde ela
+    /// abriu — antes vinha da última linha do arquivo, que não é onde se conserta.
     @Test func cssBraces() {
         let issues = Lint.rules(text: ".a {\n  color: red !important;\n", language: .css)
-        #expect(issues.map(\.rule) == ["no-important", "css-brace"])
+        #expect(issues.map(\.rule) == ["sem-fechamento", "no-important"])
+        #expect(issues.first?.line == 1, "o recado tem que apontar a abertura")
     }
 
     @Test func swiftRules() {

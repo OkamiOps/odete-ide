@@ -16941,6 +16941,34 @@
         }
       }
     },
+    "YAML não aceita tabulação no recuo": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "YAML doesn't allow tabs for indentation"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "YAML erlaubt keine Tabulatoren zum Einrücken"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "YAML n’accepte pas de tabulation pour l’indentation"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "YAML no acepta tabulación en la indentación"
+          }
+        }
+      }
+    },
     "Zerar estado": {
       "localizations": {
         "en": {
@@ -17077,6 +17105,174 @@
           "stringUnit": {
             "state": "translated",
             "value": "`!important` dificulta sobrescribir"
+          }
+        }
+      }
+    },
+    "`%1$@` aberto aqui e nunca fechado": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`%1$@` opened here and never closed"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`%1$@` hier geöffnet und nie geschlossen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`%1$@` ouvert ici et jamais fermé"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`%1$@` abierto aquí y nunca cerrado"
+          }
+        }
+      }
+    },
+    "`%1$@` fecha o `%2$@` da linha %3$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`%1$@` closes the `%2$@` from line %3$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`%1$@` schließt das `%2$@` aus Zeile %3$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`%1$@` ferme le `%2$@` de la ligne %3$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`%1$@` cierra el `%2$@` de la línea %3$@"
+          }
+        }
+      }
+    },
+    "`%1$@` sem abertura": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`%1$@` with nothing opened"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`%1$@` ohne Öffnung"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`%1$@` sans ouverture"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`%1$@` sin apertura"
+          }
+        }
+      }
+    },
+    "`<%1$@>` aberta aqui e nunca fechada": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`<%1$@>` opened here and never closed"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`<%1$@>` hier geöffnet und nie geschlossen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`<%1$@>` ouverte ici et jamais fermée"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`<%1$@>` abierta aquí y nunca cerrada"
+          }
+        }
+      }
+    },
+    "`</%1$@>` fecha antes de `%2$@`": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`</%1$@>` closes before `%2$@`"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`</%1$@>` schließt vor `%2$@`"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`</%1$@>` ferme avant `%2$@`"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`</%1$@>` cierra antes de `%2$@`"
+          }
+        }
+      }
+    },
+    "`</%1$@>` sem abertura": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`</%1$@>` with nothing opened"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`</%1$@>` ohne Öffnung"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`</%1$@>` sans ouverture"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`</%1$@>` sin apertura"
           }
         }
       }
@@ -19517,6 +19713,34 @@
         }
       }
     },
+    "espaço e tabulação misturados no recuo": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "spaces and tabs mixed in the indentation"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leerzeichen und Tabulatoren in der Einrückung gemischt"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "espaces et tabulations mélangés dans l’indentation"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "espacios y tabulaciones mezclados en la indentación"
+          }
+        }
+      }
+    },
     "esperando você autorizar…": {
       "localizations": {
         "en": {
@@ -19681,6 +19905,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "falló: %1$@: %2$@"
+          }
+        }
+      }
+    },
+    "falta `:` no fim desta linha": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "missing `:` at the end of this line"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "am Zeilenende fehlt `:`"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "il manque `:` à la fin de cette ligne"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "falta `:` al final de esta línea"
           }
         }
       }
@@ -24105,6 +24357,62 @@
           "stringUnit": {
             "state": "translated",
             "value": "terminal"
+          }
+        }
+      }
+    },
+    "texto aberto com %1$@ e não fechado": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "text opened with %1$@ and never closed"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Text mit %1$@ geöffnet und nie geschlossen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "texte ouvert par %1$@ et jamais fermé"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "texto abierto con %1$@ y nunca cerrado"
+          }
+        }
+      }
+    },
+    "texto aberto com %1$@ e não fechado nesta linha": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "text opened with %1$@ and not closed on this line"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Text mit %1$@ geöffnet und in dieser Zeile nicht geschlossen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "texte ouvert par %1$@ et non fermé sur cette ligne"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "texto abierto con %1$@ y no cerrado en esta línea"
           }
         }
       }

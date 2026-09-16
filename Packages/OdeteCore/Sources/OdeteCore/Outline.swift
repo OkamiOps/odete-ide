@@ -49,11 +49,15 @@ public enum Outline {
         case .javascript, .jsx, .typescript, .tsx: return js(lines)
         case .swift: return swift(lines)
         case .markdown: return markdown(lines)
-        case .css: return css(lines)
+        case .css, .scss: return css(lines)
         case .json: return json(lines)
-        case .html: return html(lines)
+        // Astro e Svelte são HTML com um bloco de script em cima, e .xml/.svg também
+        // são marcação: o contorno de HTML serve para os três.
+        case .html, .astro, .svelte, .xml: return html(lines)
         case .yaml: return yaml(lines)
-        case .plain: return []
+        // As outras ainda não têm contorno próprio — colorir já funciona, listar
+        // símbolo não. Devolver vazio é honesto; inventar contorno errado não é.
+        default: return []
         }
     }
 

@@ -370,7 +370,14 @@ struct NewProjectSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""
     @State private var template: Template = .blank
+    @State private var pasta: URL?
+    @State private var escolhendoPasta = false
     @FocusState private var focused: Bool
+
+    /// Onde o projeto nasce quando a pessoa não escolhe nada.
+    var padrao: String {
+        chrome.snapshot.projectsInCloud ? tr("iCloud Drive") : tr("Dentro do app")
+    }
 
     var body: some View {
         NavigationStack {
@@ -382,7 +389,52 @@ struct NewProjectSheet: View {
                         .textInputAutocapitalization(.never)
                         .onSubmit(create)
                 }
-                Section(tr("Modelo")) {
+                // Onde o projeto vai morar. Antes não havia escolha: tudo nascia na raiz
+                // do app, e quem trabalha num SSD externo ou troca de máquina ficava sem
+                // saída depois.
+                Section(tr("Onde")) {
+                    Button {
+                        pasta = nil
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: chrome.snapshot.projectsInCloud ? "icloud" : "iphone")
+                                .frame(width: 24)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(tr("Pasta da Odete")).foregroundStyle(.primary)
+                                Text(padrao).font(.footnote).foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            if pasta == nil {
+                                Image(systemName: "checkmark").foregroundStyle(theme.accent)
+                            }
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    Button {
+                        escolhendoPasta = true
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "folder.badge.plus").frame(width: 24)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(tr("Outra pasta…")).foregroundStyle(.primary)
+                                Text(pasta?.lastPathComponent
+                                    ?? tr("Arquivos, iCloud, um SSD externo"))
+                                    .font(.footnote).foregroundStyle(.secondary)
+                                    .lineLimit(1).truncationMode(.middle)
+                            }
+                            Spacer()
+                            if pasta != nil {
+                                Image(systemName: "checkmark").foregroundStyle(theme.accent)
+                            }
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+                // Chave própria: "Modelo" também é o modelo de IA no compositor, e em inglês
+                // um é "Template" e o outro é "Model".
+                Section(tr("Modelo do projeto")) {
                     ForEach(Template.allCases) { t in
                         Button {
                             template = t
@@ -404,6 +456,11 @@ struct NewProjectSheet: View {
                     }
                 }
             }
+            .fileImporter(isPresented: $escolhendoPasta, allowedContentTypes: [.folder]) { r in
+                if case let .success(u) = r {
+                    pasta = u
+                }
+            }
             .navigationTitle(tr("Novo projeto"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -414,12 +471,17 @@ struct NewProjectSheet: View {
             }
             .onAppear { focused = true }
         }
-        .presentationDetents([.medium, .large])
+        // Com a escolha de local são três seções: no detent médio o modelo ficava fora
+        // da tela, e a pessoa criava tudo em branco sem ver que havia opção.
+        .presentationDetents([.large])
     }
 
     func create() {
         let n = name.trimmingCharacters(in: .whitespaces)
-        guard !n.isEmpty, let p = app.create(name: n, template: template) else { return }
+        guard !n.isEmpty else { return }
+        let criado = pasta.map { app.create(name: n, template: template, em: $0) }
+            ?? app.create(name: n, template: template)
+        guard let p = criado else { return }
         dismiss()
         app.open(p, chrome: chrome)
     }

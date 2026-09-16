@@ -49,3 +49,57 @@ struct ProjectStoreTests {
         #expect(try store.list().first?.name == "A")
     }
 }
+
+/// Criar projeto fora da raiz do app — numa pasta escolhida no app Arquivos, que pode
+/// ser o iCloud ou um SSD externo.
+struct CriarEmPastaTests {
+    init() {
+        Texto.escolher(.ptBR)
+    }
+
+    @Test func nasceNaPastaEscolhidaENaoNaRaiz() throws {
+        let raiz = try tempDir()
+        let escolhida = try tempDir()
+        let store = ProjectStore(root: raiz)
+
+        let (p, dir) = try ProjectStore.criar(name: "no-ssd", template: .blank, dentroDe: escolhida)
+
+        #expect(p.name == "no-ssd")
+        #expect(dir == escolhida.appending(path: "no-ssd", directoryHint: .isDirectory))
+        #expect(FileManager.default.fileExists(atPath: dir.appending(path: ".odete/project.json").path))
+        // a raiz do app continua vazia: o projeto não foi parar lá
+        #expect(try store.list().isEmpty)
+    }
+
+    @Test func escreveOsArquivosDoModelo() throws {
+        let escolhida = try tempDir()
+        let (_, dir) = try ProjectStore.criar(name: "site", template: .blank, dentroDe: escolhida)
+        for (caminho, _) in Template.blank.files(projectName: "site") {
+            #expect(FileManager.default.fileExists(atPath: dir.appending(path: caminho).path))
+        }
+    }
+
+    @Test func naoSobrescreveOqueJaExiste() throws {
+        let escolhida = try tempDir()
+        _ = try ProjectStore.criar(name: "igual", template: .blank, dentroDe: escolhida)
+        #expect(throws: FileError.self) {
+            try ProjectStore.criar(name: "igual", template: .blank, dentroDe: escolhida)
+        }
+    }
+
+    @Test func recusaNomeInvalido() throws {
+        let escolhida = try tempDir()
+        #expect(throws: FileError.self) {
+            try ProjectStore.criar(name: "../fora", template: .blank, dentroDe: escolhida)
+        }
+    }
+
+    /// O caminho normal continua igual: criar sem escolher pasta cai na raiz do app.
+    @Test func semEscolhaContinuaNaRaiz() throws {
+        let raiz = try tempDir()
+        let store = ProjectStore(root: raiz)
+        let p = try store.create(name: "normal", template: .blank)
+        #expect(try store.list().map(\.name) == [p.name])
+        #expect(FileManager.default.fileExists(atPath: raiz.appending(path: "normal").path))
+    }
+}

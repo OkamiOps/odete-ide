@@ -3025,6 +3025,34 @@
         }
       }
     },
+    "Arquivos, iCloud, um SSD externo": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Files, iCloud, an external SSD"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dateien, iCloud, eine externe SSD"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fichiers, iCloud, un SSD externe"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Archivos, iCloud, un SSD externo"
+          }
+        }
+      }
+    },
     "Arraste um arquivo da lista para cá, ou escolha um na trilha do outro lado.": {
       "localizations": {
         "en": {
@@ -5905,6 +5933,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dark dimmed."
+          }
+        }
+      }
+    },
+    "Dentro do app": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inside the app"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In der App"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dans l’app"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dentro de la app"
           }
         }
       }
@@ -9829,6 +9885,34 @@
         }
       }
     },
+    "Modelo do projeto": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Template"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vorlage"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modèle"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Plantilla"
+          }
+        }
+      }
+    },
     "Modo": {
       "localizations": {
         "en": {
@@ -11705,6 +11789,34 @@
         }
       }
     },
+    "Onde": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Where"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wo"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Où"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dónde"
+          }
+        }
+      }
+    },
     "Opções da busca": {
       "localizations": {
         "en": {
@@ -11897,6 +12009,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Los proyectos viven en Archivos → Odete (o en el iCloud Drive, si quieres). Nada se envía a servidores de Odete."
+          }
+        }
+      }
+    },
+    "Outra pasta…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Another folder…"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anderer Ordner…"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Autre dossier…"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Otra carpeta…"
           }
         }
       }
@@ -12261,6 +12401,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Detener [%1$@] %2$@"
+          }
+        }
+      }
+    },
+    "Pasta da Odete": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Odete folder"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Odete-Ordner"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dossier Odete"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Carpeta de Odete"
           }
         }
       }
@@ -19877,6 +20045,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "hay conflictos por resolver"
+          }
+        }
+      }
+    },
+    "iCloud Drive": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iCloud Drive"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iCloud Drive"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iCloud Drive"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iCloud Drive"
           }
         }
       }

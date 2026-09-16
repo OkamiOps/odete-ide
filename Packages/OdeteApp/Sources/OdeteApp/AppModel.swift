@@ -164,6 +164,30 @@ public final class AppModel {
         }
     }
 
+    /// Cria o projeto numa pasta escolhida pela pessoa, fora da raiz do app.
+    ///
+    /// É o caminho para quem trabalha num SSD externo ou quer o projeto num lugar que
+    /// sobreviva a desinstalar a Odete. A pasta vem do seletor de arquivos com acesso
+    /// concedido; o bookmark do projeto novo é tirado com esse acesso ainda aberto, que
+    /// é o que faz ele continuar valendo depois de fechar o app.
+    public func create(name: String, template: Template, em pasta: URL) -> Project? {
+        let acesso = pasta.startAccessingSecurityScopedResource()
+        defer {
+            if acesso {
+                pasta.stopAccessingSecurityScopedResource()
+            }
+        }
+        do {
+            let (_, dir) = try ProjectStore.criar(name: name, template: template, dentroDe: pasta)
+            let p = try external.add(dir)
+            refresh()
+            return p
+        } catch {
+            self.error = error.localizedDescription
+            return nil
+        }
+    }
+
     public func rename(_ p: Project, to name: String) {
         guard !p.external else { return }
         do { _ = try store.rename(p, to: name); refresh() } catch { self.error = error.localizedDescription }

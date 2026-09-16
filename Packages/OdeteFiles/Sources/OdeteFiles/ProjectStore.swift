@@ -61,8 +61,19 @@ public struct ProjectStore: Sendable {
 
     @discardableResult
     public func create(name: String, template: Template = .blank) throws -> Project {
+        try Self.criar(name: name, template: template, dentroDe: root).0
+    }
+
+    /// Cria o projeto dentro da pasta indicada, que não precisa ser a raiz do app.
+    ///
+    /// É o mesmo trabalho da criação normal, separado para servir também a uma pasta que
+    /// a pessoa escolheu no app Arquivos — iCloud, Working Copy, um SSD externo. Devolve
+    /// a pasta criada junto, porque quem cria fora da raiz precisa dela para guardar o
+    /// acesso depois.
+    @discardableResult
+    public static func criar(name: String, template: Template, dentroDe pasta: URL) throws -> (Project, URL) {
         guard PathRules.validName(name) else { throw FileError.invalidName(name) }
-        let dir = root.appending(path: name, directoryHint: .isDirectory)
+        let dir = pasta.appending(path: name, directoryHint: .isDirectory)
         if FileManager.default.fileExists(atPath: dir.path) {
             throw FileError.alreadyExists(name)
         }
@@ -76,8 +87,12 @@ public struct ProjectStore: Sendable {
             try contents.write(to: f, atomically: true, encoding: .utf8)
         }
         let p = Project(name: name)
-        try writeMeta(p, at: dir)
-        return p
+        let enc = JSONEncoder()
+        enc.dateEncodingStrategy = .iso8601
+        enc.outputFormatting = [.prettyPrinted, .sortedKeys]
+        try FileManager.default.createDirectory(at: dir.appending(path: ".odete"), withIntermediateDirectories: true)
+        try enc.encode(p).write(to: dir.appending(path: ".odete/project.json"), options: .atomic)
+        return (p, dir)
     }
 
     public func rename(_ project: Project, to newName: String) throws -> Project {

@@ -368,7 +368,7 @@ func runAll(
         // meio obrigava a pessoa a ficar mandando "continua" numa ferramenta de
         // desenvolvimento. O teto só existe para caso perdido não virar conta alta;
         // quem interrompe de verdade é o botão de parar.
-        #expect(LoopConfig(mode: .build, permit: .ask, model: "m").maxRounds >= 100)
+        #expect(LoopConfig(mode: .build, permit: .ask, model: "m").maxRounds >= 350)
     }
 
     @Test func roundCapAndStop() async throws {

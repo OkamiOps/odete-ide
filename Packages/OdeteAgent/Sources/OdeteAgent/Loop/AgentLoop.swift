@@ -11,12 +11,15 @@ public struct LoopConfig: Sendable {
     public var conversationId: String
     /// Teto de rodadas de ferramenta.
     ///
-    /// Vinte era pouco para uma ferramenta de desenvolvimento: uma landing page inteira,
-    /// um refactor ou um fluxo de git completo passam disso com facilidade, e parar no
-    /// meio obrigava a pessoa a ficar mandando "continua". O teto existe só para um caso
-    /// perdido não virar conta alta — quem interrompe de verdade é o botão de parar, que
-    /// está sempre à mão e é o freio que a pessoa controla.
-    public var maxRounds = 200
+    /// Sessão de desenvolvimento de verdade passa de mil rodadas. Vinte era absurdo, e
+    /// duzentas ainda parariam no meio de um trabalho grande — e parar no meio obriga a
+    /// pessoa a ficar mandando "continua", que é exatamente o que uma ferramenta assim
+    /// não pode fazer.
+    ///
+    /// O que sobra aqui não é um limite de trabalho, é um fusível: o modelo entrando em
+    /// laço não pode virar conta alta na chave de quem está usando. Quem interrompe
+    /// trabalho legítimo é o botão de parar, que está sempre à mão.
+    public var maxRounds = 5000
     public init(mode: AgentMode, permit: PermitMode, model: String, effort: String = "", conversationId: String = "") {
         self.mode = mode; self.permit = permit; self.model = model; self.effort = effort; self
             .conversationId = conversationId

@@ -23,10 +23,14 @@ public final class DevServer: @unchecked Sendable {
     public func start(port: Int = 5173, preset: Preset = .vite) async throws {
         _ = try await esbuild.ready()
         let js = Bundle.module.url(forResource: "js", withExtension: nil)!
-        try await esbuild.engine.evaluate(
-            String(contentsOf: js.appending(path: "devserver.js"), encoding: .utf8),
-            name: "devserver.js"
-        )
+        // O compilador de .astro vem antes: o servidor chama `__astroCompila` ao servir
+        // uma rota de `src/pages`.
+        for arquivo in ["astro.js", "devserver.js"] {
+            try await esbuild.engine.evaluate(
+                String(contentsOf: js.appending(path: arquivo), encoding: .utf8),
+                name: arquivo
+            )
+        }
         let json = try await esbuild.engine.call("__devStart", [root.path, port, preset.rawValue])
         let obj = try JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any]
         self.port = (obj?["port"] as? Int) ?? port

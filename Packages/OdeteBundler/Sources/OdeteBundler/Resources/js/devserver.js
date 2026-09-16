@@ -93,6 +93,54 @@
     return "não encontrado: " + p + extra;
   }
 
+  // ---- páginas .astro ----
+  // Carrega um .astro como módulo, compilando na hora e resolvendo os imports dele —
+  // inclusive outros .astro, que são componentes e layouts. Cache por mtime, para
+  // editar um componente refletir sem reiniciar o servidor.
+  const modAstro = new Map();
+  function carregaAstro(arquivo) {
+    const mt = fs.statSync(arquivo).mtimeMs;
+    const cache = modAstro.get(arquivo);
+    if (cache && cache.mt === mt) return cache.exports;
+    const js = globalThis.__astroCompila(fs.readFileSync(arquivo, "utf8"), arquivo);
+    const mod = { exports: {} };
+    const daPasta = path.dirname(arquivo);
+    const req = (spec) => {
+      const alvo = spec.startsWith(".") ? path.resolve(daPasta, spec) : spec;
+      if (typeof alvo === "string" && alvo.endsWith(".astro")) return carregaAstro(alvo);
+      // CSS e afins importados só por efeito não existem no servidor.
+      if (/\.(css|scss|sass|less|svg|png|jpe?g|webp|gif)$/i.test(spec)) return {};
+      return require(alvo);
+    };
+    const fn = (0, eval)("(function (module, __req, __astroRuntime) {" + js + "\n})\n//# sourceURL=" + arquivo);
+    fn(mod, req, globalThis.__astroRuntime);
+    modAstro.set(arquivo, { mt, exports: mod.exports });
+    return mod.exports;
+  }
+
+  // A rota vem do nome do arquivo: / → src/pages/index.astro, /a → src/pages/a.astro
+  // ou src/pages/a/index.astro.
+  function paginaAstro(p) {
+    const base = path.join(state.root, "src", "pages");
+    if (!fs.existsSync(base)) return null;
+    const rel = p.replace(/^\/+|\/+$/g, "");
+    const nomes = rel === "" ? ["index.astro"] : [rel + ".astro", path.join(rel, "index.astro")];
+    for (const n of nomes) {
+      const f = path.join(base, n);
+      if (!f.startsWith(base)) continue;
+      if (fs.existsSync(f) && fs.statSync(f).isFile()) return f;
+    }
+    return null;
+  }
+
+  async function renderizaAstro(arquivo) {
+    const mod = carregaAstro(arquivo);
+    if (typeof mod.render !== "function") throw new Error(arquivo + " não exporta uma página");
+    const html = await mod.render({ props: {}, url: new URL("http://localhost/") }, {});
+    const head = importMap() + CLIENT;
+    return html.includes("</head>") ? html.replace("</head>", head + "</head>") : head + html;
+  }
+
   function send(res, status, type, body) { res.writeHead(status, { "content-type": type, "cache-control": "no-store", "access-control-allow-origin": "*" }); res.end(body); }
 
   async function handle(req, res) {
@@ -113,6 +161,9 @@
         if ([".ts", ".tsx", ".jsx", ".mts"].includes(ext)) { const b = await bundle(path.relative(state.root, f)); return send(res, 200, MIME[".js"], b.js); }
         return send(res, 200, MIME[ext] || "application/octet-stream", fs.readFileSync(f));
       }
+      // páginas de framework, antes do fallback: um projeto Astro não tem index.html
+      const pagina = paginaAstro(p);
+      if (pagina) return send(res, 200, MIME[".html"], await renderizaAstro(pagina));
       // SPA fallback
       const index = path.join(state.root, "index.html");
       if (!path.extname(p) && fs.existsSync(index)) return send(res, 200, MIME[".html"], html(index));

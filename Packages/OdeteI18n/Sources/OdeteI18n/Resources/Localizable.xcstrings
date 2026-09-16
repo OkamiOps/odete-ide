@@ -1625,6 +1625,202 @@
         }
       }
     },
+    "A conversa passou da janela de %1$@ fichas do modelo. Comece uma conversa nova.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The conversation outgrew the model's %1$@-token window. Start a new one."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das Gespräch hat das %1$@-Token-Fenster des Modells gesprengt. Beginne ein neues."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La conversation dépasse la fenêtre de %1$@ jetons du modèle. Commencez-en une nouvelle."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La conversación pasó de la ventana de %1$@ fichas del modelo. Empieza una nueva."
+          }
+        }
+      }
+    },
+    "A cota da nuvem privada da Apple acabou por enquanto.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple's private cloud quota is used up for now."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das Kontingent für Apples private Cloud ist vorerst aufgebraucht."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le quota du cloud privé d’Apple est épuisé pour l’instant."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La cuota de la nube privada de Apple se agotó por ahora."
+          }
+        }
+      }
+    },
+    "A cota da nuvem privada da Apple acabou. Ela renova em %1$@.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple's private cloud quota ran out. It resets on %1$@."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das Kontingent für Apples private Cloud ist aufgebraucht. Es wird am %1$@ zurückgesetzt."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le quota du cloud privé d’Apple est épuisé. Il se renouvelle le %1$@."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La cuota de la nube privada de Apple se acabó. Se renueva el %1$@."
+          }
+        }
+      }
+    },
+    "A nuvem privada da Apple ainda não está pronta. Tente daqui a pouco.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple's private cloud isn't ready yet. Try again shortly."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apples private Cloud ist noch nicht bereit. Versuche es gleich noch einmal."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le cloud privé d’Apple n’est pas encore prêt. Réessayez dans un instant."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La nube privada de Apple todavía no está lista. Prueba en un momento."
+          }
+        }
+      }
+    },
+    "A nuvem privada da Apple não está disponível agora.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple's private cloud isn't available right now."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apples private Cloud ist gerade nicht verfügbar."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le cloud privé d’Apple n’est pas disponible pour le moment."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La nube privada de Apple no está disponible ahora."
+          }
+        }
+      }
+    },
+    "A nuvem privada da Apple não respondeu. Tente de novo.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple's private cloud didn't answer. Try again."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apples private Cloud hat nicht geantwortet. Versuche es erneut."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le cloud privé d’Apple n’a pas répondu. Réessayez."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La nube privada de Apple no respondió. Prueba de nuevo."
+          }
+        }
+      }
+    },
+    "A nuvem privada da Apple pede iPadOS 27.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple's private cloud needs iPadOS 27."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apples private Cloud benötigt iPadOS 27."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "le cloud privé d’Apple demande iPadOS 27."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "la nube privada de Apple pide iPadOS 27."
+          }
+        }
+      }
+    },
     "A sessão da conta %1$@ expirou. Reconecte em Ajustes → Contas.": {
       "localizations": {
         "en": {
@@ -7417,6 +7613,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Este"
+          }
+        }
+      }
+    },
+    "Este aparelho não é elegível para a nuvem privada da Apple.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This device isn't eligible for Apple's private cloud."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dieses Gerät ist für Apples private Cloud nicht berechtigt."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cet appareil n’est pas éligible au cloud privé d’Apple."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este dispositivo no es elegible para la nube privada de Apple."
           }
         }
       }

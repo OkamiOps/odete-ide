@@ -4,25 +4,42 @@ import OdeteI18n
 
 /// O modelo de linguagem do sistema, no próprio aparelho.
 ///
-/// Com a SDK do iOS 26 o framework `FoundationModels` só expõe a apps de terceiros o
-/// modelo local, de cerca de três bilhões de parâmetros, com janela medida em tempo de
-/// execução: 4096 fichas contando entrada e saída. O modelo grande do Private Cloud
-/// Compute atende funcionalidades do sistema e não tem API pública aqui.
+/// O modelo local vem do sistema e muda com ele: a Apple troca a geração do modelo numa
+/// atualização de iPadOS e o app não recompila. Por isso **nenhum número aqui é fixo** —
+/// janela, orçamento de entrada e tamanho de resposta saem todos de `contextSize`, que o
+/// aparelho informa em tempo de execução. Quem chegar num aparelho com janela maior usa
+/// a janela maior sem trocar uma linha.
 ///
 /// Em troca: não precisa de conta, não precisa de rede e não sai nada do iPad.
 ///
-/// Para ligar a nuvem quando a SDK do iOS 27 estiver instalada: trocar `model: .default`
-/// por uma `PrivateCloudComputeLanguageModel` atrás de `if #available(iOS 27, *)`,
-/// oferecer os dois como modelos diferentes em `models()` com a janela de cada um, e
-/// pedir o entitlement `com.apple.developer.private-cloud-compute`, que a Apple aprova
-/// caso a caso. O resto desta implementação continua igual: a sessão é a mesma classe.
+/// A partir do iOS 27 existe um segundo nível: `PrivateCloudComputeLanguageModel`, o
+/// modelo grande da Apple rodando no Private Cloud Compute. É o mesmo `LanguageModelSession`
+/// — só muda o modelo que entra nela —, continua sem conta e sem chave, e tem cota, que
+/// aparece como erro com data de renovação. Os dois são oferecidos como modelos separados.
 public struct AppleProvider: Provider {
     public let kind: ProviderKind = .apple
-    /// A janela é de 4096 fichas contando entrada e saída. O orçamento de entrada é em
-    /// caracteres porque a contagem de fichas do framework só existe do iOS 26.4 em
-    /// diante; em português dá mais ou menos três caracteres e meio por ficha.
-    static let orcamentoDeEntrada = 8000
-    static let respostaMaxima = 900
+    /// Identificadores que aparecem em `models()` e chegam de volta em `TurnRequest.model`.
+    public static let idLocal = "apple-on-device"
+    public static let idNuvem = "apple-private-cloud"
+    /// Orçamento de entrada, em caracteres, derivado da janela que o aparelho informa.
+    ///
+    /// Estava fixo em 8000 — o que dava certo para a janela de 4096 fichas do modelo de
+    /// terceira geração da SDK 26 e **parava aí**. Quando a Apple troca o modelo por um
+    /// com janela maior, `contextSize` cresce sozinho e este número tinha que crescer
+    /// junto, senão a Odete continua mandando meia conversa para um modelo que aguentava
+    /// o dobro. Em caracteres e não em fichas porque a contagem de fichas do framework
+    /// só existe do iOS 26.4 em diante; em português dá uns três caracteres e meio por
+    /// ficha, e o desconto de 15% é a margem para essa conta ser aproximada.
+    static var orcamentoDeEntrada: Int {
+        let paraEntrada = max(1024, janela - respostaMaxima)
+        return Int(Double(paraEntrada) * 3.5 * 0.85)
+    }
+
+    /// A resposta também acompanha: um quarto da janela, com teto para a pessoa não
+    /// esperar três parágrafos quando pediu uma linha.
+    static var respostaMaxima: Int {
+        min(1500, max(400, janela / 4))
+    }
 
     public init() {}
 
@@ -60,24 +77,78 @@ public struct AppleProvider: Provider {
         return 4096
     }
 
+    /// A nuvem privada está disponível? Só do iOS 27 em diante, e só em aparelho que a
+    /// Apple considera elegível.
+    public static var nuvemDisponivel: Bool {
+        guard #available(iOS 27.0, *) else { return false }
+        return PrivateCloudComputeLanguageModel().isAvailable
+    }
+
+    /// Por que a nuvem não dá, quando não dá.
+    public static var impedimentoDaNuvem: String? {
+        guard #available(iOS 27.0, *) else {
+            return tr("A nuvem privada da Apple pede iPadOS 27.")
+        }
+        switch PrivateCloudComputeLanguageModel().availability {
+        case .available: return nil
+        case let .unavailable(motivo):
+            switch motivo {
+            case .deviceNotEligible:
+                return tr("Este aparelho não é elegível para a nuvem privada da Apple.")
+            case .systemNotReady:
+                return tr("A nuvem privada da Apple ainda não está pronta. Tente daqui a pouco.")
+            @unknown default:
+                return tr("A nuvem privada da Apple não está disponível agora.")
+            }
+        }
+    }
+
     public func models() async throws -> [ModelInfo] {
-        [ModelInfo(id: "apple-on-device", label: "Apple", efforts: nil, ctx: Self.janela)]
+        var out = [ModelInfo(id: Self.idLocal, label: "Apple · no aparelho", efforts: nil, ctx: Self.janela)]
+        if Self.nuvemDisponivel {
+            // A janela da nuvem não é publicada pelo framework; o que se sabe é que é
+            // bem maior que a local. Fica o número da sessão, que é o que limita aqui.
+            out.append(ModelInfo(
+                id: Self.idNuvem,
+                label: "Apple · nuvem privada",
+                efforts: nil,
+                ctx: Self.janelaDaNuvem
+            ))
+        }
+        return out
+    }
+
+    /// Orçamento de entrada da nuvem. Mais generoso que o local, e ainda assim um teto:
+    /// a cota da Apple é por uso, então mandar a conversa inteira a cada turno gasta à toa.
+    static let janelaDaNuvem = 32000
+
+    /// A sessão da rodada, com o modelo que o pedido escolheu.
+    static func sessao(_ turn: TurnRequest) -> LanguageModelSession {
+        if turn.model == idNuvem, #available(iOS 27.0, *), nuvemDisponivel {
+            return LanguageModelSession(
+                model: PrivateCloudComputeLanguageModel(),
+                instructions: Instructions(instrucoes(turn.system))
+            )
+        }
+        return LanguageModelSession(model: .default, instructions: instrucoes(turn.system))
     }
 
     public func stream(_ turn: TurnRequest) -> AsyncThrowingStream<StreamEvent, Error> {
         AsyncThrowingStream { cont in
             let tarefa = Task {
-                if let impedimento = Self.impedimento {
+                let naNuvem = turn.model == Self.idNuvem
+                if let impedimento = naNuvem ? Self.impedimentoDaNuvem : Self.impedimento {
                     cont.yield(.error(impedimento))
                     cont.finish()
                     return
                 }
                 do {
-                    let sessao = LanguageModelSession(
-                        model: .default,
-                        instructions: Self.instrucoes(turn.system)
+                    let sessao = Self.sessao(turn)
+                    let prompt = Self.prompt(
+                        turn.messages,
+                        orcamento: naNuvem ? Self.janelaDaNuvem : Self
+                            .orcamentoDeEntrada
                     )
-                    let prompt = Self.prompt(turn.messages)
                     var anterior = ""
                     let fluxo = sessao.streamResponse(
                         to: prompt,
@@ -99,6 +170,11 @@ public struct AppleProvider: Provider {
                     cont.yield(.error(Self.explicar(erro)))
                     cont.finish()
                 } catch {
+                    if let recado = Self.explicarNuvem(error) {
+                        cont.yield(.error(recado))
+                        cont.finish()
+                        return
+                    }
                     cont.yield(.error(error.localizedDescription))
                     cont.finish()
                 }
@@ -123,9 +199,13 @@ public struct AppleProvider: Provider {
     }
 
     /// Junta o histórico num prompt só, cortando o começo até caber na janela.
-    static func prompt(_ mensagens: [AgentMessage]) -> String {
+    /// O corte tem dois limites, e os dois precisam acompanhar a janela: o número de
+    /// mensagens e o tamanho em caracteres. Só mexer no segundo não adianta — o primeiro
+    /// amarra antes, e o modelo grande recebe a mesma conversinha do pequeno.
+    static func prompt(_ mensagens: [AgentMessage], orcamento: Int = orcamentoDeEntrada) -> String {
         var partes: [String] = []
-        for m in mensagens.suffix(20) {
+        let quantas = max(20, (orcamento / orcamentoDeEntrada) * 20)
+        for m in mensagens.suffix(quantas) {
             switch m.role {
             case .user: partes.append("Pessoa: " + m.content)
             case .assistant where !m.content.isEmpty: partes.append("Odete: " + m.content)
@@ -135,18 +215,38 @@ public struct AppleProvider: Provider {
         }
         while partes.count > 1 {
             let texto = partes.joined(separator: "\n\n")
-            if texto.count <= orcamentoDeEntrada {
+            if texto.count <= orcamento {
                 return texto
             }
             partes.removeFirst()
         }
-        return String((partes.first ?? "").suffix(orcamentoDeEntrada))
+        return String((partes.first ?? "").suffix(orcamento))
+    }
+
+    /// A cota da nuvem é por uso e vem com data de renovação: dizer "tente de novo" sem
+    /// dizer quando não ajuda ninguém.
+    static func explicarNuvem(_ erro: Error) -> String? {
+        guard #available(iOS 27.0, *) else { return nil }
+        switch erro {
+        case let cota as PrivateCloudComputeLanguageModel.Error.QuotaLimitReached:
+            if let quando = cota.resetDate {
+                let f = DateFormatter()
+                f.dateStyle = .short
+                f.timeStyle = .short
+                return tr("A cota da nuvem privada da Apple acabou. Ela renova em %1$@.", f.string(from: quando))
+            }
+            return tr("A cota da nuvem privada da Apple acabou por enquanto.")
+        case is PrivateCloudComputeLanguageModel.Error.ServiceUnavailable:
+            return tr("A nuvem privada da Apple não respondeu. Tente de novo.")
+        default:
+            return nil
+        }
     }
 
     static func explicar(_ erro: LanguageModelSession.GenerationError) -> String {
         switch erro {
         case .exceededContextWindowSize:
-            "A conversa passou da janela de \(janela) fichas do modelo local. Comece uma conversa nova."
+            tr("A conversa passou da janela de %1$@ fichas do modelo. Comece uma conversa nova.", "\(janela)")
         case .guardrailViolation:
             "O filtro de segurança da Apple barrou este pedido."
         case .unsupportedLanguageOrLocale:

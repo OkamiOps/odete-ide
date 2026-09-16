@@ -71,10 +71,10 @@
         contents: fs.readFileSync(args.path, "utf8"), loader: loaderFor(args.path), resolveDir: path.dirname(args.path),
       }));
       build.onLoad({ filter: /.*/, namespace: "file" }, (args) => {
-        if (opts.ilhas && /\.(tsx|jsx|ts|js|mjs)$/i.test(args.path)) {
+        if ((opts.ilhas || opts.acoes) && /\.(tsx|jsx|ts|js|mjs)$/i.test(args.path)) {
           const src = fs.readFileSync(args.path, "utf8");
-          if (/^\s*(["'])use client\1\s*;?/.test(src)) {
-            const rel = path.relative(root, args.path);
+          const rel = path.relative(root, args.path);
+          if (opts.ilhas && /^\s*(["'])use client\1\s*;?/.test(src)) {
             const nomes = exportadosDe(src);
             opts.ilhas[rel] = nomes;
             const linhas = [`import * as __real from ${JSON.stringify("odete-real:" + args.path)};`];
@@ -82,6 +82,33 @@
               const alvo = `__real[${JSON.stringify(n)}]`;
               const marca = `globalThis.__odeteIlha(${JSON.stringify(rel)}, ${JSON.stringify(n)}, ${alvo})`;
               linhas.push(n === "default" ? `export default ${marca};` : `export const ${n} = ${marca};`);
+            }
+            return { contents: linhas.join("\n"), loader: "js", resolveDir: path.dirname(args.path) };
+          }
+          // Fronteira de servidor: "use server" marca funções que só rodam aqui. No
+          // pacote do servidor elas continuam sendo elas mesmas, com uma identidade
+          // pendurada para o formulário poder dizer qual chamar; no pacote do navegador
+          // viram um talão que chama a de cá pela rede, porque o corpo delas não pode
+          // descer para o navegador.
+          if (opts.acoes && /^\s*(["'])use server\1\s*;?/.test(src)) {
+            const nomes = exportadosDe(src);
+            const linhas = [];
+            if (opts.acoes === "cliente") {
+              // O talão é escrito inteiro aqui, e não apoiado num global: um módulo ESM
+              // roda antes de quem o importa, então um global posto pela entrada ainda
+              // não existiria na hora em que este corpo é avaliado.
+              linhas.push(TALAO);
+              for (const n of nomes) {
+                const talao = `__odeteChama(${JSON.stringify(rel + "#" + n)})`;
+                linhas.push(n === "default" ? `export default ${talao};` : `export const ${n} = ${talao};`);
+              }
+            } else {
+              linhas.push(`import * as __real from ${JSON.stringify("odete-real:" + args.path)};`);
+              for (const n of nomes) {
+                const alvo = `__real[${JSON.stringify(n)}]`;
+                const marca = `globalThis.__odeteAcaoServidor(${JSON.stringify(rel)}, ${JSON.stringify(n)}, ${alvo})`;
+                linhas.push(n === "default" ? `export default ${marca};` : `export const ${n} = ${marca};`);
+              }
             }
             return { contents: linhas.join("\n"), loader: "js", resolveDir: path.dirname(args.path) };
           }
@@ -95,6 +122,33 @@
       };
     },
   });
+
+
+  // O talão que o navegador recebe no lugar de uma Server Action: a função de verdade
+  // fica no servidor, e daqui vai uma chamada pela rede com os argumentos em JSON.
+  const TALAO = `
+const __odeteSerializa = (v) => {
+  if (typeof FormData !== "undefined" && v instanceof FormData) {
+    const pares = [];
+    v.forEach((x, k) => { if (typeof x === "string") pares.push([k, x]); });
+    return { __odeteFormData: pares };
+  }
+  return v;
+};
+const __odeteChama = (id) => async (...args) => {
+  const r = await fetch("/@odete/acao/" + encodeURIComponent(id), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(args.map(__odeteSerializa)),
+  });
+  const t = await r.text();
+  let j = null;
+  try { j = JSON.parse(t); } catch (e) { throw new Error(t || ("acao " + id + " falhou")); }
+  if (!r.ok || j.erro) throw new Error(j && j.erro ? j.erro : "acao " + id + " falhou");
+  if (j.redireciona) { location.assign(j.redireciona); return undefined; }
+  return j.valor;
+};
+`;
 
   // Nomes exportados, para a ilha reexportar os mesmos. Cobre o que um componente de
   // cliente usa: `export default`, `export function X`, `export const X`.

@@ -316,8 +316,10 @@ Ehrlich benannt, denn eine README, die nur Erfolge auflistet, ist eine Broschür
 
 - `astro build` und `next build` laufen noch nicht — Astro und Next nur im Dev-Modus
 - Astro-Seiten werden gerendert; Islands mit Hydration, MDX und Content Collections nicht
-- Next-Seiten werden serverseitig gerendert; Interaktivität im Client, Server Actions,
-  Middleware und `next/font` fehlen noch
+- Next rendert serverseitig, hydriert `'use client'`-Komponenten und führt Middleware,
+  `next/font` und Server Actions aus. Es fehlt: `useActionState` zeigt den Anfangszustand,
+  bis die Island hydriert (`renderToString` nimmt den Postback nicht entgegen), Datei-Uploads
+  per Formular-Action und `'use server'` in der Komponente statt am Dateianfang
 - Kein SourceKit, also keine Swift-Autovervollständigung; `GeometryReader` und `Canvas` sind nicht in der Preview-Teilmenge
 - Die Vervollständigung lässt sich nicht mit Pfeiltasten durchgehen — Tab/Enter nimmt den ersten Eintrag, oder antippen
 - Zwei Agenten parallel, MCP und Sprachsteuerung sind nicht gebaut

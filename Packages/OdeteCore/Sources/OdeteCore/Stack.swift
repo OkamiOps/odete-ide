@@ -87,6 +87,9 @@ public struct Stack: Hashable, Sendable {
             \(comum)
             Rotas em `app/` (App Router) ou `pages/`, conforme o que o projeto já usa —
             olhe antes de criar. Estáticos em `public/`. Não crie `index.html` na raiz.
+            O Preview renderiza no servidor e hidrata componente marcado com
+            `'use client'`; `middleware.ts`, `next/font` e Server Actions com
+            `'use server'` no topo do arquivo funcionam. `next build` ainda não roda.
             """
         case "remix", "tanstack-start":
             return """

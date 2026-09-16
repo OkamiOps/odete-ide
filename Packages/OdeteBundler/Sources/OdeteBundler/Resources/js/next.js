@@ -445,10 +445,114 @@
     };
   }
 
+
+  // ---- Server Actions ----
+  // Um módulo que começa com "use server" exporta funções que só rodam aqui. O que o
+  // React precisa para ligar um `<form action={fn}>` a uma delas é `$$FORM_ACTION`: ele
+  // chama isso no render e escreve no formulário para onde postar e que campos ocultos
+  // mandar. O formulário então funciona sem JavaScript nenhum, que é o comportamento
+  // que o Next chama de progressive enhancement.
+  const acoes = { registro: new Map(), rota: "/" };
+
+  // O `data` do `$$FORM_ACTION` é um FormData do ponto de vista do React: ele percorre
+  // com forEach e o `useActionState` acrescenta a própria chave com append.
+  class Campos {
+    constructor(pares) { this.pares = pares ? pares.slice() : []; }
+    append(k, v) { this.pares.push([String(k), String(v)]); return this; }
+    forEach(f, t) { for (const [k, v] of this.pares) f.call(t, v, k, this); }
+  }
+
+  function embrulhaAcao(id, fn, ligados) {
+    const acao = function () {
+      return fn.apply(null, ligados.concat(Array.prototype.slice.call(arguments)));
+    };
+    acao.$$id = id;
+    acao.$$FORM_ACTION = function () {
+      const dados = new Campos([[CAMPO, id]]);
+      if (ligados.length) {
+        // `bind` sem serializar viraria argumento perdido no caminho até aqui.
+        try { dados.append(CAMPO_LIGADOS, JSON.stringify(ligados)); } catch (e) { /* fica de fora */ }
+      }
+      return {
+        action: acoes.rota,
+        method: "POST",
+        encType: "application/x-www-form-urlencoded",
+        data: dados,
+      };
+    };
+    // `useActionState` faz `action.bind(null, estadoInicial)`, e o `bind` de série não
+    // leva as propriedades junto — sem este, o React desiste e cai no talão que só
+    // funciona depois de hidratar.
+    acao.bind = function () {
+      const extra = Array.prototype.slice.call(arguments, 1);
+      return embrulhaAcao(id, fn, ligados.concat(extra));
+    };
+    return acao;
+  }
+
+  const CAMPO = "$odete_acao";
+  const CAMPO_LIGADOS = "$odete_ligados";
+
+  function instalaAcoes() {
+    raiz.__odeteAcaoServidor = function (modulo, exportado, fn) {
+      if (typeof fn !== "function") return fn;
+      const id = modulo + "#" + exportado;
+      acoes.registro.set(id, fn);
+      return embrulhaAcao(id, fn, []);
+    };
+  }
+
+  function rotaDasAcoes(p) { acoes.rota = p; }
+
+  function acaoPorId(id) { return acoes.registro.get(id) || null; }
+
+  // `redirect()` e `notFound()` do Next funcionam lançando: quem chama não segue adiante.
+  const REDIR = "__odeteRedirect", NAOACHOU = "__odeteNotFound";
+
+  function moduloNavegacao() {
+    const lanca = (url, status) => {
+      const e = new Error("NEXT_REDIRECT");
+      e[REDIR] = String(url); e.status = status;
+      throw e;
+    };
+    return {
+      __esModule: true,
+      redirect: (url) => lanca(url, 307),
+      permanentRedirect: (url) => lanca(url, 308),
+      notFound: () => { const e = new Error("NEXT_NOT_FOUND"); e[NAOACHOU] = true; throw e; },
+      RedirectType: { push: "push", replace: "replace" },
+      usePathname: () => acoes.rota,
+      useSearchParams: () => new URLSearchParams(),
+      useRouter: () => ({
+        push: () => {}, replace: () => {}, back: () => {}, forward: () => {},
+        refresh: () => {}, prefetch: () => {},
+      }),
+      useParams: () => ({}),
+    };
+  }
+
+  // O Preview re-renderiza a cada requisição: não há cache para invalidar.
+  function moduloCache() {
+    return {
+      __esModule: true,
+      revalidatePath: () => {}, revalidateTag: () => {},
+      unstable_cache: (fn) => fn, unstable_noStore: () => {},
+    };
+  }
+
+  function leErroDeNavegacao(e) {
+    if (!e || typeof e !== "object") return null;
+    if (e[REDIR]) return { acao: "redireciona", destino: e[REDIR], status: e.status || 307 };
+    if (e[NAOACHOU]) return { acao: "naoachou" };
+    return null;
+  }
+
   raiz.__next = {
     rota, renderiza, resolveServidor, instalaIlhas,
     moduloFonteGoogle, moduloFonteLocal, cabecalhoDeFontes,
     moduloNextServer, pedidoNext, casaMatcher, leResposta, regexDoMatcher,
+    instalaAcoes, rotaDasAcoes, acaoPorId, moduloNavegacao, moduloCache,
+    leErroDeNavegacao, CAMPO, CAMPO_LIGADOS,
   };
   if (typeof module !== "undefined" && module.exports) module.exports = raiz.__next;
 })(typeof globalThis !== "undefined" ? globalThis : this);

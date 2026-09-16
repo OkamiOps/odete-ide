@@ -124,7 +124,7 @@
       root: state.root, entries: [path.relative(state.root, arquivo)],
       format: "cjs", platform: "node", dev: true, outdir: "__odete_next",
       external: ["react", "react-dom", "react/jsx-runtime", "react/jsx-dev-runtime", "next/*"],
-      ilhas: ilhasDoBuild,
+      ilhas: ilhasDoBuild, acoes: "servidor",
     });
     if (!r.ok) throw new Error((r.errors[0] && r.errors[0].text) || "build da página falhou");
     const saida = r.files.find((f) => f.path.endsWith(".js"));
@@ -158,7 +158,7 @@
     const virtual = `${importa}\nexport const MODULOS = {\n${mapa}\n};\n`;
     const r = await globalThis.__build({
       root: state.root, entries: ["__odete_ilhas_entrada.js"], format: "esm", platform: "browser",
-      dev: true, outdir: "__odete_ilhas", externalMissing: true,
+      dev: true, outdir: "__odete_ilhas", externalMissing: true, acoes: "cliente",
       virtuais: {
         "__odete_ilhas_entrada.js": globalThis.__ilhasClienteJS,
         "virtual:odete-ilhas": virtual,
@@ -174,6 +174,8 @@
   function substitutoNext(spec, React) {
     const nome = spec.slice("next/".length);
     if (nome === "server") return globalThis.__next.moduloNextServer();
+    if (nome === "navigation") return globalThis.__next.moduloNavegacao();
+    if (nome === "cache") return globalThis.__next.moduloCache();
     if (nome === "font/google") return globalThis.__next.moduloFonteGoogle();
     if (nome === "font/local") return globalThis.__next.moduloFonteLocal();
     if (nome === "link") {
@@ -280,6 +282,80 @@
     res.end(r.corpo == null ? "" : r.corpo);
   }
 
+  // ---- Server Actions ----
+  function corpoDoPedido(req) {
+    return new Promise((resolve) => {
+      const partes = [];
+      req.on("data", (c) => partes.push(Buffer.from(c)));
+      req.on("end", () => resolve(Buffer.concat(partes).toString("utf8")));
+      req.on("error", () => resolve(""));
+      req.resume();
+    });
+  }
+
+  // O formulário chega urlencoded, e o `<input type="file">` não atravessa isso. Quem
+  // precisa de arquivo hoje usa fetch da ilha, que vai em JSON.
+  function camposDoCorpo(texto) {
+    const mapa = new Map();
+    for (const parte of String(texto).split("&")) {
+      if (!parte) continue;
+      const i = parte.indexOf("=");
+      const k = decodeURIComponent((i < 0 ? parte : parte.slice(0, i)).replace(/\+/g, " "));
+      const v = i < 0 ? "" : decodeURIComponent(parte.slice(i + 1).replace(/\+/g, " "));
+      if (mapa.has(k)) mapa.get(k).push(v); else mapa.set(k, [v]);
+    }
+    return camposDeMapa(mapa);
+  }
+
+  function camposDeMapa(mapa) {
+    return {
+      get: (k) => (mapa.has(k) ? mapa.get(k)[0] : null),
+      getAll: (k) => (mapa.get(k) || []).slice(),
+      has: (k) => mapa.has(k),
+      forEach: (f, t) => { for (const [k, vs] of mapa) for (const v of vs) f.call(t, v, k); },
+      entries: function* () { for (const [k, vs] of mapa) for (const v of vs) yield [k, v]; },
+      keys: () => mapa.keys(),
+      append: () => {},
+      set: () => {},
+      delete: () => {},
+    };
+  }
+
+  // FormData não atravessa JSON: a ilha manda os pares e aqui vira de novo algo que a
+  // ação lê com `.get(...)`, que é como toda Server Action recebe um formulário.
+  function argumentoDaIlha(v) {
+    if (!v || typeof v !== "object" || !Array.isArray(v.__odeteFormData)) return v;
+    const mapa = new Map();
+    for (const [k, x] of v.__odeteFormData) {
+      if (mapa.has(k)) mapa.get(k).push(String(x)); else mapa.set(k, [String(x)]);
+    }
+    return camposDeMapa(mapa);
+  }
+
+  // A ação pode estar num módulo que esta execução ainda não carregou (o navegador
+  // guardou a página e o servidor reiniciou). O id diz o arquivo: carrega e procura.
+  async function achaAcao(id) {
+    let fn = globalThis.__next.acaoPorId(id);
+    if (fn) return fn;
+    const arquivo = path.join(state.root, id.split("#")[0]);
+    if (!arquivo.startsWith(state.root) || !fs.existsSync(arquivo)) return null;
+    await carregaNext(arquivo);
+    return globalThis.__next.acaoPorId(id);
+  }
+
+  async function rodaAcao(id, args) {
+    const fn = await achaAcao(id);
+    if (!fn) return { erro: "ação desconhecida: " + id };
+    try {
+      return { valor: await fn.apply(null, args) };
+    } catch (e) {
+      const nav = globalThis.__next.leErroDeNavegacao(e);
+      if (nav && nav.acao === "redireciona") return { redireciona: nav.destino, status: nav.status };
+      if (nav) return { naoachou: true };
+      return { erro: String((e && e.message) || e) };
+    }
+  }
+
   function faltaReact(e) {
     return /Cannot find module '(react|react-dom)/.test(String(e && e.message));
   }
@@ -384,9 +460,44 @@
         const js = await pacoteDeIlhas(rota);
         return send(res, 200, MIME[".js"], js);
       }
+      // A ilha chama a ação pela rede, em JSON, e recebe o valor de volta.
+      if (p.startsWith("/@odete/acao/") && req.method === "POST") {
+        const id = decodeURIComponent(p.slice("/@odete/acao/".length));
+        let args = [];
+        try { args = JSON.parse(await corpoDoPedido(req)) || []; } catch (e) { args = []; }
+        const r = await rodaAcao(id, (Array.isArray(args) ? args : [args]).map(argumentoDaIlha));
+        return send(res, r.erro ? 500 : 200, "application/json", JSON.stringify(r));
+      }
+
       const rotaNext = globalThis.__next && globalThis.__next.rota(fs, path, state.root, p);
       if (rotaNext) {
         try {
+          globalThis.__next.instalaAcoes();
+          globalThis.__next.rotaDasAcoes(p);
+
+          // `<form action={acaoDeServidor}>` posta para a própria rota, com a
+          // identidade da ação num campo oculto que o React escreveu no render. Roda a
+          // ação antes e devolve a página já com o efeito dela.
+          if (req.method === "POST") {
+            const campos = camposDoCorpo(await corpoDoPedido(req));
+            const id = campos.get(globalThis.__next.CAMPO);
+            if (id) {
+              let ligados = [];
+              const bruto = campos.get(globalThis.__next.CAMPO_LIGADOS);
+              if (bruto) { try { ligados = JSON.parse(bruto) || []; } catch (e) { ligados = []; } }
+              const r = await rodaAcao(id, ligados.concat([campos]));
+              // 303 e não o 307 do `redirect()`: 307 e 308 preservam o método, e o
+              // navegador postaria o mesmo formulário no destino — a ação rodaria de
+              // novo, em laço. Depois de um POST o que se quer é um GET no destino.
+              if (r.redireciona) {
+                return send(res, 303, "text/plain; charset=utf-8", "",
+                  (extras || []).concat([["location", r.redireciona]]));
+              }
+              if (r.naoachou) return send(res, 404, "text/plain; charset=utf-8", recado404(p), extras);
+              if (r.erro) return send(res, 500, "text/plain; charset=utf-8", r.erro, extras);
+            }
+          }
+
           const usadas = new Set();
           globalThis.__next.instalaIlhas(contextoNext().React, usadas);
           const corpo = await globalThis.__next.renderiza(contextoNext(), rotaNext, url);
@@ -399,6 +510,13 @@
             "</head><body>" + corpo + hidrata + "</body></html>";
           return send(res, 200, MIME[".html"], doc, extras);
         } catch (e) {
+          // `redirect()` e `notFound()` do Next chegam aqui lançados, de dentro do render.
+          const nav = globalThis.__next.leErroDeNavegacao(e);
+          if (nav && nav.acao === "redireciona") {
+            return send(res, nav.status, "text/plain; charset=utf-8", "",
+              (extras || []).concat([["location", nav.destino]]));
+          }
+          if (nav) return send(res, 404, "text/plain; charset=utf-8", recado404(p), extras);
           if (faltaReact(e)) {
             return send(res, 500, "text/plain; charset=utf-8",
               "O projeto é Next mas react e react-dom não estão instalados.\nRode npm install no terminal.");

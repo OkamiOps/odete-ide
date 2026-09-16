@@ -312,8 +312,10 @@ Stated plainly, because a README that only lists wins is a brochure:
 
 - `astro build` and `next build` don't run yet — Astro and Next are dev-mode only
 - Astro pages render, but islands with hydration, MDX and content collections don't
-- Next pages render on the server; client interactivity, Server Actions, middleware and
-  `next/font` are not wired yet
+- Next renders on the server, hydrates `'use client'` components, and runs middleware,
+  `next/font` and Server Actions. What's missing: `useActionState` shows its initial state
+  until the island hydrates (`renderToString` can't receive the postback), file uploads in
+  a form action, and `'use server'` written inside a component instead of at the top of a file
 - No SourceKit, so no Swift autocomplete; `GeometryReader` and `Canvas` aren't in the preview subset
 - Completion doesn't navigate with arrow keys — Tab/Enter takes the first item, or tap
 - Two agents in parallel, MCP and voice are not built

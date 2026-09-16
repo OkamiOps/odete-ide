@@ -19,6 +19,18 @@ ORIG = RAIZ / 'docs/store/origem'
 # iPad 13" em paisagem, a medida que o App Store Connect aceita
 LARG, ALT = 2752, 2064
 
+# O iPhone entra no mesmo molde, em retrato. O App Store Connect exige as duas famílias
+# quando o app declara iPhone e iPad, e 1284×2778 é uma das medidas que ele aceita no
+# lugar de 6,5". O print do iPhone já sai em pé do simulador, então não gira.
+FORMATOS = {
+    'ipad':   {'larg': 2752, 'alt': 2064, 'origem': 'docs/store/origem', 'gira': True,
+               'titulo': 104, 'apoio': 52, 'largura_aparelho': 0.72, 'topo_texto': 150,
+               'espaco': 46, 'reserva': 430, 'redige_conta': True},
+    'iphone': {'larg': 1284, 'alt': 2778, 'origem': 'docs/store/origem-iphone', 'gira': False,
+               'titulo': 68, 'apoio': 34, 'largura_aparelho': 0.78, 'topo_texto': 110,
+               'espaco': 30, 'reserva': 300, 'redige_conta': False},
+}
+
 # tema Odete, o mesmo hex do ThemePalette
 FUNDO = (8, 8, 10)
 BRASA = (255, 106, 0)
@@ -38,18 +50,26 @@ def fonte(nome: str, tam: int) -> ImageFont.FreeTypeFont:
 PLACA = RAIZ / 'docs/store/fundo.png'
 
 
-def fundo() -> Image.Image:
+def cobre(im: Image.Image, larg: int, alt: int) -> Image.Image:
+    """Redimensiona cobrindo a moldura e corta o excesso pelo centro."""
+    escala = max(larg / im.width, alt / im.height)
+    m = im.resize((round(im.width * escala), round(im.height * escala)), Image.LANCZOS)
+    x, y = (m.width - larg) // 2, (m.height - alt) // 2
+    return m.crop((x, y, x + larg, y + alt))
+
+
+def fundo(larg: int = LARG, alt: int = ALT) -> Image.Image:
     if PLACA.exists():
-        return Image.open(PLACA).convert('RGB')
+        return cobre(Image.open(PLACA).convert('RGB'), larg, alt)
     # Sem a placa, o degradê desenhado à mão — mesma paleta, menos atmosfera.
-    im = Image.new('RGB', (LARG, ALT), FUNDO)
-    halo = Image.new('RGB', (LARG // 8, ALT // 8), FUNDO)
+    im = Image.new('RGB', (larg, alt), FUNDO)
+    halo = Image.new('RGB', (larg // 8, alt // 8), FUNDO)
     d = ImageDraw.Draw(halo)
     w, h = halo.size
     d.ellipse((-w * 0.15, -h * 0.35, w * 0.55, h * 0.45), fill=(58, 24, 6))
     d.ellipse((w * 0.6, h * 0.55, w * 1.25, h * 1.4), fill=(6, 34, 40))
     halo = halo.filter(ImageFilter.GaussianBlur(w // 12))
-    return Image.blend(im, halo.resize((LARG, ALT), Image.LANCZOS), 0.9)
+    return Image.blend(im, halo.resize((larg, alt), Image.LANCZOS), 0.9)
 
 
 def moldura(print_: Image.Image, larg: int) -> Image.Image:
@@ -81,9 +101,9 @@ def sombra(im: Image.Image, desfoque: int = 48, desce: int = 40) -> Image.Image:
     return s.filter(ImageFilter.GaussianBlur(desfoque))
 
 
-def texto_centrado(d, y, txt, f, cor):
+def texto_centrado(d, y, txt, f, cor, larg=LARG):
     x0, y0, x1, y1 = d.textbbox((0, 0), txt, font=f)
-    d.text(((LARG - (x1 - x0)) / 2 - x0, y), txt, font=f, fill=cor)
+    d.text(((larg - (x1 - x0)) / 2 - x0, y), txt, font=f, fill=cor)
     return y1 - y0
 
 
@@ -146,20 +166,28 @@ def sem_conta(print_: Image.Image) -> Image.Image:
     return print_
 
 
-def compoe(origem: str, titulo: str, apoio: str, saida: pathlib.Path) -> None:
-    im = fundo()
+def compoe(origem: str, titulo: str, apoio: str, saida: pathlib.Path, fmt: dict) -> None:
+    larg, alt = fmt['larg'], fmt['alt']
+    im = fundo(larg, alt)
     d = ImageDraw.Draw(im)
 
-    h = texto_centrado(im and d, 150, titulo, fonte('IBMPlexSans-SemiBold.ttf', 104), CLARO)
-    texto_centrado(d, 150 + h + 46, apoio, fonte('IBMPlexSans-Regular.ttf', 52), MUDO)
+    topo_texto = fmt['topo_texto']
+    h = texto_centrado(d, topo_texto, titulo, fonte('IBMPlexSans-SemiBold.ttf', fmt['titulo']),
+                       CLARO, larg)
+    texto_centrado(d, topo_texto + h + fmt['espaco'], apoio,
+                   fonte('IBMPlexSans-Regular.ttf', fmt['apoio']), MUDO, larg)
 
-    print_ = sem_conta(Image.open(ORIG / origem).convert('RGB').rotate(-90, expand=True))
-    apar = moldura(print_, round(LARG * 0.72))
+    print_ = Image.open(RAIZ / fmt['origem'] / origem).convert('RGB')
+    if fmt['gira']:
+        print_ = print_.rotate(-90, expand=True)
+    if fmt['redige_conta']:
+        print_ = sem_conta(print_)
+    apar = moldura(print_, round(larg * fmt['largura_aparelho']))
     som = sombra(apar)
     # centrado no espaço que sobra abaixo do texto, com folga igual em cima e embaixo
-    topo = 430 + (ALT - 430 - apar.height) // 2
-    im.paste(som, ((LARG - som.width) // 2, topo - 96), som)
-    im.paste(apar, ((LARG - apar.width) // 2, topo), apar)
+    topo = fmt['reserva'] + (alt - fmt['reserva'] - apar.height) // 2
+    im.paste(som, ((larg - som.width) // 2, topo - 96), som)
+    im.paste(apar, ((larg - apar.width) // 2, topo), apar)
 
     im.save(saida, optimize=True)
     print(f'{saida.name}  {im.size[0]}×{im.size[1]}')
@@ -185,8 +213,24 @@ CENAS = [
      'Screens, terminal, git and the agent. Switch without reopening.'),
 ]
 
+CENAS_IPHONE = [
+    ('edit.png', 'The editor, in your pocket',
+     'tree-sitter, git marks, completion.'),
+    ('git.png', 'Git, the real one',
+     'Commit, branch, push. libgit2 on the device.'),
+    ('arvore.png', 'Your project, your files',
+     'In the Files app. No account needed.'),
+    ('agent.png', 'An agent that asks first',
+     'Every edit is a patch you accept or reject.'),
+    ('settings.png', 'Eleven themes, five languages',
+     'It follows your iPhone, and changes instantly.'),
+]
+
 if __name__ == '__main__':
-    dst = pathlib.Path(sys.argv[1])
+    qual = 'iphone' if '--iphone' in sys.argv else 'ipad'
+    dst = pathlib.Path([a for a in sys.argv[1:] if not a.startswith('--')][0])
     dst.mkdir(parents=True, exist_ok=True)
-    for i, (origem, titulo, apoio) in enumerate(CENAS, 1):
-        compoe(origem, titulo, apoio, dst / f'{i:02d}-{origem[:-4]}.png')
+    fmt = FORMATOS[qual]
+    cenas = CENAS_IPHONE if qual == 'iphone' else CENAS
+    for i, (origem, titulo, apoio) in enumerate(cenas, 1):
+        compoe(origem, titulo, apoio, dst / f'{i:02d}-{origem[:-4]}.png', fmt)

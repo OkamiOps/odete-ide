@@ -2,16 +2,14 @@ import XCTest
 
 /// Tocar na conta no topo do painel do agente tem que abrir a lista.
 ///
-/// Já falhou de dois jeitos, e os dois só aparecem com o app na tela. Primeiro o popover
-/// abria com altura zero, porque um `ScrollView` não tem tamanho próprio. Depois, com a
-/// medida no lugar, ele voltou a abrir como uma **linha atravessada na tela**: o tamanho
-/// de classe lido de dentro do popover responde `.compact` mesmo no iPad — quem está
-/// sendo medido é o popover, que é estreito, e não a tela — e o iPad caía no caminho do
-/// iPhone, sem largura e sem altura.
+/// Já falhou três vezes, sempre do mesmo jeito visto de fora: uma linha atravessada na
+/// tela, com a setinha do popover e nada para tocar. As causas foram diferentes a cada
+/// vez — o `ScrollView` sem tamanho próprio, o tamanho de classe lido de dentro do próprio
+/// popover, o espaço acima do botão — e é por isso que a lista deixou de ser popover.
 ///
-/// Por isso o teste não pergunta só se existe: pergunta o tamanho. Uma linha de 1 pt de
-/// altura, ou um conteúdo de 900 pt de largura dentro de um popover de 280, são as duas
-/// formas que esse bug já teve.
+/// Por isso o teste não pergunta se o botão existe: pergunta o tamanho e o lugar do que
+/// abriu. Altura de 1 pt e conteúdo espalhado de ponta a ponta da tela são as formas que
+/// esse bug já teve, e a checagem antiga passava por cima das duas.
 final class ContasNoPainelTests: XCTestCase {
     func botao(_ app: XCUIApplication, _ pt: String, _ en: String) -> XCUIElement {
         for rotulo in [pt, en] {
@@ -77,13 +75,12 @@ final class ContasNoPainelTests: XCTestCase {
             janela.insetBy(dx: -1, dy: -1).contains(r),
             "a lista abriu fora da tela: \(r) numa janela de \(janela)"
         )
-        // No iPad o popover tem 280 pt. Espalhar-se pela tela é o sinal de que o conteúdo
-        // caiu no caminho do iPhone, que é `maxWidth: .infinity`.
+        // Numa tela larga a folha é um cartão no meio, não a tela inteira. Ocupar tudo é
+        // sinal de que a apresentação se perdeu.
         if janela.width > 1000 {
             XCTAssertLessThan(
-                r.width, 340,
-                "o conteúdo esticou para \(Int(r.width)) pt numa tela de \(Int(janela.width)): "
-                    + "o popover está se achando estreito"
+                r.width, janela.width - 120,
+                "o conteúdo esticou para \(Int(r.width)) pt numa tela de \(Int(janela.width))"
             )
         }
     }

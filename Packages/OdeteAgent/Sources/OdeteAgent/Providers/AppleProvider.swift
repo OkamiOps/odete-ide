@@ -1,6 +1,7 @@
 import Foundation
 import FoundationModels
 import OdeteI18n
+import Synchronization
 
 /// O modelo de linguagem do sistema, no próprio aparelho.
 ///
@@ -122,15 +123,56 @@ public struct AppleProvider: Provider {
     /// a cota da Apple é por uso, então mandar a conversa inteira a cada turno gasta à toa.
     static let janelaDaNuvem = 32000
 
+    /// Fecha a rodada. O que o modelo pediu sai como `.tools`; quem executa é o laço do
+    /// agente, que é onde mora a confirmação e a revisão do patch.
+    static func encerra(_ cont: AsyncThrowingStream<StreamEvent, Error>.Continuation, _ pedidos: [ToolCall]) {
+        if !pedidos.isEmpty {
+            cont.yield(.tools(pedidos))
+        }
+        cont.yield(.usage(TokenUse(input: 0, output: 0)))
+        cont.finish()
+    }
+
+    /// As ferramentas que cabem no modelo local.
+    ///
+    /// Toda ferramenta ocupa lugar na janela: nome, descrição e schema entram nas
+    /// instruções antes de qualquer conversa. Numa janela de poucos milhares de fichas,
+    /// oferecer as sete é gastar metade do orçamento explicando ferramenta que não vai
+    /// ser usada. Ficam as que fazem o trabalho de editar código; `github`, que tem a
+    /// descrição mais longa de todas, fica de fora do modelo local.
+    static let enxutas: Set<String> = ["read_file", "str_replace", "write_file", "list_dir", "grep", "run_shell"]
+
+    static func ferramentas(
+        _ turn: TurnRequest,
+        anotar: @escaping @Sendable (String, String) -> Void
+    ) -> [any Tool] {
+        let naNuvem = turn.model == idNuvem
+        return turn.tools.compactMap { spec in
+            guard naNuvem || enxutas.contains(spec.name) else { return nil }
+            guard let esquema = try? EsquemaApple.esquema(de: spec) else { return nil }
+            return FerramentaDaOdete(
+                name: spec.name,
+                description: spec.description,
+                parameters: esquema,
+                anotar: anotar
+            )
+        }
+    }
+
     /// A sessão da rodada, com o modelo que o pedido escolheu.
-    static func sessao(_ turn: TurnRequest) -> LanguageModelSession {
+    static func sessao(_ turn: TurnRequest, ferramentas: [any Tool]) -> LanguageModelSession {
         if turn.model == idNuvem, #available(iOS 27.0, *), nuvemDisponivel {
             return LanguageModelSession(
                 model: PrivateCloudComputeLanguageModel(),
-                instructions: Instructions(instrucoes(turn.system))
+                tools: ferramentas,
+                instructions: Instructions(instrucoes(turn.system, comFerramentas: !ferramentas.isEmpty))
             )
         }
-        return LanguageModelSession(model: .default, instructions: instrucoes(turn.system))
+        return LanguageModelSession(
+            model: .default,
+            tools: ferramentas,
+            instructions: instrucoes(turn.system, comFerramentas: !ferramentas.isEmpty)
+        )
     }
 
     public func stream(_ turn: TurnRequest) -> AsyncThrowingStream<StreamEvent, Error> {
@@ -142,8 +184,18 @@ public struct AppleProvider: Provider {
                     cont.finish()
                     return
                 }
+                let pedidos = Mutex<[ToolCall]>([])
                 do {
-                    let sessao = Self.sessao(turn)
+                    let ferramentas = Self.ferramentas(turn) { nome, argumentos in
+                        pedidos.withLock {
+                            $0.append(ToolCall(
+                                id: "apple-\($0.count)-\(UUID().uuidString.prefix(8))",
+                                name: nome,
+                                arguments: argumentos
+                            ))
+                        }
+                    }
+                    let sessao = Self.sessao(turn, ferramentas: ferramentas)
                     let prompt = Self.prompt(
                         turn.messages,
                         orcamento: naNuvem ? Self.janelaDaNuvem : Self
@@ -164,12 +216,24 @@ public struct AppleProvider: Provider {
                             anterior = texto
                         }
                     }
-                    cont.yield(.usage(TokenUse(input: 0, output: 0)))
-                    cont.finish()
+                    Self.encerra(cont, pedidos.withLock { $0 })
                 } catch let erro as LanguageModelSession.GenerationError {
+                    // É por aqui que o pedido de ferramenta chega: a ferramenta anota e
+                    // lança, e o framework embrulha isso num erro de geração. Com pedido
+                    // anotado não houve falha nenhuma — o turno só acabou mais cedo.
+                    let anotados = pedidos.withLock { $0 }
+                    guard anotados.isEmpty else {
+                        Self.encerra(cont, anotados)
+                        return
+                    }
                     cont.yield(.error(Self.explicar(erro)))
                     cont.finish()
                 } catch {
+                    let anotados = pedidos.withLock { $0 }
+                    guard anotados.isEmpty else {
+                        Self.encerra(cont, anotados)
+                        return
+                    }
                     if let recado = Self.explicarNuvem(error) {
                         cont.yield(.error(recado))
                         cont.finish()
@@ -184,33 +248,95 @@ public struct AppleProvider: Provider {
     }
 
     /// As instruções do agente completo não cabem aqui. Fica o essencial.
-    static func instrucoes(_ sistema: String) -> String {
-        let projeto = sistema
-            .split(separator: "\n")
-            .first { $0.lowercased().contains("projeto") }
-            .map(String.init) ?? ""
+    ///
+    /// O que entra é escrito para este modelo, e não recortado do prompt grande. A versão
+    /// antiga pescava do sistema a primeira linha que falasse em "projeto" e colava aqui;
+    /// como essa linha é `O projeto é uma pasta real no dispositivo. A lista de caminhos
+    /// vem no sistema; o conteúdo só entra se VOCÊ chamar read_file`, o modelo pequeno
+    /// devolvia isso parafraseado na cara de quem perguntou. Entranha do sistema não é
+    /// resposta.
+    static func instrucoes(_ sistema: String, comFerramentas: Bool) -> String {
+        let arquivos = Self.arquivosDoSistema(sistema)
+        let comoAgir = comFerramentas
+            ? """
+            Você mexe no projeto de verdade, pelas ferramentas. Leia antes de escrever e
+            prefira str_replace a write_file. Peça uma ferramenta por vez: o resultado
+            chega na mensagem seguinte e aí você continua. Não sabe o caminho? list_dir
+            ou grep. Nunca responda que não consegue editar — se falta informação, vá
+            buscar.
+            """
+            : """
+            Nesta rodada você está sem ferramentas: responda com o que dá para responder
+            e diga, em uma frase, o que precisaria abrir para ir além.
+            """
         return """
         Você é a Odete, assistente de programação dentro de um editor no iPad.
         Responda em \(Texto.idioma.paraOModelo), com objetividade, em no máximo dois parágrafos
         curtos ou uma lista curta. Use markdown. Quando não souber, diga que não sabe.
-        Você não edita arquivos nem roda comandos: para isso a pessoa precisa de uma
-        conta de IA com ferramentas. \(projeto)
+        \(comoAgir)\(arquivos)
         """
+    }
+
+    /// Os primeiros caminhos do projeto, para o modelo não gastar uma rodada de `list_dir`
+    /// só para descobrir que existe um `src/`.
+    ///
+    /// O prompt grande manda até 400 caminhos; aqui cabem poucos, e poucos já resolvem o
+    /// caso comum — quem quiser o resto pede `list_dir`. O corte é por quantidade e não
+    /// por caractere para a lista nunca terminar no meio de um caminho.
+    static let quantosArquivos = 40
+
+    static func arquivosDoSistema(_ sistema: String) -> String {
+        guard let faixa = sistema.range(of: "Arquivos no projeto:\n") else { return "" }
+        // As seções do prompt grande são separadas por linha em branco, então é a linha
+        // em branco que marca o fim da lista.
+        let caminhos = sistema[faixa.upperBound...]
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .prefix { !$0.isEmpty }
+            .prefix(quantosArquivos)
+        if caminhos.isEmpty {
+            return ""
+        }
+        return "\n\nArquivos do projeto:\n" + caminhos.joined(separator: "\n")
     }
 
     /// Junta o histórico num prompt só, cortando o começo até caber na janela.
     /// O corte tem dois limites, e os dois precisam acompanhar a janela: o número de
     /// mensagens e o tamanho em caracteres. Só mexer no segundo não adianta — o primeiro
     /// amarra antes, e o modelo grande recebe a mesma conversinha do pequeno.
+    /// Quanto de um resultado de ferramenta cabe numa mensagem do histórico.
+    ///
+    /// Estava preso em 400 caracteres. Para conversar bastava; para editar, não: quem
+    /// pede `read_file` e recebe um pedaço do arquivo não tem como montar um
+    /// `str_replace` com o trecho exato, e o modelo passa a errar por falta de texto, não
+    /// por falta de capacidade. Um terço do orçamento é o que sobra para o arquivo depois
+    /// das instruções e da conversa — o que não couber ele busca de novo, com `grep` ou
+    /// lendo outro pedaço.
+    static func tetoDoResultado(_ orcamento: Int) -> Int {
+        max(400, orcamento / 3)
+    }
+
     static func prompt(_ mensagens: [AgentMessage], orcamento: Int = orcamentoDeEntrada) -> String {
         var partes: [String] = []
         let quantas = max(20, (orcamento / orcamentoDeEntrada) * 20)
+        let teto = tetoDoResultado(orcamento)
         for m in mensagens.suffix(quantas) {
             switch m.role {
-            case .user: partes.append("Pessoa: " + m.content)
-            case .assistant where !m.content.isEmpty: partes.append("Odete: " + m.content)
-            case .tool: partes.append(tr("Resultado de ferramenta: ") + m.content.prefix(400))
-            default: break
+            case .user:
+                partes.append("Pessoa: " + m.content)
+            case .assistant:
+                if !m.content.isEmpty {
+                    partes.append("Odete: " + m.content)
+                }
+                // O pedido entra mesmo quando não veio texto junto: sem ele a rodada
+                // seguinte vê um resultado caído do céu, sem saber de qual arquivo é nem
+                // por que foi pedido.
+                for chamada in m.toolCalls ?? [] {
+                    partes.append(tr("Odete pediu %1$@: %2$@", chamada.name, chamada.arguments))
+                }
+            case .tool:
+                partes.append(tr("Resultado de ferramenta: ") + m.content.prefix(teto))
+            default:
+                break
             }
         }
         while partes.count > 1 {

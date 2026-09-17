@@ -12657,6 +12657,34 @@
         }
       }
     },
+    "Odete pediu %1$@: %2$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Odete asked for %1$@: %2$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Odete hat %1$@ angefordert: %2$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Odete a demandé %1$@ : %2$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Odete pidió %1$@: %2$@"
+          }
+        }
+      }
+    },
     "Odete · shell no iPad. Digite help.": {
       "localizations": {
         "en": {

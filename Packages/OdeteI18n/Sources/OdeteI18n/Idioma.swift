@@ -73,7 +73,11 @@ public enum Idioma: String, CaseIterable, Sendable, Identifiable, Codable {
     public var paraOModelo: String {
         switch self {
         case .sistema: Self.doAparelho.paraOModelo
-        case .ptBR: "Brazilian Portuguese"
+        // Dizer só "português" faz o modelo escrever como em Portugal, e "Brazilian
+        // Portuguese" sozinho não segura: o que segura é dar as palavras. As quatro
+        // abaixo são as que mais aparecem numa conversa sobre código.
+        case .ptBR: "português do Brasil — diga \"você\", \"arquivo\", \"tela\" e \"time\", "
+            + "nunca \"utilizador\", \"ficheiro\", \"ecrã\" ou \"equipa\""
         case .en: "English"
         case .de: "German"
         case .fr: "French"

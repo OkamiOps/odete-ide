@@ -54,6 +54,21 @@ struct NavegacaoTests {
 @Suite(.serialized)
 @MainActor
 struct PoliticaDeNavegacaoTests {
+    /// Espera a condição acontecer, em vez de dormir um tempo fixo.
+    ///
+    /// Aqui estava `Task.sleep(for: .seconds(2))`, e dois segundos são bastante num
+    /// simulador quente e pouco num simulador que o `xcodebuild` acabou de ligar: o
+    /// WebKit ainda está subindo o processo de conteúdo quando o teste já foi cobrar o
+    /// resultado. Isso falhava as duas checagens de uma vez, e por um motivo que não é o
+    /// que elas medem. Esperando pela condição, o caso rápido termina em milissegundos e
+    /// o lento tem folga.
+    func espera(_ prazo: Duration = .seconds(20), ate condicao: () -> Bool) async {
+        let fim = ContinuousClock.now + prazo
+        while ContinuousClock.now < fim, !condicao() {
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+    }
+
     @Test func recusaEnderecoDeFora() async throws {
         let model = PreviewModel(root: FileManager.default.temporaryDirectory)
         let coord = PreviewView.Coordinator(model: model)
@@ -62,7 +77,7 @@ struct PoliticaDeNavegacaoTests {
         coord.webView = wv
 
         try wv.load(URLRequest(url: #require(URL(string: "https://example.com/"))))
-        try await Task.sleep(for: .seconds(2))
+        await espera { model.console.contains { $0.text.contains("example.com") } }
 
         let recusou = model.console.contains { $0.text.contains("example.com") }
         #expect(recusou, "a política não foi chamada: o painel carregaria qualquer site")
@@ -86,7 +101,7 @@ struct PoliticaDeNavegacaoTests {
         coord.webView = wv
 
         wv.load(URLRequest(url: model.staticURL()))
-        try await Task.sleep(for: .seconds(2))
+        await espera { !wv.isLoading && wv.backForwardList.currentItem != nil }
 
         #expect(wv.backForwardList.currentItem != nil, "a página do projeto foi bloqueada")
         let texto = try await wv.evaluateJavaScript("document.body.innerText") as? String

@@ -259,11 +259,20 @@ public struct AppleProvider: Provider {
         let arquivos = Self.arquivosDoSistema(sistema)
         let comoAgir = comFerramentas
             ? """
-            Você mexe no projeto de verdade, pelas ferramentas. Leia antes de escrever e
-            prefira str_replace a write_file. Peça uma ferramenta por vez: o resultado
-            chega na mensagem seguinte e aí você continua. Não sabe o caminho? list_dir
-            ou grep. Nunca responda que não consegue editar — se falta informação, vá
-            buscar.
+            Você mexe no projeto de verdade, pelas ferramentas.
+
+            - Aja, não peça licença. Nunca pergunte "posso seguir?", "confirma?" ou "quer
+              que eu liste?". Quem aprova é o app: cada mudança aparece para a pessoa
+              aceitar antes de valer. Pergunte só quando o pedido for ambíguo a ponto de
+              você não saber em qual arquivo mexer.
+            - Uma ferramenta por vez. O resultado chega na mensagem seguinte, e aí você
+              segue sozinho, até terminar o que foi pedido.
+            - Leia antes de escrever. Em str_replace, `old` tem que ser copiado caractere
+              por caractere do que o read_file devolveu — nunca escrito de memória. Se o
+              trecho não for encontrado, leia o arquivo de novo em vez de tentar outro
+              palpite.
+            - Não sabe o caminho? list_dir ou grep, sem perguntar.
+            - Nunca responda que não consegue editar.
             """
             : """
             Nesta rodada você está sem ferramentas: responda com o que dá para responder
@@ -273,8 +282,19 @@ public struct AppleProvider: Provider {
         Você é a Odete, assistente de programação dentro de um editor no iPad.
         Responda em \(Texto.idioma.paraOModelo), com objetividade, em no máximo dois parágrafos
         curtos ou uma lista curta. Use markdown. Quando não souber, diga que não sabe.
-        \(comoAgir)\(arquivos)
+        \(comoAgir)\(modoDoSistema(sistema))\(arquivos)
         """
+    }
+
+    /// A linha do modo, tirada do prompt grande.
+    ///
+    /// Sem ela o modelo não sabe se está em CHAT, PLAN ou BUILD — e no BUILD, que é o
+    /// modo em que ele pode editar, ficava perguntando se podia editar. As instruções
+    /// daqui são escritas à parte de propósito, mas o modo não dá para inventar: ele é
+    /// uma escolha que a pessoa fez na tela.
+    static func modoDoSistema(_ sistema: String) -> String {
+        guard let linha = sistema.split(separator: "\n").first(where: { $0.hasPrefix("Modo ") }) else { return "" }
+        return "\n\n" + linha
     }
 
     /// Os primeiros caminhos do projeto, para o modelo não gastar uma rodada de `list_dir`

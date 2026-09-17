@@ -85,6 +85,36 @@ struct AppleFerramentasTests {
         #expect(texto.contains("str_replace"), "ninguém disse ao modelo por onde editar")
     }
 
+    /// O modo é uma escolha que a pessoa fez na tela. Sem ele nas instruções, o modelo
+    /// não sabe que está no BUILD — e ficava pedindo licença para editar no modo cujo
+    /// nome é "pode editar".
+    @Test func oModoEscolhidoChegaAoModelo() {
+        let texto = AppleProvider.instrucoes(
+            Prompts.build(mode: .build, fileList: ["a.ts"], extras: []),
+            comFerramentas: true
+        )
+        #expect(texto.contains("Modo BUILD"), "o modo não chegou nas instruções")
+    }
+
+    /// Foi o que apareceu na primeira build com ferramentas: três rodadas seguidas
+    /// terminando em "posso seguir?" enquanto a pessoa respondia "sim pode seguir".
+    @Test func asInstrucoesProibemPedirLicenca() {
+        let texto = AppleProvider.instrucoes("", comFerramentas: true)
+        #expect(texto.contains("não peça licença"))
+        #expect(texto.contains("posso seguir"), "falta o exemplo da pergunta que ele fazia")
+    }
+
+    /// O outro erro da mesma tela: `str_replace` com `old: "Apple"`, um trecho que não
+    /// existia no arquivo — escrito de memória em vez de copiado do que ele acabara de ler.
+    @Test func asInstrucoesExigemCopiarOTrechoLido() {
+        // Numa linha só: a frase atravessa a quebra do literal, e o teste é sobre o que
+        // está escrito, não sobre onde a linha termina.
+        let texto = AppleProvider.instrucoes("", comFerramentas: true)
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+        #expect(texto.contains("caractere por caractere"))
+        #expect(texto.contains("read_file"))
+    }
+
     @Test func semFerramentaAsInstrucoesDizemOQueFalta() {
         let texto = AppleProvider.instrucoes("", comFerramentas: false)
         #expect(texto.contains("sem ferramentas"))

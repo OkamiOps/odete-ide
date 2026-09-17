@@ -213,17 +213,109 @@ struct SettingsContent: View {
                 }
             }
             VStack(alignment: .leading, spacing: 8) {
+                SectionTitle(tr("Cores do código"))
+                CardList {
+                    ForEach(Array(SyntaxColors.nomes.enumerated()), id: \.element) { i, nome in
+                        CardRow(
+                            rotuloDoToken(nome),
+                            symbol: "paintbrush.pointed",
+                            color: Color(hex: chrome.palette.syntax.cor(nome)),
+                            detail: exemploDoToken(nome),
+                            first: i == 0
+                        ) {
+                            ColorPicker("", selection: corDoToken(nome), supportsOpacity: false)
+                                .labelsHidden()
+                        }
+                    }
+                }
+                if !chrome.snapshot.syntaxOverrides.isEmpty {
+                    CardList {
+                        Button { chrome.snapshot.syntaxOverrides = [:] } label: {
+                            CardRow(
+                                tr("Voltar às cores do tema"),
+                                symbol: "arrow.counterclockwise",
+                                color: .gray,
+                                first: true
+                            ) {
+                                Image(systemName: "chevron.right").font(.caption2.bold())
+                                    .foregroundStyle(theme.fgSubtle)
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                CardNote(tr(
+                    "Vale por cima do tema escolhido. O que você não trocar continua vindo do tema, então trocar de tema depois ainda muda o resto."
+                ))
+            }
+            VStack(alignment: .leading, spacing: 8) {
                 SectionTitle(tr("Interface"))
                 CardList {
-                    CardRow(tr("Barra de abas"), symbol: "rectangle.topthird.inset.filled", color: .teal, first: true) {
+                    CardRow(
+                        tr("Tamanho da interface"),
+                        symbol: "textformat.size.larger",
+                        color: .teal,
+                        first: true
+                    ) {
+                        // Os Ajustes não se redesenham a cada passo (ver `RootView`), então
+                        // a amostra é quem mostra o tamanho na hora, aqui do lado do botão.
+                        Text(tr("Exemplo"))
+                            .font(.system(size: 13 * chrome.snapshot.uiScale))
+                            .foregroundStyle(theme.fgMuted).lineLimit(1)
+                        Text("\(Int(chrome.snapshot.uiScale * 100))%")
+                            .font(.footnote).monospacedDigit().foregroundStyle(.secondary)
+                        Stepper(
+                            tr("Tamanho da interface"),
+                            value: $chrome.snapshot.uiScale,
+                            in: 0.85 ... 1.4,
+                            step: 0.05
+                        )
+                        .labelsHidden().fixedSize()
+                    }
+                    CardRow(tr("Barra de abas"), symbol: "rectangle.topthird.inset.filled", color: .teal) {
                         Toggle("", isOn: $chrome.snapshot.showTabBar).labelsHidden()
                     }
                     CardRow(tr("Barra de status"), symbol: "rectangle.bottomthird.inset.filled", color: .teal) {
                         Toggle("", isOn: $chrome.snapshot.showStatusBar).labelsHidden()
                     }
                 }
-                CardNote(tr("Some com as barras para sobrar tela. As abas continuam na paleta de comandos."))
+                CardNote(tr(
+                    "O tamanho aqui é o das telas do app. O do código é separado, em Editor, e não muda junto."
+                ))
             }
+        }
+    }
+
+    /// Ligação para uma cor do código: lê do tema com a troca por cima, escreve como hex.
+    func corDoToken(_ nome: String) -> Binding<Color> {
+        Binding(
+            get: { Color(hex: chrome.palette.syntax.cor(nome)) },
+            set: { chrome.snapshot.syntaxOverrides[nome] = $0.hexRGB }
+        )
+    }
+
+    func rotuloDoToken(_ nome: String) -> String {
+        switch nome {
+        case "keyword": tr("Palavra-chave")
+        case "string": tr("Texto")
+        case "comment": tr("Comentário")
+        case "number": tr("Número")
+        case "function": tr("Função")
+        default: tr("Tipo")
+        }
+    }
+
+    /// Um pedaço de código de verdade ao lado do nome, para não ter que adivinhar o que
+    /// cada um pinta.
+    func exemploDoToken(_ nome: String) -> String {
+        switch nome {
+        case "keyword": "return, if, func"
+        case "string": "\"olá\""
+        case "comment": "// nota"
+        case "number": "42, 3.14"
+        case "function": "calcula()"
+        default: "String, Pessoa"
         }
     }
 
@@ -270,8 +362,11 @@ struct SettingsContent: View {
                         }
                         .labelsHidden()
                     }
-                    CardRow(tr("Espaçamento das letras"), symbol: "arrow.left.and.right.text.vertical",
-                            color: .blue) {
+                    CardRow(
+                        tr("Espaçamento das letras"),
+                        symbol: "arrow.left.and.right.text.vertical",
+                        color: .blue
+                    ) {
                         Picker("", selection: $chrome.snapshot.editor.kern) {
                             Text(tr("Apertado")).tag(-0.4)
                             Text(tr("Normal")).tag(0.0)
@@ -367,6 +462,54 @@ struct SettingsContent: View {
     var layout: some View {
         @Bindable var chrome = chrome
         return Group {
+            VStack(alignment: .leading, spacing: 8) {
+                SectionTitle(tr("Onde cada área fica"))
+                CardList {
+                    CardRow(tr("Arquivos"), symbol: "sidebar.left", color: .orange, first: true) {
+                        Picker("", selection: $chrome.snapshot.sideSide) {
+                            ForEach(LadoDoPainel.allCases, id: \.self) { l in Text(l.label).tag(l) }
+                        }
+                        .labelsHidden()
+                    }
+                    CardRow(tr("Agente"), symbol: "sparkles", color: .orange) {
+                        Picker("", selection: $chrome.snapshot.agentSide) {
+                            ForEach(LadoDoPainel.allCases, id: \.self) { l in Text(l.label).tag(l) }
+                        }
+                        .labelsHidden()
+                    }
+                    CardRow(tr("Terminal"), symbol: "terminal", color: .orange) {
+                        Picker("", selection: $chrome.snapshot.termPlace) {
+                            ForEach(LugarDoTerminal.allCases, id: \.self) { l in Text(l.label).tag(l) }
+                        }
+                        .labelsHidden()
+                    }
+                }
+                CardNote(tr(
+                    "O terminal embaixo dos arquivos deixa a largura inteira para o código. Com a barra de arquivos fechada ele volta para baixo do editor, senão sumiria junto."
+                ))
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                SectionTitle(tr("Terminal"))
+                CardList {
+                    CardRow(tr("Tamanho da fonte"), symbol: "textformat.size", color: .green, first: true) {
+                        Text(tr("%1$@ pt", "\(Int(chrome.snapshot.termFontSize))"))
+                            .font(.footnote).monospacedDigit().foregroundStyle(.secondary)
+                        Stepper(
+                            tr("Tamanho da fonte"),
+                            value: $chrome.snapshot.termFontSize,
+                            in: 9 ... 20,
+                            step: 1
+                        )
+                        .labelsHidden().fixedSize()
+                    }
+                    CardRow(tr("Fonte"), symbol: "character", color: .green) {
+                        Picker("", selection: $chrome.snapshot.termFont) {
+                            ForEach(EditorFont.allCases, id: \.self) { f in Text(f.label).tag(f) }
+                        }
+                        .labelsHidden()
+                    }
+                }
+            }
             VStack(alignment: .leading, spacing: 8) {
                 SectionTitle(tr("Painéis"))
                 CardList {

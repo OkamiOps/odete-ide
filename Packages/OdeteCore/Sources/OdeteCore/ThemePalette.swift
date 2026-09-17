@@ -18,6 +18,39 @@ public struct SyntaxColors: Hashable, Codable, Sendable {
         self.type = type
     }
 
+    /// Nomes na ordem em que aparecem na tela de ajustes.
+    public static let nomes = ["keyword", "type", "function", "string", "number", "comment"]
+
+    public func cor(_ nome: String) -> String {
+        switch nome {
+        case "keyword": keyword
+        case "string": string
+        case "comment": comment
+        case "number": number
+        case "function": function
+        default: type
+        }
+    }
+
+    /// As mesmas cores com o que a pessoa trocou por cima. O que ela não tocou continua
+    /// sendo o do tema, então trocar de tema depois continua valendo para o resto.
+    public func com(_ trocas: [String: String]) -> SyntaxColors {
+        guard !trocas.isEmpty else { return self }
+        var c = self
+        for (nome, hex) in trocas where !hex.isEmpty {
+            switch nome {
+            case "keyword": c.keyword = hex
+            case "string": c.string = hex
+            case "comment": c.comment = hex
+            case "number": c.number = hex
+            case "function": c.function = hex
+            case "type": c.type = hex
+            default: break
+            }
+        }
+        return c
+    }
+
     /// Padrão de `src/styles.css` para temas sem cores próprias.
     public static let base = SyntaxColors(
         keyword: "#c3a6ff", string: "#9dcf8a", comment: "#6f6d68",

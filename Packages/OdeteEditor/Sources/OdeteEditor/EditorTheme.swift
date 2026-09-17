@@ -21,8 +21,8 @@ final class EditorTheme: Runestone.Theme, @unchecked Sendable {
 
     init(palette: ThemePalette, fontSize: CGFloat, familia: EditorFont = .plex) {
         let miuda = max(fontSize - 1, 10)
-        // Nome que não exista no aparelho cai na monoespaçada do sistema, em vez de
-        // devolver a proporcional e desalinhar a grade inteira do código.
+        /// Nome que não exista no aparelho cai na monoespaçada do sistema, em vez de
+        /// devolver a proporcional e desalinhar a grade inteira do código.
         func fonte(_ tamanho: CGFloat) -> UIFont {
             guard let nome = familia.postScript, let f = UIFont(name: nome, size: tamanho) else {
                 return .monospacedSystemFont(ofSize: tamanho, weight: .regular)

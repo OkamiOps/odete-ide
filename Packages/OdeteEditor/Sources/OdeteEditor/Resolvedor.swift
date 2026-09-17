@@ -270,7 +270,9 @@ public enum Resolvedor {
         }
         for i in 0 ..< ts_node_child_count(node) {
             liga(ts_node_child(node, i), &e)
-            if e.desligou { return }
+            if e.desligou {
+                return
+            }
         }
     }
 
@@ -298,7 +300,8 @@ public enum Resolvedor {
     private nonisolated static func marca(_ node: TSNode, _ e: inout Estado) {
         let t = Arvore.tipo(node)
         if t == "identifier" || t == "field_identifier" || t == "type_identifier"
-            || t == "shorthand_property_identifier_pattern" || t == "property_identifier" {
+            || t == "shorthand_property_identifier_pattern" || t == "property_identifier"
+        {
             e.ligados.insert(Arvore.texto(node, e.bytes))
             e.posicoes.insert(ts_node_start_byte(node))
             return
@@ -322,7 +325,9 @@ public enum Resolvedor {
                 e.desligou = true
                 return false
             }
-            if let deOnde, ts_node_eq(filho, deOnde) { return false }
+            if let deOnde, ts_node_eq(filho, deOnde) {
+                return false
+            }
             switch t {
             case "aliased_import", "package_identifier":
                 if let alias = Arvore.campo(filho, "alias") ?? Arvore.campo(filho, "name") {
@@ -369,31 +374,43 @@ public enum Resolvedor {
 
     private nonisolated static func usa(_ node: TSNode, _ e: inout Estado) {
         let t = Arvore.tipo(node)
-        if e.perfil.imports.contains(t) || e.perfil.semReferencias.contains(t) { return }
-        if let campo = e.perfil.semReferenciasComCampo[t], Arvore.campo(node, campo) != nil { return }
+        if e.perfil.imports.contains(t) || e.perfil.semReferencias.contains(t) {
+            return
+        }
+        if let campo = e.perfil.semReferenciasComCampo[t], Arvore.campo(node, campo) != nil {
+            return
+        }
         if e.perfil.tokensSoUsam.contains(t) {
             e.usados.insert(Arvore.texto(node, e.bytes))
             return
         }
         if e.perfil.nomeSoUsa.contains(t) {
             let nome = Arvore.campo(node, "name")
-            if let nome { registraUso(nome, &e) }
+            if let nome {
+                registraUso(nome, &e)
+            }
             for i in 0 ..< ts_node_child_count(node) {
                 let filho = ts_node_child(node, i)
-                if let nome, ts_node_eq(filho, nome) { continue }
+                if let nome, ts_node_eq(filho, nome) {
+                    continue
+                }
                 usa(filho, &e)
             }
             return
         }
         if let campo = e.perfil.referenciaParcial[t] {
-            if let alvo = Arvore.campo(node, campo) { usa(alvo, &e) }
+            if let alvo = Arvore.campo(node, campo) {
+                usa(alvo, &e)
+            }
             return
         }
         if let campo = e.perfil.semOCampo[t] {
             let pular = Arvore.campo(node, campo)
             for i in 0 ..< ts_node_child_count(node) {
                 let filho = ts_node_child(node, i)
-                if let pular, ts_node_eq(filho, pular) { continue }
+                if let pular, ts_node_eq(filho, pular) {
+                    continue
+                }
                 usa(filho, &e)
             }
             return

@@ -155,6 +155,16 @@ struct TerminalView: View {
     @Bindable var session: TerminalSession
     @FocusState private var focused: Bool
 
+    /// O terminal tem tamanho e fonte próprios: ler log e escrever código não pedem o
+    /// mesmo corpo, e quem deixa o terminal numa faixa estreita quer letra menor ali.
+    var fonteDoTerminal: Font {
+        let tamanho = chrome.snapshot.termFontSize
+        guard let nome = chrome.snapshot.termFont.postScript,
+              UIFont(name: nome, size: tamanho) != nil
+        else { return .system(size: tamanho, design: .monospaced) }
+        return .custom(nome, fixedSize: tamanho)
+    }
+
     /// Manda uma linha do terminal para o compositor do agente.
     func enviar(linha: TermLine) {
         ws.agent.anexarTrecho(origem: "terminal", texto: linha.text)
@@ -168,7 +178,7 @@ struct TerminalView: View {
                     LazyVStack(alignment: .leading, spacing: 1) {
                         ForEach(session.lines) { line in
                             Text(line.text)
-                                .font(OdeteFont.mono(12))
+                                .font(fonteDoTerminal)
                                 .foregroundStyle(color(line.kind))
                                 .textSelection(.enabled)
                                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -190,9 +200,9 @@ struct TerminalView: View {
                 .onTapGesture { focused = true }
             }
             HStack(spacing: 8) {
-                Text(session.prompt).font(OdeteFont.mono(12)).foregroundStyle(theme.accent).lineLimit(1).fixedSize()
+                Text(session.prompt).font(fonteDoTerminal).foregroundStyle(theme.accent).lineLimit(1).fixedSize()
                 TextField(tr("comando"), text: $session.input)
-                    .font(OdeteFont.mono(12))
+                    .font(fonteDoTerminal)
                     .foregroundStyle(theme.fg)
                     .textFieldStyle(.plain)
                     .autocorrectionDisabled()

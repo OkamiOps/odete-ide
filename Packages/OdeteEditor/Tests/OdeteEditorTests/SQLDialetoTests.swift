@@ -55,7 +55,9 @@ struct SQLDialetoTests {
     /// pode virar desculpa para calar o arquivo inteiro.
     @Test func erroDeVerdadeContinuaAcusado() {
         #expect(erros("CREATE TABLE p (id INTEGER") != "", "faltou fechar")
-        #expect(erros("CREATE TABLE p (id INTEGER PRIMARY KEY AUTOINCREMENT;") != "",
-                "falta o parêntese, mesmo com a palavra apagada")
+        #expect(
+            erros("CREATE TABLE p (id INTEGER PRIMARY KEY AUTOINCREMENT;") != "",
+            "falta o parêntese, mesmo com a palavra apagada"
+        )
     }
 }

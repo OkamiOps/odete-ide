@@ -41,6 +41,14 @@ public struct RootView: View {
     @Environment(\.colorScheme) private var esquema
 
     public var body: some View {
+        // A escala da interface vive numa estática lida por dentro das fontes. Casar o
+        // valor aqui, no começo do corpo, garante que já esta passada de desenho saia no
+        // tamanho novo — num `onChange` ela chegaria uma passada atrasada.
+        OdeteFont.escala = chrome.snapshot.uiScale
+        return corpo
+    }
+
+    var corpo: some View {
         // `VStack` e não `safeAreaInset`: o `TabView` do layout estreito desenhava a
         // própria barra por baixo da faixa, e aqui a divisão é dura para qualquer layout.
         VStack(spacing: 0) {
@@ -61,6 +69,11 @@ public struct RootView: View {
         .environment(\.emJanela, emJanela)
         .onGeometryChange(for: CGSize.self) { $0.size } action: { _ in emJanela = Janela.temControles }
         .task { emJanela = Janela.temControles }
+        // O tamanho da interface entra por uma estática nas fontes: quem não lê o valor
+        // não se redesenha sozinho, então a árvore do app é refeita quando ele muda.
+        // Só a do app: os Ajustes ficam de fora de propósito, senão cada toque no mais
+        // jogava a lista de volta para o topo e ninguém conseguia ajustar olhando.
+        .id("\(chrome.snapshot.uiScale)·\(tamanhoDoSistema)")
         // Duas `.sheet` no mesmo nível competem; esta fica um degrau abaixo da de boas-vindas.
         .sheet(isPresented: Binding(get: { chrome.settingsOpen }, set: { chrome.settingsOpen = $0 })) {
             SettingsSheet()
@@ -77,7 +90,6 @@ public struct RootView: View {
             default: break
             }
         }
-        .id(tamanhoDoSistema)
         // Quem manda no claro/escuro é o iPad, e quem lê é aqui: com `themeAuto` ligado
         // o app não força esquema nenhum, então este valor é mesmo o do sistema.
         .onChange(of: esquema, initial: true) { chrome.sistemaEscuro = esquema == .dark }
@@ -94,8 +106,11 @@ public struct RootView: View {
                 }
             }
         )) {
-            OnboardingView().environment(chrome).odeteTheme(Theme(chrome.palette, seguirSistema: chrome.snapshot.themeAuto))
-                .presentationSizing(.page)
+            OnboardingView().environment(chrome).odeteTheme(Theme(
+                chrome.palette,
+                seguirSistema: chrome.snapshot.themeAuto
+            ))
+            .presentationSizing(.page)
         }
         .onOpenURL { url in app.importURL(url, chrome: chrome) }
         .onAppear {

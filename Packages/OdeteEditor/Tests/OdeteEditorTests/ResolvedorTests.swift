@@ -9,7 +9,12 @@ import Testing
 /// que grita em arquivo bom é pior que resolvedor nenhum, porque ensina a pessoa a ignorar
 /// a marca vermelha — e aí ele também não serve quando estiver certo.
 struct ResolvedorTests {
-    func erros(_ texto: String, _ lang: Language, path: String = "", indice: Resolvedor.Indice = .init()) -> [LintIssue] {
+    func erros(
+        _ texto: String,
+        _ lang: Language,
+        path: String = "",
+        indice: Resolvedor.Indice = .init()
+    ) -> [LintIssue] {
         Resolvedor.problemas(text: texto, language: lang, path: path, indice: indice)
             .filter { $0.severity == .error }
     }
@@ -258,8 +263,10 @@ struct ResolvedorTests {
         }
         """
         let indice = Resolvedor.Indice(arquivos: [("loja/tela.go", tela)])
-        #expect(!erros(main, .go, path: "outro/main.go", indice: indice).isEmpty,
-                "pasta diferente é pacote diferente")
+        #expect(
+            !erros(main, .go, path: "outro/main.go", indice: indice).isEmpty,
+            "pasta diferente é pacote diferente"
+        )
     }
 
     /// Java acha a classe pelo nome no projeto todo.
@@ -296,8 +303,10 @@ struct ResolvedorTests {
     /// import. Enxergar o vizinho seria aceitar nome que o interpretador recusa.
     @Test func pythonNaoEnxergaVizinho() {
         let indice = Resolvedor.Indice(arquivos: [("app/loja.py", "class Loja:\n    pass\n")])
-        #expect(!erros("l = Loja()\n", .python, path: "app/main.py", indice: indice).isEmpty,
-                "em Python o vizinho só chega por import")
+        #expect(
+            !erros("l = Loja()\n", .python, path: "app/main.py", indice: indice).isEmpty,
+            "em Python o vizinho só chega por import"
+        )
     }
 
     // MARK: - o resto

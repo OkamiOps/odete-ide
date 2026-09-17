@@ -229,8 +229,10 @@ struct ResolveWebTests {
     }
 
     @Test func importSemUsoEhAvisoENaoErro() {
-        let todos = Resolvedor.problemas(text: "import { alpha } from './alpha'\n\nexport const x = 1\n",
-                                         language: .typescript)
+        let todos = Resolvedor.problemas(
+            text: "import { alpha } from './alpha'\n\nexport const x = 1\n",
+            language: .typescript
+        )
         #expect(todos.count == 1, "\(conta(todos))")
         #expect(todos.first?.severity == .warning)
         #expect(todos.first?.message.contains("alpha") == true)

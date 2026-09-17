@@ -109,10 +109,16 @@ struct CenterPane: View {
                 // é aqui que a mão vai quando a linha não cabe na tela.
                 Section(tr("Editor")) {
                     Toggle(tr("Quebrar linhas"), systemImage: "text.append", isOn: $chrome.snapshot.editor.wrap)
-                    Toggle(tr("Números de linha"), systemImage: "list.number",
-                           isOn: $chrome.snapshot.editor.lineNumbers)
-                    Toggle(tr("Espaços e tabs"), systemImage: "space",
-                           isOn: $chrome.snapshot.editor.showWhitespace)
+                    Toggle(
+                        tr("Números de linha"),
+                        systemImage: "list.number",
+                        isOn: $chrome.snapshot.editor.lineNumbers
+                    )
+                    Toggle(
+                        tr("Espaços e tabs"),
+                        systemImage: "space",
+                        isOn: $chrome.snapshot.editor.showWhitespace
+                    )
                 }
             } label: {
                 Label(tr("Mais"), systemImage: "ellipsis")

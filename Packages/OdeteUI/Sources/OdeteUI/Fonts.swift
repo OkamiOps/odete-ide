@@ -23,9 +23,14 @@ public enum OdeteFont {
     /// fixo. O teto existe porque isto aqui é um editor de código com colunas estreitas —
     /// acompanhar os tamanhos de acessibilidade inteiros quebraria a grade. Quem precisa
     /// de código maior tem o ajuste de fonte do editor, que é separado.
+    /// Multiplicador escolhido nos Ajustes, por cima do tamanho do sistema. Vive numa
+    /// estática porque as fontes são pedidas de dentro de dezenas de views que não têm
+    /// como receber o estado, e ele muda uma vez a cada vez que alguém mexe no ajuste.
+    public nonisolated(unsafe) static var escala: CGFloat = 1
+
     public static func escalado(_ size: CGFloat) -> CGFloat {
         let ajustado = UIFontMetrics(forTextStyle: .body).scaledValue(for: size)
-        return min(max(ajustado, size * 0.9), size * 1.3)
+        return min(max(ajustado, size * 0.9), size * 1.3) * escala
     }
 
     public static func ui(_ size: CGFloat = 13, weight: Font.Weight = .regular) -> Font {

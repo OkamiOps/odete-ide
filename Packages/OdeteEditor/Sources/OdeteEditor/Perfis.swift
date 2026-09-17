@@ -140,7 +140,9 @@ enum Perfis {
                 "internal_module": .campo("name"),
                 "module": .campo("name"),
                 "import_alias": .campo("name"),
-            ] { ligacoes[k] = v }
+            ] {
+                ligacoes[k] = v
+            }
         } else {
             ligacoes["formal_parameters"] = .tudoAbaixo
         }

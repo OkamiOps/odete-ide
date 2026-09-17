@@ -146,16 +146,22 @@ public enum ParserErros {
         while i < b.count {
             guard inicioDePalavra(b, i) else { i += 1; continue }
             if let fim = casaFrase(b, i, frasesDoSQLite) {
-                for k in i ..< fim { b[k] = 0x20 }
+                for k in i ..< fim {
+                    b[k] = 0x20
+                }
                 i = fim
                 continue
             }
             if inicioDeLinha(b, i), let fim = casaComando(b, i) {
-                for k in i ..< fim where b[k] != 0x0A { b[k] = 0x20 }
+                for k in i ..< fim where b[k] != 0x0A {
+                    b[k] = 0x20
+                }
                 i = fim
                 continue
             }
-            while i < b.count, ehLetra(b[i]) { i += 1 }
+            while i < b.count, ehLetra(b[i]) {
+                i += 1
+            }
         }
         return String(decoding: b, as: UTF8.self)
     }
@@ -170,7 +176,9 @@ public enum ParserErros {
 
     private nonisolated static func inicioDeLinha(_ b: [UInt8], _ i: Int) -> Bool {
         var k = i - 1
-        while k >= 0, b[k] == 0x20 || b[k] == 0x09 { k -= 1 }
+        while k >= 0, b[k] == 0x20 || b[k] == 0x09 {
+            k -= 1
+        }
         return k < 0 || b[k] == 0x0A
     }
 
@@ -178,7 +186,9 @@ public enum ParserErros {
     private nonisolated static func casaPalavra(_ b: [UInt8], _ i: Int, _ palavra: String) -> Int? {
         let alvo = Array(palavra.utf8)
         guard i + alvo.count <= b.count else { return nil }
-        for (k, c) in alvo.enumerated() where (b[i + k] | 0x20) != c { return nil }
+        for (k, c) in alvo.enumerated() where (b[i + k] | 0x20) != c {
+            return nil
+        }
         let fim = i + alvo.count
         guard fim == b.count || !ehLetra(b[fim]) else { return nil }
         return fim
@@ -192,13 +202,19 @@ public enum ParserErros {
             for (n, palavra) in frase.enumerated() {
                 if n > 0 {
                     let antes = pos
-                    while pos < b.count, b[pos] == 0x20 || b[pos] == 0x09 || b[pos] == 0x0A { pos += 1 }
-                    if pos == antes { casou = false; break }
+                    while pos < b.count, b[pos] == 0x20 || b[pos] == 0x09 || b[pos] == 0x0A {
+                        pos += 1
+                    }
+                    if pos == antes {
+                        casou = false; break
+                    }
                 }
                 guard let fim = casaPalavra(b, pos, palavra) else { casou = false; break }
                 pos = fim
             }
-            if casou { return pos }
+            if casou {
+                return pos
+            }
         }
         return nil
     }
@@ -208,7 +224,9 @@ public enum ParserErros {
         guard comandosDoSQLite.contains(where: { casaPalavra(b, i, $0) != nil }) else { return nil }
         var pos = i
         while pos < b.count, b[pos] != 0x0A {
-            if b[pos] == 0x3B { return pos + 1 }
+            if b[pos] == 0x3B {
+                return pos + 1
+            }
             pos += 1
         }
         return pos

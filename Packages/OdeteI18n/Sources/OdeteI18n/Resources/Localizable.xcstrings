@@ -1877,6 +1877,62 @@
         }
       }
     },
+    "Abaixo do editor": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Under the editor"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unter dem Editor"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sous l’éditeur"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Debajo del editor"
+          }
+        }
+      }
+    },
+    "Abaixo dos arquivos": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Under the files"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unter den Dateien"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sous les fichiers"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Debajo de los archivos"
+          }
+        }
+      }
+    },
     "Abortar merge": {
       "localizations": {
         "en": {
@@ -4509,6 +4565,34 @@
         }
       }
     },
+    "Comentário": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Comment"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kommentar"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Commentaire"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Comentario"
+          }
+        }
+      }
+    },
     "Comentários": {
       "localizations": {
         "en": {
@@ -5877,6 +5961,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Copiar sha"
+          }
+        }
+      }
+    },
+    "Cores do código": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Code colours"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Code-Farben"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couleurs du code"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Colores del código"
           }
         }
       }
@@ -7981,6 +8093,34 @@
         }
       }
     },
+    "Exemplo": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Example"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Beispiel"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exemple"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ejemplo"
+          }
+        }
+      }
+    },
     "Exibição": {
       "localizations": {
         "en": {
@@ -8649,6 +8789,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Funciona offline en lo que no depende de la red"
+          }
+        }
+      }
+    },
+    "Função": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Function"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Funktion"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fonction"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Función"
           }
         }
       }
@@ -12013,6 +12181,34 @@
         }
       }
     },
+    "Número": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Number"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zahl"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nombre"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Número"
+          }
+        }
+      }
+    },
     "Números de linha": {
       "localizations": {
         "en": {
@@ -12349,6 +12545,62 @@
         }
       }
     },
+    "O tamanho aqui é o das telas do app. O do código é separado, em Editor, e não muda junto.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This is the size of the app’s screens. The code’s size is separate, under Editor, and doesn’t change with it."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dies ist die Größe der App-Oberfläche. Die Schriftgröße des Codes ist getrennt, unter Editor, und ändert sich nicht mit."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Il s’agit de la taille des écrans de l’app. Celle du code est séparée, dans Éditeur, et ne change pas avec."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este es el tamaño de las pantallas de la app. El del código es aparte, en Editor, y no cambia con él."
+          }
+        }
+      }
+    },
+    "O terminal embaixo dos arquivos deixa a largura inteira para o código. Com a barra de arquivos fechada ele volta para baixo do editor, senão sumiria junto.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The terminal under the files leaves the full width to the code. With the file bar closed it goes back under the editor — otherwise it would disappear with it."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das Terminal unter den Dateien lässt dem Code die volle Breite. Bei geschlossener Dateileiste rückt es wieder unter den Editor, sonst würde es mit verschwinden."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le terminal sous les fichiers laisse toute la largeur au code. Barre des fichiers fermée, il revient sous l’éditeur, sinon il disparaîtrait avec elle."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El terminal debajo de los archivos deja todo el ancho al código. Con la barra de archivos cerrada vuelve debajo del editor; si no, desaparecería con ella."
+          }
+        }
+      }
+    },
     "O token sai do Keychain. Push e clone de repositório privado param de funcionar.": {
       "localizations": {
         "en": {
@@ -12485,6 +12737,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dónde"
+          }
+        }
+      }
+    },
+    "Onde cada área fica": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Where each area sits"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wo jeder Bereich sitzt"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Où se place chaque zone"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dónde va cada área"
           }
         }
       }
@@ -12933,6 +13213,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Paneles"
+          }
+        }
+      }
+    },
+    "Palavra-chave": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keyword"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Schlüsselwort"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mot-clé"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Palabra clave"
           }
         }
       }
@@ -15485,34 +15793,6 @@
         }
       }
     },
-    "Some com as barras para sobrar tela. As abas continuam na paleta de comandos.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Hide the bars to gain screen. The tabs are still in the command palette."
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Blenden Sie die Leisten aus, um Bildschirm zu gewinnen. Die Tabs bleiben in der Befehlspalette."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Masquez les barres pour gagner de l’écran. Les onglets restent dans la palette de commandes."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Oculta las barras para ganar pantalla. Las pestañas siguen en la paleta de comandos."
-          }
-        }
-      }
-    },
     "Split": {
       "localizations": {
         "en": {
@@ -16045,6 +16325,34 @@
         }
       }
     },
+    "Tamanho da interface": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Interface size"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Größe der Oberfläche"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Taille de l’interface"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tamaño de la interfaz"
+          }
+        }
+      }
+    },
     "Tamanho da tela": {
       "localizations": {
         "en": {
@@ -16405,6 +16713,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Texto"
+          }
+        }
+      }
+    },
+    "Tipo": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Type"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Typ"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Type"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tipo"
           }
         }
       }
@@ -17221,6 +17557,34 @@
         }
       }
     },
+    "Vale por cima do tema escolhido. O que você não trocar continua vindo do tema, então trocar de tema depois ainda muda o resto.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This sits on top of the chosen theme. What you don’t change still comes from the theme, so switching themes later still changes the rest."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dies liegt über dem gewählten Thema. Was Sie nicht ändern, kommt weiterhin vom Thema — ein späterer Themenwechsel ändert also weiterhin den Rest."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ceci se superpose au thème choisi. Ce que vous ne changez pas vient toujours du thème : changer de thème plus tard modifie donc encore le reste."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esto va por encima del tema elegido. Lo que no cambies sigue viniendo del tema, así que cambiar de tema después sigue cambiando lo demás."
+          }
+        }
+      }
+    },
     "Vale qualquer API no formato /chat/completions da OpenAI: OpenAI, OpenRouter, Groq, ": {
       "localizations": {
         "en": {
@@ -17637,6 +18001,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Volver a los proyectos"
+          }
+        }
+      }
+    },
+    "Voltar às cores do tema": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Back to the theme’s colours"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zurück zu den Themenfarben"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Revenir aux couleurs du thème"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Volver a los colores del tema"
           }
         }
       }
@@ -25897,6 +26289,62 @@
           "stringUnit": {
             "state": "translated",
             "value": "| archivo | qué es |\n| --- | --- |\n| `index.html` | página del preview |\n| `src/style.css` | aspecto |\n| `src/main.js` | comportamiento |"
+          }
+        }
+      }
+    },
+    "À direita": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "On the right"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rechts"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "À droite"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A la derecha"
+          }
+        }
+      }
+    },
+    "À esquerda": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "On the left"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Links"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "À gauche"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A la izquierda"
           }
         }
       }

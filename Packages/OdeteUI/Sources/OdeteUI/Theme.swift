@@ -20,6 +20,22 @@ public extension Color {
             opacity: 1
         )
     }
+
+    /// De volta a "#rrggbb", para guardar no estado. Sai pelo espaço sRGB porque é o que
+    /// o `init(hex:)` lê de volta; uma cor do seletor pode vir em outro espaço e voltar
+    /// diferente da que a pessoa escolheu.
+    var hexRGB: String {
+        let c = UIColor(self).cgColor
+        guard let srgb = c.converted(
+            to: CGColorSpace(name: CGColorSpace.sRGB)!,
+            intent: .defaultIntent,
+            options: nil
+        ), let p = srgb.components, p.count >= 3 else { return "#ff00ff" }
+        func canal(_ v: CGFloat) -> Int {
+            Int((min(max(v, 0), 1) * 255).rounded())
+        }
+        return String(format: "#%02x%02x%02x", canal(p[0]), canal(p[1]), canal(p[2]))
+    }
 }
 
 /// Tema pronto para SwiftUI, derivado de `ThemePalette`.
@@ -34,6 +50,7 @@ public struct Theme: Sendable, Hashable {
         self.palette = palette
         self.seguirSistema = seguirSistema
     }
+
     public var id: ThemeId {
         palette.id
     }

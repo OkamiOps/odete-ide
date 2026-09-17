@@ -75,6 +75,28 @@ public enum PhoneTab: String, Codable, CaseIterable, Sendable {
 
 public enum MinimapSize: String, Codable, CaseIterable, Sendable { case off, s, m, l }
 
+/// De que lado da tela um painel mora.
+public enum LadoDoPainel: String, Codable, CaseIterable, Sendable {
+    case esquerda, direita
+    public var label: String {
+        switch self {
+        case .esquerda: tr("À esquerda")
+        case .direita: tr("À direita")
+        }
+    }
+}
+
+/// Onde o terminal abre.
+public enum LugarDoTerminal: String, Codable, CaseIterable, Sendable {
+    case editor, lateral
+    public var label: String {
+        switch self {
+        case .editor: tr("Abaixo do editor")
+        case .lateral: tr("Abaixo dos arquivos")
+        }
+    }
+}
+
 /// Fonte do editor. Todas existem no iPad sem baixar nada: a primeira vem no app, as
 /// outras vêm do sistema.
 public enum EditorFont: String, Codable, CaseIterable, Sendable {
@@ -183,6 +205,20 @@ public struct ChromeSnapshot: Codable, Hashable, Sendable {
     /// Barras que podem sumir para sobrar tela.
     public var showTabBar = true
     public var showStatusBar = true
+    /// Multiplicador do texto da interface. O do código é separado, em `editor.fontSize`.
+    public var uiScale: Double = 1
+    /// Cores do código por cima do tema, por nome de token: keyword, string, comment,
+    /// number, function, type. Vazio é o tema como ele veio.
+    public var syntaxOverrides: [String: String] = [:]
+    /// Onde cada painel mora. Trocar de lado é preferência de mão, não de gosto: quem
+    /// segura o iPad de um jeito quer a árvore do outro.
+    public var sideSide: LadoDoPainel = .esquerda
+    public var agentSide: LadoDoPainel = .direita
+    public var termPlace: LugarDoTerminal = .editor
+    /// Terminal: tamanho e fonte próprios, porque ninguém lê log no mesmo corpo em que
+    /// escreve código.
+    public var termFontSize: Double = 12
+    public var termFont: EditorFont = .plex
     public var side: SidePanel = .files
     public var sideOpen = true
     public var center: CenterMode = .code
@@ -219,6 +255,13 @@ public struct ChromeSnapshot: Codable, Hashable, Sendable {
         themeDark = try c.decodeIfPresent(ThemeId.self, forKey: .themeDark) ?? d.themeDark
         showTabBar = try c.decodeIfPresent(Bool.self, forKey: .showTabBar) ?? d.showTabBar
         showStatusBar = try c.decodeIfPresent(Bool.self, forKey: .showStatusBar) ?? d.showStatusBar
+        uiScale = try c.decodeIfPresent(Double.self, forKey: .uiScale) ?? d.uiScale
+        syntaxOverrides = try c.decodeIfPresent([String: String].self, forKey: .syntaxOverrides) ?? [:]
+        sideSide = try c.decodeIfPresent(LadoDoPainel.self, forKey: .sideSide) ?? d.sideSide
+        agentSide = try c.decodeIfPresent(LadoDoPainel.self, forKey: .agentSide) ?? d.agentSide
+        termPlace = try c.decodeIfPresent(LugarDoTerminal.self, forKey: .termPlace) ?? d.termPlace
+        termFontSize = try c.decodeIfPresent(Double.self, forKey: .termFontSize) ?? d.termFontSize
+        termFont = try c.decodeIfPresent(EditorFont.self, forKey: .termFont) ?? d.termFont
         side = try c.decodeIfPresent(SidePanel.self, forKey: .side) ?? d.side
         sideOpen = try c.decodeIfPresent(Bool.self, forKey: .sideOpen) ?? d.sideOpen
         center = try c.decodeIfPresent(CenterMode.self, forKey: .center) ?? d.center
@@ -260,8 +303,11 @@ public final class ChromeState {
     public var sistemaEscuro = true
 
     public var palette: ThemePalette {
-        guard snapshot.themeAuto else { return ThemePalette.by(snapshot.theme) }
-        return ThemePalette.by(sistemaEscuro ? snapshot.themeDark : snapshot.themeLight)
+        var p = snapshot.themeAuto
+            ? ThemePalette.by(sistemaEscuro ? snapshot.themeDark : snapshot.themeLight)
+            : ThemePalette.by(snapshot.theme)
+        p.syntax = p.syntax.com(snapshot.syntaxOverrides)
+        return p
     }
 
     public func toggleSide() {

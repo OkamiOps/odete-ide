@@ -125,69 +125,139 @@ struct WorkspaceView: View {
     }
 
     func columns(narrow: Bool, medidas m: Medidas) -> some View {
-        @Bindable var chrome = chrome
+        let esquerdaPrimeiro = chrome.snapshot.sideSide == .esquerda
+        let agenteNaEsquerda = chrome.snapshot.agentSide == .esquerda
+        let agenteAberto = chrome.snapshot.agentVisible && !narrow
         return HStack(spacing: 0) {
-            let problemas = ws.problemCounts
-            Rail(
-                side: chrome.snapshot.side,
-                sideOpen: chrome.snapshot.sideOpen,
-                agentVisible: chrome.snapshot.agentVisible,
-                agentBusy: ws.agent.running,
-                problemas: problemas.errors + problemas.warnings,
-                problemasGraves: problemas.errors > 0,
-                alteracoes: ws.git.status.count,
-                onSelect: { chrome.select(side: $0) },
-                onToggleAgent: { chrome.toggleAgent() },
-                // Ajustes é uma folha, não um painel de coluna: numa coluna estreita a
-                // lista inteira vira uma linguiça sem hierarquia.
-                onSettings: { chrome.settingsOpen = true },
-                onProjects: { app.closeWorkspace() }
-            )
+            if esquerdaPrimeiro {
+                ladoDosArquivos(m, naEsquerda: true)
+            }
+            if agenteNaEsquerda, agenteAberto {
+                agente(m, naEsquerda: true)
+            }
+            centro(m)
+            if !agenteNaEsquerda, agenteAberto {
+                agente(m, naEsquerda: false)
+            }
+            if !esquerdaPrimeiro {
+                ladoDosArquivos(m, naEsquerda: false)
+            }
+        }
+    }
+
+    /// O rail sempre encosta na borda da tela, e a árvore fica entre ele e o editor.
+    /// Trocar de lado é espelhar os dois, não só mover a árvore.
+    @ViewBuilder
+    func ladoDosArquivos(_ m: Medidas, naEsquerda: Bool) -> some View {
+        @Bindable var chrome = chrome
+        let problemas = ws.problemCounts
+        let rail = Rail(
+            side: chrome.snapshot.side,
+            sideOpen: chrome.snapshot.sideOpen,
+            agentVisible: chrome.snapshot.agentVisible,
+            agentBusy: ws.agent.running,
+            problemas: problemas.errors + problemas.warnings,
+            problemasGraves: problemas.errors > 0,
+            alteracoes: ws.git.status.count,
+            onSelect: { chrome.select(side: $0) },
+            onToggleAgent: { chrome.toggleAgent() },
+            // Ajustes é uma folha, não um painel de coluna: numa coluna estreita a
+            // lista inteira vira uma linguiça sem hierarquia.
+            onSettings: { chrome.settingsOpen = true },
+            onProjects: { app.closeWorkspace() }
+        )
+        let divisor = Splitter(
+            value: preso($chrome.snapshot.sideWidth, Metrics.minSide, m.sideMax),
+            axis: .horizontal,
+            range: Metrics.minSide ... m.sideMax,
+            direction: naEsquerda ? 1 : -1
+        )
+        if naEsquerda {
+            rail
             if chrome.snapshot.sideOpen {
-                SidebarView()
-                    .frame(width: m.side)
-                    // Cinto de segurança: conteúdo que não consiga encolher fica cortado
-                    // dentro da coluna, em vez de empurrar o rail para fora da tela.
-                    .clipped()
-                    .background(theme.surface)
-                Splitter(
-                    value: preso($chrome.snapshot.sideWidth, Metrics.minSide, m.sideMax),
-                    axis: .horizontal,
-                    range: Metrics.minSide ... m.sideMax
-                )
+                colunaLateral(m)
+                divisor
             }
-            VStack(spacing: 0) {
-                CenterPane()
-                // As informações do arquivo ficam colados no pé do editor, não no pé da janela.
-                if chrome.snapshot.showStatusBar {
-                    StatusBar()
-                }
-                if chrome.snapshot.termVisible {
-                    Splitter(
-                        value: preso($chrome.snapshot.termHeight, Metrics.minTerm, m.termMax),
-                        axis: .vertical,
-                        range: Metrics.minTerm ... m.termMax,
-                        direction: -1
-                    )
-                    TerminalPane()
-                        .frame(height: clamp(chrome.snapshot.termHeight, Metrics.minTerm, m.termMax))
-                }
+        } else {
+            if chrome.snapshot.sideOpen {
+                divisor
+                colunaLateral(m)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .clipped()
-            // Identificada para o teste poder medir a largura dela: o bug de recolher os
-            // dois lados e a coluna não crescer só aparece na medida.
-            .accessibilityElement(children: .contain)
-            .accessibilityIdentifier("colunaCentral")
-            if chrome.snapshot.agentVisible, !narrow {
+            rail
+        }
+    }
+
+    /// A árvore, e embaixo dela o terminal quando ele foi posto aqui. Com o terminal do
+    /// lado sobra a largura inteira para o código, que é o que se olha o dia todo.
+    func colunaLateral(_ m: Medidas) -> some View {
+        @Bindable var chrome = chrome
+        let comTerminal = chrome.snapshot.termVisible && chrome.snapshot.termPlace == .lateral
+        return VStack(spacing: 0) {
+            SidebarView()
+                // Cinto de segurança: conteúdo que não consiga encolher fica cortado
+                // dentro da coluna, em vez de empurrar o rail para fora da tela.
+                .clipped()
+                .frame(maxHeight: .infinity)
+            if comTerminal {
                 Splitter(
-                    value: preso($chrome.snapshot.agentWidth, Metrics.minAgent, m.agentMax),
-                    axis: .horizontal,
-                    range: Metrics.minAgent ... m.agentMax,
+                    value: preso($chrome.snapshot.termHeight, Metrics.minTerm, m.termMax),
+                    axis: .vertical,
+                    range: Metrics.minTerm ... m.termMax,
                     direction: -1
                 )
-                AgentPane()
-                    .frame(width: m.agent)
+                TerminalPane()
+                    .frame(height: clamp(chrome.snapshot.termHeight, Metrics.minTerm, m.termMax))
+            }
+        }
+        .frame(width: m.side)
+        .background(theme.surface)
+    }
+
+    func centro(_ m: Medidas) -> some View {
+        @Bindable var chrome = chrome
+        // Terminal na coluna lateral só existe quando a coluna existe; com a árvore
+        // fechada ele volta para baixo do editor em vez de sumir.
+        let aqui = chrome.snapshot.termPlace == .editor || !chrome.snapshot.sideOpen
+        return VStack(spacing: 0) {
+            CenterPane()
+            // As informações do arquivo ficam colados no pé do editor, não no pé da janela.
+            if chrome.snapshot.showStatusBar {
+                StatusBar()
+            }
+            if chrome.snapshot.termVisible, aqui {
+                Splitter(
+                    value: preso($chrome.snapshot.termHeight, Metrics.minTerm, m.termMax),
+                    axis: .vertical,
+                    range: Metrics.minTerm ... m.termMax,
+                    direction: -1
+                )
+                TerminalPane()
+                    .frame(height: clamp(chrome.snapshot.termHeight, Metrics.minTerm, m.termMax))
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .clipped()
+        // Identificada para o teste poder medir a largura dela: o bug de recolher os
+        // dois lados e a coluna não crescer só aparece na medida.
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("colunaCentral")
+    }
+
+    func agente(_ m: Medidas, naEsquerda: Bool) -> some View {
+        @Bindable var chrome = chrome
+        let divisor = Splitter(
+            value: preso($chrome.snapshot.agentWidth, Metrics.minAgent, m.agentMax),
+            axis: .horizontal,
+            range: Metrics.minAgent ... m.agentMax,
+            direction: naEsquerda ? 1 : -1
+        )
+        return Group {
+            if naEsquerda {
+                AgentPane().frame(width: m.agent)
+                divisor
+            } else {
+                divisor
+                AgentPane().frame(width: m.agent)
             }
         }
     }

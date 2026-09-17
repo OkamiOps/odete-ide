@@ -12,6 +12,7 @@ struct AgentPane: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
     @State private var history = false
     @State private var showAccounts = false
+    @State private var contas = false
 
     var body: some View {
         let ag = ws.agent!
@@ -24,6 +25,21 @@ struct AgentPane: View {
             Composer(agent: ag)
         }
         .background(theme.bgElevated)
+        // A lista de contas mora aqui dentro, e não numa apresentação do sistema.
+        // Popover e folha decidem sozinhos onde e de que tamanho aparecem, e foi assim
+        // que a lista abriu três vezes como uma linha achatada no iPad e uma vez como um
+        // cartão perdido no meio da tela. Desenhada no painel, ela fica onde foi posta:
+        // debaixo da linha da conta, do tamanho da lista.
+        .overlay {
+            if contas {
+                ContasSobreposto(
+                    agent: ag,
+                    escolher: { ag.setAccount($0); fechaContas() },
+                    gerenciar: { fechaContas(); showAccounts = true },
+                    fechar: { fechaContas() }
+                )
+            }
+        }
         .overlay(alignment: .leading) {
             if sizeClass != .compact {
                 Rectangle().fill(theme.border).frame(width: 1)
@@ -58,7 +74,7 @@ struct AgentPane: View {
         HStack(spacing: 8) {
             // Prioridade para a identidade: sem isto o subtítulo era comido pela
             // cápsula de ações numa coluna de 300 pt.
-            ModelMenu(agent: ag, onConnect: { showAccounts = true }).layoutPriority(1)
+            ModelMenu(agent: ag, aberto: contas, abrir: abreContas).layoutPriority(1)
             Spacer(minLength: 4)
             HStack(spacing: 0) {
                 // A contagem em cima do relógio: sem ela o botão parecia desligado, como
@@ -79,6 +95,14 @@ struct AgentPane: View {
         .padding(.trailing, 8)
         .frame(height: 52)
         .overlay(alignment: .bottom) { Rectangle().fill(theme.separator).frame(height: 0.5) }
+    }
+
+    func abreContas() {
+        withAnimation(.snappy(duration: 0.2)) { contas = true }
+    }
+
+    func fechaContas() {
+        withAnimation(.snappy(duration: 0.16)) { contas = false }
     }
 
     /// Numa coluna de 300 pt os dois botões comiam o rótulo e sobrava "1 patch p…".
@@ -172,22 +196,14 @@ func fmtTok(_ n: Int) -> String {
 struct ModelMenu: View {
     @Environment(\.theme) private var theme
     let agent: AgentModel
-    let onConnect: () -> Void
-
-    @State private var aberto = false
+    /// Só para virar a seta. Quem guarda o estado é o painel, que é quem desenha a lista.
+    var aberto: Bool
+    var abrir: () -> Void
 
     var body: some View {
-        Button { aberto = true } label: { label }
+        Button(action: abrir) { label }
             .buttonStyle(.plain)
             .accessibilityLabel(tr("Conta"))
-            .sheet(isPresented: $aberto) {
-                ListaDeContas(
-                    agent: agent,
-                    escolher: { agent.setAccount($0); aberto = false },
-                    gerenciar: { aberto = false; onConnect() },
-                    fechar: { aberto = false }
-                )
-            }
     }
 
     var label: some View {
@@ -205,7 +221,8 @@ struct ModelMenu: View {
                     Text(agent.account?.label ?? tr("Sem conta"))
                         .font(.subheadline.weight(.semibold)).foregroundStyle(theme.fg).lineLimit(1)
                     Image(systemName: "chevron.down").font(.system(size: 9, weight: .bold))
-                        .foregroundStyle(theme.fgSubtle)
+                        .foregroundStyle(aberto ? theme.accent : theme.fgSubtle)
+                        .rotationEffect(.degrees(aberto ? 180 : 0))
                 }
                 Text(subtitle).font(.caption2).foregroundStyle(.secondary)
                     .lineLimit(1).truncationMode(.middle).minimumScaleFactor(0.85)
@@ -220,20 +237,18 @@ struct ModelMenu: View {
     }
 }
 
-/// Lista de contas no formato dos cartões do resto do app, no lugar do menu do sistema,
-/// onde o e-mail quebrava no meio e o ícone do Grok parecia um erro.
+/// A lista de contas, desenhada no painel do agente.
 ///
-/// Foi popover, e três vezes abriu no iPad como uma linha atravessada na tela: a setinha,
-/// nenhuma altura, nada para tocar. Cada conserto acertou uma causa e o aparelho achou
-/// outra — o `ScrollView` sem tamanho próprio, o tamanho de classe lido de dentro do
-/// próprio popover, o espaço acima do botão. É a natureza da coisa: popover é
-/// posicionamento, e posicionamento depende de onde o botão está, de quanto sobra na
-/// direção escolhida e de como cada versão do sistema mede isso. Nada disso é visível de
-/// dentro da view, e nada disso aparece num simulador de outra versão.
+/// Já foi menu do sistema, popover e folha. O menu quebrava o e-mail no meio; o popover
+/// abriu três vezes no iPad como uma linha achatada com a setinha e nada para tocar; a
+/// folha abriu, mas como um cartão solto no meio da tela, longe do botão que a chamou.
 ///
-/// Folha não depende de nenhuma dessas três coisas. O que se perde é a elegância de abrir
-/// colado no botão; o que se ganha é abrir. A troca é fácil.
-struct ListaDeContas: View {
+/// O que as três têm em comum é que quem decide onde e de que tamanho aparecem é o
+/// sistema, a partir de coisas que a view não enxerga: espaço livre acima do botão,
+/// tamanho de classe medido do lado de dentro, versão do iPadOS. Aqui não há nada disso:
+/// é uma `overlay` do próprio painel, ancorada 54 pt abaixo do topo — logo abaixo da
+/// linha da conta —, com a largura da coluna e a altura da lista. Fica onde foi posta.
+struct ContasSobreposto: View {
     @Environment(\.theme) private var theme
     let agent: AgentModel
     var escolher: (AIAccount) -> Void
@@ -241,87 +256,75 @@ struct ListaDeContas: View {
     var fechar: () -> Void
 
     var body: some View {
+        ZStack(alignment: .topLeading) {
+            // Escurece o painel e fecha ao toque, como qualquer menu.
+            Rectangle().fill(.black.opacity(0.32))
+                .contentShape(Rectangle())
+                .onTapGesture { fechar() }
+                .accessibilityLabel(tr("Fechar"))
+                .accessibilityAddTraits(.isButton)
+                .transition(.opacity)
+            painel
+                .frame(maxWidth: 300, alignment: .leading)
+                .padding(.horizontal, 12)
+                // 52 pt de cabeçalho mais uma folga: encosta na linha da conta sem cobrir.
+                .padding(.top, 56)
+                .transition(.scale(scale: 0.96, anchor: .topLeading).combined(with: .opacity))
+        }
+    }
+
+    var painel: some View {
         VStack(spacing: 0) {
-            cabecalho
-            lista
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(theme.bg)
-        // Um degrau do tamanho da lista e outro grande, para quem tem muitas contas.
-        .presentationDetents([.height(altura), .large])
-        .presentationDragIndicator(.visible)
-    }
-
-    var cabecalho: some View {
-        HStack {
-            Text(tr("Contas")).font(.headline).foregroundStyle(theme.fg)
-            Spacer()
-            // Tocar fora fecha, mas num iPad a folha ocupa o meio da tela e "fora" não é
-            // óbvio. Um botão resolve sem custo nenhum.
-            Button(tr("OK")) { fechar() }
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(theme.accent)
-                .buttonStyle(.plain)
-        }
-        .padding(.horizontal, 16)
-        .padding(.top, 18)
-        .padding(.bottom, 4)
-    }
-
-    var lista: some View {
-        ScrollPane {
-            VStack(alignment: .leading, spacing: 14) {
-                if agent.accounts.accounts.isEmpty {
-                    CardNote(tr("Nenhuma conta ainda. O modelo da Apple não pede conta nenhuma."))
-                } else {
-                    CardList {
-                        ForEach(Array(agent.accounts.accounts.enumerated()), id: \.element.id) { i, a in
-                            Button { escolher(a) } label: {
-                                CardRow(
-                                    a.label,
-                                    symbol: a.kind.symbol,
-                                    color: a.needsReconnect ? theme.danger : ProviderCor.de(a.kind),
-                                    detail: a.needsReconnect ? tr("sessão expirou, reconecte")
-                                        : (a.login.isEmpty ? a.kind.vendor : a.login),
-                                    first: i == 0
-                                ) {
-                                    if a.id == agent.account?.id {
-                                        Image(systemName: "checkmark").font(.caption.bold())
-                                            .foregroundStyle(theme.accent)
-                                    }
-                                }
-                                .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
-                CardList {
-                    Button { gerenciar() } label: {
+            if agent.accounts.accounts.isEmpty {
+                Text(tr("Nenhuma conta ainda. O modelo da Apple não pede conta nenhuma."))
+                    .font(.footnote).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 12).padding(.vertical, 12)
+            } else {
+                ForEach(Array(agent.accounts.accounts.enumerated()), id: \.element.id) { i, a in
+                    Button { escolher(a) } label: {
                         CardRow(
-                            tr("Contas de IA…"),
-                            symbol: "person.crop.circle.badge.plus",
-                            color: .indigo,
-                            first: true
+                            a.label,
+                            symbol: a.kind.symbol,
+                            color: a.needsReconnect ? theme.danger : ProviderCor.de(a.kind),
+                            detail: a.needsReconnect ? tr("sessão expirou, reconecte")
+                                : (a.login.isEmpty ? a.kind.vendor : a.login),
+                            first: i == 0
                         ) {
-                            Image(systemName: "chevron.right").font(.caption2.bold())
-                                .foregroundStyle(theme.fgSubtle)
+                            if a.id == agent.account?.id {
+                                Image(systemName: "checkmark").font(.caption.bold())
+                                    .foregroundStyle(theme.accent)
+                            }
                         }
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .hoverEffect(.highlight)
                 }
             }
-            .padding(14)
+            // Separador inteiro, não recuado: aqui muda o assunto da lista.
+            Rectangle().fill(theme.separator).frame(height: 0.5)
+            Button { gerenciar() } label: {
+                CardRow(
+                    tr("Contas de IA…"),
+                    symbol: "person.crop.circle.badge.plus",
+                    color: .indigo,
+                    first: true
+                ) {
+                    Image(systemName: "chevron.right").font(.caption2.bold())
+                        .foregroundStyle(theme.fgSubtle)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .hoverEffect(.highlight)
         }
-    }
-
-    /// Acompanha o número de contas, senão sobra um vazio embaixo — com teto, para uma
-    /// lista longa rolar em vez de passar da tela.
-    var altura: CGFloat {
-        let contas = agent.accounts.accounts.count
-        let cabeca: CGFloat = 60
-        let pedida = cabeca + 14 + (contas == 0 ? 52 : CGFloat(contas) * 50) + 14 + 44 + 24
-        return min(pedida, 520)
+        .background(theme.bgElevated, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(theme.border, lineWidth: 0.5)
+        }
+        .shadow(color: .black.opacity(0.45), radius: 22, y: 10)
     }
 }

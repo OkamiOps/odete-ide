@@ -38,11 +38,11 @@ struct AppleProviderTests {
     @Test func oOrcamentoDaNuvemEhMaior() {
         #expect(AppleProvider.janelaDaNuvem > AppleProvider.orcamentoDeEntrada)
         let longa = (1 ... 60).map { AgentMessage.user("mensagem número \($0) " + String(repeating: "x", count: 300)) }
-        let local = AppleProvider.prompt(longa)
-        let nuvem = AppleProvider.prompt(longa, orcamento: AppleProvider.janelaDaNuvem)
-        #expect(local.count <= AppleProvider.orcamentoDeEntrada + 400)
+        let local = TranscricaoApple.cortando(longa, orcamento: AppleProvider.orcamentoDeEntrada)
+        let nuvem = TranscricaoApple.cortando(longa, orcamento: AppleProvider.janelaDaNuvem)
         #expect(nuvem.count > local.count, "a nuvem recebeu o mesmo pedaço que o modelo local")
-        #expect(nuvem.count <= AppleProvider.janelaDaNuvem + 400)
+        #expect(TranscricaoApple.tamanho(local) <= AppleProvider.orcamentoDeEntrada)
+        #expect(TranscricaoApple.tamanho(nuvem) <= AppleProvider.janelaDaNuvem)
     }
 
     /// O número que mais envelhece: quando a Apple troca o modelo por um de janela maior,
@@ -66,8 +66,8 @@ struct AppleProviderTests {
     /// O histórico cortado guarda o fim da conversa, que é a parte que importa.
     @Test func oCorteGuardaOFimDaConversa() {
         let msgs = (1 ... 40).map { AgentMessage.user("linha \($0) " + String(repeating: "y", count: 400)) }
-        let texto = AppleProvider.prompt(msgs)
-        #expect(texto.contains("linha 40"), "cortou a mensagem mais recente")
-        #expect(!texto.contains("linha 1 "), "guardou o começo em vez do fim")
+        let ficaram = TranscricaoApple.cortando(msgs, orcamento: AppleProvider.orcamentoDeEntrada)
+        #expect(ficaram.last?.content.hasPrefix("linha 40") == true, "cortou a mensagem mais recente")
+        #expect(ficaram.first?.content.hasPrefix("linha 1 ") != true, "guardou o começo em vez do fim")
     }
 }

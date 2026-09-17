@@ -11061,30 +11061,30 @@
         }
       }
     },
-    "Nada mudou no projeto: você não chamou ferramenta nenhuma. Se havia mudança a fazer, faça agora, chamando a ferramenta. Se não havia, responda só isso.": {
+    "Nada mudou no projeto: você não chamou ferramenta nenhuma, e descrever a mudança não a aplica. Chame a ferramenta agora e faça. Só responda em texto se não existir nenhuma mudança a fazer.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Nothing changed in the project: you did not call any tool. If there was a change to make, make it now by calling the tool. If there wasn't, just say so."
+            "value": "Nothing changed in the project: you did not call any tool, and describing a change does not apply it. Call the tool now and do it. Only answer in text if there is no change to make."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Im Projekt hat sich nichts geändert: Du hast kein Werkzeug aufgerufen. Wenn es etwas zu ändern gab, tu es jetzt mit dem passenden Werkzeug. Wenn nicht, sag einfach das."
+            "value": "Im Projekt hat sich nichts geändert: Du hast kein Werkzeug aufgerufen, und eine Änderung zu beschreiben wendet sie nicht an. Ruf jetzt das Werkzeug auf und mach es. Antworte nur dann mit Text, wenn es nichts zu ändern gibt."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Rien n'a changé dans le projet : tu n'as appelé aucun outil. S'il y avait une modification à faire, fais-la maintenant en appelant l'outil. Sinon, dis-le simplement."
+            "value": "Rien n'a changé dans le projet : tu n'as appelé aucun outil, et décrire une modification ne l'applique pas. Appelle l'outil maintenant et fais-le. Ne réponds en texte que s'il n'y a aucune modification à faire."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Nada cambió en el proyecto: no llamaste a ninguna herramienta. Si había un cambio que hacer, hazlo ahora llamando a la herramienta. Si no lo había, responde solo eso."
+            "value": "Nada cambió en el proyecto: no llamaste a ninguna herramienta, y describir un cambio no lo aplica. Llama a la herramienta ahora y hazlo. Responde en texto solo si no hay ningún cambio que hacer."
           }
         }
       }
@@ -12681,34 +12681,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "OK"
-          }
-        }
-      }
-    },
-    "Odete pediu %1$@: %2$@": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Odete asked for %1$@: %2$@"
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Odete hat %1$@ angefordert: %2$@"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Odete a demandé %1$@ : %2$@"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Odete pidió %1$@: %2$@"
           }
         }
       }
@@ -14981,34 +14953,6 @@
         }
       }
     },
-    "Resultado de ferramenta: ": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tool result: "
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Tool-Ergebnis: "
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Résultat d’outil : "
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Resultado de herramienta: "
-          }
-        }
-      }
-    },
     "Revelar arquivo aberto": {
       "localizations": {
         "en": {
@@ -15705,6 +15649,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Barra lateral"
+          }
+        }
+      }
+    },
+    "Siga a partir do resultado acima.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continue from the result above."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mach mit dem Ergebnis oben weiter."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continue à partir du résultat ci-dessus."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sigue a partir del resultado de arriba."
           }
         }
       }

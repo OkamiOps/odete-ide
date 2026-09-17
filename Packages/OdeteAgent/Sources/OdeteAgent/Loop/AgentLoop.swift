@@ -253,7 +253,7 @@ public final class AgentLoop: @unchecked Sendable {
                 if config.mode == .build, !fezPatch, !cutucou {
                     cutucou = true
                     messages.append(.user(tr(
-                        "Nada mudou no projeto: você não chamou ferramenta nenhuma. Se havia mudança a fazer, faça agora, chamando a ferramenta. Se não havia, responda só isso."
+                        "Nada mudou no projeto: você não chamou ferramenta nenhuma, e descrever a mudança não a aplica. Chame a ferramenta agora e faça. Só responda em texto se não existir nenhuma mudança a fazer."
                     )))
                     round += 1
                     continue

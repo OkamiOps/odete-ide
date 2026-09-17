@@ -167,20 +167,30 @@ public struct AppleProvider: Provider {
         }
     }
 
-    /// A sessão da rodada, com o modelo que o pedido escolheu.
-    static func sessao(_ turn: TurnRequest, ferramentas: [any Tool]) -> LanguageModelSession {
-        if turn.model == idNuvem, #available(iOS 27.0, *), nuvemDisponivel {
-            return LanguageModelSession(
-                model: PrivateCloudComputeLanguageModel(),
-                tools: ferramentas,
-                instructions: Instructions(instrucoes(turn.system, comFerramentas: !ferramentas.isEmpty))
+    /// A sessão da rodada, montada sobre a transcrição da conversa.
+    ///
+    /// A transcrição carrega as instruções e as ferramentas dentro dela — ver
+    /// `TranscricaoApple`. Por isso não existe aqui um `instructions:` separado: ele
+    /// duplicaria o que já é a primeira entrada.
+    static func sessao(_ turn: TurnRequest, ferramentas: [any Tool]) -> (LanguageModelSession, String) {
+        let naNuvem = turn.model == idNuvem
+        let (transcricao, prompt) = TranscricaoApple.montar(
+            turn.messages,
+            instrucoes: instrucoes(turn.system, comFerramentas: !ferramentas.isEmpty),
+            ferramentas: ferramentas,
+            orcamento: naNuvem ? janelaDaNuvem : orcamentoDeEntrada
+        )
+        if naNuvem, #available(iOS 27.0, *), nuvemDisponivel {
+            return (
+                LanguageModelSession(
+                    model: PrivateCloudComputeLanguageModel(),
+                    tools: ferramentas,
+                    transcript: transcricao
+                ),
+                prompt
             )
         }
-        return LanguageModelSession(
-            model: .default,
-            tools: ferramentas,
-            instructions: instrucoes(turn.system, comFerramentas: !ferramentas.isEmpty)
-        )
+        return (LanguageModelSession(model: .default, tools: ferramentas, transcript: transcricao), prompt)
     }
 
     public func stream(_ turn: TurnRequest) -> AsyncThrowingStream<StreamEvent, Error> {
@@ -203,12 +213,7 @@ public struct AppleProvider: Provider {
                             ))
                         }
                     }
-                    let sessao = Self.sessao(turn, ferramentas: ferramentas)
-                    let prompt = Self.prompt(
-                        turn.messages,
-                        orcamento: naNuvem ? Self.janelaDaNuvem : Self
-                            .orcamentoDeEntrada
-                    )
+                    let (sessao, prompt) = Self.sessao(turn, ferramentas: ferramentas)
                     var anterior = ""
                     let fluxo = sessao.streamResponse(
                         to: prompt,
@@ -277,52 +282,6 @@ public struct AppleProvider: Provider {
     /// O corte tem dois limites, e os dois precisam acompanhar a janela: o número de
     /// mensagens e o tamanho em caracteres. Só mexer no segundo não adianta — o primeiro
     /// amarra antes, e o modelo grande recebe a mesma conversinha do pequeno.
-    /// Quanto de um resultado de ferramenta cabe numa mensagem do histórico.
-    ///
-    /// Estava preso em 400 caracteres. Para conversar bastava; para editar, não: quem
-    /// pede `read_file` e recebe um pedaço do arquivo não tem como montar um
-    /// `str_replace` com o trecho exato, e o modelo passa a errar por falta de texto, não
-    /// por falta de capacidade. Um terço do orçamento é o que sobra para o arquivo depois
-    /// das instruções e da conversa — o que não couber ele busca de novo, com `grep` ou
-    /// lendo outro pedaço.
-    static func tetoDoResultado(_ orcamento: Int) -> Int {
-        max(400, orcamento / 3)
-    }
-
-    static func prompt(_ mensagens: [AgentMessage], orcamento: Int = orcamentoDeEntrada) -> String {
-        var partes: [String] = []
-        let quantas = max(20, (orcamento / orcamentoDeEntrada) * 20)
-        let teto = tetoDoResultado(orcamento)
-        for m in mensagens.suffix(quantas) {
-            switch m.role {
-            case .user:
-                partes.append("Pessoa: " + m.content)
-            case .assistant:
-                if !m.content.isEmpty {
-                    partes.append("Odete: " + m.content)
-                }
-                // O pedido entra mesmo quando não veio texto junto: sem ele a rodada
-                // seguinte vê um resultado caído do céu, sem saber de qual arquivo é nem
-                // por que foi pedido.
-                for chamada in m.toolCalls ?? [] {
-                    partes.append(tr("Odete pediu %1$@: %2$@", chamada.name, chamada.arguments))
-                }
-            case .tool:
-                partes.append(tr("Resultado de ferramenta: ") + m.content.prefix(teto))
-            default:
-                break
-            }
-        }
-        while partes.count > 1 {
-            let texto = partes.joined(separator: "\n\n")
-            if texto.count <= orcamento {
-                return texto
-            }
-            partes.removeFirst()
-        }
-        return String((partes.first ?? "").suffix(orcamento))
-    }
-
     /// A cota da nuvem é por uso e vem com data de renovação: dizer "tente de novo" sem
     /// dizer quando não ajuda ninguém.
     static func explicarNuvem(_ erro: Error) -> String? {

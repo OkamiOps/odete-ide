@@ -188,33 +188,93 @@ struct AppleFerramentasTests {
         #expect(texto.contains("a escolha da ferramenta é sua"), "as regras foram cortadas antes da lista")
     }
 
-    // MARK: o histórico
+    // MARK: a transcrição
 
-    /// Sem o pedido no histórico, a rodada seguinte recebe um resultado sem dono: o
-    /// modelo vê o conteúdo de um arquivo e não sabe de qual, nem por que pediu.
-    @Test func oHistoricoGuardaOPedidoEOResultado() {
-        let chamada = ToolCall(id: "1", name: "read_file", arguments: #"{"path":"index.html"}"#)
-        let texto = AppleProvider.prompt([
-            .user("troca o título"),
-            AgentMessage(role: .assistant, content: "", toolCalls: [chamada]),
-            AgentMessage(role: .tool, content: "<h1>oi</h1>", toolCallId: "1"),
-        ])
-        #expect(texto.contains("read_file"), "o pedido de ferramenta sumiu do histórico")
-        #expect(texto.contains("index.html"), "o argumento do pedido sumiu")
-        #expect(texto.contains("<h1>oi</h1>"), "o resultado sumiu")
+    func ferramentasDeTeste() -> [any Tool] {
+        AppleProvider.ferramentas(pedido()) { _, _ in }
     }
 
-    /// Quatrocentos caracteres davam para conversar e não davam para editar: com o
-    /// arquivo cortado não há como montar um `str_replace` com o trecho exato.
-    @Test func oResultadoDeFerramentaCabeUmArquivo() {
-        let arquivo = String(repeating: "uma linha de código\n", count: 200)
-        let texto = AppleProvider.prompt([AgentMessage(role: .tool, content: arquivo, toolCallId: "1")])
-        #expect(texto.count > 400, "o resultado voltou cortado em 400, como antes")
-        #expect(
-            AppleProvider.tetoDoResultado(AppleProvider.janelaDaNuvem)
-                > AppleProvider.tetoDoResultado(AppleProvider.orcamentoDeEntrada),
-            "o teto não acompanha a janela: o modelo grande recebe o mesmo pedaço do pequeno"
+    func monta(_ mensagens: [AgentMessage], orcamento: Int = 100_000) -> (Transcript, String) {
+        TranscricaoApple.montar(
+            mensagens,
+            instrucoes: "instruções",
+            ferramentas: ferramentasDeTeste(),
+            orcamento: orcamento
         )
+    }
+
+    /// A causa de o modelo escrever *sobre* editar em vez de editar.
+    ///
+    /// O histórico ia achatado num prompt de texto, onde a chamada anterior virava a
+    /// frase "Odete pediu read_file: {...}". Modelo pequeno imita o formato que vê: ele
+    /// passou a devolver prosa descrevendo a chamada — um bloco de CSS no chat com "nada
+    /// foi alterado" embaixo. Chamada tem que voltar como chamada.
+    @Test func aChamadaAnteriorVoltaComoChamadaENaoComoProsa() {
+        let chamada = ToolCall(id: "1", name: "read_file", arguments: #"{"path":"src/style.css"}"#)
+        let (transcricao, _) = monta([
+            .user("deixa o botão azul"),
+            AgentMessage(role: .assistant, content: "", toolCalls: [chamada]),
+            AgentMessage(role: .tool, content: "button { color: red }", toolCallId: "1"),
+        ])
+        var viuChamada = false, viuResultado = false
+        for entrada in transcricao {
+            switch entrada {
+            case let .toolCalls(c):
+                viuChamada = c.contains { $0.toolName == "read_file" }
+            case let .toolOutput(o):
+                // O nome tem que vir junto: o resultado sozinho é órfão para o modelo.
+                viuResultado = o.toolName == "read_file"
+            default: break
+            }
+        }
+        #expect(viuChamada, "a chamada anterior não virou entrada de chamada")
+        #expect(viuResultado, "o resultado não virou entrada de resultado com o nome da ferramenta")
+    }
+
+    /// As instruções e as ferramentas entram na transcrição, e é a primeira entrada.
+    @Test func aTranscricaoComecaPelasInstrucoesComAsFerramentas() throws {
+        let (transcricao, _) = monta([.user("oi")])
+        let primeira = try #require(transcricao.first)
+        guard case let .instructions(i) = primeira else {
+            Issue.record("a transcrição não começa pelas instruções")
+            return
+        }
+        #expect(i.toolDefinitions.count == Tools.all.count, "as ferramentas não foram declaradas na transcrição")
+    }
+
+    /// A última fala é a pergunta da vez, e não mais uma linha da transcrição.
+    @Test func aUltimaFalaViraOPrompt() {
+        let (_, prompt) = monta([.user("primeira"), .user("deixa o botão azul")])
+        #expect(prompt == "deixa o botão azul")
+    }
+
+    /// No meio de um trabalho a conversa termina em resultado de ferramenta: não há fala
+    /// nova, e o framework exige um prompt.
+    @Test func terminandoEmFerramentaOPromptMandaSeguir() {
+        let (_, prompt) = monta([
+            .user("arruma"),
+            AgentMessage(role: .tool, content: "escrito a.css (4 → 4 linhas)", toolCallId: "1"),
+        ])
+        #expect(prompt.contains("Siga"), "sem fala nova, ninguém mandou o modelo seguir")
+    }
+
+    /// Cortar o começo não pode deixar um resultado sem a chamada que o pediu: o modelo
+    /// veria a resposta de uma ferramenta que, para ele, nunca foi chamada.
+    @Test func oCorteNaoDeixaResultadoOrfao() {
+        let longa = String(repeating: "x", count: 500)
+        let mensagens: [AgentMessage] = (1 ... 20).flatMap { i -> [AgentMessage] in
+            [
+                AgentMessage(
+                    role: .assistant,
+                    content: "",
+                    toolCalls: [ToolCall(id: "\(i)", name: "read_file", arguments: "{}")]
+                ),
+                AgentMessage(role: .tool, content: longa, toolCallId: "\(i)"),
+            ]
+        }
+        let cortadas = TranscricaoApple.cortando(mensagens, orcamento: 1500)
+        #expect(cortadas.first?.role != .tool, "a conversa começa num resultado sem dono")
+        #expect(TranscricaoApple.tamanho(cortadas) <= 1500)
     }
 
     /// Os argumentos da chamada saem no orçamento da resposta, então um `write_file` de

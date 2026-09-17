@@ -171,6 +171,8 @@ func fmtTok(_ n: Int) -> String {
 /// pertencem à barra de digitação, junto do que a pessoa está escrevendo.
 struct ModelMenu: View {
     @Environment(\.theme) private var theme
+    /// Lido **aqui**, na tela, e não lá dentro. Ver `ContasPopover.compacto`.
+    @Environment(\.horizontalSizeClass) private var largura
     let agent: AgentModel
     let onConnect: () -> Void
 
@@ -183,6 +185,7 @@ struct ModelMenu: View {
             .popover(isPresented: $aberto, arrowEdge: .bottom) {
                 ContasPopover(
                     agent: agent,
+                    compacto: largura == .compact,
                     escolher: { agent.setAccount($0); aberto = false },
                     gerenciar: { aberto = false; onConnect() }
                 )
@@ -223,9 +226,15 @@ struct ModelMenu: View {
 /// onde o e-mail quebrava no meio e o ícone do Grok parecia um erro.
 struct ContasPopover: View {
     @Environment(\.theme) private var theme
-    /// No iPhone isto vira folha, e folha não tem 280 pt de largura.
-    @Environment(\.horizontalSizeClass) private var largura
     let agent: AgentModel
+    /// Se a tela é estreita — no iPhone isto vira folha, e folha não tem 280 pt.
+    ///
+    /// Vem de fora de propósito. Dentro de um popover o SwiftUI responde `.compact` para
+    /// o tamanho de classe, porque quem ele está medindo é o popover, que é estreito, e
+    /// não a tela. Lendo aqui dentro, o iPad caía no caminho do iPhone: sem largura e sem
+    /// altura, sobre um `ScrollView`, que não tem tamanho próprio. O popover abria como
+    /// uma linha atravessada na tela, com a setinha e nada para tocar.
+    let compacto: Bool
     var escolher: (AIAccount) -> Void
     var gerenciar: () -> Void
 
@@ -285,16 +294,16 @@ struct ContasPopover: View {
         // 280 pt encravados numa tela de 393, presos no canto.
         .frame(width: compacto ? nil : 280, height: compacto ? nil : altura)
         .frame(maxWidth: compacto ? .infinity : nil, maxHeight: compacto ? .infinity : nil)
+        // Rede, para o caso de o sistema mudar de ideia de novo sobre quem é compacto:
+        // nenhum caminho pode terminar em conteúdo de altura zero. `altura` já vale 138
+        // no pior caso, então aqui isto não encolhe nem estica nada que esteja certo.
+        .frame(minHeight: 120)
         .background(theme.bg)
         // Em largura compacta isto é folha. Dizer `.popover` aqui — que era o que estava
         // escrito — mandava o iPhone manter o popover, e no iPhone ele abria preso ao
         // botão, alto demais para caber: o conteúdo existia e não dava para tocar.
         .presentationCompactAdaptation(.sheet)
         .presentationDetents([.medium, .large])
-    }
-
-    var compacto: Bool {
-        largura == .compact
     }
 
     /// Acompanha o número de contas, senão sobra um vazio embaixo — com teto, para uma

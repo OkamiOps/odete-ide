@@ -24,6 +24,9 @@ public final class WorkspaceModel {
     /// percorre a árvore inteira e aloca um nó por arquivo. Como o editor se redesenha a
     /// cada tecla, essa varredura acontecia a cada tecla.
     public private(set) var filePaths: [String] = []
+    /// Índice de nomes do projeto e a assinatura que diz quando ele envelheceu.
+    var indiceCache: Resolvedor.Indice?
+    var assinaturaDoIndice = ""
     /// Scripts do package.json, na ordem em que estão escritos. Antes só existiam para
     /// quem lembrasse de digitar `npm run` no terminal.
     public private(set) var scripts: [(nome: String, comando: String)] = []

@@ -104,6 +104,7 @@ public enum ParserErros {
     /// Roda o parser e traduz o que ele marcou.
     public nonisolated static func problemas(text: String, language: Language) -> [LintIssue] {
         guard let lang = gramatica(language) else { return [] }
+        let text = semDialeto(text, language)
         guard temErro(text, lang) else { return [] }
         // Antes de descrever o erro, tenta consertá-lo com uma ficha só. Quando um `;`
         // no fim de uma linha faz a árvore inteira ficar limpa, o recado deixa de ser "o
@@ -120,6 +121,97 @@ public enum ParserErros {
         var achados: [LintIssue] = []
         colhe(ts_tree_root_node(arvore), &achados)
         return Array(achados.prefix(teto))
+    }
+
+    // MARK: - o que a gramática embarcada não conhece
+
+    /// Palavras do SQLite que a gramática de SQL embarcada não tem.
+    private static let frasesDoSQLite = [["autoincrement"], ["without", "rowid"], ["strict"]]
+
+    /// Comandos que a gramática não tem e que ocupam a instrução inteira.
+    private static let comandosDoSQLite = ["pragma", "vacuum", "reindex", "analyze", "attach", "detach"]
+
+    /// O texto que vai ao parser, com o que a gramática não conhece trocado por espaços.
+    ///
+    /// A gramática de SQL da Odete é de um SQL genérico, e o SQLite tem coisas que ela
+    /// nunca viu: `AUTOINCREMENT` na chave primária, `WITHOUT ROWID` no fim da tabela, uma
+    /// linha de `PRAGMA`. Cada uma fazia um arquivo **correto** aparecer com erro, que é o
+    /// pior defeito que um analisador pode ter. Trocar por espaços do mesmo tamanho em
+    /// bytes deixa todas as posições onde estavam, então o resto do arquivo continua sendo
+    /// conferido e o recado, quando existir, cai na coluna certa.
+    private nonisolated static func semDialeto(_ texto: String, _ language: Language) -> String {
+        guard language == .sql else { return texto }
+        var b = Array(texto.utf8)
+        var i = 0
+        while i < b.count {
+            guard inicioDePalavra(b, i) else { i += 1; continue }
+            if let fim = casaFrase(b, i, frasesDoSQLite) {
+                for k in i ..< fim { b[k] = 0x20 }
+                i = fim
+                continue
+            }
+            if inicioDeLinha(b, i), let fim = casaComando(b, i) {
+                for k in i ..< fim where b[k] != 0x0A { b[k] = 0x20 }
+                i = fim
+                continue
+            }
+            while i < b.count, ehLetra(b[i]) { i += 1 }
+        }
+        return String(decoding: b, as: UTF8.self)
+    }
+
+    private nonisolated static func ehLetra(_ c: UInt8) -> Bool {
+        (c | 0x20) >= 0x61 && (c | 0x20) <= 0x7A || (c >= 0x30 && c <= 0x39) || c == 0x5F
+    }
+
+    private nonisolated static func inicioDePalavra(_ b: [UInt8], _ i: Int) -> Bool {
+        ehLetra(b[i]) && (i == 0 || !ehLetra(b[i - 1]))
+    }
+
+    private nonisolated static func inicioDeLinha(_ b: [UInt8], _ i: Int) -> Bool {
+        var k = i - 1
+        while k >= 0, b[k] == 0x20 || b[k] == 0x09 { k -= 1 }
+        return k < 0 || b[k] == 0x0A
+    }
+
+    /// Casa uma palavra a partir de `i`, sem diferenciar maiúscula.
+    private nonisolated static func casaPalavra(_ b: [UInt8], _ i: Int, _ palavra: String) -> Int? {
+        let alvo = Array(palavra.utf8)
+        guard i + alvo.count <= b.count else { return nil }
+        for (k, c) in alvo.enumerated() where (b[i + k] | 0x20) != c { return nil }
+        let fim = i + alvo.count
+        guard fim == b.count || !ehLetra(b[fim]) else { return nil }
+        return fim
+    }
+
+    /// Casa uma das frases (palavras separadas por espaço) e devolve onde ela termina.
+    private nonisolated static func casaFrase(_ b: [UInt8], _ i: Int, _ frases: [[String]]) -> Int? {
+        for frase in frases {
+            var pos = i
+            var casou = true
+            for (n, palavra) in frase.enumerated() {
+                if n > 0 {
+                    let antes = pos
+                    while pos < b.count, b[pos] == 0x20 || b[pos] == 0x09 || b[pos] == 0x0A { pos += 1 }
+                    if pos == antes { casou = false; break }
+                }
+                guard let fim = casaPalavra(b, pos, palavra) else { casou = false; break }
+                pos = fim
+            }
+            if casou { return pos }
+        }
+        return nil
+    }
+
+    /// Um comando que ocupa a instrução inteira: apaga até o `;`, ou até o fim da linha.
+    private nonisolated static func casaComando(_ b: [UInt8], _ i: Int) -> Int? {
+        guard comandosDoSQLite.contains(where: { casaPalavra(b, i, $0) != nil }) else { return nil }
+        var pos = i
+        while pos < b.count, b[pos] != 0x0A {
+            if b[pos] == 0x3B { return pos + 1 }
+            pos += 1
+        }
+        return pos
     }
 
     private nonisolated static func analisa(_ texto: String, _ parser: OpaquePointer) -> OpaquePointer? {

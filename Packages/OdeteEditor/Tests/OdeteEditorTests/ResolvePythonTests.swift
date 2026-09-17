@@ -8,11 +8,11 @@ import Testing
 /// acusar um nome que existe é dizer que o código da pessoa está errado quando não está.
 struct ResolvePythonTests {
     func erros(_ texto: String) -> [LintIssue] {
-        ResolvePython.problemas(text: texto).filter { $0.severity == .error }
+        Resolvedor.problemas(text: texto, language: .python).filter { $0.severity == .error }
     }
 
     func descricao(_ texto: String) -> String {
-        ResolvePython.problemas(text: texto)
+        Resolvedor.problemas(text: texto, language: .python)
             .map { "l\($0.line):\($0.column) \($0.rule) \($0.message)" }.joined(separator: " | ")
     }
 
@@ -160,7 +160,7 @@ struct ResolvePythonTests {
     // MARK: - import sem uso
 
     @Test func importQueNinguemUsa() {
-        let achados = ResolvePython.problemas(text: "import os\nimport json\n\nprint(json.dumps({}))\n")
+        let achados = Resolvedor.problemas(text: "import os\nimport json\n\nprint(json.dumps({}))\n", language: .python)
         #expect(achados.contains { $0.rule == "import-sem-uso" && $0.message.contains("os") })
         #expect(!achados.contains { $0.message.contains("json") }, "acusou import que é usado")
         #expect(achados.first?.severity == .warning, "import sem uso não é erro, é aviso")

@@ -56,13 +56,16 @@ extension WorkspaceModel {
             refreshPatchMarks(path)
             return
         }
+        let indice = indiceDeNomes(para: lang)
         Task.detached(priority: .utility) { [weak self] in
             let esboco = Outline.items(text: text, language: lang)
             // Quando a linguagem tem gramática, quem confere a sintaxe é o parser dela.
             var doParser = ParserErros.problemas(text: text, language: lang)
             // Nome usado e nunca declarado: a parte do interpretador que não é sintaxe.
-            if lang == .python {
-                doParser += ResolvePython.problemas(text: text)
+            // O índice diz o que os outros arquivos do projeto declaram — sem ele, uma
+            // função do arquivo vizinho apareceria como não declarada.
+            if Resolvedor.temResolvedor(lang) {
+                doParser += Resolvedor.problemas(text: text, language: lang, path: path, indice: indice)
             }
             let regras = doParser + Lint.rules(
                 text: text,
@@ -177,5 +180,40 @@ extension WorkspaceModel {
                 self?.error = error.localizedDescription
             }
         }
+    }
+}
+
+/// O índice de nomes do projeto, para o resolvedor saber o que os outros arquivos
+/// declaram.
+extension WorkspaceModel {
+    /// O disco é lido uma vez e guardado; o que está aberto entra por cima, toda vez.
+    ///
+    /// Ler e analisar o projeto inteiro a cada pausa na digitação seria engasgo garantido,
+    /// e é por isso que a parte cara fica em cache. Mas o cache sozinho mente: quem acabou
+    /// de escrever uma função no arquivo ao lado e ainda não salvou veria o nome acusado
+    /// aqui. Por isso os arquivos abertos — que são poucos e já estão na memória — são
+    /// somados a cada chamada.
+    func indiceDeNomes(para language: Language) -> Resolvedor.Indice {
+        guard Resolvedor.usaIndice(language) else { return Resolvedor.Indice() }
+        let exts = Set(Language.extensoes[language] ?? [])
+        let alvos = filePaths.filter { exts.contains(($0 as NSString).pathExtension.lowercased()) }
+        let abertos: [(caminho: String, texto: String)] = alvos.compactMap { caminho in
+            buffers[caminho].map { (caminho, $0) }
+        }
+        let assinatura = "\(language.rawValue):\(filePaths.count):\(filePaths.last ?? "")"
+        if let guardado = indiceCache, assinaturaDoIndice == assinatura {
+            return guardado.somando(arquivos: abertos)
+        }
+        let doDisco: [(caminho: String, texto: String)] = alvos.prefix(600).compactMap { caminho in
+            guard buffers[caminho] == nil,
+                  let dados = try? String(contentsOf: root.appending(path: caminho), encoding: .utf8),
+                  dados.utf8.count <= Limites.arquivoGrande
+            else { return nil }
+            return (caminho, dados)
+        }
+        let indice = Resolvedor.Indice(arquivos: doDisco)
+        indiceCache = indice
+        assinaturaDoIndice = assinatura
+        return indice.somando(arquivos: abertos)
     }
 }

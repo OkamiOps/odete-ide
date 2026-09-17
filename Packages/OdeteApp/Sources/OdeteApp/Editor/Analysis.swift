@@ -59,7 +59,11 @@ extension WorkspaceModel {
         Task.detached(priority: .utility) { [weak self] in
             let esboco = Outline.items(text: text, language: lang)
             // Quando a linguagem tem gramática, quem confere a sintaxe é o parser dela.
-            let doParser = ParserErros.problemas(text: text, language: lang)
+            var doParser = ParserErros.problemas(text: text, language: lang)
+            // Nome usado e nunca declarado: a parte do interpretador que não é sintaxe.
+            if lang == .python {
+                doParser += ResolvePython.problemas(text: text)
+            }
             let regras = doParser + Lint.rules(
                 text: text,
                 language: lang,

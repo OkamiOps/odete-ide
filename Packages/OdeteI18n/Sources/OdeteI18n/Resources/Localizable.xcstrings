@@ -17473,6 +17473,34 @@
         }
       }
     },
+    "`%1$@` não foi declarado neste arquivo": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`%1$@` isn't declared in this file"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`%1$@` ist in dieser Datei nicht deklariert"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`%1$@` n’est pas déclaré dans ce fichier"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`%1$@` no está declarado en este archivo"
+          }
+        }
+      }
+    },
     "`%1$@` sem abertura": {
       "localizations": {
         "en": {
@@ -17497,6 +17525,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "`%1$@` sin apertura"
+          }
+        }
+      }
+    },
+    "`%1$@` é importado e não é usado": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`%1$@` is imported and never used"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`%1$@` wird importiert und nie benutzt"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`%1$@` est importé et jamais utilisé"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "`%1$@` se importa y no se usa"
           }
         }
       }

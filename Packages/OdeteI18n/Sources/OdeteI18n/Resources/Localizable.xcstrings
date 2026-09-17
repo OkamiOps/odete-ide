@@ -14869,6 +14869,34 @@
         }
       }
     },
+    "Responda em %1$@.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Answer in %1$@."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Antworte auf %1$@."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Réponds en %1$@."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Responde en %1$@."
+          }
+        }
+      }
+    },
     "Restaurar layout": {
       "localizations": {
         "en": {

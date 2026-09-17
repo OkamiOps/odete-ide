@@ -42,6 +42,17 @@ public struct AppleProvider: Provider {
         min(1500, max(400, janela / 4))
     }
 
+    /// Com ferramentas o teto sobe, e o de 1500 fichas sai de cena.
+    ///
+    /// Os argumentos da chamada saem no mesmo orçamento da resposta: um `write_file` de
+    /// arquivo inteiro bate no teto e volta truncado, e o que se vê na tela é o modelo
+    /// "não conseguindo" — por falta de espaço, não de juízo. O teto de conversa existia
+    /// para ninguém receber três parágrafos ao pedir uma linha; para escrever arquivo ele
+    /// só atrapalha.
+    static var respostaComFerramentas: Int {
+        max(respostaMaxima, janela / 3)
+    }
+
     public init() {}
 
     public static var disponivel: Bool {
@@ -133,22 +144,19 @@ public struct AppleProvider: Provider {
         cont.finish()
     }
 
-    /// As ferramentas que cabem no modelo local.
+    /// Todas as ferramentas do modo, sem peneira.
     ///
-    /// Toda ferramenta ocupa lugar na janela: nome, descrição e schema entram nas
-    /// instruções antes de qualquer conversa. Numa janela de poucos milhares de fichas,
-    /// oferecer as sete é gastar metade do orçamento explicando ferramenta que não vai
-    /// ser usada. Ficam as que fazem o trabalho de editar código; `github`, que tem a
-    /// descrição mais longa de todas, fica de fora do modelo local.
-    static let enxutas: Set<String> = ["read_file", "str_replace", "write_file", "list_dir", "grep", "run_shell"]
-
+    /// Aqui havia uma lista curta para o modelo local, tirando o `github` por ele ter a
+    /// descrição mais longa. Era economia de mentira: a diferença é de algumas centenas
+    /// de caracteres numa janela que o aparelho informa em milhares, e o preço era um
+    /// modelo que sabe menos do que o da assinatura sem ninguém ter pedido isso. Quem
+    /// decide o que cabe é o orçamento, não um palpite meu sobre o que a pessoa vai
+    /// querer usar.
     static func ferramentas(
         _ turn: TurnRequest,
         anotar: @escaping @Sendable (String, String) -> Void
     ) -> [any Tool] {
-        let naNuvem = turn.model == idNuvem
-        return turn.tools.compactMap { spec in
-            guard naNuvem || enxutas.contains(spec.name) else { return nil }
+        turn.tools.compactMap { spec in
             guard let esquema = try? EsquemaApple.esquema(de: spec) else { return nil }
             return FerramentaDaOdete(
                 name: spec.name,
@@ -204,7 +212,12 @@ public struct AppleProvider: Provider {
                     var anterior = ""
                     let fluxo = sessao.streamResponse(
                         to: prompt,
-                        options: GenerationOptions(temperature: 0.6, maximumResponseTokens: Self.respostaMaxima)
+                        options: GenerationOptions(
+                            temperature: 0.6,
+                            maximumResponseTokens: ferramentas.isEmpty
+                                ? Self.respostaMaxima
+                                : Self.respostaComFerramentas
+                        )
                     )
                     for try await pedaco in fluxo {
                         if Task.isCancelled {
@@ -247,76 +260,17 @@ public struct AppleProvider: Provider {
         }
     }
 
-    /// As instruções do agente completo não cabem aqui. Fica o essencial.
+    /// Orçamento de caracteres para as instruções.
     ///
-    /// O que entra é escrito para este modelo, e não recortado do prompt grande. A versão
-    /// antiga pescava do sistema a primeira linha que falasse em "projeto" e colava aqui;
-    /// como essa linha é `O projeto é uma pasta real no dispositivo. A lista de caminhos
-    /// vem no sistema; o conteúdo só entra se VOCÊ chamar read_file`, o modelo pequeno
-    /// devolvia isso parafraseado na cara de quem perguntou. Entranha do sistema não é
-    /// resposta.
+    /// Metade do que entra; a outra metade é a conversa e o que as ferramentas
+    /// devolveram. Acompanha a janela que o aparelho informa, como todo número daqui.
+    static var orcamentoDeInstrucoes: Int {
+        orcamentoDeEntrada / 2
+    }
+
+    /// O mesmo prompt que os provedores por assinatura recebem — ver `AppleInstrucoes`.
     static func instrucoes(_ sistema: String, comFerramentas: Bool) -> String {
-        let arquivos = Self.arquivosDoSistema(sistema)
-        let comoAgir = comFerramentas
-            ? """
-            Você mexe no projeto de verdade, pelas ferramentas.
-
-            - Aja, não peça licença. Nunca pergunte "posso seguir?", "confirma?" ou "quer
-              que eu liste?". Quem aprova é o app: cada mudança aparece para a pessoa
-              aceitar antes de valer. Pergunte só quando o pedido for ambíguo a ponto de
-              você não saber em qual arquivo mexer.
-            - Uma ferramenta por vez. O resultado chega na mensagem seguinte, e aí você
-              segue sozinho, até terminar o que foi pedido.
-            - Leia antes de escrever. Em str_replace, `old` tem que ser copiado caractere
-              por caractere do que o read_file devolveu — nunca escrito de memória. Se o
-              trecho não for encontrado, leia o arquivo de novo em vez de tentar outro
-              palpite.
-            - Não sabe o caminho? list_dir ou grep, sem perguntar.
-            - Nunca responda que não consegue editar.
-            """
-            : """
-            Nesta rodada você está sem ferramentas: responda com o que dá para responder
-            e diga, em uma frase, o que precisaria abrir para ir além.
-            """
-        return """
-        Você é a Odete, assistente de programação dentro de um editor no iPad.
-        Responda em \(Texto.idioma.paraOModelo), com objetividade, em no máximo dois parágrafos
-        curtos ou uma lista curta. Use markdown. Quando não souber, diga que não sabe.
-        \(comoAgir)\(modoDoSistema(sistema))\(arquivos)
-        """
-    }
-
-    /// A linha do modo, tirada do prompt grande.
-    ///
-    /// Sem ela o modelo não sabe se está em CHAT, PLAN ou BUILD — e no BUILD, que é o
-    /// modo em que ele pode editar, ficava perguntando se podia editar. As instruções
-    /// daqui são escritas à parte de propósito, mas o modo não dá para inventar: ele é
-    /// uma escolha que a pessoa fez na tela.
-    static func modoDoSistema(_ sistema: String) -> String {
-        guard let linha = sistema.split(separator: "\n").first(where: { $0.hasPrefix("Modo ") }) else { return "" }
-        return "\n\n" + linha
-    }
-
-    /// Os primeiros caminhos do projeto, para o modelo não gastar uma rodada de `list_dir`
-    /// só para descobrir que existe um `src/`.
-    ///
-    /// O prompt grande manda até 400 caminhos; aqui cabem poucos, e poucos já resolvem o
-    /// caso comum — quem quiser o resto pede `list_dir`. O corte é por quantidade e não
-    /// por caractere para a lista nunca terminar no meio de um caminho.
-    static let quantosArquivos = 40
-
-    static func arquivosDoSistema(_ sistema: String) -> String {
-        guard let faixa = sistema.range(of: "Arquivos no projeto:\n") else { return "" }
-        // As seções do prompt grande são separadas por linha em branco, então é a linha
-        // em branco que marca o fim da lista.
-        let caminhos = sistema[faixa.upperBound...]
-            .split(separator: "\n", omittingEmptySubsequences: false)
-            .prefix { !$0.isEmpty }
-            .prefix(quantosArquivos)
-        if caminhos.isEmpty {
-            return ""
-        }
-        return "\n\nArquivos do projeto:\n" + caminhos.joined(separator: "\n")
+        AppleInstrucoes.texto(sistema: sistema, comFerramentas: comFerramentas, teto: orcamentoDeInstrucoes)
     }
 
     /// Junta o histórico num prompt só, cortando o começo até caber na janela.

@@ -8,9 +8,14 @@ import Testing
 ///
 /// Este é o modelo que sobra num voo sem internet, então recusar-se a editar não é uma
 /// limitação aceitável — era o que acontecia: as instruções diziam ao modelo que ele não
-/// tinha ferramentas, e ele obedecia. Aqui se fixa o contrário, nas três pontas que
-/// podem quebrar sem ninguém notar: o schema traduzido, a ferramenta que anota em vez de
-/// executar, e as instruções.
+/// tinha ferramentas, e ele obedecia.
+///
+/// Depois disso a primeira versão com ferramentas errou do outro lado: por medo da janela
+/// eu escrevi um resumo à mão no lugar do prompt de verdade e tirei uma ferramenta da
+/// lista. O resultado foi um modelo que perguntava para a pessoa qual ferramenta deveria
+/// usar. Por isso vários testes daqui cobram *ausência de poda*: o modelo local recebe o
+/// mesmo que os provedores por assinatura, e o corte só existe quando o texto não cabe
+/// mesmo.
 ///
 /// Nada aqui liga o modelo. O simulador não tem Apple Intelligence, e um teste que
 /// dependesse disso não rodaria em lugar nenhum.
@@ -18,6 +23,12 @@ struct AppleFerramentasTests {
     func pedido(_ modelo: String = AppleProvider.idLocal, tools: [ToolSpec] = Tools.all) -> TurnRequest {
         TurnRequest(system: "", messages: [], tools: tools, model: modelo)
     }
+
+    var sistema: String {
+        Prompts.build(mode: .build, fileList: ["index.html", "src/main.js"], extras: ["Regras do projeto: nenhuma."])
+    }
+
+    // MARK: o schema
 
     /// Se uma ferramenta não vira schema, ela some da lista em silêncio — o modelo nunca
     /// saberia que ela existe, e ninguém veria erro nenhum.
@@ -38,15 +49,18 @@ struct AppleFerramentasTests {
         #expect(throws: Never.self) { try EsquemaApple.esquema(de: github) }
     }
 
+    // MARK: a ferramenta
+
     /// A ferramenta anota e para. Se um dia ela executar de verdade aqui dentro, o laço
     /// do agente deixa de ver a chamada — e com ele somem a confirmação e a revisão do
     /// patch.
     @Test func aFerramentaAnotaEParaEmVezDeExecutar() async throws {
         let vistos = Caixa<[(String, String)]>([])
+        let read = try #require(Tools.all.first { $0.name == "read_file" })
         let ferramenta = try FerramentaDaOdete(
             name: "read_file",
             description: "lê",
-            parameters: EsquemaApple.esquema(de: #require(Tools.all.first { $0.name == "read_file" })),
+            parameters: EsquemaApple.esquema(de: read),
             anotar: { nome, args in vistos.mexer { $0.append((nome, args)) } }
         )
         await #expect(throws: PedidoDeFerramenta.self) {
@@ -58,80 +72,85 @@ struct AppleFerramentasTests {
         #expect(anotados.first?.1.contains("src/index.ts") == true, "os argumentos não chegaram inteiros")
     }
 
-    /// Ferramenta oferecida ocupa janela mesmo sem ser usada: nome, descrição e schema
-    /// entram nas instruções. No modelo local isso é caro.
-    @Test func oModeloLocalNaoRecebeAFerramentaMaisPesada() {
+    /// O modelo local não é um modelo de segunda classe: ele recebe as mesmas ferramentas
+    /// do modo, sem peneira minha no meio.
+    @Test func oModeloLocalRecebeTodasAsFerramentasDoModo() {
         let local = AppleProvider.ferramentas(pedido()) { _, _ in }
-        let nuvem = AppleProvider.ferramentas(pedido(AppleProvider.idNuvem)) { _, _ in }
-        #expect(!local.contains { $0.name == "github" }, "github entrou no modelo local")
-        #expect(local.contains { $0.name == "str_replace" }, "sem str_replace o modelo local não edita nada")
-        #expect(nuvem.contains { $0.name == "github" }, "a nuvem tem janela de sobra e mesmo assim perdeu github")
-        #expect(nuvem.count > local.count)
+        #expect(local.count == Tools.all.count, "alguma ferramenta foi podada antes de chegar ao modelo local")
+        for spec in Tools.all {
+            #expect(local.contains { $0.name == spec.name }, "\(spec.name) não chegou ao modelo local")
+        }
     }
 
-    /// O bug que apareceu num vídeo: a resposta ao usuário repetia, parafraseada, a linha
-    /// do prompt do sistema sobre `read_file`. Ela chegava lá porque as instruções do
-    /// modelo da Apple pescavam do sistema a primeira linha que falasse em "projeto".
-    @Test func asInstrucoesNaoLevamOPromptDoSistemaJunto() {
-        let sistema = Prompts.build(mode: .build, fileList: ["src/app.ts"], extras: [])
+    // MARK: as instruções
+
+    /// O prompt de verdade, e não um resumo: é dele que vêm o modo escolhido na tela, as
+    /// regras da pilha e as regras do projeto.
+    @Test func oModeloLocalRecebeOPromptDeVerdade() {
         let texto = AppleProvider.instrucoes(sistema, comFerramentas: true)
-        #expect(!texto.contains("só entra se VOCÊ chamar"), "a entranha do sistema voltou para as instruções")
-        #expect(!texto.contains("TDAH"), "o bloco de formato do prompt grande vazou para cá")
+        #expect(texto.contains("Modo BUILD"), "o modo escolhido não chegou")
+        #expect(texto.contains("Regras do projeto"), "os acréscimos do projeto não chegaram")
+        #expect(texto.contains("index.html"), "a lista de arquivos não chegou")
     }
 
-    @Test func comFerramentaAsInstrucoesMandamEditar() {
-        let texto = AppleProvider.instrucoes("", comFerramentas: true)
-        #expect(!texto.contains("não edita arquivos"), "as instruções continuam dizendo que ele não edita")
-        #expect(texto.contains("str_replace"), "ninguém disse ao modelo por onde editar")
+    /// Foi o que apareceu nas duas primeiras builds com ferramentas: rodadas terminando
+    /// em "posso seguir?" e, pior, em "qual ferramenta devo usar?".
+    @Test func asInstrucoesProibemPerguntarAntesDeAgir() {
+        let texto = AppleProvider.instrucoes(sistema, comFerramentas: true)
+        #expect(texto.contains("posso seguir"), "falta proibir a pergunta que ele fazia")
+        #expect(texto.contains("qual ferramenta devo usar"), "falta proibir perguntar qual ferramenta usar")
+        #expect(texto.contains("a escolha da ferramenta é sua"))
     }
 
-    /// O modo é uma escolha que a pessoa fez na tela. Sem ele nas instruções, o modelo
-    /// não sabe que está no BUILD — e ficava pedindo licença para editar no modo cujo
-    /// nome é "pode editar".
-    @Test func oModoEscolhidoChegaAoModelo() {
-        let texto = AppleProvider.instrucoes(
-            Prompts.build(mode: .build, fileList: ["a.ts"], extras: []),
-            comFerramentas: true
-        )
-        #expect(texto.contains("Modo BUILD"), "o modo não chegou nas instruções")
-    }
-
-    /// Foi o que apareceu na primeira build com ferramentas: três rodadas seguidas
-    /// terminando em "posso seguir?" enquanto a pessoa respondia "sim pode seguir".
-    @Test func asInstrucoesProibemPedirLicenca() {
-        let texto = AppleProvider.instrucoes("", comFerramentas: true)
-        #expect(texto.contains("não peça licença"))
-        #expect(texto.contains("posso seguir"), "falta o exemplo da pergunta que ele fazia")
-    }
-
-    /// O outro erro da mesma tela: `str_replace` com `old: "Apple"`, um trecho que não
-    /// existia no arquivo — escrito de memória em vez de copiado do que ele acabara de ler.
+    /// O outro erro da mesma tela: `str_replace` com um `old` que não existia no arquivo,
+    /// escrito de memória em vez de copiado do que ele acabara de ler.
     @Test func asInstrucoesExigemCopiarOTrechoLido() {
         // Numa linha só: a frase atravessa a quebra do literal, e o teste é sobre o que
         // está escrito, não sobre onde a linha termina.
-        let texto = AppleProvider.instrucoes("", comFerramentas: true)
+        let texto = AppleProvider.instrucoes(sistema, comFerramentas: true)
             .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
         #expect(texto.contains("caractere por caractere"))
         #expect(texto.contains("read_file"))
     }
 
     @Test func semFerramentaAsInstrucoesDizemOQueFalta() {
-        let texto = AppleProvider.instrucoes("", comFerramentas: false)
+        let texto = AppleProvider.instrucoes(sistema, comFerramentas: false)
         #expect(texto.contains("sem ferramentas"))
     }
 
-    /// A lista de caminhos poupa uma rodada de `list_dir`, mas a do prompt grande vai até
-    /// 400 linhas — numa janela de poucos milhares de fichas isso é o orçamento inteiro.
-    @Test func aListaDeArquivosEntraECortaNoLimite() {
-        let muitos = (1 ... 300).map { "src/arquivo\($0).ts" }
-        let texto = AppleProvider.instrucoes(
-            Prompts.build(mode: .build, fileList: muitos, extras: ["Regras do projeto: nenhuma."]),
-            comFerramentas: true
-        )
-        #expect(texto.contains("src/arquivo1.ts"), "a lista de arquivos não entrou")
-        #expect(!texto.contains("src/arquivo\(AppleProvider.quantosArquivos + 1).ts"), "a lista passou do corte")
-        #expect(!texto.contains("Regras do projeto"), "a leitura passou da lista e entrou na seção seguinte")
+    // MARK: o corte, quando ele precisa acontecer
+
+    /// Num projeto pequeno o prompt cabe inteiro, e cortar seria perda pura.
+    @Test func oQueCabeVaiInteiro() {
+        let texto = AppleInstrucoes.cabendo(sistema, teto: 100_000)
+        #expect(texto == sistema, "cortou um prompt que cabia")
     }
+
+    /// Quando não cabe, quem encolhe é a lista de arquivos — a única parte que cresce com
+    /// o tamanho do projeto. As regras são texto fixo: cortar regra é cortar
+    /// comportamento.
+    @Test func quandoNaoCabeQuemEncolheEhAListaDeArquivos() {
+        let grande = Prompts.build(
+            mode: .build,
+            fileList: (1 ... 400).map { "src/arquivo\($0).ts" },
+            extras: ["Regras do projeto: nenhuma."]
+        )
+        let teto = grande.count / 2
+        let texto = AppleInstrucoes.cabendo(grande, teto: teto)
+        #expect(texto.count <= teto, "o corte não respeitou o teto")
+        #expect(texto.contains("Modo BUILD"), "o modo foi junto no corte")
+        #expect(texto.contains("Regras do projeto"), "os acréscimos foram junto no corte")
+        #expect(texto.contains("src/arquivo1.ts"), "a lista sumiu inteira quando era para só encolher")
+        #expect(!texto.contains("src/arquivo400.ts"), "a lista não encolheu")
+    }
+
+    @Test func asRegrasDeFerramentaCabemNoTeto() {
+        let texto = AppleInstrucoes.texto(sistema: sistema, comFerramentas: true, teto: 900)
+        #expect(texto.count <= 900 + AppleInstrucoes.comFerramentas.count, "o texto final estourou o teto pedido")
+        #expect(texto.contains("a escolha da ferramenta é sua"), "as regras foram cortadas antes da lista")
+    }
+
+    // MARK: o histórico
 
     /// Sem o pedido no histórico, a rodada seguinte recebe um resultado sem dono: o
     /// modelo vê o conteúdo de um arquivo e não sabe de qual, nem por que pediu.
@@ -160,10 +179,11 @@ struct AppleFerramentasTests {
         )
     }
 
-    @Test func semListaNoSistemaAsInstrucoesSeguemInteiras() {
-        let texto = AppleProvider.instrucoes("qualquer coisa sem lista", comFerramentas: true)
-        #expect(!texto.contains("Arquivos do projeto:"))
-        #expect(texto.contains("Você é a Odete"))
+    /// Os argumentos da chamada saem no orçamento da resposta, então um `write_file` de
+    /// arquivo inteiro batia no teto de conversa e voltava truncado.
+    @Test func comFerramentaOTetoDaRespostaSobe() {
+        #expect(AppleProvider.respostaComFerramentas >= AppleProvider.respostaMaxima)
+        #expect(AppleProvider.respostaComFerramentas > 1500 || AppleProvider.janela < 4500)
     }
 }
 

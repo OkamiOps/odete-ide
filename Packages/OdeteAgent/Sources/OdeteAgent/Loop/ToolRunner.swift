@@ -129,6 +129,12 @@ public struct ToolRunner: Sendable {
             let old = (args["old"] as? String) ?? ""
             let new = (args["new"] as? String) ?? ""
             guard !old.isEmpty else { return .init(text: "old vazio") }
+            // Trocar um trecho por ele mesmo não muda nada, e o "escrito" que saía daqui
+            // virava prova de serviço feito: o modelo anunciava o conserto e a tela
+            // continuava quebrada. Quem pediu isso se enganou — e precisa saber.
+            guard old != new else {
+                return .init(text: "old e new são iguais — isso não mudaria nada. Escreva em new o texto corrigido.")
+            }
             guard let before = host.read(path) else { return .init(text: "não existe: \(path)") }
             let hits = before.components(separatedBy: old).count - 1
             if hits == 0 {
@@ -140,7 +146,12 @@ public struct ToolRunner: Sendable {
             guard let r = before.range(of: old) else { return .init(text: "trecho não encontrado") }
             after = before.replacingCharacters(in: r, with: new)
         } else {
-            after = (args["content"] as? String) ?? ""
+            // Sem `content` o arquivo virava vazio e a resposta dizia "escrito". Apagar um
+            // arquivo por esquecimento de campo não é uma edição — é uma perda.
+            guard let conteudo = args["content"] as? String else {
+                return .init(text: "faltou content — mande o arquivo inteiro, ou use str_replace para trocar um trecho")
+            }
+            after = conteudo
         }
         if mode == .plan {
             guard path == ".odete/plan.md"
@@ -156,6 +167,11 @@ public struct ToolRunner: Sendable {
         }
         let patch = patches.queue(path: path, before: before, after: after)
         host.reveal(path)
-        return .init(text: "escrito \(path)", patch: patch)
+        // O tamanho vai junto porque é a consequência: um arquivo que dobrou de linhas
+        // quando era para ser consertado é um erro que o próprio modelo enxerga na
+        // resposta, em vez de anunciar conserto por cima de um estrago.
+        let antes = before.isEmpty ? 0 : before.split(separator: "\n", omittingEmptySubsequences: false).count
+        let depois = after.isEmpty ? 0 : after.split(separator: "\n", omittingEmptySubsequences: false).count
+        return .init(text: "escrito \(path) (\(antes) → \(depois) linhas)", patch: patch)
     }
 }

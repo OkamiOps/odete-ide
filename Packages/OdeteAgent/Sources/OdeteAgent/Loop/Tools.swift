@@ -45,27 +45,39 @@ public enum Tools {
         ToolSpec(
             name: "read_file",
             description: "Lê um arquivo do projeto.",
-            parameters: obj(["path": str], required: ["path"])
+            parameters: obj(["path": caminho], required: ["path"])
         ),
         ToolSpec(
             name: "str_replace",
             description: "Substitui um trecho EXATO no arquivo. Prefira isto a write_file. old precisa aparecer uma vez.",
-            parameters: obj(["path": str, "old": str, "new": str], required: ["path", "old", "new"])
+            parameters: obj([
+                "path": caminho,
+                "old": texto("O trecho como ele está hoje no arquivo, copiado do read_file, "
+                    + "com a mesma indentação e as mesmas quebras de linha."),
+                "new": texto("O trecho que entra no lugar, em texto puro e na linguagem do próprio arquivo."),
+            ], required: ["path", "old", "new"])
         ),
         ToolSpec(
             name: "write_file",
             description: "Cria arquivo ou reescreve INTEIRO. No modo plan, grave o plano em .odete/plan.md.",
-            parameters: obj(["path": str, "content": str], required: ["path", "content"])
+            parameters: obj([
+                "path": caminho,
+                "content": texto("O arquivo inteiro, em texto puro e na linguagem do próprio arquivo: "
+                    + "CSS num .css, HTML num .html, JavaScript num .js. Nunca JSON, a não ser num .json."),
+            ], required: ["path", "content"])
         ),
         ToolSpec(
             name: "list_dir",
             description: "Lista arquivos e pastas. path vazio = raiz.",
-            parameters: obj(["path": str])
+            parameters: obj(["path": texto("Pasta a listar, relativa à raiz. Vazio lista a raiz.")])
         ),
         ToolSpec(
             name: "grep",
             description: "Busca regex no projeto.",
-            parameters: obj(["pattern": str, "path": str], required: ["pattern"])
+            parameters: obj([
+                "pattern": texto("Expressão regular a procurar."),
+                "path": texto("Pasta ou arquivo onde procurar. Vazio procura no projeto todo."),
+            ], required: ["pattern"])
         ),
         ToolSpec(
             name: "read_terminal",
@@ -99,6 +111,22 @@ public enum Tools {
 
     static var str: [String: Any] {
         ["type": "string"]
+    }
+
+    /// Campo de texto que diz o que se espera dentro dele.
+    ///
+    /// Parece detalhe e não é. Com geração guiada — que é como o modelo do sistema chama
+    /// ferramenta — o modelo está emitindo JSON, e um campo `content` sem explicação faz
+    /// um modelo pequeno continuar o padrão do JSON para dentro do valor: foi assim que
+    /// um pedido de novo visual gravou `{"body": {"margin": "0"}}` dentro de um
+    /// `style.css`. Dizer "o arquivo inteiro, na linguagem do próprio arquivo" corta isso
+    /// na raiz, e não atrapalha ninguém.
+    static func texto(_ oQueEh: String) -> [String: Any] {
+        ["type": "string", "description": oQueEh]
+    }
+
+    static var caminho: [String: Any] {
+        texto("Caminho relativo à raiz do projeto, como src/main.js.")
     }
 
     static func obj(_ props: [String: Any], required: [String] = []) -> [String: Any] {

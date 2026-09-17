@@ -113,6 +113,44 @@ struct AppleFerramentasTests {
         #expect(texto.contains("read_file"))
     }
 
+    /// Um pedido de novo visual gravou `{"body": {"margin": "0"}}` dentro de um
+    /// `style.css`: com geração guiada o modelo está emitindo JSON, e sem ninguém dizer o
+    /// contrário ele continua o padrão para dentro do valor do campo.
+    @Test func oConteudoDeArquivoEhTextoPuro() throws {
+        let write = try #require(Tools.all.first { $0.name == "write_file" })
+        let props = try #require(write.parameters["properties"] as? [String: Any])
+        let content = try #require(props["content"] as? [String: Any])
+        let explicacao = try #require(content["description"] as? String)
+        #expect(explicacao.contains("Nunca JSON"), "o campo do conteúdo não diz que não é JSON")
+
+        let texto = AppleProvider.instrucoes(sistema, comFerramentas: true)
+        #expect(texto.contains("Nunca escreva JSON"), "a regra não chegou às instruções")
+    }
+
+    /// Todo campo que carrega texto de arquivo tem que se explicar — é o que impede o
+    /// modelo de inventar um formato para ele.
+    @Test func osCamposDeTextoSeExplicam() throws {
+        for nome in ["write_file", "str_replace", "read_file", "grep", "list_dir"] {
+            let spec = try #require(Tools.all.first { $0.name == nome })
+            let props = try #require(spec.parameters["properties"] as? [String: Any])
+            for (campo, esquema) in props {
+                let dicionario = try #require(esquema as? [String: Any])
+                #expect(
+                    (dicionario["description"] as? String)?.isEmpty == false,
+                    "\(nome).\(campo) não diz o que espera receber"
+                )
+            }
+        }
+    }
+
+    /// "Next Steps: Verify HTML" e ponto final: ele sabia o que faltava e parou para
+    /// contar em vez de fazer.
+    @Test func asInstrucoesProibemAnunciarEmVezDeAgir() {
+        let texto = AppleProvider.instrucoes(sistema, comFerramentas: true)
+        #expect(texto.contains("Não anuncie o que vai fazer"))
+        #expect(texto.contains("Próximos passos"), "falta proibir a lista de próximos passos")
+    }
+
     @Test func semFerramentaAsInstrucoesDizemOQueFalta() {
         let texto = AppleProvider.instrucoes(sistema, comFerramentas: false)
         #expect(texto.contains("sem ferramentas"))

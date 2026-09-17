@@ -148,7 +148,10 @@ func runAll(
         #expect(await r.run(call("str_replace", ["path": "a.txt", "old": "\n", "new": "B"]), mode: .build).text
             .contains("vezes"))
         let out = await r.run(call("str_replace", ["path": "a.txt", "old": "b\n", "new": "B\n"]), mode: .build)
-        #expect(out.text == "escrito a.txt" && out.patch?.path == "a.txt" && host.read("a.txt") == "a\nB\nc\n")
+        #expect(out.text.hasPrefix("escrito a.txt") && out.patch?.path == "a.txt" && host.read("a.txt") == "a\nB\nc\n")
+        // O tamanho vai na resposta: é assim que quem editou percebe que dobrou o arquivo
+        // em vez de consertá-lo.
+        #expect(out.text.contains("linhas"), "a resposta não diz o tamanho do que ficou")
         #expect(await r.run(call("write_file", ["path": "src/y.ts", "content": "y"]), mode: .plan).text
             .contains("plan só escreve"))
         #expect(await r.run(call("write_file", ["path": ".odete/plan.md", "content": "# plano"]), mode: .plan)
@@ -163,6 +166,37 @@ func runAll(
         #expect(await r.run(call("run_shell", ["command": "git push --force"]), mode: .build).text
             .contains("não é permitido"))
         #expect(await r.run(call("run_shell", ["command": "npm run dev"]), mode: .build).text == "ok: npm run dev")
+    }
+
+    /// Uma edição que não edita não pode responder "escrito".
+    ///
+    /// Aconteceu numa tela: com o CSS quebrado, o modelo pediu `str_replace` trocando
+    /// `:root {` por `:root {` — nada — e, com o "escrito" de volta, anunciou "corrigido
+    /// início de :root" por cima de um arquivo que continuava quebrado. Resposta boa
+    /// para trabalho nenhum é pior que erro: vira prova falsa.
+    @Test func trocaPorSiMesmoNaoPassa() async throws {
+        let root = try tmpProject()
+        let host = TestHost(root: root)
+        let r = ToolRunner(host: host, patches: PatchStore(root: root))
+        let saida = await r.run(call("str_replace", ["path": "a.txt", "old": "b", "new": "b"]), mode: .build)
+        #expect(saida.text.contains("iguais"), "a troca por si mesma passou como edição")
+        #expect(saida.patch == nil, "virou patch sem ter mudado nada")
+        #expect(host.read("a.txt") == "a\nb\nc\n", "o arquivo foi reescrito à toa")
+    }
+
+    /// `write_file` sem `content` esvaziava o arquivo e respondia "escrito". Esquecer um
+    /// campo não pode custar o arquivo da pessoa.
+    @Test func escreverSemConteudoNaoApagaOArquivo() async throws {
+        let root = try tmpProject()
+        let host = TestHost(root: root)
+        let r = ToolRunner(host: host, patches: PatchStore(root: root))
+        let saida = await r.run(call("write_file", ["path": "a.txt"]), mode: .build)
+        #expect(saida.text.contains("faltou content"))
+        #expect(host.read("a.txt") == "a\nb\nc\n", "o arquivo foi esvaziado")
+        // Esvaziar de propósito continua valendo: o campo existe, só está vazio.
+        #expect(await r.run(call("write_file", ["path": "a.txt", "content": ""]), mode: .build).text
+            .hasPrefix("escrito a.txt"))
+        #expect(host.read("a.txt") == "")
     }
 }
 

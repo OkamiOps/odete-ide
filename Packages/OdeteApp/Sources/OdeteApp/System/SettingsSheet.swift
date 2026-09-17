@@ -179,16 +179,62 @@ struct SettingsContent: View {
     // MARK: aparência
 
     var appearance: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            SectionTitle(tr("Tema"))
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 10)], spacing: 10) {
-                ForEach(ThemePalette.all) { p in
-                    ThemeCard(palette: p, on: p.id == chrome.snapshot.theme) {
-                        withAnimation(.snappy(duration: 0.2)) { chrome.snapshot.theme = p.id }
+        @Bindable var chrome = chrome
+        return Group {
+            VStack(alignment: .leading, spacing: 8) {
+                SectionTitle(tr("Claro e escuro"))
+                CardList {
+                    CardRow(tr("Seguir o iPad"), symbol: "circle.lefthalf.filled", color: .purple, first: true) {
+                        Toggle("", isOn: $chrome.snapshot.themeAuto).labelsHidden()
+                    }
+                    if chrome.snapshot.themeAuto {
+                        CardRow(tr("Tema claro"), symbol: "sun.max", color: .orange) {
+                            escolhaDeTema($chrome.snapshot.themeLight, claros: true)
+                        }
+                        CardRow(tr("Tema escuro"), symbol: "moon", color: .indigo) {
+                            escolhaDeTema($chrome.snapshot.themeDark, claros: false)
+                        }
+                    }
+                }
+                CardNote(tr(
+                    "Com isto ligado a Odete troca de tema junto com o iPad, no fim do dia. Desligado, fica no tema escolhido abaixo."
+                ))
+            }
+            if !chrome.snapshot.themeAuto {
+                VStack(alignment: .leading, spacing: 8) {
+                    SectionTitle(tr("Tema"))
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 10)], spacing: 10) {
+                        ForEach(ThemePalette.all) { p in
+                            ThemeCard(palette: p, on: p.id == chrome.snapshot.theme) {
+                                withAnimation(.snappy(duration: 0.2)) { chrome.snapshot.theme = p.id }
+                            }
+                        }
                     }
                 }
             }
+            VStack(alignment: .leading, spacing: 8) {
+                SectionTitle(tr("Interface"))
+                CardList {
+                    CardRow(tr("Barra de abas"), symbol: "rectangle.topthird.inset.filled", color: .teal, first: true) {
+                        Toggle("", isOn: $chrome.snapshot.showTabBar).labelsHidden()
+                    }
+                    CardRow(tr("Barra de status"), symbol: "rectangle.bottomthird.inset.filled", color: .teal) {
+                        Toggle("", isOn: $chrome.snapshot.showStatusBar).labelsHidden()
+                    }
+                }
+                CardNote(tr("Some com as barras para sobrar tela. As abas continuam na paleta de comandos."))
+            }
         }
+    }
+
+    /// Só os temas do lado certo: não faz sentido oferecer um tema escuro como "tema claro".
+    func escolhaDeTema(_ escolha: Binding<ThemeId>, claros: Bool) -> some View {
+        Picker("", selection: escolha) {
+            ForEach(ThemePalette.all.filter { $0.dark != claros }) { p in
+                Text(p.label).tag(p.id)
+            }
+        }
+        .labelsHidden()
     }
 
     // MARK: editor
@@ -213,6 +259,23 @@ struct SettingsContent: View {
                             Text(tr("Compacta")).tag(1.1)
                             Text(tr("Normal")).tag(1.25)
                             Text(tr("Arejada")).tag(1.45)
+                        }
+                        .labelsHidden()
+                    }
+                    CardRow(tr("Fonte"), symbol: "character", color: .blue) {
+                        Picker("", selection: $chrome.snapshot.editor.fontFamily) {
+                            ForEach(EditorFont.allCases, id: \.self) { f in
+                                Text(f.label).tag(f)
+                            }
+                        }
+                        .labelsHidden()
+                    }
+                    CardRow(tr("Espaçamento das letras"), symbol: "arrow.left.and.right.text.vertical",
+                            color: .blue) {
+                        Picker("", selection: $chrome.snapshot.editor.kern) {
+                            Text(tr("Apertado")).tag(-0.4)
+                            Text(tr("Normal")).tag(0.0)
+                            Text(tr("Solto")).tag(0.6)
                         }
                         .labelsHidden()
                     }
@@ -277,8 +340,17 @@ struct SettingsContent: View {
                     CardRow(tr("Fechar pares automaticamente"), symbol: "parentheses", color: .teal, first: true) {
                         Toggle("", isOn: $chrome.snapshot.editor.autoClosePairs).labelsHidden()
                     }
+                    CardRow(tr("Rolar além do fim"), symbol: "arrow.down.to.line", color: .teal) {
+                        Toggle("", isOn: $chrome.snapshot.editor.scrollPastEnd).labelsHidden()
+                    }
                     CardRow(tr("Salvar automaticamente"), symbol: "square.and.arrow.down", color: .teal) {
                         Toggle("", isOn: $chrome.snapshot.editor.autoSave).labelsHidden()
+                    }
+                    CardRow(tr("Aparar espaços ao salvar"), symbol: "scissors", color: .teal) {
+                        Toggle("", isOn: $chrome.snapshot.editor.trimOnSave).labelsHidden()
+                    }
+                    CardRow(tr("Linha em branco no fim"), symbol: "return", color: .teal) {
+                        Toggle("", isOn: $chrome.snapshot.editor.finalNewline).labelsHidden()
                     }
                 }
                 CardNote(

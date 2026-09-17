@@ -25,6 +25,15 @@ public extension Color {
 /// Tema pronto para SwiftUI, derivado de `ThemePalette`.
 public struct Theme: Sendable, Hashable {
     public let palette: ThemePalette
+    /// Quando o tema acompanha o claro/escuro do iPad, o app não força esquema nenhum:
+    /// forçar faria a leitura do esquema do sistema devolver o que o próprio app acabou
+    /// de impor, e a escolha nunca mais mudaria sozinha.
+    public var seguirSistema = false
+
+    public init(_ palette: ThemePalette, seguirSistema: Bool = false) {
+        self.palette = palette
+        self.seguirSistema = seguirSistema
+    }
     public var id: ThemeId {
         palette.id
     }
@@ -122,7 +131,7 @@ public extension View {
     /// Aplica o tema no ambiente e o esquema de cores correspondente.
     func odeteTheme(_ theme: Theme) -> some View {
         environment(\.theme, theme)
-            .preferredColorScheme(theme.colorScheme)
+            .preferredColorScheme(theme.seguirSistema ? nil : theme.colorScheme)
             .tint(theme.accent)
     }
 }

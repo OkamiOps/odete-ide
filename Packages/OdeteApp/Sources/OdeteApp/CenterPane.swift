@@ -26,12 +26,16 @@ struct CenterPane: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(tr("Projetos"))
-                EditorTabs(
-                    tabs: ws.tabs,
-                    active: ws.active,
-                    onSelect: { ws.openFile($0) },
-                    onClose: { ws.closeTab($0) }
-                )
+                if chrome.snapshot.showTabBar {
+                    EditorTabs(
+                        tabs: ws.tabs,
+                        active: ws.active,
+                        onSelect: { ws.openFile($0) },
+                        onClose: { ws.closeTab($0) }
+                    )
+                } else {
+                    Spacer(minLength: 0)
+                }
             }
             .background(theme.surface)
             // Largura medida uma vez por layout (ViewThatFits media o ModePicker fora da main thread e travava).
@@ -83,7 +87,8 @@ struct CenterPane: View {
     /// Sidebar, terminal e agente já têm botão no rail; repetir aqui só enche a barra.
     /// Ficam a paleta, salvar e o menu do arquivo aberto.
     var actions: some View {
-        HStack(spacing: 6) {
+        @Bindable var chrome = chrome
+        return HStack(spacing: 6) {
             Button(tr("Paleta"), systemImage: "command") { ws.paletteOpen = true }
             Button(tr("Salvar"), systemImage: "square.and.arrow.down") { ws.save() }
                 .disabled(ws.activeTab?.isDirty != true)
@@ -99,6 +104,15 @@ struct CenterPane: View {
                     Section {
                         Button(tr("Fechar aba"), systemImage: "xmark") { ws.closeTab(path) }
                     }
+                }
+                // Os três que se mexe no meio do trabalho, sem passar pelos Ajustes —
+                // é aqui que a mão vai quando a linha não cabe na tela.
+                Section(tr("Editor")) {
+                    Toggle(tr("Quebrar linhas"), systemImage: "text.append", isOn: $chrome.snapshot.editor.wrap)
+                    Toggle(tr("Números de linha"), systemImage: "list.number",
+                           isOn: $chrome.snapshot.editor.lineNumbers)
+                    Toggle(tr("Espaços e tabs"), systemImage: "space",
+                           isOn: $chrome.snapshot.editor.showWhitespace)
                 }
             } label: {
                 Label(tr("Mais"), systemImage: "ellipsis")
@@ -427,7 +441,7 @@ struct Crumbs: View {
             }
             .presentationDetents([.large])
             .presentationSizing(.page)
-            .odeteTheme(Theme(chrome.palette))
+            .odeteTheme(Theme(chrome.palette, seguirSistema: chrome.snapshot.themeAuto))
         }
         .padding(.horizontal, 12)
         .frame(height: 26)

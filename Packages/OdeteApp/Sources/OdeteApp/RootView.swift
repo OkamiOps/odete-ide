@@ -37,13 +37,16 @@ public struct RootView: View {
             State(initialValue: AppModel(store: ProjectStore(root: AppModel.projectsRoot(cloud: snap.projectsInCloud))))
     }
 
+    /// O claro/escuro do iPad, para quando o tema segue o sistema.
+    @Environment(\.colorScheme) private var esquema
+
     public var body: some View {
         // `VStack` e não `safeAreaInset`: o `TabView` do layout estreito desenhava a
         // própria barra por baixo da faixa, e aqui a divisão é dura para qualquer layout.
         VStack(spacing: 0) {
             if emJanela {
                 BarraDaJanela(titulo: app.workspace?.project.name ?? "Odete")
-                    .odeteTheme(Theme(chrome.palette))
+                    .odeteTheme(Theme(chrome.palette, seguirSistema: chrome.snapshot.themeAuto))
             }
             Group {
                 if let ws = app.workspace {
@@ -62,7 +65,7 @@ public struct RootView: View {
         .sheet(isPresented: Binding(get: { chrome.settingsOpen }, set: { chrome.settingsOpen = $0 })) {
             SettingsSheet()
                 .environment(chrome).environment(app).environment(app.accounts).environment(app.aiAccounts)
-                .odeteTheme(Theme(chrome.palette))
+                .odeteTheme(Theme(chrome.palette, seguirSistema: chrome.snapshot.themeAuto))
         }
         .onChange(of: fase) { _, nova in
             guard let ws = app.workspace else { return }
@@ -75,11 +78,14 @@ public struct RootView: View {
             }
         }
         .id(tamanhoDoSistema)
+        // Quem manda no claro/escuro é o iPad, e quem lê é aqui: com `themeAuto` ligado
+        // o app não força esquema nenhum, então este valor é mesmo o do sistema.
+        .onChange(of: esquema, initial: true) { chrome.sistemaEscuro = esquema == .dark }
         .environment(chrome)
         .environment(app)
         .environment(app.accounts)
         .environment(app.aiAccounts)
-        .odeteTheme(Theme(chrome.palette))
+        .odeteTheme(Theme(chrome.palette, seguirSistema: chrome.snapshot.themeAuto))
         .sheet(isPresented: Binding(
             get: { !chrome.snapshot.welcomeDone },
             set: {
@@ -88,7 +94,7 @@ public struct RootView: View {
                 }
             }
         )) {
-            OnboardingView().environment(chrome).odeteTheme(Theme(chrome.palette))
+            OnboardingView().environment(chrome).odeteTheme(Theme(chrome.palette, seguirSistema: chrome.snapshot.themeAuto))
                 .presentationSizing(.page)
         }
         .onOpenURL { url in app.importURL(url, chrome: chrome) }

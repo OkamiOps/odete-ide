@@ -75,6 +75,31 @@ public enum PhoneTab: String, Codable, CaseIterable, Sendable {
 
 public enum MinimapSize: String, Codable, CaseIterable, Sendable { case off, s, m, l }
 
+/// Fonte do editor. Todas existem no iPad sem baixar nada: a primeira vem no app, as
+/// outras vêm do sistema.
+public enum EditorFont: String, Codable, CaseIterable, Sendable {
+    case plex, sistema, menlo, courier
+
+    public var label: String {
+        switch self {
+        case .plex: "IBM Plex Mono"
+        case .sistema: tr("Do sistema")
+        case .menlo: "Menlo"
+        case .courier: "Courier New"
+        }
+    }
+
+    /// Nome para o `UIFont`. `nil` cai na monoespaçada do sistema.
+    public var postScript: String? {
+        switch self {
+        case .plex: "IBMPlexMono"
+        case .sistema: nil
+        case .menlo: "Menlo-Regular"
+        case .courier: "CourierNewPSMT"
+        }
+    }
+}
+
 /// Preferências do editor.
 public struct EditorPrefs: Codable, Hashable, Sendable {
     public var fontSize: Double = 13
@@ -92,11 +117,22 @@ public struct EditorPrefs: Codable, Hashable, Sendable {
     public var pageGuide = 0
     public var highlightLine = true
     public var autoClosePairs = true
+    /// Fonte do texto do código.
+    public var fontFamily: EditorFont = .plex
+    /// Espaço extra entre letras, em pontos. Negativo aperta.
+    public var kern: Double = 0
+    /// Deixa rolar depois da última linha. Sem isto, a linha em que se está trabalhando
+    /// vive colada na borda de baixo quando o arquivo termina ali.
+    public var scrollPastEnd = true
+    /// Ao salvar: tira espaço no fim das linhas; garante uma quebra no fim do arquivo.
+    public var trimOnSave = false
+    public var finalNewline = false
     public init() {}
 
     enum CodingKeys: String, CodingKey {
         case fontSize, autoSave, wrap, minimap, lineNumbers, indentGuides, tabWidth, lineHeight, showWhitespace,
-             showLineBreaks, pageGuide, highlightLine, autoClosePairs
+             showLineBreaks, pageGuide, highlightLine, autoClosePairs,
+             fontFamily, kern, scrollPastEnd, trimOnSave, finalNewline
     }
 
     public init(from decoder: Decoder) throws {
@@ -115,6 +151,11 @@ public struct EditorPrefs: Codable, Hashable, Sendable {
         pageGuide = try c.decodeIfPresent(Int.self, forKey: .pageGuide) ?? d.pageGuide
         highlightLine = try c.decodeIfPresent(Bool.self, forKey: .highlightLine) ?? d.highlightLine
         autoClosePairs = try c.decodeIfPresent(Bool.self, forKey: .autoClosePairs) ?? d.autoClosePairs
+        fontFamily = try c.decodeIfPresent(EditorFont.self, forKey: .fontFamily) ?? d.fontFamily
+        kern = try c.decodeIfPresent(Double.self, forKey: .kern) ?? d.kern
+        scrollPastEnd = try c.decodeIfPresent(Bool.self, forKey: .scrollPastEnd) ?? d.scrollPastEnd
+        trimOnSave = try c.decodeIfPresent(Bool.self, forKey: .trimOnSave) ?? d.trimOnSave
+        finalNewline = try c.decodeIfPresent(Bool.self, forKey: .finalNewline) ?? d.finalNewline
     }
 }
 
@@ -135,6 +176,13 @@ public struct ChromeSnapshot: Codable, Hashable, Sendable {
     /// Projetos guardados no iCloud Drive (container ubíquo) em vez de Documents.
     public var projectsInCloud = false
     public var theme: ThemeId = .odete
+    /// Segue o claro/escuro do iPad, trocando entre os dois temas abaixo.
+    public var themeAuto = false
+    public var themeLight: ThemeId = .latte
+    public var themeDark: ThemeId = .odete
+    /// Barras que podem sumir para sobrar tela.
+    public var showTabBar = true
+    public var showStatusBar = true
     public var side: SidePanel = .files
     public var sideOpen = true
     public var center: CenterMode = .code
@@ -166,6 +214,11 @@ public struct ChromeSnapshot: Codable, Hashable, Sendable {
         welcomeDone = try c.decodeIfPresent(Bool.self, forKey: .welcomeDone) ?? d.welcomeDone
         projectsInCloud = try c.decodeIfPresent(Bool.self, forKey: .projectsInCloud) ?? d.projectsInCloud
         theme = try c.decodeIfPresent(ThemeId.self, forKey: .theme) ?? d.theme
+        themeAuto = try c.decodeIfPresent(Bool.self, forKey: .themeAuto) ?? d.themeAuto
+        themeLight = try c.decodeIfPresent(ThemeId.self, forKey: .themeLight) ?? d.themeLight
+        themeDark = try c.decodeIfPresent(ThemeId.self, forKey: .themeDark) ?? d.themeDark
+        showTabBar = try c.decodeIfPresent(Bool.self, forKey: .showTabBar) ?? d.showTabBar
+        showStatusBar = try c.decodeIfPresent(Bool.self, forKey: .showStatusBar) ?? d.showStatusBar
         side = try c.decodeIfPresent(SidePanel.self, forKey: .side) ?? d.side
         sideOpen = try c.decodeIfPresent(Bool.self, forKey: .sideOpen) ?? d.sideOpen
         center = try c.decodeIfPresent(CenterMode.self, forKey: .center) ?? d.center
@@ -203,8 +256,12 @@ public final class ChromeState {
         self.snapshot = snapshot
     }
 
+    /// O iPad está no escuro? Alimentado pela view raiz; só vale quando `themeAuto`.
+    public var sistemaEscuro = true
+
     public var palette: ThemePalette {
-        ThemePalette.by(snapshot.theme)
+        guard snapshot.themeAuto else { return ThemePalette.by(snapshot.theme) }
+        return ThemePalette.by(sistemaEscuro ? snapshot.themeDark : snapshot.themeLight)
     }
 
     public func toggleSide() {

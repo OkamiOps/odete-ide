@@ -159,7 +159,9 @@ struct WorkspaceView: View {
             VStack(spacing: 0) {
                 CenterPane()
                 // As informações do arquivo ficam colados no pé do editor, não no pé da janela.
-                StatusBar()
+                if chrome.snapshot.showStatusBar {
+                    StatusBar()
+                }
                 if chrome.snapshot.termVisible {
                     Splitter(
                         value: preso($chrome.snapshot.termHeight, Metrics.minTerm, m.termMax),

@@ -19,10 +19,18 @@ final class EditorTheme: Runestone.Theme, @unchecked Sendable {
     let markedTextBackgroundColor: UIColor
     private let syntax: [String: UIColor]
 
-    init(palette: ThemePalette, fontSize: CGFloat) {
-        font = UIFont(name: "IBMPlexMono", size: fontSize) ?? .monospacedSystemFont(ofSize: fontSize, weight: .regular)
-        lineNumberFont = UIFont(name: "IBMPlexMono", size: max(fontSize - 1, 10))
-            ?? .monospacedSystemFont(ofSize: max(fontSize - 1, 10), weight: .regular)
+    init(palette: ThemePalette, fontSize: CGFloat, familia: EditorFont = .plex) {
+        let miuda = max(fontSize - 1, 10)
+        // Nome que não exista no aparelho cai na monoespaçada do sistema, em vez de
+        // devolver a proporcional e desalinhar a grade inteira do código.
+        func fonte(_ tamanho: CGFloat) -> UIFont {
+            guard let nome = familia.postScript, let f = UIFont(name: nome, size: tamanho) else {
+                return .monospacedSystemFont(ofSize: tamanho, weight: .regular)
+            }
+            return f
+        }
+        font = fonte(fontSize)
+        lineNumberFont = fonte(miuda)
         textColor = UIColor(hex: palette.fg)
         gutterBackgroundColor = UIColor(hex: palette.bg)
         gutterHairlineColor = UIColor(hex: palette.border)

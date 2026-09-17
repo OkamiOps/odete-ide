@@ -2969,6 +2969,34 @@
         }
       }
     },
+    "Aparar espaços ao salvar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trim spaces on save"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leerzeichen beim Sichern entfernen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprimer les espaces à l’enregistrement"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recortar espacios al guardar"
+          }
+        }
+      }
+    },
     "Aparência": {
       "localizations": {
         "en": {
@@ -2993,6 +3021,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Apariencia"
+          }
+        }
+      }
+    },
+    "Apertado": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tight"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eng"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Serré"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apretado"
           }
         }
       }
@@ -3669,6 +3725,62 @@
         }
       }
     },
+    "Barra de abas": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tab bar"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tableiste"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Barre d’onglets"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Barra de pestañas"
+          }
+        }
+      }
+    },
+    "Barra de status": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Status bar"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Statusleiste"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Barre d’état"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Barra de estado"
+          }
+        }
+      }
+    },
     "Bem-vindo à Odete": {
       "localizations": {
         "en": {
@@ -4145,6 +4257,34 @@
         }
       }
     },
+    "Claro e escuro": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Light and dark"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hell und dunkel"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clair et sombre"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claro y oscuro"
+          }
+        }
+      }
+    },
     "Claude não devolveu access token": {
       "localizations": {
         "en": {
@@ -4309,6 +4449,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Pega la URL y se vuelve el `origin` de este proyecto"
+          }
+        }
+      }
+    },
+    "Com isto ligado a Odete troca de tema junto com o iPad, no fim do dia. Desligado, fica no tema escolhido abaixo.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "With this on, Odete changes theme along with the iPad at the end of the day. Off, it stays on the theme chosen below."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wenn dies aktiviert ist, wechselt Odete das Thema zusammen mit dem iPad am Ende des Tages. Deaktiviert bleibt das unten gewählte Thema."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avec ceci activé, Odete change de thème en même temps que l’iPad, à la tombée du jour. Désactivé, il garde le thème choisi ci-dessous."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Con esto activado, Odete cambia de tema junto con el iPad al final del día. Desactivado, se queda en el tema elegido abajo."
           }
         }
       }
@@ -6721,6 +6889,34 @@
         }
       }
     },
+    "Do sistema": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "System"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "System"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Système"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Del sistema"
+          }
+        }
+      }
+    },
     "Dois": {
       "localizations": {
         "en": {
@@ -7505,6 +7701,62 @@
         }
       }
     },
+    "Espaçamento das letras": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Letter spacing"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zeichenabstand"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Espacement des lettres"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Espaciado de letras"
+          }
+        }
+      }
+    },
+    "Espaços e tabs": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Spaces and tabs"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leerzeichen und Tabs"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Espaces et tabulations"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Espacios y tabulaciones"
+          }
+        }
+      }
+    },
     "Espaços: %1$@": {
       "localizations": {
         "en": {
@@ -8229,6 +8481,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Filtrar archivos"
+          }
+        }
+      }
+    },
+    "Fonte": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Font"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Schrift"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Police"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fuente"
           }
         }
       }
@@ -9129,6 +9409,34 @@
         }
       }
     },
+    "Interface": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Interface"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oberfläche"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Interface"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Interfaz"
+          }
+        }
+      }
+    },
     "Interromper (Ctrl+C)": {
       "localizations": {
         "en": {
@@ -9685,6 +9993,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Limpiar filtro"
+          }
+        }
+      }
+    },
+    "Linha em branco no fim": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Blank line at the end"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leerzeile am Ende"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ligne vide à la fin"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Línea en blanco al final"
           }
         }
       }
@@ -14365,6 +14701,34 @@
         }
       }
     },
+    "Rolar além do fim": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scroll past the end"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Über das Ende hinaus scrollen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Défiler au-delà de la fin"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Desplazar más allá del final"
+          }
+        }
+      }
+    },
     "Runestone e tree-sitter": {
       "localizations": {
         "en": {
@@ -14613,6 +14977,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Scripts del proyecto"
+          }
+        }
+      }
+    },
+    "Seguir o iPad": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Follow the iPad"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dem iPad folgen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Suivre l’iPad"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seguir el iPad"
           }
         }
       }
@@ -15061,6 +15453,62 @@
           "stringUnit": {
             "state": "translated",
             "value": "Soltar aquí"
+          }
+        }
+      }
+    },
+    "Solto": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Loose"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Weit"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Large"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Suelto"
+          }
+        }
+      }
+    },
+    "Some com as barras para sobrar tela. As abas continuam na paleta de comandos.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hide the bars to gain screen. The tabs are still in the command palette."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Blenden Sie die Leisten aus, um Bildschirm zu gewinnen. Die Tabs bleiben in der Befehlspalette."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Masquez les barres pour gagner de l’écran. Les onglets restent dans la palette de commandes."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Oculta las barras para ganar pantalla. Las pestañas siguen en la paleta de comandos."
           }
         }
       }
@@ -15705,6 +16153,62 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tema"
+          }
+        }
+      }
+    },
+    "Tema claro": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Light theme"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Helles Thema"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thème clair"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tema claro"
+          }
+        }
+      }
+    },
+    "Tema escuro": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dark theme"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dunkles Thema"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Thème sombre"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tema oscuro"
           }
         }
       }
@@ -17473,30 +17977,30 @@
         }
       }
     },
-    "`%1$@` não foi declarado neste arquivo": {
+    "`%1$@` não foi declarado": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "`%1$@` isn't declared in this file"
+            "value": "`%1$@` is not declared"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "`%1$@` ist in dieser Datei nicht deklariert"
+            "value": "`%1$@` ist nicht deklariert"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "`%1$@` n’est pas déclaré dans ce fichier"
+            "value": "`%1$@` n’est pas déclaré"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "`%1$@` no está declarado en este archivo"
+            "value": "`%1$@` no está declarado"
           }
         }
       }

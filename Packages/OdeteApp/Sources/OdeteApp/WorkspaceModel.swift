@@ -489,8 +489,12 @@ public final class WorkspaceModel {
     }
 
     public func save(_ path: String? = nil) {
-        guard let path = path ?? active, let text = buffers[path], !naoEhTexto.contains(path) else { return }
+        guard let path = path ?? active, let bruto = buffers[path], !naoEhTexto.contains(path) else { return }
+        let text = arrumado(bruto)
         do {
+            if text != bruto {
+                buffers[path] = text
+            }
             try ops.write(path, text)
             marcaDisco[path] = ops.modifiedAt(path)
             markDirty(path, false)
@@ -499,6 +503,25 @@ public final class WorkspaceModel {
         } catch {
             self.error = error.localizedDescription
         }
+    }
+
+    /// O que os ajustes de salvamento mandam fazer com o texto antes de ele ir ao disco.
+    ///
+    /// Os dois são o que todo editor de código faz e todo revisor de diff agradece: linha
+    /// que termina em espaço e arquivo sem quebra no fim viram ruído no `git diff` de quem
+    /// mexer no arquivo depois. Ficam desligados por padrão, porque mexer no arquivo de
+    /// alguém sem avisar é pior que o ruído.
+    func arrumado(_ texto: String) -> String {
+        var t = texto
+        if chrome.snapshot.editor.trimOnSave {
+            t = t.split(separator: "\n", omittingEmptySubsequences: false)
+                .map { String($0.reversed().drop { $0 == " " || $0 == "\t" }.reversed()) }
+                .joined(separator: "\n")
+        }
+        if chrome.snapshot.editor.finalNewline, !t.isEmpty, !t.hasSuffix("\n") {
+            t += "\n"
+        }
+        return t
     }
 
     public func saveAll() {

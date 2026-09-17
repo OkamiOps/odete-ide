@@ -142,7 +142,10 @@ public struct CodeEditorView: UIViewRepresentable {
     public func updateUIView(_ tv: TextView, context: Context) {
         let c = context.coordinator
         let docChanged = c.documentId != documentId
+        // A família da fonte entra aqui: trocar de fonte é refazer o tema, não um ajuste
+        // solto — o destaque de sintaxe carrega a fonte em cada faixa colorida.
         let themeChanged = c.palette != palette || c.fontSize != prefs.fontSize
+            || c.fontFamily != prefs.fontFamily
         if docChanged || themeChanged {
             apply(to: tv, context: context, fullReset: true)
         } else if !c.isEditing, tv.text != text {
@@ -200,6 +203,14 @@ public struct CodeEditorView: UIViewRepresentable {
         tv.showPageGuide = prefs.pageGuide > 0
         tv.pageGuideColumn = max(prefs.pageGuide, 1)
         tv.lineSelectionDisplayType = prefs.highlightLine ? .line : .disabled
+        tv.kern = prefs.kern
+        tv.lineBreakMode = .byWordWrapping
+        // Espaço depois da última linha. Sem ele, quem está editando o fim do arquivo
+        // digita colado na borda de baixo, com o teclado logo abaixo.
+        let fundo: CGFloat = prefs.scrollPastEnd ? 200 : 24
+        if tv.textContainerInset.bottom != fundo {
+            tv.textContainerInset.bottom = fundo
+        }
         tv.characterPairs = prefs.autoClosePairs ? Self.pairs : []
         if c.lineHeight != prefs.lineHeight {
             c.lineHeight = prefs.lineHeight
@@ -238,9 +249,10 @@ public struct CodeEditorView: UIViewRepresentable {
         c.documentId = documentId
         c.palette = palette
         c.fontSize = prefs.fontSize
+        c.fontFamily = prefs.fontFamily
         c.parent = self
         c.hidePopup()
-        let theme = EditorTheme(palette: palette, fontSize: prefs.fontSize)
+        let theme = EditorTheme(palette: palette, fontSize: prefs.fontSize, familia: prefs.fontFamily)
         tv.backgroundColor = UIColor(hex: palette.bg)
         c.overlay.addedColor = UIColor(hex: palette.ok)
         c.overlay.modifiedColor = UIColor(hex: palette.syntax.keyword)
@@ -280,6 +292,7 @@ public struct CodeEditorView: UIViewRepresentable {
         var documentId = ""
         var palette: ThemePalette?
         var fontSize: Double = 0
+        var fontFamily: EditorFont = .plex
         var isEditing = false
         var revealToken = -1
         var marks: [EditorGutterMark] = []

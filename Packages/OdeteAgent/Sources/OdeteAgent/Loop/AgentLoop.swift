@@ -140,6 +140,10 @@ public final class AgentLoop: @unchecked Sendable {
         let tools = Tools.forMode(config.mode)
         var round = 0
         var hitCap = false
+        // Se o turno chegou a mexer em arquivo, e se a cutucada de "anunciar não é
+        // fazer" já foi dada — ver o `toolCalls.isEmpty` mais abaixo.
+        var fezPatch = false
+        var cutucou = false
         while round < config.maxRounds {
             if isStopped {
                 break
@@ -237,6 +241,23 @@ public final class AgentLoop: @unchecked Sendable {
             ))
             emit(.history(messages))
             if toolCalls.isEmpty {
+                // Anunciar não é fazer.
+                //
+                // No Build já aconteceu do modelo devolver quinze linhas de "Fixed
+                // color-scheme", "Set font-family", "Updated padding" — sem ter chamado
+                // uma ferramenta sequer. O turno terminava ali: arquivo intacto, erro na
+                // tela e a pessoa achando que tinha sido resolvido. Escrever isso nas
+                // instruções não resolveu, então resolve aqui: uma cutucada, uma vez por
+                // turno, e ela mesma abre a porta para "não havia o que fazer" — que é a
+                // resposta certa quando a pergunta era só uma pergunta.
+                if config.mode == .build, !fezPatch, !cutucou {
+                    cutucou = true
+                    messages.append(.user(tr(
+                        "Nada mudou no projeto: você não chamou ferramenta nenhuma. Se havia mudança a fazer, faça agora, chamando a ferramenta. Se não havia, responda só isso."
+                    )))
+                    round += 1
+                    continue
+                }
                 break
             }
             var redirected = false
@@ -266,6 +287,7 @@ public final class AgentLoop: @unchecked Sendable {
                 }
                 let out = await runner.run(call, mode: config.mode)
                 if let p = out.patch {
+                    fezPatch = true
                     emit(.item(.patch(id: UUID().uuidString, patchId: p.id, path: p.path)))
                 } else if !Tools.needsPermit(config.permit, call) {
                     emit(.item(.tool(

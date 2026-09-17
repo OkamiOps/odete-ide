@@ -11061,6 +11061,34 @@
         }
       }
     },
+    "Nada mudou no projeto: você não chamou ferramenta nenhuma. Se havia mudança a fazer, faça agora, chamando a ferramenta. Se não havia, responda só isso.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nothing changed in the project: you did not call any tool. If there was a change to make, make it now by calling the tool. If there wasn't, just say so."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Im Projekt hat sich nichts geändert: Du hast kein Werkzeug aufgerufen. Wenn es etwas zu ändern gab, tu es jetzt mit dem passenden Werkzeug. Wenn nicht, sag einfach das."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rien n'a changé dans le projet : tu n'as appelé aucun outil. S'il y avait une modification à faire, fais-la maintenant en appelant l'outil. Sinon, dis-le simplement."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nada cambió en el proyecto: no llamaste a ninguna herramienta. Si había un cambio que hacer, hazlo ahora llamando a la herramienta. Si no lo había, responde solo eso."
+          }
+        }
+      }
+    },
     "Nada para comparar": {
       "localizations": {
         "en": {

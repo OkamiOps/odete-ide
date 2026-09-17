@@ -465,3 +465,75 @@ func runAll(
         }.count == 2)
     }
 }
+
+/// Anunciar não é fazer.
+///
+/// No Build, com o modelo local, aconteceu de a resposta ser quinze linhas de "Fixed
+/// color-scheme", "Set font-family", "Updated padding" — sem uma chamada de ferramenta
+/// sequer. O turno acabava ali, o arquivo continuava quebrado e quem pediu achava que
+/// estava resolvido. Instrução no prompt não resolveu em duas builds seguidas; o laço
+/// resolve.
+@Suite(.serialized) struct CutucadaTests {
+    init() {
+        Texto.escolher(.ptBR)
+    }
+
+    func make(_ script: [[StreamEvent]]) throws -> (AgentLoop, TestHost, FakeProvider) {
+        let root = try tmpProject()
+        let host = TestHost(root: root)
+        let p = FakeProvider(script)
+        return (AgentLoop(provider: p, host: host, patches: PatchStore(root: root)), host, p)
+    }
+
+    @Test func noBuildQuemSoAnunciaEhCutucadoUmaVez() async throws {
+        let (loop, host, p) = try make([
+            [.text("Changes: Fixed color-scheme, Set font-family"), .done],
+            [.tools([ToolCall(
+                id: "1",
+                name: "str_replace",
+                arguments: #"{"path":"a.txt","old":"b","new":"B"}"#
+            )]), .done],
+            [.text("pronto, troquei"), .done],
+        ])
+        _ = await runAll(loop, "arruma o a.txt", LoopConfig(mode: .build, permit: .full, model: "m"))
+        #expect(host.read("a.txt") == "a\nB\nc\n", "a cutucada não levou a edição nenhuma")
+        let cutucada = p.turns.withLock { $0 }
+            .flatMap(\.messages)
+            .contains { $0.role == .user && $0.content.contains("não chamou ferramenta nenhuma") }
+        #expect(cutucada, "o laço encerrou no anúncio em vez de cutucar")
+    }
+
+    /// Uma vez por turno. Se ele insistir em só falar, o turno acaba — cutucar em laço
+    /// seria trocar um defeito por outro pior.
+    @Test func aCutucadaNaoViraLaco() async throws {
+        let (loop, _, p) = try make([
+            [.text("primeiro anúncio"), .done],
+            [.text("segundo anúncio"), .done],
+            [.text("terceiro anúncio"), .done],
+        ])
+        _ = await runAll(loop, "arruma", LoopConfig(mode: .build, permit: .full, model: "m"))
+        #expect(p.turns.withLock { $0.count } == 2, "cutucou mais de uma vez no mesmo turno")
+    }
+
+    /// No Chat não existe o que fazer: uma resposta de texto é a resposta certa.
+    @Test func noChatNinguemEhCutucado() async throws {
+        let (loop, _, p) = try make([[.text("esse CSS centraliza a página"), .done]])
+        _ = await runAll(loop, "o que esse css faz?", LoopConfig(mode: .chat, permit: .auto, model: "m"))
+        #expect(p.turns.withLock { $0.count } == 1, "cutucou no Chat, onde responder é o trabalho")
+    }
+
+    /// Quem já mexeu em arquivo no turno não é cutucado ao terminar contando o que fez —
+    /// que é exatamente o final certo.
+    @Test func quemJaEditouPodeFecharFalando() async throws {
+        let (loop, _, p) = try make([
+            [.tools([ToolCall(
+                id: "1",
+                name: "str_replace",
+                arguments: #"{"path":"a.txt","old":"b","new":"B"}"#
+            )]), .done],
+            [.text("troquei b por B no a.txt"), .done],
+        ])
+        _ = await runAll(loop, "arruma o a.txt", LoopConfig(mode: .build, permit: .full, model: "m"))
+        #expect(p.turns.withLock { $0.count } == 2, "cutucou quem já tinha feito o trabalho")
+    }
+}

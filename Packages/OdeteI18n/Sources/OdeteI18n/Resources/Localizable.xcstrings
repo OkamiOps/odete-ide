@@ -13441,30 +13441,30 @@
         }
       }
     },
-    "Parei: a mesma chamada de %1$@ se repetiu %2$@ vezes sem mudar nada. Redirecione ou tente outro modelo.": {
+    "Parei: a mesma chamada de %1$@ se repetiu %2$@ vezes, mesmo avisada. Redirecione ou tente outro modelo.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Stopped: the same %1$@ call repeated %2$@ times without changing anything. Redirect it or try another model."
+            "value": "Stopped: the same %1$@ call repeated %2$@ times even after being warned. Redirect it or try another model."
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Gestoppt: derselbe %1$@-Aufruf kam %2$@ Mal ohne Änderung. Lenk ihn um oder nimm ein anderes Modell."
+            "value": "Gestoppt: derselbe %1$@-Aufruf kam %2$@ Mal, trotz Hinweis. Lenk ihn um oder nimm ein anderes Modell."
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "Arrêt : le même appel à %1$@ s'est répété %2$@ fois sans rien changer. Redirige-le ou essaie un autre modèle."
+            "value": "Arrêt : le même appel à %1$@ s'est répété %2$@ fois malgré l'avertissement. Redirige-le ou essaie un autre modèle."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Me detuve: la misma llamada a %1$@ se repitió %2$@ veces sin cambiar nada. Redirígela o prueba otro modelo."
+            "value": "Me detuve: la misma llamada a %1$@ se repitió %2$@ veces, incluso avisada. Redirígela o prueba otro modelo."
           }
         }
       }
@@ -17977,6 +17977,34 @@
         }
       }
     },
+    "Você já chamou %1$@ com estes mesmos argumentos nesta conversa e o resultado não mudou. Não repita: use o que já leu. Se a mudança já foi feita, diga o que mudou e encerre.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You already called %1$@ with these same arguments in this conversation and the result has not changed. Do not repeat it: use what you already read. If the change is already made, say what changed and finish."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Du hast %1$@ in diesem Gespräch schon mit genau diesen Argumenten aufgerufen, und das Ergebnis hat sich nicht geändert. Wiederhol es nicht: nimm, was du schon gelesen hast. Wenn die Änderung schon gemacht ist, sag was sich geändert hat und hör auf."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tu as déjà appelé %1$@ avec ces mêmes arguments dans cette conversation et le résultat n'a pas changé. Ne le répète pas : sers-toi de ce que tu as déjà lu. Si la modification est faite, dis ce qui a changé et termine."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ya llamaste a %1$@ con estos mismos argumentos en esta conversación y el resultado no cambió. No lo repitas: usa lo que ya leíste. Si el cambio ya está hecho, di qué cambió y termina."
+          }
+        }
+      }
+    },
     "Você é a Odete, IDE no iPad. Responda em português, curto e direto.": {
       "localizations": {
         "en": {
@@ -22257,6 +22285,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "ya existe un proyecto llamado %1$@"
+          }
+        }
+      }
+    },
+    "já lido, sem mudança": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "already read, unchanged"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "schon gelesen, unverändert"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "déjà lu, inchangé"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ya leído, sin cambios"
           }
         }
       }

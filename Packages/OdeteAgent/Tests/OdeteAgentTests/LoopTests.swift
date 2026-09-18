@@ -556,15 +556,43 @@ func runAll(
         }
     }
 
-    @Test func aMesmaChamadaRepetidaPara() async throws {
+    /// Orientar, não matar o turno.
+    ///
+    /// Parar era a versão bruta: transferia para a pessoa um problema que é do harness.
+    /// Da quarta repetição em diante a chamada não roda — no lugar do resultado volta o
+    /// aviso, e o agente segue com chance de corrigir o rumo sozinho.
+    @Test func aMesmaChamadaRepetidaRecebeOrientacaoESegue() async throws {
+        let root = try tmpProject()
+        let p = FakeProvider(repetindo(6) + [[.text("já estava lido, não mudei nada"), .done]])
+        let loop = AgentLoop(provider: p, host: TestHost(root: root), patches: PatchStore(root: root))
+        let r = await runAll(loop, "lê o arquivo", LoopConfig(mode: .build, permit: .full, model: "m"))
+        #expect(
+            r.history.contains { $0.role == .tool && $0.content.contains("Não repita") },
+            "repetiu e ninguém avisou"
+        )
+        #expect(
+            p.turns.withLock { $0.count } > AgentLoop.tetoDeRepeticao + 1,
+            "o laço morreu na repetição em vez de orientar e seguir"
+        )
+        #expect(
+            !r.items.contains {
+                if case .error = $0 {
+                    true
+                } else {
+                    false
+                }
+            },
+            "orientou e mesmo assim encerrou com erro"
+        )
+    }
+
+    /// Quando nem a orientação pega, desiste — e diz por quê.
+    @Test func quandoNemOAvisoPegaOLacoDesiste() async throws {
         let root = try tmpProject()
         let p = FakeProvider(repetindo(40))
         let loop = AgentLoop(provider: p, host: TestHost(root: root), patches: PatchStore(root: root))
         let r = await runAll(loop, "lê o arquivo", LoopConfig(mode: .build, permit: .full, model: "m"))
-        #expect(
-            p.turns.withLock { $0.count } <= AgentLoop.tetoDeRepeticao + 1,
-            "o laço deixou a mesma chamada rodar além do teto"
-        )
+        #expect(p.turns.withLock { $0.count } <= AgentLoop.tetoDeDesistencia + 2, "passou do ponto de desistir")
         #expect(
             r.items.contains {
                 if case let .error(_, texto) = $0 {
@@ -573,7 +601,7 @@ func runAll(
                     false
                 }
             },
-            "parou calado: quem está olhando não fica sabendo por quê"
+            "desistiu calado: quem está olhando não fica sabendo por quê"
         )
     }
 

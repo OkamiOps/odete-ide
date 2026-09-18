@@ -51,11 +51,20 @@ public final class AgentLoop: @unchecked Sendable {
         self.checkpoints = checkpoints
     }
 
-    /// Quantas repetições idênticas antes de desistir.
+    /// A partir de quantas repetições idênticas o laço passa a orientar.
     ///
-    /// Cinco é folgado para um agente que relê um arquivo depois de mexer nele, e curto o
-    /// bastante para a pessoa não ficar olhando o mesmo pedido rodar por meia hora.
-    static let tetoDeRepeticao = 5
+    /// Três é folgado para um agente que relê um arquivo depois de mexer nele. Da quarta
+    /// em diante a chamada nem chega a rodar: no lugar do resultado volta um aviso de que
+    /// aquilo já foi lido e não mudou. Orientar é o trabalho do harness; matar o turno
+    /// seria transferir para a pessoa um problema que é nosso.
+    static let tetoDeRepeticao = 3
+
+    /// E quando nem a orientação pega, aí sim desiste.
+    ///
+    /// Um agente que insiste na mesma chamada doze vezes, já avisado, não vai sair do
+    /// lugar sozinho — e quem está olhando merece saber disso em vez de ver o mesmo
+    /// pedido rodar para sempre.
+    static let tetoDeDesistencia = 12
 
     public func approve(_ id: String, _ ok: Bool) {
         permits.withLock { $0.removeValue(forKey: id) }?.resume(returning: ok)
@@ -290,16 +299,27 @@ public final class AgentLoop: @unchecked Sendable {
                 let assinatura = "\(call.name)|\(call.arguments)"
                 let vezes = (repetidas[assinatura] ?? 0) + 1
                 repetidas[assinatura] = vezes
-                if vezes > Self.tetoDeRepeticao {
+                if vezes > Self.tetoDeDesistencia {
                     emit(.item(.error(
                         id: UUID().uuidString,
                         text: tr(
-                            "Parei: a mesma chamada de %1$@ se repetiu %2$@ vezes sem mudar nada. Redirecione ou tente outro modelo.",
+                            "Parei: a mesma chamada de %1$@ se repetiu %2$@ vezes, mesmo avisada. Redirecione ou tente outro modelo.",
                             call.name,
                             "\(vezes)"
                         )
                     )))
                     return
+                }
+                if vezes > Self.tetoDeRepeticao {
+                    // A chamada nem roda: no lugar do resultado volta a orientação, no
+                    // formato de resultado de ferramenta, que é o que mantém a
+                    // transcrição inteira — chamada feita, chamada respondida.
+                    emit(.item(.tool(id: call.id, name: call.name, detail: tr("já lido, sem mudança"))))
+                    messages.append(.tool(call.id, tr(
+                        "Você já chamou %1$@ com estes mesmos argumentos nesta conversa e o resultado não mudou. Não repita: use o que já leu. Se a mudança já foi feita, diga o que mudou e encerre.",
+                        call.name
+                    )))
+                    continue
                 }
                 let hint = Self.hint(call)
                 if Tools.needsPermit(config.permit, call) {

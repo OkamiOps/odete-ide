@@ -5657,6 +5657,34 @@
         }
       }
     },
+    "Continue o pedido: %1$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continue the request: %1$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mach mit der Aufgabe weiter: %1$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continue la demande : %1$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continúa el pedido: %1$@"
+          }
+        }
+      }
+    },
     "Conversas": {
       "localizations": {
         "en": {

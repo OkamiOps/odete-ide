@@ -68,6 +68,9 @@ struct AppleProviderTests {
         let msgs = (1 ... 40).map { AgentMessage.user("linha \($0) " + String(repeating: "y", count: 400)) }
         let ficaram = TranscricaoApple.cortando(msgs, orcamento: AppleProvider.orcamentoDeEntrada)
         #expect(ficaram.last?.content.hasPrefix("linha 40") == true, "cortou a mensagem mais recente")
-        #expect(ficaram.first?.content.hasPrefix("linha 1 ") != true, "guardou o começo em vez do fim")
+        // O enunciado fica preso — ver `TranscricaoApple.cortando` — e quem encolhe é o
+        // meio: some a linha 2, nunca a 1 nem a 40.
+        #expect(ficaram.first?.content.hasPrefix("linha 1 ") == true, "o corte levou o pedido junto")
+        #expect(!ficaram.contains { $0.content.hasPrefix("linha 2 ") }, "não cortou nada do meio")
     }
 }

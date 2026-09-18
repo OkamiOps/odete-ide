@@ -37,9 +37,16 @@ enum TranscricaoApple {
                 toolDefinitions: ferramentas.map { Transcript.ToolDefinition(tool: $0) }
             )),
         ]
-        var prompt = tr("Siga a partir do resultado acima.")
         var corpo = cabendo
         // A última fala da pessoa é a pergunta da vez; o resto é transcrição.
+        //
+        // Quando não há fala nova — o caso comum no meio de um trabalho, com a conversa
+        // terminando em resultado de ferramenta — o prompt repete o pedido em vez de
+        // dizer só "siga". "Siga" sozinho não diz para onde, e é assim que um agente
+        // começa a vagar pelos arquivos.
+        var prompt = corpo.first { $0.role == .user }
+            .map { tr("Continue o pedido: %1$@", $0.content) }
+            ?? tr("Siga a partir do resultado acima.")
         if corpo.last?.role == .user {
             prompt = corpo.removeLast().content
         }
@@ -90,19 +97,32 @@ enum TranscricaoApple {
         }
     }
 
-    /// Corta o começo da conversa até caber, sem separar uma chamada do resultado dela.
+    /// Corta a conversa até caber, **sem nunca tirar o pedido**.
     ///
-    /// Transcrição com resultado órfão é pior que transcrição curta: o modelo vê a
-    /// resposta de uma ferramenta que, para ele, nunca foi chamada.
+    /// Cortar pela frente parecia óbvio: o começo é o mais velho. Só que o começo é o
+    /// enunciado. Depois de umas rodadas de arquivo lido — e arquivo lido é grande — a
+    /// primeira fala, "troca a cor do botão para azul", era a primeira a sair, e o que
+    /// sobrava era uma pilha de conteúdo e um "siga daqui". O agente não estava teimoso:
+    /// ele tinha perdido o enunciado e ficava relendo o projeto procurando o que fazer.
+    ///
+    /// Então o pedido fica preso no lugar e quem encolhe é o meio. E o corte continua
+    /// nunca separando uma chamada do resultado dela: transcrição com resultado órfão é
+    /// pior que transcrição curta, porque o modelo vê a resposta de uma ferramenta que,
+    /// para ele, nunca foi chamada.
     static func cortando(_ mensagens: [AgentMessage], orcamento: Int) -> [AgentMessage] {
-        var fim = mensagens
-        while tamanho(fim) > orcamento, !fim.isEmpty {
-            fim.removeFirst()
-            while let primeira = fim.first, primeira.role == .tool {
-                fim.removeFirst()
+        guard tamanho(mensagens) > orcamento else { return mensagens }
+        guard let pedido = mensagens.first(where: { $0.role == .user }) else {
+            return []
+        }
+        var resto = Array(mensagens.drop { $0.role != .user }.dropFirst())
+        let fixo = tamanho([pedido])
+        while tamanho(resto) + fixo > orcamento, !resto.isEmpty {
+            resto.removeFirst()
+            while let primeira = resto.first, primeira.role == .tool {
+                resto.removeFirst()
             }
         }
-        return fim
+        return [pedido] + resto
     }
 
     static func tamanho(_ mensagens: [AgentMessage]) -> Int {

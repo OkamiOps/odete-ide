@@ -255,7 +255,7 @@ struct AppleFerramentasTests {
             .user("arruma"),
             AgentMessage(role: .tool, content: "escrito a.css (4 → 4 linhas)", toolCallId: "1"),
         ])
-        #expect(prompt.contains("Siga"), "sem fala nova, ninguém mandou o modelo seguir")
+        #expect(prompt.contains("arruma"), "sem fala nova, o prompt tem que lembrar o pedido")
     }
 
     /// Cortar o começo não pode deixar um resultado sem a chamada que o pediu: o modelo
@@ -299,5 +299,55 @@ final class Caixa<T>: @unchecked Sendable {
 
     func ler() -> T {
         trava.lock(); defer { trava.unlock() }; return valor
+    }
+}
+
+/// O pedido não pode sair da transcrição.
+///
+/// Foi a causa do agente vagar pelos arquivos depois de já ter feito o trabalho: o corte
+/// tirava as mensagens mais velhas, e a mais velha é justamente a que diz o que fazer.
+/// Sobrava uma pilha de arquivos lidos e um "siga daqui" que não diz para onde.
+struct AppleEnunciadoTests {
+    @Test func oPedidoNuncaSaiNoCorte() {
+        let pedido = AgentMessage.user("troca a cor do botão para azul")
+        let entulho = (1 ... 40).flatMap { i -> [AgentMessage] in
+            [
+                AgentMessage(
+                    role: .assistant,
+                    content: "",
+                    toolCalls: [ToolCall(id: "\(i)", name: "read_file", arguments: "{}")]
+                ),
+                AgentMessage(role: .tool, content: String(repeating: "conteúdo ", count: 20), toolCallId: "\(i)"),
+            ]
+        }
+        let ficaram = TranscricaoApple.cortando([pedido] + entulho, orcamento: 2000)
+        #expect(ficaram.first?.content == pedido.content, "o corte levou o enunciado junto")
+        #expect(TranscricaoApple.tamanho(ficaram) <= 2000 + pedido.content.count, "o corte não respeitou o teto")
+        #expect(ficaram.count > 1, "cortou tudo menos o pedido")
+    }
+
+    /// Sem fala nova, o prompt repete o pedido em vez de dizer só "siga".
+    @Test func semFalaNovaOPromptLembraOPedido() {
+        let (_, prompt) = TranscricaoApple.montar(
+            [
+                .user("troca a cor do botão para azul"),
+                AgentMessage(role: .tool, content: "escrito style.css (4 → 4 linhas)", toolCallId: "1"),
+            ],
+            instrucoes: "i",
+            ferramentas: [],
+            orcamento: 100_000
+        )
+        #expect(prompt.contains("cor do botão"), "o prompt de continuação não diz para onde seguir")
+    }
+
+    /// Com fala nova, quem manda é ela.
+    @Test func comFalaNovaOPromptEhAFalaNova() {
+        let (_, prompt) = TranscricaoApple.montar(
+            [.user("primeiro pedido"), .user("agora deixa o título maior")],
+            instrucoes: "i",
+            ferramentas: [],
+            orcamento: 100_000
+        )
+        #expect(prompt == "agora deixa o título maior")
     }
 }

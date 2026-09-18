@@ -32,8 +32,29 @@ public struct AppleProvider: Provider {
     /// só existe do iOS 26.4 em diante; em português dá uns três caracteres e meio por
     /// ficha, e o desconto de 15% é a margem para essa conta ser aproximada.
     static var orcamentoDeEntrada: Int {
-        let paraEntrada = max(1024, janela - respostaMaxima)
+        orcamentoDeEntrada(comFerramentas: false)
+    }
+
+    /// Com ferramentas sobra menos: o teto da resposta sobe, e o que sobe lá tem que
+    /// descer aqui.
+    ///
+    /// Estava contando contra `respostaMaxima` mesmo quando a geração usava
+    /// `respostaComFerramentas`, que é maior. Somado à conta de instruções, que pedia
+    /// metade *deste* número em vez de metade do total, o provedor mandava uma vez e meia
+    /// o que cabia — foi o que apareceu no medidor do app como 329% da janela.
+    static func orcamentoDeEntrada(comFerramentas: Bool) -> Int {
+        let resposta = comFerramentas ? respostaComFerramentas : respostaMaxima
+        let paraEntrada = max(1024, janela - resposta)
         return Int(Double(paraEntrada) * 3.5 * 0.85)
+    }
+
+    /// O que as definições de ferramenta ocupam nas instruções.
+    ///
+    /// Nome, descrição e schema de cada uma entram na sessão antes de qualquer conversa,
+    /// e isso não é de graça: com oito ferramentas são milhares de caracteres. Sem
+    /// descontar, o orçamento da conversa mente.
+    static func custoDasFerramentas(_ specs: [ToolSpec]) -> Int {
+        specs.reduce(0) { $0 + $1.name.count + $1.description.count + $1.parametersJSON.count }
     }
 
     /// A resposta também acompanha: um quarto da janela, com teto para a pessoa não
@@ -174,11 +195,18 @@ public struct AppleProvider: Provider {
     /// duplicaria o que já é a primeira entrada.
     static func sessao(_ turn: TurnRequest, ferramentas: [any Tool]) -> (LanguageModelSession, String) {
         let naNuvem = turn.model == idNuvem
+        let comFerramentas = !ferramentas.isEmpty
+        let instrucoes = instrucoes(turn.system, comFerramentas: comFerramentas)
+        // O que sobra para a conversa é o total menos o que as instruções e as definições
+        // de ferramenta já ocuparam. Somar orçamentos independentes é como a sessão
+        // acabava com mais texto do que a janela aguenta.
+        let total = naNuvem ? janelaDaNuvem : orcamentoDeEntrada(comFerramentas: comFerramentas)
+        let sobra = max(1000, total - instrucoes.count - custoDasFerramentas(turn.tools))
         let (transcricao, prompt) = TranscricaoApple.montar(
             turn.messages,
-            instrucoes: instrucoes(turn.system, comFerramentas: !ferramentas.isEmpty),
+            instrucoes: instrucoes,
             ferramentas: ferramentas,
-            orcamento: naNuvem ? janelaDaNuvem : orcamentoDeEntrada
+            orcamento: sobra
         )
         if naNuvem, #available(iOS 27.0, *), nuvemDisponivel {
             return (
@@ -269,13 +297,18 @@ public struct AppleProvider: Provider {
     ///
     /// Metade do que entra; a outra metade é a conversa e o que as ferramentas
     /// devolveram. Acompanha a janela que o aparelho informa, como todo número daqui.
-    static var orcamentoDeInstrucoes: Int {
-        orcamentoDeEntrada / 2
+    /// Quanto do total as instruções podem ocupar: dois quintos, e o resto é a conversa.
+    static func orcamentoDeInstrucoes(comFerramentas: Bool) -> Int {
+        orcamentoDeEntrada(comFerramentas: comFerramentas) * 2 / 5
     }
 
     /// O mesmo prompt que os provedores por assinatura recebem — ver `AppleInstrucoes`.
     static func instrucoes(_ sistema: String, comFerramentas: Bool) -> String {
-        AppleInstrucoes.texto(sistema: sistema, comFerramentas: comFerramentas, teto: orcamentoDeInstrucoes)
+        AppleInstrucoes.texto(
+            sistema: sistema,
+            comFerramentas: comFerramentas,
+            teto: orcamentoDeInstrucoes(comFerramentas: comFerramentas)
+        )
     }
 
     /// Junta o histórico num prompt só, cortando o começo até caber na janela.

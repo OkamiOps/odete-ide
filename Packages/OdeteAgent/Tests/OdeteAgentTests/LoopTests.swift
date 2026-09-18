@@ -407,8 +407,10 @@ func runAll(
 
     @Test func roundCapAndStop() async throws {
         var script: [[StreamEvent]] = []
-        for _ in 0 ..< 9 {
-            script.append([.tools([call("list_dir", ["path": ""])]), .done])
+        // Cada rodada pede uma pasta diferente: repetir a mesma chamada agora esbarra no
+        // freio de repetição, que é outro teste — este é sobre parar no teto de rodadas.
+        for i in 0 ..< 9 {
+            script.append([.tools([call("list_dir", ["path": "src/\(i)"])]), .done])
         }
         let (loop, _, p, _) = try make(script)
         // O teto vem do config: o teste é sobre parar nele, não sobre quanto ele vale.
@@ -535,5 +537,72 @@ func runAll(
         ])
         _ = await runAll(loop, "arruma o a.txt", LoopConfig(mode: .build, permit: .full, model: "m"))
         #expect(p.turns.withLock { $0.count } == 2, "cutucou quem já tinha feito o trabalho")
+    }
+}
+
+/// O freio contra rodar em círculo.
+///
+/// Com o modelo local aconteceu de o mesmo `read_file` do mesmo arquivo sair cento e
+/// oitenta e seis vezes seguidas. O teto de rodadas existe, mas é um fusível de cinco mil:
+/// até ele disparar, já passou meia hora com a pessoa olhando.
+@Suite(.serialized) struct RepeticaoTests {
+    init() {
+        Texto.escolher(.ptBR)
+    }
+
+    func repetindo(_ quantas: Int) -> [[StreamEvent]] {
+        (0 ..< quantas).map { _ in
+            [.tools([ToolCall(id: UUID().uuidString, name: "read_file", arguments: #"{"path":"a.txt"}"#)]), .done]
+        }
+    }
+
+    @Test func aMesmaChamadaRepetidaPara() async throws {
+        let root = try tmpProject()
+        let p = FakeProvider(repetindo(40))
+        let loop = AgentLoop(provider: p, host: TestHost(root: root), patches: PatchStore(root: root))
+        let r = await runAll(loop, "lê o arquivo", LoopConfig(mode: .build, permit: .full, model: "m"))
+        #expect(
+            p.turns.withLock { $0.count } <= AgentLoop.tetoDeRepeticao + 1,
+            "o laço deixou a mesma chamada rodar além do teto"
+        )
+        #expect(
+            r.items.contains {
+                if case let .error(_, texto) = $0 {
+                    texto.contains("repetiu")
+                } else {
+                    false
+                }
+            },
+            "parou calado: quem está olhando não fica sabendo por quê"
+        )
+    }
+
+    /// Chamadas diferentes não são repetição: um agente que lê cinco arquivos está
+    /// trabalhando.
+    @Test func chamadasDiferentesNaoTravam() async throws {
+        let root = try tmpProject()
+        let script: [[StreamEvent]] = (1 ... 10).map { i in
+            [.tools([ToolCall(
+                id: "\(i)",
+                name: "read_file",
+                arguments: #"{"path":"arquivo\#(i).txt"}"#
+            )]), .done]
+        } + [[.text("li tudo"), .done]]
+        let p = FakeProvider(script)
+        let loop = AgentLoop(provider: p, host: TestHost(root: root), patches: PatchStore(root: root))
+        let r = await runAll(loop, "lê os arquivos", LoopConfig(mode: .build, permit: .full, model: "m"))
+        // Onze rodadas de roteiro e mais uma da cutucada de "anunciar não é fazer", já que
+        // o turno terminou em texto sem ter editado nada.
+        #expect(p.turns.withLock { $0.count } >= 11, "travou um agente que estava lendo arquivos diferentes")
+        #expect(
+            !r.items.contains {
+                if case let .error(_, texto) = $0 {
+                    texto.contains("repetiu")
+                } else {
+                    false
+                }
+            },
+            "o freio de repetição disparou em chamadas diferentes"
+        )
     }
 }

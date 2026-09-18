@@ -13441,6 +13441,34 @@
         }
       }
     },
+    "Parei: a mesma chamada de %1$@ se repetiu %2$@ vezes sem mudar nada. Redirecione ou tente outro modelo.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stopped: the same %1$@ call repeated %2$@ times without changing anything. Redirect it or try another model."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gestoppt: derselbe %1$@-Aufruf kam %2$@ Mal ohne Änderung. Lenk ihn um oder nimm ein anderes Modell."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Arrêt : le même appel à %1$@ s'est répété %2$@ fois sans rien changer. Redirige-le ou essaie un autre modèle."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Me detuve: la misma llamada a %1$@ se repitió %2$@ veces sin cambiar nada. Redirígela o prueba otro modelo."
+          }
+        }
+      }
+    },
     "Pasta da Odete": {
       "localizations": {
         "en": {

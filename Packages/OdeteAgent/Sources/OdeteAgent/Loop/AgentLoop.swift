@@ -51,6 +51,12 @@ public final class AgentLoop: @unchecked Sendable {
         self.checkpoints = checkpoints
     }
 
+    /// Quantas repetições idênticas antes de desistir.
+    ///
+    /// Cinco é folgado para um agente que relê um arquivo depois de mexer nele, e curto o
+    /// bastante para a pessoa não ficar olhando o mesmo pedido rodar por meia hora.
+    static let tetoDeRepeticao = 5
+
     public func approve(_ id: String, _ ok: Bool) {
         permits.withLock { $0.removeValue(forKey: id) }?.resume(returning: ok)
     }
@@ -144,6 +150,8 @@ public final class AgentLoop: @unchecked Sendable {
         // fazer" já foi dada — ver o `toolCalls.isEmpty` mais abaixo.
         var fezPatch = false
         var cutucou = false
+        // Quantas vezes cada chamada idêntica já aconteceu neste turno — ver `tetoDeRepeticao`.
+        var repetidas: [String: Int] = [:]
         while round < config.maxRounds {
             if isStopped {
                 break
@@ -271,6 +279,27 @@ public final class AgentLoop: @unchecked Sendable {
                     }
                     redirected = hasSteer
                     break
+                }
+                // A mesma chamada, com os mesmos argumentos, repetida sem parar.
+                //
+                // Foi o que aconteceu com o modelo local: cento e oitenta e seis
+                // `read_file` do mesmo arquivo, um atrás do outro. Um agente que relê o
+                // mesmo arquivo pela sexta vez não está trabalhando, está preso — e o
+                // fusível de rodadas, lá em cima, é grande demais para servir de freio
+                // aqui: até ele disparar já passou meia hora.
+                let assinatura = "\(call.name)|\(call.arguments)"
+                let vezes = (repetidas[assinatura] ?? 0) + 1
+                repetidas[assinatura] = vezes
+                if vezes > Self.tetoDeRepeticao {
+                    emit(.item(.error(
+                        id: UUID().uuidString,
+                        text: tr(
+                            "Parei: a mesma chamada de %1$@ se repetiu %2$@ vezes sem mudar nada. Redirecione ou tente outro modelo.",
+                            call.name,
+                            "\(vezes)"
+                        )
+                    )))
+                    return
                 }
                 let hint = Self.hint(call)
                 if Tools.needsPermit(config.permit, call) {

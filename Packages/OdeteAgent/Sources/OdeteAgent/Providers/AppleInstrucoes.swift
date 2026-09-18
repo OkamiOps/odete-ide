@@ -48,8 +48,29 @@ enum AppleInstrucoes {
         let regras = temFerramentas ? comFerramentas : semFerramentas
         let idioma = tr("Responda em %1$@.", Texto.idioma.paraOModelo)
         let fixo = "\n\n" + regras + "\n\n" + idioma
-        return cabendo(sistema, teto: max(0, teto - fixo.count)) + fixo
+        let base = temFerramentas ? semOFormato(sistema) : sistema
+        return cabendo(base, teto: max(0, teto - fixo.count)) + fixo
     }
+
+    /// Tira do prompt o bloco que manda responder em `##` e listas.
+    ///
+    /// Medido numa bancada com o modelo do sistema rodando de verdade: mesmo laço, mesma
+    /// conversa, única diferença este bloco. Com ele, o modelo lê o arquivo e escreve
+    /// `## Mudança de cor do botão` com bullets, e nunca edita. Sem ele, lê e chama
+    /// `str_replace`. Não é prompt mal escrito — é que "formato de resposta obrigatório"
+    /// e "chame a ferramenta" disputam a mesma saída, e num modelo de poucos bilhões de
+    /// parâmetros o formato obrigatório ganha.
+    ///
+    /// O bloco continua valendo para os provedores por assinatura, que fazem as duas
+    /// coisas sem se atrapalhar. Sai só daqui, e só quando há ferramenta em jogo.
+    static func semOFormato(_ sistema: String) -> String {
+        guard let inicio = sistema.range(of: marcaDoFormato) else { return sistema }
+        let resto = sistema[inicio.upperBound...]
+        guard let fim = resto.range(of: "\n\n") else { return String(sistema[..<inicio.lowerBound]) }
+        return String(sistema[..<inicio.lowerBound]) + String(resto[fim.upperBound...])
+    }
+
+    static let marcaDoFormato = "Formato (obrigatório"
 
     /// O prompt inteiro quando cabe; com a lista de arquivos encolhida quando não cabe.
     ///

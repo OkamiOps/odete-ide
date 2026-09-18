@@ -38,22 +38,75 @@ enum TranscricaoApple {
             )),
         ]
         var corpo = cabendo
-        // A última fala da pessoa é a pergunta da vez; o resto é transcrição.
-        //
-        // Quando não há fala nova — o caso comum no meio de um trabalho, com a conversa
-        // terminando em resultado de ferramenta — o prompt repete o pedido em vez de
-        // dizer só "siga". "Siga" sozinho não diz para onde, e é assim que um agente
-        // começa a vagar pelos arquivos.
-        var prompt = corpo.first { $0.role == .user }
-            .map { tr("Continue o pedido: %1$@", $0.content) }
-            ?? tr("Siga a partir do resultado acima.")
         if corpo.last?.role == .user {
-            prompt = corpo.removeLast().content
+            corpo.removeLast()
         }
+        // O pedido da vez é a **última** fala da pessoa, não a primeira: quem manda "agora
+        // deixa o título maior" no meio da conversa mudou de assunto. E o estado — leu,
+        // editou — é o que aconteceu depois dela, senão um trabalho terminado antes faria
+        // o pedido novo já nascer "pronto".
+        let ultima = cabendo.lastIndex { $0.role == .user }
+        let prompt = ordem(
+            pedido: ultima.map { cabendo[$0].content } ?? "",
+            feito: ultima.map { Array(cabendo.suffix(from: $0 + 1)) } ?? cabendo
+        )
         for m in corpo {
             entradas.append(contentsOf: entrada(m, entre: corpo))
         }
         return (Transcript(entries: entradas), prompt)
+    }
+
+    /// A ordem da vez, conforme o que já foi feito.
+    ///
+    /// Medido na bancada, com o modelo do sistema rodando de verdade: dado só o objetivo
+    /// — "preciso trocar a cor do botão para azul" — ele responde com conselho de CSS e
+    /// não chama ferramenta nenhuma. Dado o mesmo objetivo com uma primeira ordem
+    /// concreta junto — "chame read_file no arquivo que precisa mudar" — ele chama. Esse
+    /// modelo atende pedido que mapeia numa ferramenta e não decompõe objetivo em passos;
+    /// decompor é trabalho do harness, não dele.
+    ///
+    /// E a ordem muda com o estado, senão vira laço: mandar "aplique com str_replace"
+    /// depois de aplicado é pedir para aplicar de novo — foi exatamente o que a bancada
+    /// mostrou, vinte chamadas seguidas editando o mesmo arquivo.
+    static func ordem(pedido: String, feito: [AgentMessage]) -> String {
+        guard !pedido.isEmpty else { return tr("Siga a partir do resultado acima.") }
+        var leu = false, editou = false, errouOTrecho = false
+        for m in feito where m.role == .tool {
+            if m.content.hasPrefix("escrito ") {
+                editou = true
+                errouOTrecho = false
+            } else if m.content.hasPrefix("trecho não encontrado") {
+                errouOTrecho = true
+            } else if !m.content.isEmpty {
+                leu = true
+                errouOTrecho = false
+            }
+        }
+        // Errar o trecho e mandar "aplique de novo" é pedir o mesmo palpite outra vez —
+        // medido na bancada: dez, vinte chamadas do mesmo str_replace que não casa. Quem
+        // errou o texto precisa do texto, não de mais uma ordem para aplicar.
+        if errouOTrecho {
+            return tr(
+                "Pedido: %1$@\n\nO trecho não foi encontrado no arquivo. Chame read_file de novo e copie daí o texto exato antes de tentar outra vez.",
+                pedido
+            )
+        }
+        if editou {
+            return tr(
+                "Pedido: %1$@\n\nA mudança já foi aplicada no arquivo. Diga em uma frase o que mudou e pare. Não chame mais ferramentas.",
+                pedido
+            )
+        }
+        if leu {
+            return tr(
+                "Pedido: %1$@\n\nAgora aplique a mudança chamando str_replace, com old copiado exatamente do que você leu. Não explique antes de chamar.",
+                pedido
+            )
+        }
+        return tr(
+            "%1$@\n\nPrimeiro passo: chame read_file no arquivo que precisa mudar, ou list_dir se não souber qual. Não explique antes de chamar.",
+            pedido
+        )
     }
 
     static func entrada(_ m: AgentMessage, entre todas: [AgentMessage]) -> [Transcript.Entry] {

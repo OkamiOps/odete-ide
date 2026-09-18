@@ -66,6 +66,25 @@ public final class AgentLoop: @unchecked Sendable {
     /// pedido rodar para sempre.
     static let tetoDeDesistencia = 12
 
+    /// As últimas mensagens, com o pedido da pessoa sempre junto.
+    ///
+    /// `suffix(24)` sozinho jogava fora o enunciado num trabalho de vinte e tantas
+    /// chamadas — e é aqui, antes do provedor, então nem adianta o provedor proteger o
+    /// pedido depois: o que não chega não dá para preservar. Era a mesma perda do corte
+    /// por orçamento, um andar acima, e uma anulava a correção da outra.
+    static func comOPedido(_ mensagens: [AgentMessage], ultimas: Int) -> [AgentMessage] {
+        let fim = Array(mensagens.suffix(ultimas))
+        guard let pedido = mensagens.first(where: { $0.role == .user }) else { return fim }
+        if fim.contains(where: { $0.role == .user && $0.content == pedido.content }) {
+            return fim
+        }
+        // Resultado de ferramenta no começo da janela ficou sem a chamada que o pediu.
+        // Tirar esses órfãos é bom; tirar tudo não — numa sequência que só tem
+        // resultados, um órfão informa mais que uma conversa vazia.
+        let semOrfaos = Array(fim.drop { $0.role == .tool })
+        return [pedido] + (semOrfaos.isEmpty ? fim : semOrfaos)
+    }
+
     public func approve(_ id: String, _ ok: Bool) {
         permits.withLock { $0.removeValue(forKey: id) }?.resume(returning: ok)
     }
@@ -170,7 +189,7 @@ public final class AgentLoop: @unchecked Sendable {
                 err = Mutex<String?>(nil)
             let turn = TurnRequest(
                 system: systemPrompt(mode: config.mode, userText: userText),
-                messages: Array(messages.suffix(24)),
+                messages: Self.comOPedido(messages, ultimas: 24),
                 tools: tools,
                 model: config.model,
                 effort: config.effort,
@@ -300,14 +319,25 @@ public final class AgentLoop: @unchecked Sendable {
                 let vezes = (repetidas[assinatura] ?? 0) + 1
                 repetidas[assinatura] = vezes
                 if vezes > Self.tetoDeDesistencia {
-                    emit(.item(.error(
-                        id: UUID().uuidString,
-                        text: tr(
-                            "Parei: a mesma chamada de %1$@ se repetiu %2$@ vezes, mesmo avisada. Redirecione ou tente outro modelo.",
-                            call.name,
-                            "\(vezes)"
-                        )
-                    )))
+                    // Quando o trabalho já foi feito, isto não é falha: é um agente que
+                    // não sabe parar de conferir. Terminar em vermelho, com o patch
+                    // pronto esperando na tela, faz parecer que deu errado o que deu
+                    // certo.
+                    if fezPatch {
+                        emit(.item(.assistant(
+                            id: UUID().uuidString,
+                            text: tr("Fiz as mudanças e parei de reler o projeto. O patch está aí para você revisar.")
+                        )))
+                    } else {
+                        emit(.item(.error(
+                            id: UUID().uuidString,
+                            text: tr(
+                                "Parei: a mesma chamada de %1$@ se repetiu %2$@ vezes, mesmo avisada. Redirecione ou tente outro modelo.",
+                                call.name,
+                                "\(vezes)"
+                            )
+                        )))
+                    }
                     return
                 }
                 if vezes > Self.tetoDeRepeticao {
@@ -315,10 +345,21 @@ public final class AgentLoop: @unchecked Sendable {
                     // formato de resultado de ferramenta, que é o que mantém a
                     // transcrição inteira — chamada feita, chamada respondida.
                     emit(.item(.tool(id: call.id, name: call.name, detail: tr("já lido, sem mudança"))))
-                    messages.append(.tool(call.id, tr(
-                        "Você já chamou %1$@ com estes mesmos argumentos nesta conversa e o resultado não mudou. Não repita: use o que já leu. Se a mudança já foi feita, diga o que mudou e encerre.",
-                        call.name
-                    )))
+                    // Com patch já feito o aviso é outro: não é "não releia", é "acabou".
+                    // Quem está relendo depois de editar não precisa de dado, precisa de
+                    // alguém dizendo que o trabalho terminou.
+                    messages.append(.tool(
+                        call.id,
+                        fezPatch
+                            ?
+                            tr(
+                                "As mudanças já foram feitas e estão na tela para revisão. Pare de ler: responda em uma frase o que mudou."
+                            )
+                            : tr(
+                                "Você já chamou %1$@ com estes mesmos argumentos nesta conversa e o resultado não mudou. Não repita: use o que já leu. Se a mudança já foi feita, diga o que mudou e encerre.",
+                                call.name
+                            )
+                    ))
                     continue
                 }
                 let hint = Self.hint(call)

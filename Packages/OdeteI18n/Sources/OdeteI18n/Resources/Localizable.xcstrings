@@ -281,6 +281,34 @@
         }
       }
     },
+    "%1$@\n\nPrimeiro passo: chame read_file no arquivo que precisa mudar, ou list_dir se não souber qual. Não explique antes de chamar.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@\n\nFirst step: call read_file on the file that needs to change, or list_dir if you don't know which. Do not explain before calling."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@\n\nErster Schritt: ruf read_file für die Datei auf, die sich ändern muss, oder list_dir, wenn du nicht weißt welche. Erklär nichts vorher."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@\n\nPremière étape : appelle read_file sur le fichier à modifier, ou list_dir si tu ne sais pas lequel. N'explique pas avant d'appeler."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@\n\nPrimer paso: llama a read_file en el archivo que hay que cambiar, o list_dir si no sabes cuál. No expliques antes de llamar."
+          }
+        }
+      }
+    },
     "%1$@  %2$@": {
       "localizations": {
         "en": {
@@ -3473,6 +3501,34 @@
         }
       }
     },
+    "As mudanças já foram feitas e estão na tela para revisão. Pare de ler: responda em uma frase o que mudou.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The changes are already made and are on screen for review. Stop reading: say in one sentence what changed."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Änderungen sind schon gemacht und stehen zur Durchsicht auf dem Bildschirm. Hör auf zu lesen: sag in einem Satz was sich geändert hat."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les modifications sont déjà faites et affichées pour relecture. Arrête de lire : dis en une phrase ce qui a changé."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Los cambios ya están hechos y están en pantalla para revisar. Deja de leer: di en una frase qué cambió."
+          }
+        }
+      }
+    },
     "Ask": {
       "localizations": {
         "en": {
@@ -5653,34 +5709,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sigue desde donde se quedó."
-          }
-        }
-      }
-    },
-    "Continue o pedido: %1$@": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Continue the request: %1$@"
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Mach mit der Aufgabe weiter: %1$@"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Continue la demande : %1$@"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Continúa el pedido: %1$@"
           }
         }
       }
@@ -8649,6 +8677,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Filtrar archivos"
+          }
+        }
+      }
+    },
+    "Fiz as mudanças e parei de reler o projeto. O patch está aí para você revisar.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I made the changes and stopped re-reading the project. The patch is there for you to review."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ich habe die Änderungen gemacht und aufgehört, das Projekt nochmal zu lesen. Der Patch liegt zur Durchsicht bereit."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "J'ai fait les modifications et j'ai arrêté de relire le projet. Le patch est là pour que tu le relises."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hice los cambios y dejé de releer el proyecto. El patch está ahí para que lo revises."
           }
         }
       }
@@ -13577,6 +13633,90 @@
           "stringUnit": {
             "state": "translated",
             "value": "Patch del agente: +%1$@ −%2$@"
+          }
+        }
+      }
+    },
+    "Pedido: %1$@\n\nA mudança já foi aplicada no arquivo. Diga em uma frase o que mudou e pare. Não chame mais ferramentas.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Request: %1$@\n\nThe change has already been applied to the file. Say in one sentence what changed and stop. Do not call any more tools."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aufgabe: %1$@\n\nDie Änderung ist schon in der Datei. Sag in einem Satz was sich geändert hat und hör auf. Ruf keine Werkzeuge mehr auf."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Demande : %1$@\n\nLa modification est déjà appliquée dans le fichier. Dis en une phrase ce qui a changé et arrête. N'appelle plus d'outils."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pedido: %1$@\n\nEl cambio ya se aplicó en el archivo. Di en una frase qué cambió y detente. No llames más herramientas."
+          }
+        }
+      }
+    },
+    "Pedido: %1$@\n\nAgora aplique a mudança chamando str_replace, com old copiado exatamente do que você leu. Não explique antes de chamar.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Request: %1$@\n\nNow apply the change by calling str_replace, with old copied exactly from what you read. Do not explain before calling."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aufgabe: %1$@\n\nWende die Änderung jetzt mit str_replace an, mit old exakt aus dem kopiert, was du gelesen hast. Erklär nichts vorher."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Demande : %1$@\n\nApplique maintenant la modification en appelant str_replace, avec old copié exactement de ce que tu as lu. N'explique pas avant d'appeler."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pedido: %1$@\n\nAhora aplica el cambio llamando a str_replace, con old copiado exactamente de lo que leíste. No expliques antes de llamar."
+          }
+        }
+      }
+    },
+    "Pedido: %1$@\n\nO trecho não foi encontrado no arquivo. Chame read_file de novo e copie daí o texto exato antes de tentar outra vez.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Request: %1$@\n\nThe snippet was not found in the file. Call read_file again and copy the exact text from it before trying again."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aufgabe: %1$@\n\nDer Abschnitt wurde in der Datei nicht gefunden. Ruf read_file nochmal auf und kopier den genauen Text daraus, bevor du es erneut versuchst."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Demande : %1$@\n\nL'extrait n'a pas été trouvé dans le fichier. Rappelle read_file et copie le texte exact avant de réessayer."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pedido: %1$@\n\nEl fragmento no se encontró en el archivo. Llama a read_file de nuevo y copia de ahí el texto exacto antes de intentarlo otra vez."
           }
         }
       }

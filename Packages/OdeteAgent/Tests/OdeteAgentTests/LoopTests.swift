@@ -634,3 +634,27 @@ func runAll(
         )
     }
 }
+
+/// O enunciado tem que chegar ao provedor.
+///
+/// O laço mandava as últimas vinte e quatro mensagens. Num trabalho de vinte e tantas
+/// chamadas isso joga fora justamente a primeira — a que diz o que fazer — e aí não
+/// adianta o provedor protegê-la: o que não chega não dá para preservar.
+@Suite(.serialized) struct EnunciadoTests {
+    @Test func oPedidoVaiJuntoMesmoDepoisDeMuitasChamadas() {
+        let pedido = AgentMessage.user("troca a cor do botão para azul")
+        let muitas = (1 ... 60).map { AgentMessage(role: .tool, content: "resultado \($0)", toolCallId: "\($0)") }
+        let enviadas = AgentLoop.comOPedido([pedido] + muitas, ultimas: 24)
+        #expect(enviadas.first?.content == pedido.content, "o pedido não chegou ao provedor")
+        #expect(enviadas.count <= 25)
+        #expect(enviadas.last?.content == "resultado 60", "perdeu o fim da conversa")
+    }
+
+    /// Conversa curta não ganha cópia do pedido: ele já está lá.
+    @Test func semCorteNadaEhDuplicado() {
+        let msgs: [AgentMessage] = [.user("arruma"), AgentMessage(role: .assistant, content: "ok")]
+        let enviadas = AgentLoop.comOPedido(msgs, ultimas: 24)
+        #expect(enviadas.count == 2)
+        #expect(enviadas.filter { $0.role == .user }.count == 1, "duplicou o pedido")
+    }
+}

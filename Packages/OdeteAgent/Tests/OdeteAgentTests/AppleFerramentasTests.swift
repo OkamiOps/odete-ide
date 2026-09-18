@@ -242,10 +242,35 @@ struct AppleFerramentasTests {
         #expect(i.toolDefinitions.count == Tools.all.count, "as ferramentas não foram declaradas na transcrição")
     }
 
-    /// A última fala é a pergunta da vez, e não mais uma linha da transcrição.
-    @Test func aUltimaFalaViraOPrompt() {
+    /// A última fala é o pedido da vez, e vem com a primeira ordem concreta junto.
+    ///
+    /// Medido com o modelo do sistema rodando de verdade: só o objetivo não faz ele
+    /// chamar ferramenta; objetivo mais "chame read_file" faz. Ver `TranscricaoApple.ordem`.
+    @Test func aUltimaFalaViraOPromptComAOrdemDoPrimeiroPasso() {
         let (_, prompt) = monta([.user("primeira"), .user("deixa o botão azul")])
-        #expect(prompt == "deixa o botão azul")
+        #expect(prompt.contains("deixa o botão azul"), "o pedido da vez não entrou no prompt")
+        #expect(prompt.contains("read_file"), "faltou a primeira ordem concreta")
+        #expect(!prompt.contains("primeira"), "usou o pedido velho em vez do novo")
+    }
+
+    /// Depois de ler, a ordem muda para aplicar.
+    @Test func depoisDeLerAOrdemEhAplicar() {
+        let (_, prompt) = monta([
+            .user("deixa o botão azul"),
+            AgentMessage(role: .tool, content: "button { font: inherit; }", toolCallId: "1"),
+        ])
+        #expect(prompt.contains("str_replace"), "leu e ninguém mandou aplicar")
+    }
+
+    /// E depois de editar, a ordem é parar — mandar aplicar de novo é o que fazia o laço
+    /// editar o mesmo arquivo vinte vezes seguidas.
+    @Test func depoisDeEditarAOrdemEhParar() {
+        let (_, prompt) = monta([
+            .user("deixa o botão azul"),
+            AgentMessage(role: .tool, content: "escrito src/style.css (4 → 4 linhas)", toolCallId: "1"),
+        ])
+        #expect(prompt.contains("já foi aplicada"), "não disse que acabou")
+        #expect(!prompt.contains("Agora aplique"), "mandou aplicar de novo o que já estava aplicado")
     }
 
     /// No meio de um trabalho a conversa termina em resultado de ferramenta: não há fala
@@ -340,14 +365,19 @@ struct AppleEnunciadoTests {
         #expect(prompt.contains("cor do botão"), "o prompt de continuação não diz para onde seguir")
     }
 
-    /// Com fala nova, quem manda é ela.
+    /// Com fala nova, quem manda é ela — inclusive quando um trabalho já terminou antes.
     @Test func comFalaNovaOPromptEhAFalaNova() {
         let (_, prompt) = TranscricaoApple.montar(
-            [.user("primeiro pedido"), .user("agora deixa o título maior")],
+            [
+                .user("primeiro pedido"),
+                AgentMessage(role: .tool, content: "escrito a.css (1 → 1 linhas)", toolCallId: "1"),
+                .user("agora deixa o título maior"),
+            ],
             instrucoes: "i",
             ferramentas: [],
             orcamento: 100_000
         )
-        #expect(prompt == "agora deixa o título maior")
+        #expect(prompt.contains("agora deixa o título maior"))
+        #expect(prompt.contains("read_file"), "o pedido novo nasceu como se já estivesse pronto")
     }
 }

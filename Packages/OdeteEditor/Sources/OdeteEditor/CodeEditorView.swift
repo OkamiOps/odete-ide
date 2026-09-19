@@ -148,13 +148,14 @@ public struct CodeEditorView: UIViewRepresentable {
             || c.fontFamily != prefs.fontFamily
         if docChanged || themeChanged {
             apply(to: tv, context: context, fullReset: true)
-        } else if !c.isEditing, tv.text != text {
+        } else if !c.isEditing, c.textoAtual != text {
             tv.text = text
+            c.anotarTexto(text)
             c.scheduleDecorations()
         }
         c.parent = self
         applyPrefs(tv, context: context)
-        c.atualizarMinimapa(tv.text)
+        c.agendarMinimapa()
         if docChanged {
             DispatchQueue.main.async { c.positionOverlay() }
         }
@@ -225,7 +226,7 @@ public struct CodeEditorView: UIViewRepresentable {
             c.minimapSize = prefs.minimap
             c.minimap.tamanho = prefs.minimap
             c.minimapTexto = ""
-            c.atualizarMinimapa(tv.text)
+            c.agendarMinimapa()
         }
         c.positionOverlay()
         // O texto não pode correr por baixo do mapa.
@@ -276,6 +277,7 @@ public struct CodeEditorView: UIViewRepresentable {
         } else {
             tv.setState(TextViewState(text: text, theme: theme))
         }
+        c.anotarTexto(text)
         c.scheduleDecorations()
     }
 
@@ -315,6 +317,24 @@ public struct CodeEditorView: UIViewRepresentable {
         var tabWidth = 2
         var offsetObservation: NSKeyValueObservation?
         var decorationTask: Task<Void, Never>?
+        var minimapTask: Task<Void, Never>?
+        /// O texto do documento como o coordenador o conhece.
+        ///
+        /// `tv.text` parece um campo e não é: cada leitura remonta a String inteira a
+        /// partir da estrutura interna do Runestone, e custa o tamanho do arquivo.
+        /// Medido no simulador, uma tecla num arquivo de 2000 linhas gastava 84 ms de
+        /// CPU — porque o documento era remontado quatro vezes por tecla: no delegate,
+        /// duas em `updateUIView` e mais uma na decoração. Guardar aqui troca quatro
+        /// varreduras por uma.
+        var textoAtual = ""
+        /// Sobe a cada mudança do texto. É o que invalida o cache de início de linha.
+        var versaoDoTexto = 0
+        /// O mapa de linhas do texto atual, guardado por versão — ver `linhas()`.
+        var mapaCacheado = MapaDeLinhas("")
+        var versaoCacheada = -1
+        /// Em que linha o cursor estava da última vez, para não refazer decoração
+        /// quando ele só anda dentro da mesma.
+        var ultimaLinhaDoCursor = -1
         private var popupContext: CompletionContext?
 
         init(parent: CodeEditorView) {
@@ -323,11 +343,26 @@ public struct CodeEditorView: UIViewRepresentable {
 
         public func textViewDidChange(_ textView: TextView) {
             isEditing = true
-            parent.text = textView.text
+            textoAtual = textView.text
+            versaoDoTexto &+= 1
+            parent.text = textoAtual
             isEditing = false
             scheduleDecorations()
             offerCompletions()
-            atualizarMinimapa(textView.text)
+            agendarMinimapa()
+        }
+
+        /// O minimapa mede cada linha do arquivo para desenhar. Fazer isso a cada tecla
+        /// é medir 2000 linhas para mostrar uma mudança de um caractere; esperar a
+        /// pessoa parar de digitar mostra o mesmo desenho pelo preço de uma medição.
+        func agendarMinimapa() {
+            guard minimapSize != .off else { return }
+            minimapTask?.cancel()
+            minimapTask = Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .milliseconds(200))
+                guard !Task.isCancelled, let self else { return }
+                atualizarMinimapa(textoAtual)
+            }
         }
 
         func atualizarMinimapa(_ texto: String) {
@@ -338,14 +373,21 @@ public struct CodeEditorView: UIViewRepresentable {
 
         public func textViewDidChangeSelection(_ textView: TextView) {
             parent.onCursor(textView.selectedRange.location)
+            // A guia de recuo marca a linha do cursor, então só muda quando o cursor
+            // muda de linha. Refazer a decoração a cada seta para o lado era redesenhar
+            // o arquivo inteiro para nada.
             if guidesOn {
-                scheduleDecorations()
+                let linha = linhaDe(textView.selectedRange.location)
+                if linha != ultimaLinhaDoCursor {
+                    ultimaLinhaDoCursor = linha
+                    scheduleDecorations()
+                }
             }
             if popupContext != nil, !popup.isHidden {
                 // Cursor saiu da palavra: fecha.
                 let ctx = Complete.context(
-                    text: textView.text,
-                    cursor: charOffset(textView.selectedRange.location, in: textView.text)
+                    text: textoAtual,
+                    cursor: charOffset(textView.selectedRange.location, in: textoAtual)
                 )
                 if ctx?.start != popupContext?.start {
                     hidePopup()
@@ -379,7 +421,7 @@ public struct CodeEditorView: UIViewRepresentable {
                 hidePopup()
                 return
             }
-            let text = tv.text
+            let text = textoAtual
             let cursor = charOffset(tv.selectedRange.location, in: text)
             guard let ctx = Complete.context(text: text, cursor: cursor) else {
                 hidePopup()
@@ -422,7 +464,7 @@ public struct CodeEditorView: UIViewRepresentable {
 
         func accept(_ item: Completion) {
             guard let tv = textView, let ctx = popupContext else { return }
-            let text = tv.text
+            let text = textoAtual
             let startUTF16 = utf16Offset(ctx.start, in: text)
             let cursor = tv.selectedRange.location
             var insert = item.insert

@@ -175,7 +175,7 @@ extension WorkspaceModel {
             do {
                 try await repo.discardHunk(h, in: f)
                 self?.reloadBuffer(path)
-                self?.git.scheduleRefresh()
+                self?.git.agendarMarcas()
             } catch {
                 self?.error = error.localizedDescription
             }

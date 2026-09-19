@@ -15,10 +15,37 @@ extension CodeEditorView.Coordinator {
         }
     }
 
+    /// Anota o texto novo e invalida o cache de linhas.
+    ///
+    /// Todo lugar que troca o conteúdo do editor passa por aqui — fora daqui o
+    /// coordenador seguiria decorando com o mapa de linhas do texto anterior.
+    func anotarTexto(_ texto: String) {
+        textoAtual = texto
+        versaoDoTexto &+= 1
+    }
+
+    /// O mapa de linhas do texto atual, refeito só quando o texto muda de versão.
+    ///
+    /// Era recalculado em toda passada de decoração — que acontece ao digitar, ao mover
+    /// o cursor, ao rolar e ao mudar a margem. Ver `MapaDeLinhas` para o custo que isso
+    /// tinha.
+    func linhas() -> MapaDeLinhas {
+        if versaoCacheada != versaoDoTexto {
+            mapaCacheado = MapaDeLinhas(textoAtual)
+            versaoCacheada = versaoDoTexto
+        }
+        return mapaCacheado
+    }
+
+    func linhaDe(_ offset: Int) -> Int {
+        linhas().linha(de: offset)
+    }
+
     func layoutDecorations() {
         guard let tv = textView else { return }
-        let ns = tv.text as NSString
-        let starts = lineStarts(ns)
+        let mapa = linhas()
+        let ns = mapa.ns
+        let starts = mapa.starts
         var placed: [GutterOverlay.Placed] = []
         for m in marks where m.line >= 1 && m.line <= starts.count {
             guard let pos = tv.position(from: tv.beginningOfDocument, offset: starts[m.line - 1]) else { continue }
@@ -278,23 +305,6 @@ extension CodeEditorView.Coordinator {
             minimap.setNeedsDisplay()
         }
     }
-
-    private func lineStarts(_ ns: NSString) -> [Int] {
-        var out = [0]
-        var i = 0
-        let n = ns.length
-        while i < n {
-            let r = ns.lineRange(for: NSRange(location: i, length: 0))
-            i = r.location + r.length
-            if i < n || (i == n && ns.character(at: n - 1) == 10) {
-                out.append(i)
-            }
-            if r.length == 0 {
-                break
-            }
-        }
-        return out
-    }
 }
 
 /// Busca e substituição dentro do arquivo aberto.
@@ -337,6 +347,10 @@ extension CodeEditorView.Coordinator {
         tv.replaceText(in: BatchReplaceSet(replacements: alvo.map {
             .init(range: $0.range, text: $0.replacementText)
         }))
+        // Substituição em lote não passa pelo delegate de digitação, então o texto
+        // guardado — e o mapa de linhas junto — ficaria sendo o de antes da troca.
+        anotarTexto(tv.text)
+        parent.text = textoAtual
         buscar(tv)
     }
 
@@ -359,8 +373,7 @@ extension CodeEditorView.Coordinator {
 extension CodeEditorView.Coordinator {
     /// Põe a linha a um terço do topo da área visível, quando há rolagem para isso.
     func centralizar(_ tv: TextView, linha: Int) {
-        let ns = tv.text as NSString
-        let starts = lineStarts(ns)
+        let starts = linhas().starts
         guard linha >= 1, linha <= starts.count,
               let pos = tv.position(from: tv.beginningOfDocument, offset: starts[linha - 1]) else { return }
         let r = tv.caretRect(for: pos)
@@ -379,8 +392,9 @@ extension CodeEditorView.Coordinator {
     /// palpite certo: é onde a pessoa está olhando.
     func mandarSelecao() {
         guard let tv = textView else { return }
-        let ns = tv.text as NSString
-        let starts = lineStarts(ns)
+        let mapa = linhas()
+        let ns = mapa.ns
+        let starts = mapa.starts
         var faixa = tv.selectedRange
         if faixa.length == 0 {
             // Linha inteira do cursor, sem a quebra no fim.

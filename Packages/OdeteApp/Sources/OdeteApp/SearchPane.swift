@@ -174,7 +174,7 @@ struct SearchPane: View {
                 ws.reloadBuffer(p)
             }
             ws.reload()
-            ws.git.scheduleRefresh()
+            ws.git.agendarMarcas()
             recado = r.trocas == 0
                 ? tr("nada foi trocado")
                 : tr("%1$@ troca(s) em %2$@ arquivo(s)", "\(r.trocas)", "\(r.arquivos)")

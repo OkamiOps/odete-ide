@@ -124,6 +124,45 @@ public final class GitModel {
         }
     }
 
+    /// O painel do Git está à vista? Quem responde é quem sabe da tela.
+    public var painelAberto: @MainActor () -> Bool = { false }
+
+    /// Atualiza o git depois de uma mudança de arquivo — e só o que se vê.
+    ///
+    /// `refresh()` faz treze operações de libgit2: estado, log dos últimos duzentos
+    /// commits, ramos, stashes, remotos, contagem de adiantado/atrasado e dois diffs do
+    /// working tree inteiro. Isso rodava por completo a cada arquivo que o agente, o
+    /// terminal ou um script escrevia — com o painel do Git fechado, para atualizar um
+    /// número numa barra e as bolinhas da árvore.
+    ///
+    /// Com o painel aberto nada muda: lá tudo aquilo está na tela e precisa estar certo.
+    /// Fechado, sai só o que aparece fora dele.
+    public func agendarMarcas() {
+        refreshTask?.cancel()
+        refreshTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(150))
+            guard !Task.isCancelled, let self else { return }
+            if painelAberto() {
+                await refresh()
+            } else {
+                await atualizarMarcas()
+            }
+        }
+    }
+
+    /// O estado dos arquivos, e nada além dele.
+    public func atualizarMarcas() async {
+        guard let repo else { return }
+        do {
+            status = try await repo.status()
+            conflicts = try await repo.conflictedPaths()
+            mergeInProgress = await repo.mergeInProgress
+        } catch {
+            self.error = error.localizedDescription
+        }
+        onRefreshed?()
+    }
+
     public func refresh() async {
         guard let repo else { return }
         do {

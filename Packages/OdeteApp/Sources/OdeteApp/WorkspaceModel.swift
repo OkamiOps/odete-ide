@@ -125,6 +125,7 @@ public final class WorkspaceModel {
         acompanharAbas()
         agent = AgentModel(ws: self, chrome: chrome, accounts: aiAccounts)
         git.onRefreshed = { [weak self] in self?.refreshGutters() }
+        git.painelAberto = { [weak chrome] in chrome?.snapshot.side == .git }
         for t in tabs {
             analyze(t.path)
         }
@@ -245,7 +246,7 @@ public final class WorkspaceModel {
         // remontada fora do ator principal: percorrer o projeto inteiro aqui travava a
         // digitação toda vez que o agente ou um script mexesse em arquivo.
         recarregarArvoreEmSegundoPlano()
-        git.scheduleRefresh()
+        git.agendarMarcas()
         for t in tabs where !t.isDirty {
             if ops.exists(t.path) {
                 if let disk = try? ops.read(t.path), disk != buffers[t.path] {
@@ -511,7 +512,7 @@ public final class WorkspaceModel {
             try ops.write(path, text)
             marcaDisco[path] = ops.modifiedAt(path)
             markDirty(path, false)
-            git.scheduleRefresh()
+            git.agendarMarcas()
             refreshGutter(path)
         } catch {
             self.error = error.localizedDescription

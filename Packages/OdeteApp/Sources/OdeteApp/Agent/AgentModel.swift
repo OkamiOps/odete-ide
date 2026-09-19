@@ -327,7 +327,7 @@ public final class AgentModel {
             self.loop = nil
             persist()
             ws.reload()
-            ws.git.scheduleRefresh()
+            ws.git.agendarMarcas()
         }
     }
 

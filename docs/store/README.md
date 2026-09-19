@@ -16,6 +16,12 @@ O app está registrado como **Odete IDE** (`com.okamiops.odete`), com português
 Brasil como idioma principal. Com "IDE" já no nome, o subtítulo não repete a palavra —
 esses 30 caracteres rendem mais dizendo o que mais ninguém faz.
 
+## App Review
+
+A resposta ao questionário de conta nova (Guideline 2.1) está em
+[app-review.md](app-review.md) — o texto em inglês para colar na mensagem e no
+campo Notes, e a lista do que conferir antes de reenviar.
+
 ## Limites que o App Store Connect impõe
 
 Estourar qualquer um destes trava o salvamento da ficha, por localização:

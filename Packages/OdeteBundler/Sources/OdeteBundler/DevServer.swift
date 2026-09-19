@@ -9,7 +9,7 @@ public final class DevServer: @unchecked Sendable {
     public let root: URL
     public private(set) var port = 0
     public var onDiagnostics: (@Sendable ([Diagnostic]) -> Void)?
-    private var watcher: DirectoryWatcherLite?
+    private var observador: ObservadorDeArquivos?
 
     public init(root: URL, output: @escaping @Sendable (OutputKind, String) -> Void = { _, _ in }) {
         self.root = root
@@ -41,8 +41,9 @@ public final class DevServer: @unchecked Sendable {
         let json = try await esbuild.engine.call("__devStart", [root.path, port, preset.rawValue])
         let obj = try JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any]
         self.port = (obj?["port"] as? Int) ?? port
-        watcher = DirectoryWatcherLite(url: root) { [weak self] in self?.invalidate() }
-        watcher?.start()
+        let obs = ObservadorDeArquivos(raiz: root) { [weak self] in self?.invalidate() }
+        obs.comecar()
+        observador = obs
     }
 
     /// Texto virando literal de JS, sem depender de escape à mão.
@@ -84,61 +85,8 @@ public final class DevServer: @unchecked Sendable {
     }
 
     public func stop() {
-        watcher?.stop()
-        watcher = nil
+        observador?.parar()
+        observador = nil
         esbuild.engine.stop()
-    }
-}
-
-/// Watcher simples por polling de mtimes (o de OdeteFiles vive noutro pacote).
-final class DirectoryWatcherLite: @unchecked Sendable {
-    let url: URL
-    let onChange: @Sendable () -> Void
-    private var timer: DispatchSourceTimer?
-    private var last = 0
-    private let queue = DispatchQueue(label: "odete.devwatch")
-
-    init(url: URL, onChange: @escaping @Sendable () -> Void) {
-        self.url = url; self.onChange = onChange
-    }
-
-    func start() {
-        last = signature()
-        let t = DispatchSource.makeTimerSource(queue: queue)
-        t.schedule(deadline: .now() + 1, repeating: 1)
-        t.setEventHandler { [weak self] in
-            guard let self else { return }
-            let s = signature()
-            if s != last {
-                last = s; onChange()
-            }
-        }
-        t.resume()
-        timer = t
-    }
-
-    func stop() {
-        timer?.cancel(); timer = nil
-    }
-
-    private func signature() -> Int {
-        var h = Hasher()
-        guard let e = FileManager.default.enumerator(
-            at: url,
-            includingPropertiesForKeys: [.contentModificationDateKey, .isDirectoryKey],
-            options: [.skipsHiddenFiles]
-        ) else { return 0 }
-        for case let item as URL in e {
-            let name = item.lastPathComponent
-            if name == "node_modules" || name == "dist" || name == ".git" {
-                e.skipDescendants(); continue
-            }
-            if let v = try? item.resourceValues(forKeys: [.contentModificationDateKey, .isDirectoryKey]),
-               v.isDirectory != true
-            {
-                h.combine(item.path); h.combine(v.contentModificationDate?.timeIntervalSince1970 ?? 0)
-            }
-        }
-        return h.finalize()
     }
 }

@@ -90,7 +90,7 @@ public final class WorkspaceModel {
 
     private let chrome: ChromeState
     private let rascunhos: Rascunhos
-    private var watcher: DirectoryWatcher?
+    private var observador: ObservadorDeArquivos?
     private var saveTasks: [String: Task<Void, Never>] = [:]
 
     init(project: Project, root: URL, chrome: ChromeState, accounts: AccountStore, aiAccounts: AIAccountStore) {
@@ -112,13 +112,17 @@ public final class WorkspaceModel {
             load(t.path)
         }
         retomarRascunhos()
-        let w = DirectoryWatcher(url: root) { [weak self] in
+        // Sem relógio: quem avisa é o sistema de arquivos. A árvore acorda quando algo
+        // muda nela, e cada aba aberta tem observador próprio porque conteúdo reescrito
+        // não mexe na data da pasta — ver `ObservadorDeArquivos`.
+        let obs = ObservadorDeArquivos(raiz: root) { [weak self] in
             Task { @MainActor in self?.externalReload() }
-        } onTick: { [weak self] in
-            Task { @MainActor in self?.conferirDisco() }
+        } aoMudarArquivo: { [weak self] caminho in
+            Task { @MainActor in self?.conferirDisco(caminho) }
         }
-        w.start()
-        watcher = w
+        obs.comecar()
+        observador = obs
+        acompanharAbas()
         agent = AgentModel(ws: self, chrome: chrome, accounts: aiAccounts)
         git.onRefreshed = { [weak self] in self?.refreshGutters() }
         for t in tabs {
@@ -176,7 +180,7 @@ public final class WorkspaceModel {
     }
 
     func stop() {
-        watcher?.stop()
+        observador?.parar()
         run.stopAll()
         agent.stop()
         for t in saveTasks.values {
@@ -215,19 +219,25 @@ public final class WorkspaceModel {
     /// script no terminal ou do agente escrevendo, e o salvamento automático gravava o
     /// velho por cima do novo. Buffer com alteração não salva é deixado em paz: ali quem
     /// manda é o que a pessoa digitou.
-    func conferirDisco() {
-        for t in tabs {
-            guard let data = ops.modifiedAt(t.path) else { continue }
-            let antes = marcaDisco[t.path]
-            marcaDisco[t.path] = data
-            guard let antes, antes != data, !t.isDirty else { continue }
-            if let disco = try? ops.read(t.path), disco != buffers[t.path] {
-                buffers[t.path] = disco
-                reloadTick += 1
-                analyze(t.path)
-                refreshGutter(t.path)
-            }
+    func conferirDisco(_ absoluto: String) {
+        // O observador fala em caminho absoluto, o resto do app em caminho relativo à
+        // raiz. Comparar os absolutos evita montar a conversão de volta e errar nela.
+        guard let t = tabs.first(where: { (try? ops.url($0.path))?.path == absoluto }) else { return }
+        guard let data = ops.modifiedAt(t.path) else { return }
+        let antes = marcaDisco[t.path]
+        marcaDisco[t.path] = data
+        guard antes != data, !t.isDirty else { return }
+        if let disco = try? ops.read(t.path), disco != buffers[t.path] {
+            buffers[t.path] = disco
+            reloadTick += 1
+            analyze(t.path)
+            refreshGutter(t.path)
         }
+    }
+
+    /// Diz ao observador quais arquivos merecem vigilância própria: os abertos.
+    func acompanharAbas() {
+        observador?.acompanhar(tabs.compactMap { (try? ops.url($0.path))?.path })
     }
 
     private func externalReload() {
@@ -383,6 +393,7 @@ public final class WorkspaceModel {
     public func openFile(_ path: String) {
         if !tabs.contains(where: { $0.path == path }) {
             tabs.append(EditorTab(path: path))
+            acompanharAbas()
             load(path)
             analyze(path)
             refreshGutter(path)
@@ -404,6 +415,7 @@ public final class WorkspaceModel {
         guard path != active else { return }
         if !tabs.contains(where: { $0.path == path }) {
             tabs.append(EditorTab(path: path))
+            acompanharAbas()
             load(path)
             analyze(path)
             refreshGutter(path)
@@ -439,6 +451,7 @@ public final class WorkspaceModel {
             save(path)
         }
         tabs.remove(at: i)
+        acompanharAbas()
         if secondary == path {
             secondary = nil
         }

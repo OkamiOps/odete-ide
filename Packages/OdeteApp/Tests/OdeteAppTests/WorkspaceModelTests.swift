@@ -54,13 +54,13 @@ struct WorkspaceModelTests {
         let arquivo = root.appending(path: "index.html")
 
         try "<h1>de fora</h1>\n".write(to: arquivo, atomically: true, encoding: .utf8)
-        ws.conferirDisco()
+        ws.conferirDisco(arquivo.path)
         #expect(ws.text(for: "index.html") == "<h1>de fora</h1>\n")
         #expect(ws.activeTab?.isDirty == false)
 
         ws.setText("<h1>meu texto</h1>\n", for: "index.html")
         try "<h1>de fora de novo</h1>\n".write(to: arquivo, atomically: true, encoding: .utf8)
-        ws.conferirDisco()
+        ws.conferirDisco(arquivo.path)
         #expect(ws.text(for: "index.html") == "<h1>meu texto</h1>\n")
     }
 

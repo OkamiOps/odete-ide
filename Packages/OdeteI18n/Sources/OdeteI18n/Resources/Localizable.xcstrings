@@ -1597,6 +1597,34 @@
         }
       }
     },
+    "A Apple ainda não liberou a permissão para a Odete usar a nuvem privada.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple hasn’t yet granted Odete permission to use the private cloud."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple hat Odete die Berechtigung für die private Cloud noch nicht erteilt."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple n’a pas encore accordé à Odete l’autorisation d’utiliser le cloud privé."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple todavía no le dio a Odete permiso para usar la nube privada."
+          }
+        }
+      }
+    },
     "A conta do GitHub não tem acesso a este repositório.": {
       "localizations": {
         "en": {

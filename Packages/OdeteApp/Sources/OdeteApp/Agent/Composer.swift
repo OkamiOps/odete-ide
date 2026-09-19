@@ -400,10 +400,16 @@ struct ModeloPopover: View {
                                 .buttonStyle(.plain)
                             }
                             ForEach(Array(agent.models.enumerated()), id: \.element.id) { i, m in
-                                Button { agent.setModel(m.id); fechar() } label: {
-                                    linha(m.label, escolhido: m.id == agent.model, first: i == 0, kind: acc.kind)
+                                if let motivo = m.indisponivel {
+                                    // Aparece, apagado, com o porquê. Some da lista era
+                                    // pior: escondia a existência da opção.
+                                    linha(m.label, escolhido: false, first: i == 0, kind: acc.kind, motivo: motivo)
+                                } else {
+                                    Button { agent.setModel(m.id); fechar() } label: {
+                                        linha(m.label, escolhido: m.id == agent.model, first: i == 0, kind: acc.kind)
+                                    }
+                                    .buttonStyle(.plain)
                                 }
-                                .buttonStyle(.plain)
                             }
                         }
                         if agent.loadingModels {
@@ -444,19 +450,31 @@ struct ModeloPopover: View {
         return 28 + 32 + CGFloat(modelos) * 44 + (esforcos == 0 ? 0 : 14 + 32 + CGFloat(esforcos) * 44)
     }
 
-    func linha(_ texto: String, escolhido: Bool, first: Bool, kind: ProviderKind?) -> some View {
+    func linha(
+        _ texto: String,
+        escolhido: Bool,
+        first: Bool,
+        kind: ProviderKind?,
+        motivo: String? = nil
+    ) -> some View {
         HStack(spacing: 10) {
             if let kind {
-                Marca(kind: kind, lado: 22, glifo: 11, apagada: false)
+                Marca(kind: kind, lado: 22, glifo: 11, apagada: motivo != nil)
             }
-            Text(texto).font(.subheadline).foregroundStyle(theme.fg).lineLimit(1).truncationMode(.middle)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(texto).font(.subheadline).foregroundStyle(motivo == nil ? theme.fg : theme.fgSubtle)
+                    .lineLimit(1).truncationMode(.middle)
+                if let motivo {
+                    Text(motivo).font(.caption2).foregroundStyle(theme.fgSubtle).lineLimit(3)
+                }
+            }
             Spacer(minLength: 8)
             if escolhido {
                 Image(systemName: "checkmark").font(.caption.bold()).foregroundStyle(theme.accent)
             }
         }
         .padding(.horizontal, 12)
-        .frame(height: 44)
+        .frame(minHeight: 44)
         .contentShape(Rectangle())
         .overlay(alignment: .top) {
             if !first {

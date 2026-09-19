@@ -15,16 +15,23 @@ O Mac precisa de Apple Intelligence ligado. Para conferir:
 ## Como rodar
 
 O contexto vem do próprio app, e não de uma cópia escrita à mão que envelhece: o teste
-`DespejaContexto` imprime as instruções e os schemas reais entre marcas.
+`DespejaContexto` imprime as instruções e os schemas reais em pedaços numerados de base64
+— numerados porque o `xcodebuild` entremeia a saída dos outros testes no meio deles.
 
     cd Packages/OdeteAgent
-    xcodebuild test -scheme OdeteAgent -destination 'platform=iOS Simulator,name=iPad Air 11-inch (M4),OS=26.5' \
+    xcodebuild test -scheme OdeteAgent \
+      -destination 'platform=iOS Simulator,name=iPad Air 11-inch (M4)' \
       -derivedDataPath ../../build 2>&1 \
-      | sed -n '/ODETE_CONTEXTO_INICIO/,/ODETE_CONTEXTO_FIM/p' | sed '1d;$d' | head -1 > /tmp/contexto.json
+      | grep -o 'ODETE_CTX [0-9]* .*' | sort -u -k2,2n \
+      | cut -d' ' -f3 | tr -d '\n' | base64 -d > /tmp/contexto.json
 
     cd ../../tools/bancada
-    xcrun swiftc -target arm64-apple-macos26.0 main.swift -o bancada
+    xcrun swiftc -target arm64-apple-macos27.0 main.swift -o bancada
     ./bancada /tmp/contexto.json "Preciso trocar a cor do botao de contagem de cliques para azul"
+
+Para rodar o mesmo laço contra a nuvem privada, que é o segundo modelo oferecido no app:
+
+    ODETE_NUVEM=1 ./bancada /tmp/contexto.json "Preciso trocar a cor do botao de contagem de cliques para azul"
 
 Saída boa é curta:
 

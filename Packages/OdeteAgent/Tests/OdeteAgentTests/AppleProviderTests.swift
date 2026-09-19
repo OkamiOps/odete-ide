@@ -15,13 +15,34 @@ struct AppleProviderTests {
         #expect(modelos.first?.ctx ?? 0 > 0, "a janela do modelo local veio zerada")
     }
 
-    @Test func aNuvemSoEntraQuandoEstaDisponivel() async throws {
+    /// A nuvem aparece sempre — o que muda é se dá para escolher.
+    ///
+    /// Escondendo a linha quando o aparelho ainda não tem o modelo, quem está no iPadOS 27
+    /// não descobre que existe: some sem explicação e parece que a Odete só roda o modelo
+    /// pequeno. Aparecendo com o motivo ao lado, a pessoa sabe o que falta.
+    @Test func aNuvemApareceSempre() async throws {
         let modelos = try await AppleProvider().models()
-        let temNuvem = modelos.contains { $0.id == AppleProvider.idNuvem }
-        #expect(
-            temNuvem == AppleProvider.nuvemDisponivel,
-            "a lista e a disponibilidade discordam: oferecer um modelo que não roda é pior que não oferecer"
+        let nuvem = try #require(
+            modelos.first { $0.id == AppleProvider.idNuvem },
+            "a nuvem sumiu da lista: quem não vê não sabe que existe"
         )
+        #expect(
+            (nuvem.indisponivel == nil) == AppleProvider.nuvemDisponivel,
+            "a linha e a disponibilidade discordam"
+        )
+    }
+
+    /// Sem a permissão da Apple, a nuvem não pode ser oferecida de jeito nenhum.
+    ///
+    /// Não é preferência de interface: `PrivateCloudComputeLanguageModel` derruba o
+    /// processo — `fatalError` dentro do framework, que nenhum `catch` pega — quando o
+    /// app não tem `com.apple.developer.private-cloud-compute`. Deixar `nuvemDisponivel`
+    /// dizer sim sem a permissão é entregar um app que fecha sozinho quando a pessoa
+    /// escolhe o modelo. Este teste é o que impede isso de voltar.
+    @Test func semPermissaoANuvemNaoEhOferecida() {
+        guard !AppleProvider.temPermissaoDaNuvem else { return }
+        #expect(!AppleProvider.nuvemDisponivel, "ofereceu a nuvem sem a permissão: isso derruba o app")
+        #expect(AppleProvider.impedimentoDaNuvem?.isEmpty == false, "recusou e não disse por quê")
     }
 
     /// Quando não dá, tem que dizer por quê — e não só sumir da lista.

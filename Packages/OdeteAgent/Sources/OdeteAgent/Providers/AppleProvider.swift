@@ -74,6 +74,14 @@ public struct AppleProvider: Provider {
         max(respostaMaxima, janela / 3)
     }
 
+    /// Na nuvem o teto é outro: o do aparelho sai da janela do modelo pequeno.
+    ///
+    /// `respostaComFerramentas` é um terço de `janela`, que é a janela do modelo **local**
+    /// — umas 2700 fichas. Usar esse número na nuvem é pedir a um modelo grande que
+    /// escreva pela régua do pequeno: um `write_file` de arquivo inteiro volta cortado no
+    /// meio, e o que aparece na tela é o modelo grande "falhando" por falta de espaço.
+    static let respostaDaNuvem = 8000
+
     public init() {}
 
     public static var disponivel: Bool {
@@ -110,10 +118,30 @@ public struct AppleProvider: Provider {
         return 4096
     }
 
-    /// A nuvem privada está disponível? Só do iOS 27 em diante, e só em aparelho que a
-    /// Apple considera elegível.
+    /// A Odete já tem a permissão da Apple para usar a nuvem privada?
+    ///
+    /// Usar `PrivateCloudComputeLanguageModel` não depende só do aparelho: a Apple exige
+    /// do app a entitlement gerenciada `com.apple.developer.private-cloud-compute`, que
+    /// não se marca no Xcode — se pede num formulário e ela é concedida. Medido aqui no
+    /// Mac, com o modelo da nuvem dizendo `isAvailable: true` e `availability: available`:
+    /// a sessão é criada, a primeira resposta é pedida e o framework **derruba o
+    /// processo** com "Missing entitlement: com.apple.developer.private-cloud-compute".
+    /// Não é erro que dá para pegar num `catch`; é `fatalError` dentro do framework.
+    ///
+    /// Por isso a chave é esta, e não `isAvailable`: oferecer a nuvem sem a entitlement
+    /// não daria uma mensagem de erro, daria um app que fecha sozinho quando a pessoa
+    /// escolhe o modelo.
+    ///
+    /// Quando a concessão sair, isto vira `true` **e** a entitlement entra em
+    /// `Odete/Odete.entitlements`. As duas coisas andam juntas: uma sem a outra é o
+    /// mesmo estrago. O pedido é feito em
+    /// <https://developer.apple.com/contact/request/private-cloud-compute/>.
+    public static let temPermissaoDaNuvem = false
+
+    /// A nuvem privada está disponível? Precisa da permissão da Apple, do iOS 27 em
+    /// diante, e de um aparelho que a Apple considere elegível.
     public static var nuvemDisponivel: Bool {
-        guard #available(iOS 27.0, *) else { return false }
+        guard temPermissaoDaNuvem, #available(iOS 27.0, *) else { return false }
         return PrivateCloudComputeLanguageModel().isAvailable
     }
 
@@ -121,6 +149,11 @@ public struct AppleProvider: Provider {
     public static var impedimentoDaNuvem: String? {
         guard #available(iOS 27.0, *) else {
             return tr("A nuvem privada da Apple pede iPadOS 27.")
+        }
+        // A falta da permissão vem antes de qualquer conversa sobre o aparelho: o
+        // aparelho pode estar pronto e o app não poder usar assim mesmo.
+        guard temPermissaoDaNuvem else {
+            return tr("A Apple ainda não liberou a permissão para a Odete usar a nuvem privada.")
         }
         switch PrivateCloudComputeLanguageModel().availability {
         case .available: return nil
@@ -136,19 +169,31 @@ public struct AppleProvider: Provider {
         }
     }
 
+    /// Os dois modelos, sempre — com o motivo quando um deles não dá.
+    ///
+    /// A nuvem privada só aparecia quando estava disponível, e isso a tornava invisível:
+    /// quem está no iPadOS 27 e não a vê na lista conclui que a Odete não tem, e não que
+    /// o aparelho ainda não liberou. A linha aparece dos dois jeitos; o que muda é poder
+    /// tocar nela.
     public func models() async throws -> [ModelInfo] {
-        var out = [ModelInfo(id: Self.idLocal, label: "Apple · no aparelho", efforts: nil, ctx: Self.janela)]
-        if Self.nuvemDisponivel {
-            // A janela da nuvem não é publicada pelo framework; o que se sabe é que é
-            // bem maior que a local. Fica o número da sessão, que é o que limita aqui.
-            out.append(ModelInfo(
+        [
+            ModelInfo(
+                id: Self.idLocal,
+                label: "Apple · no aparelho",
+                efforts: nil,
+                ctx: Self.janela,
+                indisponivel: Self.impedimento
+            ),
+            // A janela da nuvem não é publicada pelo framework; o que se sabe é que é bem
+            // maior que a local. Fica o número da sessão, que é o que limita aqui.
+            ModelInfo(
                 id: Self.idNuvem,
                 label: "Apple · nuvem privada",
                 efforts: nil,
-                ctx: Self.janelaDaNuvem
-            ))
-        }
-        return out
+                ctx: Self.janelaDaNuvem,
+                indisponivel: Self.impedimentoDaNuvem
+            ),
+        ]
     }
 
     /// Orçamento de entrada da nuvem. Mais generoso que o local, e ainda assim um teto:
@@ -247,9 +292,9 @@ public struct AppleProvider: Provider {
                         to: prompt,
                         options: GenerationOptions(
                             temperature: 0.6,
-                            maximumResponseTokens: ferramentas.isEmpty
-                                ? Self.respostaMaxima
-                                : Self.respostaComFerramentas
+                            maximumResponseTokens: naNuvem
+                                ? Self.respostaDaNuvem
+                                : (ferramentas.isEmpty ? Self.respostaMaxima : Self.respostaComFerramentas)
                         )
                     )
                     for try await pedaco in fluxo {

@@ -169,8 +169,22 @@ public struct ModelInfo: Sendable, Hashable, Identifiable, Codable {
     public var label: String
     public var efforts: [String]?
     public var ctx: Int?
-    public init(id: String, label: String? = nil, efforts: [String]? = nil, ctx: Int? = nil) {
+    /// Por que este modelo não dá para usar agora — nulo quando dá.
+    ///
+    /// Sumir com a opção esconde a existência dela: quem está no iPadOS 27 e ouviu falar
+    /// da nuvem privada da Apple abre a lista, não encontra nada e conclui que o app não
+    /// tem. Melhor a linha aparecer apagada, com o motivo do lado e um caminho para
+    /// resolver.
+    public var indisponivel: String?
+    public init(
+        id: String,
+        label: String? = nil,
+        efforts: [String]? = nil,
+        ctx: Int? = nil,
+        indisponivel: String? = nil
+    ) {
         self.id = id; self.label = label ?? id; self.efforts = efforts; self.ctx = ctx
+        self.indisponivel = indisponivel
     }
 }
 

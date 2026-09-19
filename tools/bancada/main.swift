@@ -213,7 +213,18 @@ for rodada in 1 ... 20 {
             entradas.append(.toolOutput(.init(id: id, toolName: nome, segments: [.text(.init(content: texto))])))
         }
     }
-    let sessao = LanguageModelSession(model: .default, tools: ferramentas, transcript: Transcript(entries: entradas))
+    // ODETE_NUVEM=1 roda o mesmo laço contra o Private Cloud Compute, que é o segundo
+    // modelo oferecido no app. Mesma transcrição, mesmas ferramentas: o que muda é quem
+    // responde, que é exatamente a comparação que interessa.
+    let sessao = if ProcessInfo.processInfo.environment["ODETE_NUVEM"] == "1" {
+        LanguageModelSession(
+            model: PrivateCloudComputeLanguageModel(),
+            tools: ferramentas,
+            transcript: Transcript(entries: entradas)
+        )
+    } else {
+        LanguageModelSession(model: .default, tools: ferramentas, transcript: Transcript(entries: entradas))
+    }
     var texto = ""
     do {
         let temp = Double(ProcessInfo.processInfo.environment["ODETE_TEMP"] ?? "0.6") ?? 0.6

@@ -1933,6 +1933,90 @@
         }
       }
     },
+    "Aba": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tab"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tab"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Onglet"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pestaña"
+          }
+        }
+      }
+    },
+    "Aba %1$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tab %1$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tab %1$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Onglet %1$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pestaña %1$@"
+          }
+        }
+      }
+    },
+    "Aba anterior": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Previous Tab"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vorheriger Tab"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Onglet précédent"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pestaña anterior"
+          }
+        }
+      }
+    },
     "Abaixo do editor": {
       "localizations": {
         "en": {
@@ -3053,6 +3137,34 @@
         }
       }
     },
+    "Apagar linhas": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete Lines"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zeilen löschen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprimer les lignes"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Eliminar líneas"
+          }
+        }
+      }
+    },
     "Apagar projeto": {
       "localizations": {
         "en": {
@@ -3385,6 +3497,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Archivo todavía sin commits."
+          }
+        }
+      }
+    },
+    "Arquivo vazio": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Empty file"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Leere Datei"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fichier vide"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Archivo vacío"
           }
         }
       }
@@ -3749,6 +3889,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Actualizar"
+          }
+        }
+      }
+    },
+    "Aumentar recuo": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Indent"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Einrücken"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Augmenter le retrait"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aumentar sangría"
           }
         }
       }
@@ -4645,6 +4813,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Comandos de Odete:"
+          }
+        }
+      }
+    },
+    "Comentar linhas": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Comment Lines"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zeilen auskommentieren"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Commenter les lignes"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Comentar líneas"
           }
         }
       }
@@ -6021,6 +6217,34 @@
         }
       }
     },
+    "Copiar mensagem": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copy Message"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nachricht kopieren"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copier le message"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copiar mensaje"
+          }
+        }
+      }
+    },
     "Copiar sha": {
       "localizations": {
         "en": {
@@ -6073,6 +6297,62 @@
           "stringUnit": {
             "state": "translated",
             "value": "Colores del código"
+          }
+        }
+      }
+    },
+    "Corrija estes problemas:\n%1$@\n\nLeia cada arquivo antes de mudar e confira com read_problems no fim.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fix these problems:\n%1$@\n\nRead each file before changing it and check with read_problems at the end."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Behebe diese Probleme:\n%1$@\n\nLies jede Datei, bevor du sie änderst, und prüfe am Ende mit read_problems."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Corrige ces problèmes :\n%1$@\n\nLis chaque fichier avant de le modifier et vérifie avec read_problems à la fin."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Corrige estos problemas:\n%1$@\n\nLee cada archivo antes de cambiarlo y comprueba con read_problems al final."
+          }
+        }
+      }
+    },
+    "Corrija os problemas que a Odete está mostrando. Comece com read_problems e leia cada arquivo antes de mudar.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fix the problems Odete is showing. Start with read_problems and read each file before changing it."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Behebe die Probleme, die Odete anzeigt. Beginne mit read_problems und lies jede Datei, bevor du sie änderst."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Corrige les problèmes affichés par Odete. Commence par read_problems et lis chaque fichier avant de le modifier."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Corrige los problemas que muestra Odete. Empieza con read_problems y lee cada archivo antes de cambiarlo."
           }
         }
       }
@@ -6721,6 +7001,34 @@
         }
       }
     },
+    "Descer linhas": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move Lines Down"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zeilen nach unten"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Descendre les lignes"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bajar líneas"
+          }
+        }
+      }
+    },
     "Descrição": {
       "localizations": {
         "en": {
@@ -7001,6 +7309,62 @@
         }
       }
     },
+    "Digite uma linha, ou linha:coluna": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Type a line, or line:column"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zeile eingeben oder Zeile:Spalte"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saisissez une ligne, ou ligne:colonne"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Escribe una línea, o línea:columna"
+          }
+        }
+      }
+    },
+    "Diminuir recuo": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Outdent"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ausrücken"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diminuer le retrait"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reducir sangría"
+          }
+        }
+      }
+    },
     "Distinguir maiúsculas": {
       "localizations": {
         "en": {
@@ -7193,6 +7557,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Duplicar"
+          }
+        }
+      }
+    },
+    "Duplicar linhas": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Duplicate Lines"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zeilen duplizieren"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dupliquer les lignes"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Duplicar líneas"
           }
         }
       }
@@ -9745,6 +10137,118 @@
         }
       }
     },
+    "Ir": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Go"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gehe zu"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aller"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ir"
+          }
+        }
+      }
+    },
+    "Ir para a linha %1$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Go to line %1$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gehe zu Zeile %1$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aller à la ligne %1$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ir a la línea %1$@"
+          }
+        }
+      }
+    },
+    "Ir para a linha %1$@, coluna %2$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Go to line %1$@, column %2$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gehe zu Zeile %1$@, Spalte %2$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aller à la ligne %1$@, colonne %2$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ir a la línea %1$@, columna %2$@"
+          }
+        }
+      }
+    },
+    "Ir para a linha…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Go to Line…"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gehe zu Zeile…"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aller à la ligne…"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ir a la línea…"
+          }
+        }
+      }
+    },
     "Ir para arquivo": {
       "localizations": {
         "en": {
@@ -10893,6 +11397,34 @@
         }
       }
     },
+    "Modo: %1$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mode: %1$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modus: %1$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mode : %1$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modo: %1$@"
+          }
+        }
+      }
+    },
     "Mostrar espaços": {
       "localizations": {
         "en": {
@@ -10973,6 +11505,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mostrar ocultos"
+          }
+        }
+      }
+    },
+    "Mostrar problema no cursor": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show Problem at Cursor"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Problem am Cursor anzeigen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Afficher le problème au curseur"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar problema en el cursor"
           }
         }
       }
@@ -11309,6 +11869,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ningún archivo Swift"
+          }
+        }
+      }
+    },
+    "Nenhum arquivo aberto": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No file open"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keine Datei geöffnet"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucun fichier ouvert"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ningún archivo abierto"
           }
         }
       }
@@ -12317,6 +12905,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "No staged:"
+          }
+        }
+      }
+    },
+    "Não voltaram, por passarem de 10 MB: %1$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not restored because they exceed 10 MB: %1$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nicht wiederhergestellt, da größer als 10 MB: %1$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non restaurés, car ils dépassent 10 Mo : %1$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se restauraron por superar los 10 MB: %1$@"
           }
         }
       }
@@ -14137,6 +14753,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Proyectos web (Vite, Astro, HTML) y Swift Playgrounds"
+          }
+        }
+      }
+    },
+    "Próxima aba": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next Tab"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nächster Tab"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Onglet suivant"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pestaña siguiente"
           }
         }
       }
@@ -16325,6 +16969,34 @@
         }
       }
     },
+    "Subir linhas": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move Lines Up"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zeilen nach oben"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Monter les lignes"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Subir líneas"
+          }
+        }
+      }
+    },
     "Substituir": {
       "localizations": {
         "en": {
@@ -17921,6 +18593,34 @@
         }
       }
     },
+    "Ver": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "View"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ansicht"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Présentation"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ver"
+          }
+        }
+      }
+    },
     "Ver como tabela": {
       "localizations": {
         "en": {
@@ -19041,6 +19741,34 @@
         }
       }
     },
+    "a fazer": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "to do"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "offen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "à faire"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "pendiente"
+          }
+        }
+      }
+    },
     "a sessão expirou": {
       "localizations": {
         "en": {
@@ -19433,30 +20161,30 @@
         }
       }
     },
-    "arquivo, > comando, @ símbolo": {
+    "arquivo, > comando, @ símbolo, : linha": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "file, > command, @ symbol"
+            "value": "file, > command, @ symbol, : line"
           }
         },
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Datei, > Befehl, @ Symbol"
+            "value": "Datei, > Befehl, @ Symbol, : Zeile"
           }
         },
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "fichier, > commande, @ symbole"
+            "value": "fichier, > commande, @ symbole, : ligne"
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "archivo, > comando, @ símbolo"
+            "value": "archivo, > comando, @ símbolo, : línea"
           }
         }
       }
@@ -20721,6 +21449,34 @@
         }
       }
     },
+    "de 1 a %1$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 to %1$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 bis %1$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "de 1 à %1$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "de 1 a %1$@"
+          }
+        }
+      }
+    },
     "deflate falhou: %1$@": {
       "localizations": {
         "en": {
@@ -21081,6 +21837,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "y abrir pull requests"
+          }
+        }
+      }
+    },
+    "e mais %1$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "and %1$@ more"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "und %1$@ weitere"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "et %1$@ de plus"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "y %1$@ más"
           }
         }
       }
@@ -21641,6 +22425,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "fatal: no es un repositorio git (ejecuta git init)"
+          }
+        }
+      }
+    },
+    "feito": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "done"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "erledigt"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "fait"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "hecho"
           }
         }
       }
@@ -25813,6 +26625,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "barra lateral"
+          }
+        }
+      }
+    },
+    "sintaxe": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "syntax"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Syntax"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "syntaxe"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "sintaxis"
           }
         }
       }

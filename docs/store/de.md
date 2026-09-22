@@ -11,7 +11,7 @@ Odete IDE
 ## Untertitel (30)
 
 ```
-Echt entwickeln, auf dem iPad
+Echt entwickeln, auf dem Gerät
 ```
 
 ## Werbetext (170)

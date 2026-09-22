@@ -11,7 +11,7 @@ Odete IDE
 ## Sous-titre (30)
 
 ```
-Développer vraiment sur iPad
+Coder vraiment, sur l'appareil
 ```
 
 ## Texte promotionnel (170)

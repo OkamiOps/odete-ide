@@ -11,7 +11,7 @@ Odete IDE
 ## Subtitle (30)
 
 ```
-Real development, on iPad
+Real development, on device
 ```
 
 ## Promotional text (170)
@@ -78,7 +78,7 @@ nothing to sign up for.
 ## Keywords (100, sem espaço depois da vírgula)
 
 ```
-ide,code editor,git,github,terminal,npm,vite,react,swift,swiftui,playground,agent,ai,developer
+ide,code editor,git,github,terminal,npm,vite,react,swift,swiftui,agent,ai,developer
 ```
 
 ## What's New — 1.0

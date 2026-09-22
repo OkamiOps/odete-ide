@@ -11,7 +11,7 @@ Odete IDE
 ## Subtitle (30)
 
 ```
-Programar de verdad en iPad
+Dev de verdad, en tu equipo
 ```
 
 ## Promotional text (170)

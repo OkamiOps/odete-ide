@@ -11,7 +11,7 @@ Odete IDE
 ## Subtítulo (30)
 
 ```
-Programe de verdade no iPad
+Dev de verdade, no aparelho
 ```
 
 ## Texto promocional (170)

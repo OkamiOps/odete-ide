@@ -51,7 +51,7 @@ struct MarkdownIncrementalTests {
             passo = passo % 7 + 1
         }
         cortes.append(texto.endIndex)
-        let leitor = LeitorDeMarkdown()
+        let leitor = LeitorDoChat()
         for c in cortes {
             let parcial = String(texto[..<c])
             let aos = leitor.blocos(parcial)
@@ -66,7 +66,7 @@ struct MarkdownIncrementalTests {
 
     /// Letra por letra, que é o pior caso para o ponto seguro.
     @Test func letraPorLetra() {
-        let leitor = LeitorDeMarkdown()
+        let leitor = LeitorDoChat()
         var parcial = ""
         for c in Self.resposta {
             parcial.append(c)
@@ -76,7 +76,7 @@ struct MarkdownIncrementalTests {
 
     /// Texto que não continua o anterior (outra mensagem, "tentar de novo"): recomeça.
     @Test func textoQueNaoContinuaRecomeca() {
-        let leitor = LeitorDeMarkdown()
+        let leitor = LeitorDoChat()
         _ = leitor.blocos("# Um\n\npara um\n\n")
         let outro = "- a\n- b\n\n# Dois\n"
         #expect(leitor.blocos(outro) == MarkdownText.ler(Substring(outro)).blocos)
@@ -85,7 +85,7 @@ struct MarkdownIncrementalTests {
 
     /// A interpretação do trecho é guardada: a segunda leitura é a mesma.
     @Test func inlineGuardado() {
-        let leitor = LeitorDeMarkdown()
+        let leitor = LeitorDoChat()
         var vezes = 0
         let um = leitor.inline("**x**") { vezes += 1; return MarkdownText.interpretar($0) }
         let dois = leitor.inline("**x**") { vezes += 1; return MarkdownText.interpretar($0) }

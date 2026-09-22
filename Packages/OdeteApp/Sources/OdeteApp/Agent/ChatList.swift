@@ -435,7 +435,7 @@ struct MarkdownText: View {
     @Environment(\.theme) private var theme
     let text: String
     /// Guarda o que já foi lido, para o próximo lote da resposta não reler tudo.
-    @State private var leitor = LeitorDeMarkdown()
+    @State private var leitor = LeitorDoChat()
 
     enum Block: Identifiable, Hashable {
         case code(Int, String, String)
@@ -454,7 +454,7 @@ struct MarkdownText: View {
     }
 
     /// A leitura inteira, de uma vez. A tela usa o `leitor`, que chega ao mesmo resultado
-    /// relendo só a cauda enquanto a resposta chega — ver `LeitorDeMarkdown`.
+    /// relendo só a cauda enquanto a resposta chega — ver `LeitorDoChat`.
     var blocks: [Block] {
         Self.ler(Substring(text)).blocos
     }

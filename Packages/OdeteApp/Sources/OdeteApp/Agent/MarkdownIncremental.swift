@@ -13,7 +13,7 @@ import Foundation
 /// seguro em diante, é relida. O resultado é o mesmo da leitura inteira: o ponto seguro é
 /// um lugar onde a leitura inteira também estaria com tudo vazio, e retomar dali com o
 /// estado limpo dá exatamente os mesmos blocos, com os mesmos ids.
-final class LeitorDeMarkdown {
+final class LeitorDoChat {
     private var ultimo = ""
     /// Blocos que não mudam mais.
     private var prontos: [MarkdownText.Block] = []

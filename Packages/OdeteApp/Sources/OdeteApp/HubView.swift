@@ -17,6 +17,7 @@ struct HubView: View {
     @State private var renaming: Project?
     @State private var deleting: Project?
     @State private var newName = ""
+    @State private var cartoes = CartoesDoHub()
 
     var body: some View {
         ZStack {
@@ -40,7 +41,8 @@ struct HubView: View {
                             spacing: 14
                         ) {
                             ForEach(app.projects) { p in
-                                ProjectCard(project: p, root: app.url(for: p))
+                                ProjectCard(project: p, dados: cartoes.dados[p.id])
+                                    .onAppear { cartoes.carregar(p, app: app) }
                                     .onTapGesture { app.open(p, chrome: chrome) }
                                     .contextMenu {
                                         Button(tr("Abrir"), systemImage: "arrow.up.forward.square") { app.open(
@@ -55,10 +57,13 @@ struct HubView: View {
                                                 app.duplicate(p)
                                             }
                                         }
-                                        if let z = app.zip(p) {
-                                            ShareLink(item: z, preview: SharePreview("\(p.name).zip")) {
-                                                Label(tr("Compartilhar (.zip)"), systemImage: "square.and.arrow.up")
-                                            }
+                                        // O zip sai quando o destino é escolhido, fora do ator
+                                        // principal — ver `AppModel.compartilhavel`.
+                                        ShareLink(
+                                            item: app.compartilhavel(p),
+                                            preview: SharePreview("\(p.name).zip")
+                                        ) {
+                                            Label(tr("Compartilhar (.zip)"), systemImage: "square.and.arrow.up")
                                         }
                                         Divider()
                                         if p.external {
@@ -88,6 +93,9 @@ struct HubView: View {
                 .frame(maxWidth: .infinity)
             }
         }
+        // No hub nenhum projeto está aberto: o acesso às pastas externas que o workspace
+        // abriu volta a ser fechado aqui, em vez de ficar aberto até o app sair.
+        .onAppear { app.external.liberarTodos(exceto: app.workspace?.project.id) }
         .sheet(isPresented: $creating) { NewProjectSheet() }
         .sheet(isPresented: $cloning) { CloneSheet() }
         .fileImporter(isPresented: $importing, allowedContentTypes: [.folder, .zip]) { result in
@@ -262,35 +270,102 @@ struct CartaoNovo: View {
     }
 }
 
+/// O que o cartão do hub mostra e que vem do disco: a pilha do projeto e a primeira linha
+/// do README.
+struct DadosDoCartao: Sendable, Equatable {
+    var stack: Stack
+    var blurb: String?
+
+    /// Lê da pasta do projeto. Percorre a árvore inteira, então nunca no ator principal.
+    static func ler(_ raiz: URL) -> DadosDoCartao {
+        let tree = try? FileTreeBuilder.build(at: raiz)
+        let pkg = try? Data(contentsOf: raiz.appending(path: "package.json"))
+        let stack = Stack.detect(paths: tree?.allFiles().map(\.path) ?? [], packageJSON: pkg)
+        return DadosDoCartao(stack: stack, blurb: descricao(raiz))
+    }
+
+    /// Primeira linha de texto do README, como descrição.
+    static func descricao(_ raiz: URL) -> String? {
+        guard let s = try? String(contentsOf: raiz.appending(path: "README.md"), encoding: .utf8) else { return nil }
+        for line in s.split(separator: "\n") {
+            let t = line.trimmingCharacters(in: .whitespaces)
+            if t.isEmpty || t.hasPrefix("#") || t.hasPrefix("|") || t.hasPrefix("`") {
+                continue
+            }
+            return String(t.prefix(90))
+        }
+        return nil
+    }
+}
+
+/// Os dados dos cartões do hub, lidos fora do ator principal e guardados.
+///
+/// O cartão lia o README e percorria a árvore inteira do projeto — para descobrir a pilha —
+/// dentro do próprio corpo, no ator principal, e o corpo de cada cartão roda de novo a
+/// cada vez que a grade se refaz. Com vinte projetos, abrir o hub era ler vinte árvores
+/// antes do primeiro quadro.
+@MainActor
+@Observable
+final class CartoesDoHub {
+    private(set) var dados: [UUID: DadosDoCartao] = [:]
+    @ObservationIgnored private var pedidos: Set<UUID> = []
+
+    func carregar(_ p: Project, app: AppModel) {
+        guard !pedidos.contains(p.id) else { return }
+        pedidos.insert(p.id)
+        let id = p.id
+        let local = p.external ? nil : app.store.url(for: p)
+        // Pasta de fora é lida com o acesso aberto só durante a leitura.
+        let externo = p.external ? app.external : nil
+        Task.detached(priority: .utility) {
+            let d: DadosDoCartao? = if let local {
+                DadosDoCartao.ler(local)
+            } else {
+                externo?.comAcesso(id) { DadosDoCartao.ler($0) } ?? nil
+            }
+            guard let d else { return }
+            await self.guardar(d, para: id)
+        }
+    }
+
+    private func guardar(_ d: DadosDoCartao, para id: UUID) {
+        dados[id] = d
+    }
+}
+
 struct ProjectCard: View {
     @Environment(\.theme) private var theme
     var project: Project
-    var root: URL
+    /// Pilha e descrição; `nil` enquanto a leitura não chegou — ver `CartoesDoHub`.
+    var dados: DadosDoCartao?
 
     var body: some View {
-        let stack = stackOf()
+        let stack = dados?.stack
+        let cor = stack.map(stackColor) ?? theme.fgSubtle
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Image(systemName: symbol(stack))
+                Image(systemName: stack.map(symbol) ?? "folder")
                     .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(stackColor(stack))
+                    .foregroundStyle(cor)
                     .frame(width: 40, height: 40)
                     .background(
-                        stackColor(stack).opacity(0.16),
+                        cor.opacity(0.16),
                         in: RoundedRectangle(cornerRadius: 12, style: .continuous)
                     )
                 Spacer()
                 if project.external {
                     Pill(tr("externo"), on: false)
                 }
-                Pill(stack.label, on: true, color: stackColor(stack))
+                if let stack {
+                    Pill(stack.label, on: true, color: stackColor(stack))
+                }
             }
             .padding(.bottom, 2)
             Text(project.name)
                 .font(OdeteFont.ui(16, weight: .semibold))
                 .foregroundStyle(theme.fg)
                 .lineLimit(1)
-            if let blurb {
+            if let blurb = dados?.blurb {
                 Text(blurb).font(OdeteFont.ui(12)).foregroundStyle(theme.fgMuted).lineLimit(2).fixedSize(
                     horizontal: false,
                     vertical: true
@@ -323,19 +398,6 @@ struct ProjectCard: View {
         return project.lastOpenedAt == nil ? tr("criado %1$@", rel) : tr("aberto %1$@", rel)
     }
 
-    /// Primeira linha de texto do README, como descrição.
-    var blurb: String? {
-        guard let s = try? String(contentsOf: root.appending(path: "README.md"), encoding: .utf8) else { return nil }
-        for line in s.split(separator: "\n") {
-            let t = line.trimmingCharacters(in: .whitespaces)
-            if t.isEmpty || t.hasPrefix("#") || t.hasPrefix("|") || t.hasPrefix("`") {
-                continue
-            }
-            return String(t.prefix(90))
-        }
-        return nil
-    }
-
     func stackColor(_ s: Stack) -> Color {
         switch s.kind {
         case .swift: Color(hex: "#f05138")
@@ -344,12 +406,6 @@ struct ProjectCard: View {
         case .spa: Color(hex: "#ffc820")
         case .html: Color(hex: "#7c9cff")
         }
-    }
-
-    func stackOf() -> Stack {
-        let tree = try? FileTreeBuilder.build(at: root)
-        let pkg = try? Data(contentsOf: root.appending(path: "package.json"))
-        return Stack.detect(paths: tree?.allFiles().map(\.path) ?? [], packageJSON: pkg)
     }
 
     func symbol(_ s: Stack) -> String {

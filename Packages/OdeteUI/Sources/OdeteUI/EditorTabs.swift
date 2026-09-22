@@ -33,6 +33,7 @@ public struct EditorTabs: View {
                             onSelect: { onSelect(tab.path) },
                             onClose: { onClose(tab.path) }
                         )
+                        .equatable()
                         .id(tab.path)
                     }
                 }
@@ -51,13 +52,24 @@ public struct EditorTabs: View {
     }
 }
 
-struct TabItem: View {
+/// Uma aba.
+///
+/// `Equatable` pela aba e por estar ativa, sem os fechamentos. Os fechamentos são novos a
+/// cada vez que o centro se refaz — e ele se refaz a cada pausa na digitação, quando a
+/// análise do arquivo chega —, e o SwiftUI, que não sabe comparar fechamento, refazia
+/// todas as abas junto. Medido digitando, as abas eram a segunda view mais cara depois da
+/// barra de status. Agora só a aba cujo ponto de alteração mudou se refaz.
+struct TabItem: View, Equatable {
     @Environment(\.theme) private var theme
     var tab: EditorTab
     var on: Bool
     var onSelect: () -> Void
     var onClose: () -> Void
     @State private var hover = false
+
+    nonisolated static func == (a: TabItem, b: TabItem) -> Bool {
+        a.tab == b.tab && a.on == b.on
+    }
 
     var body: some View {
         HStack(spacing: 4) {

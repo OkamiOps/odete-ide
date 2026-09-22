@@ -399,10 +399,6 @@ struct FileRow: View {
         ws.selected == node.path
     }
 
-    var sujo: Bool {
-        ws.tabs.first { $0.path == node.path }?.isDirty == true
-    }
-
     var body: some View {
         Button {
             if node.isDirectory {
@@ -488,8 +484,8 @@ struct FileRow: View {
             }
             .padding(.leading, 5)
             Spacer(minLength: 4)
-            if sujo {
-                Circle().fill(theme.accent).frame(width: 6, height: 6)
+            if !node.isDirectory {
+                PontoDeAlteracao(path: node.path)
             }
             marca
         }
@@ -545,6 +541,24 @@ struct FileRow: View {
             return theme.fg
         }
         return theme.fg.opacity(0.84)
+    }
+}
+
+/// O ponto de alteração não salva de uma linha da árvore.
+///
+/// View própria para ser a única coisa da linha que depende das abas. A linha inteira lia
+/// `ws.tabs` para desenhar este ponto, então toda linha visível se refazia a cada vez que
+/// uma aba mudava — com salvamento automático, a cada pausa na digitação. Medido, a linha
+/// da árvore aparecia em 7 amostras por tecla sem nada nela ter mudado.
+struct PontoDeAlteracao: View {
+    @Environment(WorkspaceModel.self) private var ws
+    @Environment(\.theme) private var theme
+    let path: String
+
+    var body: some View {
+        if ws.sujos.contains(path) {
+            Circle().fill(theme.accent).frame(width: 6, height: 6)
+        }
     }
 }
 

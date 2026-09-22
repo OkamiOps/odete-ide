@@ -1,3 +1,4 @@
+import Synchronization
 import SwiftUI
 
 /// Tipografia: IBM Plex Sans e Mono (empacotadas no app), com SF como reserva.
@@ -33,9 +34,26 @@ public enum OdeteFont {
         return min(max(ajustado, size * 0.9), size * 1.3) * escala
     }
 
+    /// Quais fontes existem, perguntado uma vez por nome.
+    ///
+    /// Cada `ui()` e cada `mono()` montava um `UIFont` só para saber se a fonte empacotada
+    /// estava lá — e são dezenas por linha de lista, a cada corpo refeito. A resposta não
+    /// muda enquanto o app vive.
+    private static let conhecidas = Mutex<[String: Bool]>([:])
+
+    /// A fonte com este nome PostScript está instalada?
+    public static func existe(_ nome: String) -> Bool {
+        if let sabido = conhecidas.withLock({ $0[nome] }) {
+            return sabido
+        }
+        let tem = UIFont(name: nome, size: 12) != nil
+        conhecidas.withLock { $0[nome] = tem }
+        return tem
+    }
+
     public static func ui(_ size: CGFloat = 13, weight: Font.Weight = .regular) -> Font {
         let s = escalado(size)
-        if UIFont(name: sansName(weight), size: s) != nil {
+        if existe(sansName(weight)) {
             // `fixedSize` porque a conta do tamanho já foi feita acima, com teto; o
             // `relativeTo` escalaria de novo e sem limite.
             return .custom(sansName(weight), fixedSize: s)
@@ -45,7 +63,7 @@ public enum OdeteFont {
 
     public static func mono(_ size: CGFloat = 13, weight: Font.Weight = .regular) -> Font {
         let s = escalado(size)
-        if UIFont(name: monoName(weight), size: s) != nil {
+        if existe(monoName(weight)) {
             return .custom(monoName(weight), fixedSize: s)
         }
         return .system(size: s, weight: weight, design: .monospaced)

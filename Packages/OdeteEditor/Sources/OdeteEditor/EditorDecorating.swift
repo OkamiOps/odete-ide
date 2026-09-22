@@ -18,17 +18,20 @@ extension CodeEditorView.Coordinator {
     /// Anota o texto novo e invalida o cache de linhas.
     ///
     /// Todo lugar que troca o conteúdo do editor passa por aqui — fora daqui o
-    /// coordenador seguiria decorando com o mapa de linhas do texto anterior.
+    /// coordenador seguiria decorando com o mapa de linhas do texto anterior. O índice de
+    /// palavras do autocompletar também envelhece: o texto novo não veio de uma tecla
+    /// numa linha só, então a conta por linha dele não vale.
     func anotarTexto(_ texto: String) {
         textoAtual = texto
         versaoDoTexto &+= 1
+        pedirIndiceDePalavras(atraso: .zero)
     }
 
     /// O mapa de linhas do texto atual, refeito só quando o texto muda de versão.
     ///
-    /// Era recalculado em toda passada de decoração — que acontece ao digitar, ao mover
-    /// o cursor, ao rolar e ao mudar a margem. Ver `MapaDeLinhas` para o custo que isso
-    /// tinha.
+    /// Só quem precisa do documento inteiro usa isto — mandar a seleção para o agente,
+    /// centralizar uma linha. As decorações e o cursor perguntam ao Runestone, que já
+    /// guarda as linhas numa árvore; ver `linhaDe(_:)`.
     func linhas() -> MapaDeLinhas {
         if versaoCacheada != versaoDoTexto {
             mapaCacheado = MapaDeLinhas(textoAtual)
@@ -37,42 +40,139 @@ extension CodeEditorView.Coordinator {
         return mapaCacheado
     }
 
+    /// Linha (base zero) de um deslocamento UTF-16.
+    ///
+    /// É chamada a cada movimento do cursor. Pelo mapa, cada tecla remontava o mapa do
+    /// documento inteiro — o texto mudou de versão — só para descobrir uma linha: medido,
+    /// 2% do ator principal ao digitar num arquivo de 2000 linhas. O Runestone responde
+    /// isso pela árvore de linhas dele, em tempo logarítmico e sem ler o texto.
     func linhaDe(_ offset: Int) -> Int {
-        linhas().linha(de: offset)
+        if let tv = textView, let l = tv.textLocation(at: offset) {
+            return l.lineNumber
+        }
+        return linhas().linha(de: offset)
+    }
+
+    /// Começo (UTF-16) de uma linha base zero, ou `nil` se ela não existe.
+    func inicioDaLinha(_ tv: TextView, _ linha: Int) -> Int? {
+        tv.location(at: TextLocation(lineNumber: linha, column: 0))
+    }
+
+    /// Tamanho do documento em UTF-16, sem montar a `String` dele.
+    func tamanhoDoDocumento(_ tv: TextView) -> Int {
+        tv.offset(from: tv.beginningOfDocument, to: tv.endOfDocument)
+    }
+
+    /// Fim da linha (antes da quebra) e começo da próxima.
+    func fimDaLinha(_ tv: TextView, _ linha: Int, tamanho: Int) -> (fim: Int, proxima: Int) {
+        guard let proxima = inicioDaLinha(tv, linha + 1) else { return (tamanho, tamanho) }
+        return (max(proxima - 1, 0), proxima)
+    }
+
+    /// A faixa do documento que vale decorar agora: a tela e uma tela de folga para cima e
+    /// para baixo.
+    ///
+    /// As guias pediam `caretRect` para cada linha recuada do arquivo inteiro — até 4000 —,
+    /// e cada uma obriga o Runestone a compor a linha, esteja ela na tela ou a mil linhas
+    /// dali. As camadas tinham a altura do arquivo inteiro e eram redesenhadas por
+    /// completo a cada passada. Decorar só o que se vê troca o custo do tamanho do arquivo
+    /// pelo tamanho da tela; a folga é o que deixa rolar sem ver a decoração chegando.
+    func faixaVisivel(_ tv: TextView) -> (y: ClosedRange<CGFloat>, linhas: ClosedRange<Int>) {
+        let tamanho = tamanhoDoDocumento(tv)
+        let ultimaDoArquivo = tv.textLocation(at: tamanho)?.lineNumber ?? 0
+        let alturaMedia = max(tv.contentSize.height / CGFloat(ultimaDoArquivo + 1), 1)
+        // A linha num ponto da tela. O Runestone só sabe responder isso para linhas que já
+        // compôs; fora delas `closestPosition` devolve o fim do arquivo. Nesse caso a conta
+        // vai pela altura média das linhas, que sem quebra de linha é exata.
+        func linha(em y: CGFloat) -> Int {
+            let estimada = min(max(Int(y / alturaMedia), 0), ultimaDoArquivo)
+            guard let p = tv.closestPosition(to: CGPoint(x: tv.gutterWidth + 4, y: y)) else { return estimada }
+            let o = tv.offset(from: tv.beginningOfDocument, to: p)
+            if o >= tamanho, y < tv.contentSize.height - alturaMedia * 2 {
+                return estimada
+            }
+            return linhaDe(o)
+        }
+        let topoVisivel = tv.contentOffset.y
+        let baseVisivel = tv.contentOffset.y + max(tv.bounds.height, 1)
+        let primeiraVisivel = linha(em: topoVisivel + 1)
+        let ultimaVisivel = max(primeiraVisivel, linha(em: baseVisivel - 1))
+        // A folga é de uma tela para cada lado, contada em linhas.
+        let folga = max(ultimaVisivel - primeiraVisivel + 1, 10)
+        let primeira = max(0, primeiraVisivel - folga)
+        let ultima = min(ultimaDoArquivo, ultimaVisivel + folga)
+        func caret(_ l: Int) -> CGRect? {
+            guard let o = inicioDaLinha(tv, l), let p = tv.position(from: tv.beginningOfDocument, offset: o)
+            else { return nil }
+            return tv.caretRect(for: p)
+        }
+        let topo = min(caret(primeira)?.minY ?? topoVisivel, max(0, topoVisivel))
+        let base = max(caret(ultima)?.maxY ?? baseVisivel, baseVisivel, topo + 1)
+        return (topo ... base, primeira ... ultima)
     }
 
     func layoutDecorations() {
         guard let tv = textView else { return }
-        let mapa = linhas()
-        let ns = mapa.ns
-        let starts = mapa.starts
+        let faixa = faixaVisivel(tv)
+        faixaDecorada = faixa.y
+        let topo = faixa.y.lowerBound
+        let tamanho = tamanhoDoDocumento(tv)
         var placed: [GutterOverlay.Placed] = []
-        for m in marks where m.line >= 1 && m.line <= starts.count {
-            guard let pos = tv.position(from: tv.beginningOfDocument, offset: starts[m.line - 1]) else { continue }
+        for m in marks where faixa.linhas.contains(m.line - 1) {
+            guard let inicio = inicioDaLinha(tv, m.line - 1),
+                  let pos = tv.position(from: tv.beginningOfDocument, offset: inicio) else { continue }
             let r = tv.caretRect(for: pos)
-            placed.append(.init(y: r.minY, h: r.height, mark: m))
+            placed.append(.init(y: r.minY - topo, h: r.height, mark: m))
         }
         overlay.placed = placed
         positionOverlay()
         overlay.setNeedsDisplay()
-        layoutGuides(tv, ns: ns, starts: starts)
+        layoutGuides(tv, faixa: faixa, tamanho: tamanho)
 
         var ranges: [HighlightedRange] = []
-        marcarMudancas(tv, ns: ns, starts: starts, into: &ranges)
-        marcarProblemas(tv, ns: ns, starts: starts, into: &ranges)
-        marcarElos(tv, ns: ns)
+        marcarMudancas(tv, faixa: faixa, tamanho: tamanho, into: &ranges)
+        marcarProblemas(tv, faixa: faixa, tamanho: tamanho, into: &ranges)
+        marcarElos(tv, faixa: faixa)
         marcarBusca(into: &ranges)
         tv.highlightedRanges = ranges
     }
 
+    /// A rolagem saiu da faixa decorada: refaz já, sem a espera de quem digita.
+    ///
+    /// Chamado de `positionOverlay`, que roda dentro do `layoutSubviews` do editor; por
+    /// isso só agenda, e uma vez por volta do laço principal.
+    func conferirFaixaDaRolagem(_ tv: TextView) {
+        let visivel = tv.contentOffset.y ... (tv.contentOffset.y + tv.bounds.height)
+        guard let f = faixaDecorada,
+              visivel.lowerBound < f.lowerBound - 1 || visivel.upperBound > f.upperBound + 1
+        else { return }
+        guard !rolagemPendente else { return }
+        rolagemPendente = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            rolagemPendente = false
+            layoutDecorations()
+        }
+    }
+
     /// Problema no código: onda embaixo do trecho, fundo de leve na linha e a marca no
     /// minimapa, para dar para achar onde quebrou sem rolar o arquivo atrás.
-    func marcarProblemas(_ tv: TextView, ns: NSString, starts: [Int], into ranges: inout [HighlightedRange]) {
+    ///
+    /// O fundo vai para todos os problemas — é o Runestone quem desenha, e ele só pinta o
+    /// que está na tela. A onda, que pede a posição de cada ponta na tela, só para os que
+    /// caem na faixa visível.
+    func marcarProblemas(
+        _ tv: TextView,
+        faixa: (y: ClosedRange<CGFloat>, linhas: ClosedRange<Int>),
+        tamanho: Int,
+        into ranges: inout [HighlightedRange]
+    ) {
         let cores = palette ?? parent.palette
+        let topo = faixa.y.lowerBound
         var ondas: [ChangeMarks.Onda] = []
-        for i in issues where i.line >= 1 && i.line <= starts.count {
-            let inicioLinha = starts[i.line - 1]
-            let fimLinha = i.line < starts.count ? starts[i.line] - 1 : ns.length
+        for i in issues where i.line >= 1 {
+            guard let inicioLinha = inicioDaLinha(tv, i.line - 1) else { continue }
+            let fimLinha = fimDaLinha(tv, i.line - 1, tamanho: tamanho).fim
             let de = min(inicioLinha + max(i.column - 1, 0), fimLinha)
             // esbuild costuma apontar um caractere só; a onda vai desse ponto até o fim
             // da linha, senão fica um risco de 6 pt que ninguém vê.
@@ -88,6 +188,7 @@ extension CodeEditorView.Coordinator {
                 color: cor.withAlphaComponent(0.18),
                 cornerRadius: 3
             ))
+            guard faixa.linhas.contains(i.line - 1) else { continue }
             if let p1 = tv.position(from: tv.beginningOfDocument, offset: de),
                let p2 = tv.position(from: tv.beginningOfDocument, offset: max(ate, fimLinha))
             {
@@ -101,7 +202,7 @@ extension CodeEditorView.Coordinator {
                 // só até a borda do texto visível.
                 let mesmaLinha = abs(r2.minY - r1.minY) < 1
                 let largura = mesmaLinha ? max(r2.minX - r1.minX, 12) : max(tv.bounds.width - r1.minX - 40, 12)
-                ondas.append(.init(x: r1.minX, w: largura, y: base, cor: cor))
+                ondas.append(.init(x: r1.minX, w: largura, y: base - topo, cor: cor))
             }
         }
         changeMarks.ondas = ondas
@@ -116,15 +217,18 @@ extension CodeEditorView.Coordinator {
     /// problema, mostra a mensagem dele.
     @objc func tocouNoTexto(_ g: UITapGestureRecognizer) {
         guard let tv = textView else { return }
-        let p = g.location(in: tv)
+        // Os retângulos dos links moram no sistema da camada de decoração, que cobre só a
+        // faixa visível; as áreas dos problemas, no do próprio editor.
+        let noElo = g.location(in: changeMarks)
         // Uma folga vertical pequena: o retângulo do cursor é mais baixo que a linha e
         // acertar o sublinhado com o dedo pede alguma margem.
-        if let elo = changeMarks.elos.first(where: { $0.rect.insetBy(dx: -2, dy: -4).contains(p) }) {
+        if let elo = changeMarks.elos.first(where: { $0.rect.insetBy(dx: -2, dy: -4).contains(noElo) }) {
             parent.onOpenLink(elo.destino)
             return
         }
-        // Fora de onda, o toque também fecha o balão que estiver aberto.
-        tocouEmProblema(p)
+        // Fora de link, o toque numa onda mostra o problema; fora de onda, fecha o balão
+        // que estiver aberto.
+        tocouEmProblema(g.location(in: tv))
     }
 
     /// Convive com o reconhecedor do próprio Runestone: o toque precisa continuar levando
@@ -141,11 +245,17 @@ extension CodeEditorView.Coordinator {
     /// O sublinhado é o que avisa que aquilo abre; o retângulo guardado é o que o toque
     /// consulta depois, para não abrir arquivo quando a pessoa toca no vazio à direita da
     /// linha — `closestPosition` devolveria o fim do import ali também.
-    func marcarElos(_ tv: TextView, ns: NSString) {
+    func marcarElos(_ tv: TextView, faixa: (y: ClosedRange<CGFloat>, linhas: ClosedRange<Int>)) {
         var elos: [ChangeMarks.Elo] = []
+        let topo = faixa.y.lowerBound
+        let tamanho = tamanhoDoDocumento(tv)
+        // Os limites da faixa em deslocamento: import fora dela não precisa de retângulo,
+        // e pedir o retângulo compõe a linha.
+        let de0 = inicioDaLinha(tv, faixa.linhas.lowerBound) ?? 0
+        let ate0 = inicioDaLinha(tv, faixa.linhas.upperBound + 1) ?? tamanho
         for l in links {
             let de = l.range.lowerBound, ate = l.range.upperBound
-            guard de >= 0, ate <= ns.length, de < ate,
+            guard de >= 0, ate <= tamanho, de < ate, de >= de0, de <= ate0,
                   let p1 = tv.position(from: tv.beginningOfDocument, offset: de),
                   let p2 = tv.position(from: tv.beginningOfDocument, offset: ate) else { continue }
             let r1 = tv.caretRect(for: p1), r2 = tv.caretRect(for: p2)
@@ -154,7 +264,7 @@ extension CodeEditorView.Coordinator {
             guard abs(r2.minY - r1.minY) < 1, r2.minX > r1.minX else { continue }
             let altura = min(r1.height, fontSize * 1.5)
             elos.append(.init(
-                rect: CGRect(x: r1.minX, y: r1.minY, width: r2.minX - r1.minX, height: altura),
+                rect: CGRect(x: r1.minX, y: r1.minY - topo, width: r2.minX - r1.minX, height: altura),
                 destino: l.destino
             ))
         }
@@ -166,21 +276,26 @@ extension CodeEditorView.Coordinator {
 
     /// O patch pendente dentro do código: linha que entrou pintada de verde, e um fio
     /// vermelho onde linhas saíram. Nada aqui trava o texto — dá para editar por cima.
-    func marcarMudancas(_ tv: TextView, ns: NSString, starts: [Int], into ranges: inout [HighlightedRange]) {
+    func marcarMudancas(
+        _ tv: TextView,
+        faixa: (y: ClosedRange<CGFloat>, linhas: ClosedRange<Int>),
+        tamanho: Int,
+        into ranges: inout [HighlightedRange]
+    ) {
         let cores = palette ?? parent.palette
+        let topo = faixa.y.lowerBound
         changeMarks.frame = CGRect(
             x: 0,
-            y: 0,
+            y: topo,
             width: max(tv.contentSize.width, tv.bounds.width),
-            height: max(tv.contentSize.height, tv.bounds.height)
+            height: faixa.y.upperBound - topo
         )
         var ys: [CGFloat] = []
         for c in changes where c.line >= 1 {
             switch c.kind {
             case .added:
-                guard c.line <= starts.count else { continue }
-                let loc = starts[c.line - 1]
-                let fim = c.line < starts.count ? starts[c.line] : ns.length
+                guard let loc = inicioDaLinha(tv, c.line - 1) else { continue }
+                let fim = fimDaLinha(tv, c.line - 1, tamanho: tamanho).proxima
                 ranges.append(HighlightedRange(
                     id: "patch-\(c.line)",
                     range: NSRange(location: loc, length: max(fim - loc, 1)),
@@ -188,75 +303,131 @@ extension CodeEditorView.Coordinator {
                     cornerRadius: 0
                 ))
             case .removed:
-                let alvo = min(max(c.line, 1), starts.count)
-                guard let pos = tv.position(from: tv.beginningOfDocument, offset: starts[alvo - 1])
+                // Linha removida depois da última: o fio vai no pé da última.
+                let existe = inicioDaLinha(tv, c.line - 1) != nil
+                var alvo = c.line - 1
+                if !existe {
+                    alvo = max(tv.textLocation(at: tamanho)?.lineNumber ?? 0, 0)
+                }
+                guard faixa.linhas.contains(alvo), let inicio = inicioDaLinha(tv, alvo),
+                      let pos = tv.position(from: tv.beginningOfDocument, offset: inicio)
                 else { continue }
                 let r = tv.caretRect(for: pos)
-                ys.append(c.line > starts.count ? r.maxY : r.minY)
+                ys.append((existe ? r.minY : r.maxY) - topo)
             }
         }
         changeMarks.cor = UIColor(hex: cores.danger)
         changeMarks.ys = ys
     }
 
-    /// Guias de indentação: uma linha vertical por nível, na coluna do recuo.
-    func layoutGuides(_ tv: TextView, ns: NSString, starts: [Int]) {
+    /// Nível de recuo da linha que ocupa `faixa` em `texto`, ou `nil` se ela está em branco.
+    private func nivel(_ texto: NSString, _ faixa: Range<Int>, largura: Int) -> Int? {
+        var espacos = 0
+        for p in faixa {
+            switch texto.character(at: p) {
+            case 32: espacos += 1
+            case 9: espacos += largura
+            case 10, 13: return nil
+            default: return espacos / largura
+            }
+        }
+        return nil
+    }
+
+    /// Nível de uma linha fora da faixa (a do cursor, quando ela saiu da tela). Linha em
+    /// branco herda o da próxima com texto, procurando até um teto.
+    private func nivelDaLinha(_ tv: TextView, _ linha: Int, tamanho: Int, largura: Int) -> Int {
+        var l = linha
+        while l < linha + 200, let inicio = inicioDaLinha(tv, l) {
+            let fim = fimDaLinha(tv, l, tamanho: tamanho).proxima
+            let texto = (tv.text(in: NSRange(location: inicio, length: max(fim - inicio, 0))) ?? "") as NSString
+            if let n = nivel(texto, 0 ..< texto.length, largura: largura) {
+                return n
+            }
+            l += 1
+        }
+        return 0
+    }
+
+    /// Onde a decoração foi montada por último, em coordenadas do conteúdo.
+    ///
+    /// Mora nas guias, e não no coordenador, porque é estado da camada: é a faixa que ela
+    /// cobre.
+    var faixaDecorada: ClosedRange<CGFloat>? {
+        get { guides.faixa }
+        set { guides.faixa = newValue }
+    }
+
+    private var rolagemPendente: Bool {
+        get { guides.refazendoNaRolagem }
+        set { guides.refazendoNaRolagem = newValue }
+    }
+
+    /// Guias de indentação: uma linha vertical por nível, na coluna do recuo — só nas
+    /// linhas da faixa visível.
+    ///
+    /// Linha em branco herda o nível da próxima linha com texto, que pode estar abaixo da
+    /// faixa: a busca continua além dela, com teto, em vez de ler o arquivo até o fim.
+    func layoutGuides(_ tv: TextView, faixa: (y: ClosedRange<CGFloat>, linhas: ClosedRange<Int>), tamanho: Int) {
+        let topo = faixa.y.lowerBound
         guides.frame = CGRect(
             x: 0,
-            y: 0,
+            y: topo,
             width: max(tv.contentSize.width, tv.bounds.width),
-            height: max(tv.contentSize.height, tv.bounds.height)
+            height: faixa.y.upperBound - topo
         )
-        guard guidesOn, starts.count <= 4000 else {
+        guard guidesOn else {
             guides.segments = []
             guides.setNeedsDisplay()
             return
         }
-        let width = max(tabWidth, 1)
-        var levels: [Int] = []
-        for (i, start) in starts.enumerated() {
-            let end = i + 1 < starts.count ? starts[i + 1] : ns.length
-            var spaces = 0
-            var p = start
-            var blank = true
-            while p < end {
-                let ch = ns.character(at: p)
-                if ch == 32 {
-                    spaces += 1
-                } else if ch == 9 {
-                    spaces += width
-                } else if ch == 10 || ch == 13 {
-                    break
-                } else {
-                    blank = false
-                    break
-                }
-                p += 1
-            }
-            levels.append(blank ? -1 : spaces / width)
+        let largura = max(tabWidth, 1)
+        let alem = 200
+        // Um recorte só com a faixa e a sobra, em vez de um pedido por linha.
+        let primeira = faixa.linhas.lowerBound
+        let ultimaLida = faixa.linhas.upperBound + alem
+        guard let deOffset = inicioDaLinha(tv, primeira) else { return }
+        let ateOffset = inicioDaLinha(tv, ultimaLida + 1) ?? tamanho
+        let recorte = (tv.text(in: NSRange(location: deOffset, length: max(ateOffset - deOffset, 0))) ?? "") as NSString
+        var inicios: [Int] = []
+        var i = primeira
+        while i <= ultimaLida, let s = inicioDaLinha(tv, i) {
+            inicios.append(s - deOffset)
+            i += 1
+        }
+        var niveis: [Int?] = inicios.indices.map { k in
+            let fim = min(k + 1 < inicios.count ? inicios[k + 1] : recorte.length, recorte.length)
+            return nivel(recorte, min(inicios[k], fim) ..< fim, largura: largura)
         }
         // linhas em branco herdam o nível da próxima linha não vazia
-        var next = 0
-        for i in stride(from: levels.count - 1, through: 0, by: -1) {
-            if levels[i] < 0 {
-                levels[i] = next
+        var proximo = 0
+        for k in stride(from: niveis.count - 1, through: 0, by: -1) {
+            if let n = niveis[k] {
+                proximo = n
             } else {
-                next = levels[i]
+                niveis[k] = proximo
             }
         }
-        let cursorLine = lineIndex(of: tv.selectedRange.location, starts: starts)
-        let cursorLevel = cursorLine < levels.count ? levels[cursorLine] : 0
+        // A guia acesa é a do nível do cursor em qualquer lugar da tela, como sempre foi —
+        // mesmo com o cursor fora dela.
+        let linhaDoCursor = linhaDe(tv.selectedRange.location)
+        let k = linhaDoCursor - primeira
+        let nivelDoCursor = k >= 0 && k < niveis.count
+            ? (niveis[k] ?? 0)
+            : nivelDaLinha(tv, linhaDoCursor, tamanho: tamanho, largura: largura)
         let charW = charWidth(tv)
         var segs: [IndentGuides.Segment] = []
-        for (i, start) in starts.enumerated() where levels[i] > 0 {
-            guard let pos = tv.position(from: tv.beginningOfDocument, offset: start) else { continue }
+        for k in niveis.indices where faixa.linhas.contains(primeira + k) {
+            let n = niveis[k] ?? 0
+            guard n > 0, let pos = tv.position(from: tv.beginningOfDocument, offset: deOffset + inicios[k])
+            else { continue }
             let r = tv.caretRect(for: pos)
-            for level in 0 ..< levels[i] {
+            for level in 0 ..< n {
                 segs.append(.init(
-                    x: r.minX + CGFloat(level * width) * charW,
-                    y: r.minY,
+                    x: r.minX + CGFloat(level * largura) * charW,
+                    y: r.minY - topo,
                     h: r.height,
-                    active: level == cursorLevel - 1
+                    active: level == nivelDoCursor - 1
                 ))
             }
         }
@@ -270,27 +441,18 @@ extension CodeEditorView.Coordinator {
         return ("0" as NSString).size(withAttributes: [.font: font]).width
     }
 
-    private func lineIndex(of offset: Int, starts: [Int]) -> Int {
-        var lo = 0, hi = starts.count - 1
-        while lo < hi {
-            let mid = (lo + hi + 1) / 2
-            if starts[mid] <= offset {
-                lo = mid
-            } else {
-                hi = mid - 1
-            }
-        }
-        return max(lo, 0)
-    }
-
     func positionOverlay() {
         guard let tv = textView else { return }
+        // A tira das marcas cobre a mesma faixa das guias; antes da primeira passada de
+        // decoração, a tela.
+        let faixa = faixaDecorada ?? (tv.contentOffset.y ... tv.contentOffset.y + tv.bounds.height)
         overlay.frame = CGRect(
             x: tv.contentOffset.x,
-            y: 0,
+            y: faixa.lowerBound,
             width: tv.gutterWidth,
-            height: max(tv.contentSize.height, tv.bounds.height)
+            height: max(faixa.upperBound - faixa.lowerBound, 1)
         )
+        conferirFaixaDaRolagem(tv)
         // Sem `bringSubviewToFront` aqui: esta função agora roda dentro do
         // layoutSubviews da TextView, e reordenar subviews ali pede novo layout.
         // A ordem das camadas já é garantida no próprio layoutSubviews.

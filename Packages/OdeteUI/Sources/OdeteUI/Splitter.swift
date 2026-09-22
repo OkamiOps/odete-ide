@@ -1,7 +1,7 @@
 import OdeteI18n
 import SwiftUI
 
-/// Alça de redimensionamento entre painéis. `value` é a dimensão do painel que ela controla.
+/// Divisor arrastável entre painéis.
 public struct Splitter: View {
     public enum Axis { case horizontal, vertical }
     @Environment(\.theme) private var theme
@@ -10,14 +10,27 @@ public struct Splitter: View {
     var range: ClosedRange<Double>
     /// +1 quando arrastar para a direita/baixo aumenta `value`; -1 quando diminui.
     var direction: Double
+    /// Chamado quando o dedo solta, e depois de cada passo do VoiceOver.
+    ///
+    /// Quem guarda a medida em preferência deve gravá-la aqui, e não a cada quadro do
+    /// arrasto: gravar a cada quadro redesenhava todas as views que leem preferências —
+    /// ver `ChromeState.arrasto`.
+    var aoSoltar: (() -> Void)?
     @State private var start: Double?
     @State private var hot = false
 
-    public init(value: Binding<Double>, axis: Axis, range: ClosedRange<Double>, direction: Double = 1) {
+    public init(
+        value: Binding<Double>,
+        axis: Axis,
+        range: ClosedRange<Double>,
+        direction: Double = 1,
+        aoSoltar: (() -> Void)? = nil
+    ) {
         _value = value
         self.axis = axis
         self.range = range
         self.direction = direction
+        self.aoSoltar = aoSoltar
     }
 
     public var body: some View {
@@ -45,12 +58,14 @@ public struct Splitter: View {
                 .onEnded { _ in
                     start = nil
                     hot = false
+                    aoSoltar?()
                 }
         )
         .accessibilityLabel(tr("Redimensionar"))
         .accessibilityAdjustableAction { d in
             let step: Double = d == .increment ? 24 : -24
             value = min(max(value + step, range.lowerBound), range.upperBound)
+            aoSoltar?()
         }
     }
 }

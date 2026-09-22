@@ -8,7 +8,12 @@ import SwiftUI
 /// o número de problemas e de arquivos alterados no próprio ícone — senão a pessoa só
 /// descobre que o build quebrou quando abre o painel. Embaixo, separado por um fio, o
 /// que não é painel: ajustes e o agente.
-public struct Rail: View {
+///
+/// É `Equatable` pelos valores que desenha, sem os fechamentos: quem monta o rail cria
+/// fechamentos novos a cada corpo, e o SwiftUI não sabe comparar fechamento — o rail e os
+/// seis botões dele se refaziam junto com qualquer coisa que refizesse a raiz do layout.
+/// Os fechamentos só chamam métodos dos modelos, que são os mesmos objetos a vida toda.
+public struct Rail: View, Equatable {
     @Environment(\.theme) private var theme
     @Namespace private var ns
     public var side: SidePanel
@@ -50,6 +55,12 @@ public struct Rail: View {
         self.onProjects = onProjects
     }
 
+    public nonisolated static func == (a: Rail, b: Rail) -> Bool {
+        a.side == b.side && a.sideOpen == b.sideOpen && a.agentVisible == b.agentVisible
+            && a.agentBusy == b.agentBusy && a.problemas == b.problemas
+            && a.problemasGraves == b.problemasGraves && a.alteracoes == b.alteracoes
+    }
+
     public var body: some View {
         VStack(spacing: 2) {
             Button(action: onProjects) {
@@ -71,10 +82,12 @@ public struct Rail: View {
                     contaCor: p == .problems && problemasGraves ? theme.danger : theme.accent,
                     ns: ns
                 ) { onSelect(p) }
+                    .equatable()
             }
             Spacer(minLength: 0)
             fio
             RailButton(symbol: "gearshape", label: tr("Ajustes"), on: false, ns: nil, action: onSettings)
+                .equatable()
             RailButton(
                 symbol: "sparkles",
                 label: tr("Agente"),
@@ -84,6 +97,7 @@ public struct Rail: View {
                 ns: nil,
                 action: onToggleAgent
             )
+            .equatable()
             .padding(.bottom, Metrics.s2)
         }
         .frame(width: Metrics.railWidth)
@@ -109,7 +123,8 @@ public struct Rail: View {
     }
 }
 
-struct RailButton: View {
+/// Botão do rail. `Equatable` pelo que desenha, pelo mesmo motivo do `Rail`.
+struct RailButton: View, Equatable {
     @Environment(\.theme) private var theme
     var symbol: String
     var label: String
@@ -122,6 +137,11 @@ struct RailButton: View {
     var destaque = false
     var ns: Namespace.ID?
     var action: () -> Void
+
+    nonisolated static func == (a: RailButton, b: RailButton) -> Bool {
+        a.symbol == b.symbol && a.label == b.label && a.on == b.on && a.busy == b.busy
+            && a.conta == b.conta && a.contaCor == b.contaCor && a.destaque == b.destaque && a.ns == b.ns
+    }
 
     var body: some View {
         Button(action: action) {

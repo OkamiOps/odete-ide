@@ -8,6 +8,12 @@ import UIKit
 /// Keyboard mandam scroll contínuo, que nesse estado é ignorado: a página só anda se a
 /// pessoa clicar e arrastar. Esta sonda sobe até a `UIScrollView` que envolve o conteúdo
 /// e libera os dois tipos.
+///
+/// A sonda varria a janela inteira a cada vez que era montada e a cada atualização — e ela
+/// mora dentro de todo `ScrollPane`, cujo conteúdo se atualiza a cada linha do terminal,
+/// a cada mudança da árvore. Agora ela procura uma vez: primeiro entre os ancestrais
+/// (o caso do `ScrollPane`), e, sem achar, só na vizinhança perto dela (o caso de `List` e
+/// `Form`, que guardam a rolagem num descendente do vizinho, não num ancestral).
 public struct PointerScrollProbe: UIViewRepresentable {
     public init() {}
 
@@ -16,38 +22,60 @@ public struct PointerScrollProbe: UIViewRepresentable {
     }
 
     public func updateUIView(_ v: UIView, context _: Context) {
-        (v as? Sonda)?.liberar()
+        (v as? Sonda)?.liberarSePreciso()
     }
 
     public final class Sonda: UIView {
+        /// Já achou a rolagem desta janela.
+        private(set) var liberou = false
+        /// Quantos níveis acima da sonda a busca por descendentes começa.
+        static let alcance = 4
+
         override public func didMoveToWindow() {
             super.didMoveToWindow()
-            liberar()
+            guard window != nil else {
+                liberou = false
+                return
+            }
+            liberarSePreciso()
+            // `List` e `Form` montam a rolagem depois da sonda: uma volta do laço depois,
+            // ela já existe.
+            if !liberou {
+                DispatchQueue.main.async { [weak self] in self?.liberarSePreciso() }
+            }
         }
 
-        func liberar() {
+        func liberarSePreciso() {
+            guard !liberou, window != nil else { return }
             var atual: UIView? = superview
             while let v = atual {
                 if let scroll = v as? UIScrollView {
                     scroll.panGestureRecognizer.allowedScrollTypesMask = .all
-                    break
+                    liberou = true
+                    return
                 }
                 atual = v.superview
             }
-            // `List` e `Form` guardam a rolagem num descendente, não num ancestral, então
-            // uma varredura da janela pega os dois casos. Só adiciona capacidade.
-            if let janela = window {
-                Self.varrer(janela)
+            var raiz: UIView = self
+            for _ in 0 ..< Self.alcance {
+                guard let acima = raiz.superview else { break }
+                raiz = acima
             }
+            liberou = Self.varrer(raiz)
         }
 
-        static func varrer(_ v: UIView) {
+        /// Libera as rolagens abaixo de `v`. Devolve se achou alguma.
+        @discardableResult
+        static func varrer(_ v: UIView) -> Bool {
+            var achou = false
             if let scroll = v as? UIScrollView {
                 scroll.panGestureRecognizer.allowedScrollTypesMask = .all
+                achou = true
             }
-            for sub in v.subviews {
-                varrer(sub)
+            for sub in v.subviews where varrer(sub) {
+                achou = true
             }
+            return achou
         }
     }
 }

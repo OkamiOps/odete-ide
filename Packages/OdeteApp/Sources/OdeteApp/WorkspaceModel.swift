@@ -11,6 +11,15 @@ import OdetePreview
 import OdeteSwift
 
 /// Estado de um projeto aberto: árvore, abas, buffers e salvamento.
+///
+/// Uma regra atravessa o modelo: cada tecla pode mudar o texto, o cursor e o ponto de
+/// alteração da aba, e mais nada. Medido num arquivo TSX de 60 linhas, uma tecla gastava
+/// 17,7 ms de CPU, 59% deles em SwiftUI refazendo views que não tinham nada a ver com a
+/// tecla — a barra de status inteira três vezes, todas as abas, as linhas da árvore, o
+/// rail e o terminal. O motivo era sempre o mesmo: uma propriedade observada que muda a
+/// cada tecla (ou a cada pausa) lida por uma view grande. Por isso aqui se escreve só o
+/// que mudou, e o que é derivado fica guardado em vez de recalculado no corpo das views —
+/// ver `WorkspaceAnalise.swift` e `WorkspaceEscritas.swift`.
 @MainActor
 @Observable
 public final class WorkspaceModel {
@@ -25,15 +34,28 @@ public final class WorkspaceModel {
     /// cada tecla, essa varredura acontecia a cada tecla.
     public private(set) var filePaths: [String] = []
     /// Índice de nomes do projeto e a assinatura que diz quando ele envelheceu.
-    var indiceCache: Resolvedor.Indice?
-    var assinaturaDoIndice = ""
+    ///
+    /// Esta e as outras contas internas ficam fora da observação: nenhuma tela as lê, e
+    /// cada escrita numa propriedade observada passa pelo registro de quem observa.
+    @ObservationIgnored var indiceCache: Resolvedor.Indice?
+    @ObservationIgnored var assinaturaDoIndice = ""
     /// Scripts do package.json, na ordem em que estão escritos. Antes só existiam para
     /// quem lembrasse de digitar `npm run` no terminal.
-    public private(set) var scripts: [(nome: String, comando: String)] = []
+    public internal(set) var scripts: [(nome: String, comando: String)] = []
     /// Pacotes que dá para importar: o que o package.json declara mais o que está
     /// instalado em node_modules. É o que o autocompletar do `from "…"` oferece.
     public private(set) var packages: [String] = []
-    public var tabs: [EditorTab] = []
+    public var tabs: [EditorTab] = [] {
+        didSet { sujos = Set(tabs.lazy.filter(\.isDirty).map(\.path)) }
+    }
+
+    /// Caminhos das abas com alteração não salva.
+    ///
+    /// A árvore mostra um ponto em cada arquivo alterado, e cada linha dela lia `tabs`
+    /// para saber disso — toda linha visível era redesenhada quando qualquer aba mudava,
+    /// o que com salvamento automático é toda pausa na digitação. Aqui o ponto lê um
+    /// conjunto que só muda quando o estado de alguma aba muda de fato.
+    public private(set) var sujos: Set<String> = []
     public var active: String?
     public var buffers: [String: String] = [:]
     public var expanded: Set<String> = []
@@ -61,37 +83,49 @@ public final class WorkspaceModel {
     public private(set) var agent: AgentModel!
     /// Arquivos em conflito que o usuário quer editar como texto puro.
     public var forceTextEdit: Set<String> = []
-    /// Análise do editor por arquivo aberto: esboço, lint e marcas do git.
-    public var outlines: [String: [OutlineItem]] = [:]
     /// Arquivos abertos que não são texto: ficam sem buffer e nunca são gravados.
     public var naoEhTexto: Set<String> = []
-    /// Caminhos de import que apontam para arquivos do projeto, por arquivo aberto.
-    public var links: [String: [EditorLink]] = [:]
     /// Apelidos de caminho do `tsconfig.json` (`@/` → `src/`).
     public var tsAliases: [String: String] = [:]
     /// Símbolos do projeto inteiro, para ir à definição e para a paleta.
     public var simbolos: [ProjectSymbol] = []
-    var indexTask: Task<Void, Never>?
+    @ObservationIgnored var indexTask: Task<Void, Never>?
     /// Busca dentro do arquivo aberto. Mora aqui, e não num `@State` do centro, porque o
     /// ⌘F vem do menu de comandos, que só alcança os modelos.
     public let busca = BuscaLocal()
-    /// Linhas que o patch pendente do agente mexeu, por arquivo aberto.
-    public var patchChanges: [String: [EditorLineChange]] = [:]
-    public var lint: [String: [LintIssue]] = [:]
-    public var syntax: [String: [Diagnostic]] = [:]
-    public var gutter: [String: [GutterMark]] = [:]
-    public var gutterFiles: [String: FileDiff] = [:]
+    /// Onde está o cursor do arquivo ativo, em UTF-16. Só a posição na barra de status lê
+    /// isto; ver `posicaoDoCursor(em:)`.
     public var cursorOffset = 0
     /// Folhas de histórico/blame por arquivo (nil = fechadas).
     public var historyPath: String?
     public var blamePath: String?
-    var analysisTasks: [String: Task<Void, Never>] = [:]
-    var lintEngine: Esbuild?
+    @ObservationIgnored var analysisTasks: [String: Task<Void, Never>] = [:]
+    @ObservationIgnored var lintEngine: Esbuild?
+
+    // Onde moram esboço, lint, sintaxe, elos e marcas por arquivo. As propriedades
+    // públicas (`outlines`, `lint`, …) estão em `WorkspaceAnalise.swift` e só avisam quem
+    // observa quando o valor muda. Não escreva aqui direto: escrever direto não avisa
+    // ninguém, e a tela fica velha.
+    @ObservationIgnored var guardadoOutlines: [String: [OutlineItem]] = [:]
+    @ObservationIgnored var guardadoLinks: [String: [EditorLink]] = [:]
+    @ObservationIgnored var guardadoPatchChanges: [String: [EditorLineChange]] = [:]
+    @ObservationIgnored var guardadoLint: [String: [LintIssue]] = [:]
+    @ObservationIgnored var guardadoSyntax: [String: [Diagnostic]] = [:]
+    @ObservationIgnored var guardadoGutter: [String: [GutterMark]] = [:]
+    @ObservationIgnored var guardadoGutterFiles: [String: FileDiff] = [:]
+
+    /// Quantos erros e avisos há, somadas todas as fontes — ver `vigiarProblemas()`.
+    public internal(set) var contagemDeProblemas = ContagemDeProblemas()
 
     private let chrome: ChromeState
     private let rascunhos: Rascunhos
-    private var observador: ObservadorDeArquivos?
-    private var saveTasks: [String: Task<Void, Never>] = [:]
+    @ObservationIgnored private var observador: ObservadorDeArquivos?
+    @ObservationIgnored private var saveTasks: [String: Task<Void, Never>] = [:]
+    /// O que o próprio app gravou e ainda não teve o aviso do observador — ver
+    /// `EscritasProprias`.
+    @ObservationIgnored var escritas = EscritasProprias()
+    /// Mapa de linhas do último texto que a barra de status perguntou.
+    @ObservationIgnored var mapaDoCursor: (caminho: String, texto: String, mapa: LinhasDoTexto)?
 
     init(project: Project, root: URL, chrome: ChromeState, accounts: AccountStore, aiAccounts: AIAccountStore) {
         self.project = project
@@ -131,6 +165,7 @@ public final class WorkspaceModel {
             analyze(t.path)
         }
         refreshGutters()
+        vigiarProblemas()
     }
 
     /// Devolve às abas o que estava digitado e não salvo quando o app saiu de cena.
@@ -200,7 +235,7 @@ public final class WorkspaceModel {
             filePaths = tree.allFiles().map(\.path).filter { !Ignore.isNoisePath($0) }
             let pkg = try? Data(contentsOf: root.appending(path: "package.json"))
             stack = Stack.detect(paths: filePaths, packageJSON: pkg)
-            scripts = Self.lerScripts(pkg)
+            trocarScripts(Self.lerScripts(pkg))
             packages = Self.lerPacotes(pkg, root: root)
             tsAliases = ImportLinks.aliases(tsconfig: try? Data(contentsOf: root.appending(path: "tsconfig.json")))
             preencherAbertas()
@@ -213,7 +248,7 @@ public final class WorkspaceModel {
     }
 
     /// Data de modificação vista por último em cada arquivo aberto.
-    private var marcaDisco: [String: Date] = [:]
+    @ObservationIgnored private var marcaDisco: [String: Date] = [:]
 
     /// Arquivo aberto reescrito por fora volta para a tela.
     ///
@@ -242,7 +277,9 @@ public final class WorkspaceModel {
         observador?.acompanhar(tabs.compactMap { (try? ops.url($0.path))?.path })
     }
 
-    private func externalReload() {
+    /// A mudança veio mesmo de fora: remonta a árvore e relê as abas limpas. Quem chama é
+    /// `externalReload`, depois de descartar o aviso que foi só do salvamento do app.
+    func recarregarDeFora() {
         // Mudança vinda de fora não tem ninguém esperando na tela, então a árvore é
         // remontada fora do ator principal: percorrer o projeto inteiro aqui travava a
         // digitação toda vez que o agente ou um script mexesse em arquivo.
@@ -267,23 +304,6 @@ public final class WorkspaceModel {
                 }
             }
         }
-    }
-
-    /// Problemas de todas as fontes: build, Swift, lint do editor e erros do preview.
-    /// A barra de status e a barra lateral leem daqui, para contarem a mesma coisa.
-    public var problemCounts: (errors: Int, warnings: Int) {
-        var e = 0, w = 0
-        for d in run.diagnostics {
-            d.kind == .error ? (e += 1) : (w += 1)
-        }
-        for d in swiftDiagnostics {
-            d.kind == .error ? (e += 1) : (w += 1)
-        }
-        for item in allLint {
-            item.issue.severity == .error ? (e += 1) : (w += 1)
-        }
-        e += preview.console.filter { $0.level == .error }.count
-        return (e, w)
     }
 
     /// Dependências declaradas mais o que está de fato em node_modules, incluindo
@@ -353,7 +373,10 @@ public final class WorkspaceModel {
     }
 
     /// Igual a `reload()`, mas a varredura do disco acontece fora do ator principal.
-    private func recarregarArvoreEmSegundoPlano() {
+    ///
+    /// Árvore, caminhos, pilha e pacotes só avisam quem observa quando mudaram (o
+    /// `@Observable` compara os `Equatable`); os scripts passam por `trocarScripts`.
+    func recarregarArvoreEmSegundoPlano() {
         let raiz = root
         let ocultos = chrome.snapshot.mostrarOcultos
         Task.detached(priority: .utility) { [weak self] in
@@ -369,7 +392,7 @@ public final class WorkspaceModel {
                 self.tree = arvore
                 self.filePaths = caminhos
                 self.stack = stack
-                self.scripts = scripts
+                self.trocarScripts(scripts)
                 self.packages = pacotes
                 self.preencherAbertas()
                 self.reloadTick += 1
@@ -512,11 +535,21 @@ public final class WorkspaceModel {
             if text != bruto {
                 buffers[path] = text
             }
+            // Arquivo que não existia muda a árvore: esse aviso do observador tem de
+            // remontá-la, então a gravação não entra como só do app.
+            let existia = ops.exists(path)
             try ops.write(path, text)
             marcaDisco[path] = ops.modifiedAt(path)
+            if existia {
+                registrarEscritaPropria(path, text)
+            }
             markDirty(path, false)
             git.agendarMarcas()
             refreshGutter(path)
+            // O preview Swift lê os arquivos do disco. Antes ele recompilava porque o
+            // salvamento acordava o observador e remontava a árvore; agora que a gravação
+            // do próprio app não remonta nada, o aviso sai daqui.
+            reloadTick += 1
         } catch {
             self.error = error.localizedDescription
         }

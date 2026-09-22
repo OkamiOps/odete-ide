@@ -75,7 +75,9 @@ struct TerminalPane: View {
                     }
                     .buttonStyle(.plain)
                 }
-                if let s = run.active, s.lines.contains(where: { $0.kind == .input }) {
+                // `temEntrada` é um contador que a sessão mantém; varrer a rolagem aqui
+                // custava até 5000 linhas a cada lote de saída.
+                if let s = run.active, s.temEntrada {
                     HeaderButton("sparkles", label: tr("Enviar último comando para a Odete")) {
                         enviarUltimoBloco(s)
                     }
@@ -157,10 +159,12 @@ struct TerminalView: View {
 
     /// O terminal tem tamanho e fonte próprios: ler log e escrever código não pedem o
     /// mesmo corpo, e quem deixa o terminal numa faixa estreita quer letra menor ali.
+    ///
+    /// Calculada uma vez por corpo e passada às linhas: era pedida por linha visível, e
+    /// cada pedido montava um `UIFont` só para saber se a fonte existia.
     var fonteDoTerminal: Font {
         let tamanho = chrome.snapshot.termFontSize
-        guard let nome = chrome.snapshot.termFont.postScript,
-              UIFont(name: nome, size: tamanho) != nil
+        guard let nome = chrome.snapshot.termFont.postScript, OdeteFont.existe(nome)
         else { return .system(size: tamanho, design: .monospaced) }
         return .custom(nome, fixedSize: tamanho)
     }
@@ -172,13 +176,14 @@ struct TerminalView: View {
     }
 
     var body: some View {
+        let fonte = fonteDoTerminal
         VStack(spacing: 0) {
             ScrollViewReader { proxy in
                 ScrollPane {
                     LazyVStack(alignment: .leading, spacing: 1) {
                         ForEach(session.lines) { line in
                             Text(line.text)
-                                .font(fonteDoTerminal)
+                                .font(fonte)
                                 .foregroundStyle(color(line.kind))
                                 .textSelection(.enabled)
                                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -196,13 +201,15 @@ struct TerminalView: View {
                     }
                     .padding(.horizontal, 12).padding(.vertical, 8)
                 }
-                .onChange(of: session.lines.count) { proxy.scrollTo("bottom", anchor: .bottom) }
+                // A versão, não a contagem: no teto de linhas a contagem para de mudar e a
+                // rolagem parava de acompanhar a saída.
+                .onChange(of: session.versao) { proxy.scrollTo("bottom", anchor: .bottom) }
                 .onTapGesture { focused = true }
             }
             HStack(spacing: 8) {
-                Text(session.prompt).font(fonteDoTerminal).foregroundStyle(theme.accent).lineLimit(1).fixedSize()
+                Text(session.prompt).font(fonte).foregroundStyle(theme.accent).lineLimit(1).fixedSize()
                 TextField(tr("comando"), text: $session.input)
-                    .font(fonteDoTerminal)
+                    .font(fonte)
                     .foregroundStyle(theme.fg)
                     .textFieldStyle(.plain)
                     .autocorrectionDisabled()

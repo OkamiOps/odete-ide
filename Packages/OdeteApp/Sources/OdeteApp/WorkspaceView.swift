@@ -8,6 +8,11 @@ func clamp(_ v: Double, _ menor: Double, _ maior: Double) -> Double {
 }
 
 /// Layout de iPad: rail, sidebar, centro, agente e a gaveta do terminal.
+///
+/// A raiz do layout lê o que decide o layout — as preferências e as medidas dos
+/// divisores — e nada que mude a cada tecla. As views de dentro (centro, barra de status,
+/// terminal, árvore) não recebem parâmetros daqui, então refazer este corpo não refaz o
+/// delas; o rail recebe números e só se refaz quando eles mudam.
 struct WorkspaceView: View {
     @Environment(ChromeState.self) private var chrome
     @Environment(WorkspaceModel.self) private var ws
@@ -52,20 +57,14 @@ struct WorkspaceView: View {
     }
 
     func portraitLayout(width: CGFloat) -> some View {
-        @Bindable var chrome = chrome
-        return HStack(spacing: 0) {
+        HStack(spacing: 0) {
             PhoneShell(showAgentTab: !chrome.snapshot.agentVisible)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             if chrome.snapshot.agentVisible {
                 let maior = max(Metrics.minAgent, width - Metrics.minCenter)
-                Splitter(
-                    value: preso($chrome.snapshot.agentWidth, Metrics.minAgent, maior),
-                    axis: .horizontal,
-                    range: Metrics.minAgent ... maior,
-                    direction: -1
-                )
+                divisorArrastavel(.agente, eixo: .horizontal, menor: Metrics.minAgent, maior: maior, direcao: -1)
                 AgentPane()
-                    .frame(width: clamp(chrome.snapshot.agentWidth, Metrics.minAgent, maior))
+                    .frame(width: clamp(chrome.medida(.agente), Metrics.minAgent, maior))
             }
         }
         .background(theme.bg)
@@ -87,9 +86,9 @@ struct WorkspaceView: View {
         let livre = size.width - Metrics.railWidth - 24
         let agenteAberto = chrome.snapshot.agentVisible
         let sideMax = max(Metrics.minSide, livre - Metrics.minCenter - (agenteAberto ? Metrics.minAgent : 0))
-        let sideW = chrome.snapshot.sideOpen ? clamp(chrome.snapshot.sideWidth, Metrics.minSide, sideMax) : 0
+        let sideW = chrome.snapshot.sideOpen ? clamp(chrome.medida(.lado), Metrics.minSide, sideMax) : 0
         let agentMax = max(Metrics.minAgent, livre - sideW - Metrics.minCenter)
-        let agentW = agenteAberto ? clamp(chrome.snapshot.agentWidth, Metrics.minAgent, agentMax) : 0
+        let agentW = agenteAberto ? clamp(chrome.medida(.agente), Metrics.minAgent, agentMax) : 0
         return columns(narrow: false, medidas: Medidas(
             side: sideW,
             sideMax: sideMax,
@@ -105,13 +104,27 @@ struct WorkspaceView: View {
         .background(theme.surface.ignoresSafeArea())
     }
 
-    /// Ligação que já entrega e guarda o valor dentro dos limites desta tela: sem isso
-    /// o valor guardado passa do máximo visível e o arrasto de volta não faz nada até
-    /// ele cair de novo abaixo do corte.
-    func preso(_ valor: Binding<Double>, _ menor: Double, _ maior: Double) -> Binding<Double> {
-        Binding(
-            get: { clamp(valor.wrappedValue, menor, maior) },
-            set: { valor.wrappedValue = clamp($0, menor, maior) }
+    /// Divisor que arrasta a medida ao vivo e só grava a preferência ao soltar.
+    ///
+    /// A ligação já entrega e guarda o valor dentro dos limites desta tela: sem isso o
+    /// valor guardado passa do máximo visível e o arrasto de volta não faz nada até ele
+    /// cair de novo abaixo do corte.
+    func divisorArrastavel(
+        _ d: ChromeState.Divisor,
+        eixo: Splitter.Axis,
+        menor: Double,
+        maior: Double,
+        direcao: Double
+    ) -> Splitter {
+        Splitter(
+            value: Binding(
+                get: { clamp(chrome.medida(d), menor, maior) },
+                set: { chrome.arrastar(d, para: clamp($0, menor, maior)) }
+            ),
+            axis: eixo,
+            range: menor ... maior,
+            direction: direcao,
+            aoSoltar: { chrome.soltarArrasto() }
         )
     }
 
@@ -149,15 +162,16 @@ struct WorkspaceView: View {
     /// Trocar de lado é espelhar os dois, não só mover a árvore.
     @ViewBuilder
     func ladoDosArquivos(_ m: Medidas, naEsquerda: Bool) -> some View {
-        @Bindable var chrome = chrome
-        let problemas = ws.problemCounts
+        let problemas = ws.contagemDeProblemas
+        // Comparado pelos números: os fechamentos mudam a cada corpo, e sem isto o rail e
+        // os seis botões dele se refaziam junto com qualquer coisa que refizesse a raiz.
         let rail = Rail(
             side: chrome.snapshot.side,
             sideOpen: chrome.snapshot.sideOpen,
             agentVisible: chrome.snapshot.agentVisible,
             agentBusy: ws.agent.running,
-            problemas: problemas.errors + problemas.warnings,
-            problemasGraves: problemas.errors > 0,
+            problemas: problemas.erros + problemas.avisos,
+            problemasGraves: problemas.erros > 0,
             alteracoes: ws.git.status.count,
             onSelect: { chrome.select(side: $0) },
             onToggleAgent: { chrome.toggleAgent() },
@@ -166,12 +180,8 @@ struct WorkspaceView: View {
             onSettings: { chrome.settingsOpen = true },
             onProjects: { app.closeWorkspace() }
         )
-        let divisor = Splitter(
-            value: preso($chrome.snapshot.sideWidth, Metrics.minSide, m.sideMax),
-            axis: .horizontal,
-            range: Metrics.minSide ... m.sideMax,
-            direction: naEsquerda ? 1 : -1
-        )
+        .equatable()
+        let divisor = divisorArrastavel(.lado, eixo: .horizontal, menor: Metrics.minSide, maior: m.sideMax, direcao: naEsquerda ? 1 : -1)
         if naEsquerda {
             rail
             if chrome.snapshot.sideOpen {
@@ -190,7 +200,6 @@ struct WorkspaceView: View {
     /// A árvore, e embaixo dela o terminal quando ele foi posto aqui. Com o terminal do
     /// lado sobra a largura inteira para o código, que é o que se olha o dia todo.
     func colunaLateral(_ m: Medidas) -> some View {
-        @Bindable var chrome = chrome
         let comTerminal = chrome.snapshot.termVisible && chrome.snapshot.termPlace == .lateral
         return VStack(spacing: 0) {
             SidebarView()
@@ -199,14 +208,9 @@ struct WorkspaceView: View {
                 .clipped()
                 .frame(maxHeight: .infinity)
             if comTerminal {
-                Splitter(
-                    value: preso($chrome.snapshot.termHeight, Metrics.minTerm, m.termMax),
-                    axis: .vertical,
-                    range: Metrics.minTerm ... m.termMax,
-                    direction: -1
-                )
+                divisorArrastavel(.terminal, eixo: .vertical, menor: Metrics.minTerm, maior: m.termMax, direcao: -1)
                 TerminalPane()
-                    .frame(height: clamp(chrome.snapshot.termHeight, Metrics.minTerm, m.termMax))
+                    .frame(height: clamp(chrome.medida(.terminal), Metrics.minTerm, m.termMax))
             }
         }
         .frame(width: m.side)
@@ -214,7 +218,6 @@ struct WorkspaceView: View {
     }
 
     func centro(_ m: Medidas) -> some View {
-        @Bindable var chrome = chrome
         // Terminal na coluna lateral só existe quando a coluna existe; com a árvore
         // fechada ele volta para baixo do editor em vez de sumir.
         let aqui = chrome.snapshot.termPlace == .editor || !chrome.snapshot.sideOpen
@@ -225,14 +228,9 @@ struct WorkspaceView: View {
                 StatusBar()
             }
             if chrome.snapshot.termVisible, aqui {
-                Splitter(
-                    value: preso($chrome.snapshot.termHeight, Metrics.minTerm, m.termMax),
-                    axis: .vertical,
-                    range: Metrics.minTerm ... m.termMax,
-                    direction: -1
-                )
+                divisorArrastavel(.terminal, eixo: .vertical, menor: Metrics.minTerm, maior: m.termMax, direcao: -1)
                 TerminalPane()
-                    .frame(height: clamp(chrome.snapshot.termHeight, Metrics.minTerm, m.termMax))
+                    .frame(height: clamp(chrome.medida(.terminal), Metrics.minTerm, m.termMax))
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -244,13 +242,7 @@ struct WorkspaceView: View {
     }
 
     func agente(_ m: Medidas, naEsquerda: Bool) -> some View {
-        @Bindable var chrome = chrome
-        let divisor = Splitter(
-            value: preso($chrome.snapshot.agentWidth, Metrics.minAgent, m.agentMax),
-            axis: .horizontal,
-            range: Metrics.minAgent ... m.agentMax,
-            direction: naEsquerda ? 1 : -1
-        )
+        let divisor = divisorArrastavel(.agente, eixo: .horizontal, menor: Metrics.minAgent, maior: m.agentMax, direcao: naEsquerda ? 1 : -1)
         return Group {
             if naEsquerda {
                 AgentPane().frame(width: m.agent)

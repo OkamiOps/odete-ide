@@ -287,7 +287,20 @@ public struct CodeEditorView: UIViewRepresentable {
         weak var host: HostDoEditor?
         /// SwiftUI já desmontou este editor: não adianta mais pedir um `TextView`.
         var desmontado = false
-        private var popupContext: CompletionContext?
+        /// O contexto da lista aberta: onde começa o prefixo que a escolha substitui.
+        var popupContext: CompletionContext?
+        /// As palavras do documento, montadas fora do ator principal — ver `IndiceDePalavras`.
+        var indicePalavras = IndiceDePalavras.vazio
+        var indiceTask: Task<Void, Never>?
+        /// Sobe a cada pedido de índice; resposta de pedido velho que chega depois é jogada fora.
+        var pedidoDoIndice = 0
+        /// Começo da linha do cursor no último pedido, para a troca de linha não pedir de
+        /// novo o que já está a caminho.
+        var linhaDoPedido = -1
+        /// A última mudança de texto passou por `shouldChangeTextIn`, e ficou dentro de uma
+        /// linha só? Então o índice continua valendo — a conta por linha cobre a diferença.
+        var mudancaAnunciada = false
+        var mudancaNaLinha = false
 
         init(parent: CodeEditorView, sessoes: SessoesDoEditor = .shared) {
             self.parent = parent
@@ -338,28 +351,31 @@ public struct CodeEditorView: UIViewRepresentable {
             }
             if popupContext != nil, !popup.isHidden {
                 // Cursor saiu da palavra: fecha.
-                let ctx = Complete.context(
-                    text: textoAtual,
-                    cursor: charOffset(textView.selectedRange.location, in: textoAtual)
-                )
-                if ctx?.start != popupContext?.start {
+                let ctx = contextoNoCursor(textView)?.ctx
+                if ctx?.inicioUTF16 != popupContext?.inicioUTF16 {
                     hidePopup()
                 }
             }
+            conferirLinhaDoIndice(textView)
         }
 
         public func textViewDidChangeGutterWidth(_: TextView) {
             scheduleDecorations()
         }
 
-        public func textView(_: TextView, shouldChangeTextIn _: NSRange, replacementText text: String) -> Bool {
-            if !popup.isHidden, let first = popup.items.first, text == "\t" || text == "\n" {
-                accept(first)
+        public func textView(_ tv: TextView, shouldChangeTextIn range: NSRange, replacementText text: String) -> Bool {
+            if !popup.isHidden, let escolhida = popup.itemSelecionado, text == "\t" || text == "\n" {
+                accept(escolhida)
                 return false
             }
             if text == "\n" || text == " " {
                 hidePopup()
             }
+            // Tecla dentro de uma linha não muda o resto do documento: o índice de palavras
+            // segue valendo. Quebra de linha no texto novo ou no trecho trocado, não.
+            mudancaAnunciada = true
+            mudancaNaLinha = !text.contains(where: \.isNewline)
+                && (range.length == 0 || !(tv.text(in: range) ?? "\n").contains(where: \.isNewline))
             return true
         }
 
@@ -369,93 +385,13 @@ public struct CodeEditorView: UIViewRepresentable {
 
         // MARK: - Autocompletar
 
-        func offerCompletions() {
-            guard let tv = textView, let source = parent.completion, tv.selectedRange.length == 0 else {
-                hidePopup()
-                return
-            }
-            let text = textoAtual
-            let cursor = charOffset(tv.selectedRange.location, in: text)
-            guard let ctx = Complete.context(text: text, cursor: cursor) else {
-                hidePopup()
-                return
-            }
-            let items = Complete.suggestions(
-                text: text,
-                cursor: cursor,
-                language: parent.language,
-                files: source.files,
-                currentPath: source.path,
-                packages: source.packages
-            )
-            guard !items.isEmpty else {
-                hidePopup()
-                return
-            }
-            popupContext = ctx
-            popup.items = items
-            if popup.superview == nil {
-                tv.addSubview(popup)
-            }
-            popup.isHidden = false
-            let caret = tv.caretRect(for: tv.selectedTextRange?.start ?? tv.endOfDocument)
-            let width: CGFloat = 280
-            let maxX = tv.contentOffset.x + tv.bounds.width - width - 8
-            popup.frame = CGRect(
-                x: max(min(caret.minX, maxX), tv.gutterWidth + 4),
-                y: caret.maxY + 4,
-                width: width,
-                height: popup.preferredHeight
-            )
-            tv.bringSubviewToFront(popup)
-        }
-
-        func hidePopup() {
-            popup.isHidden = true
-            popupContext = nil
-        }
-
-        func accept(_ item: Completion) {
-            guard let tv = textView, let ctx = popupContext else { return }
-            let text = textoAtual
-            let startUTF16 = utf16Offset(ctx.start, in: text)
-            let cursor = tv.selectedRange.location
-            var insert = item.insert
-            // Indenta linhas seguintes do snippet com o recuo da linha atual.
-            let ns = text as NSString
-            let lineRange = ns.lineRange(for: NSRange(location: startUTF16, length: 0))
-            let lineText = ns.substring(with: lineRange)
-            let indent = String(lineText.prefix { $0 == " " || $0 == "\t" })
-            if !indent.isEmpty {
-                insert = insert.replacingOccurrences(of: "\n", with: "\n" + indent)
-            }
-            var caretOffset = (insert as NSString).length
-            if let r = insert.range(of: "$0") {
-                caretOffset = (String(insert[..<r.lowerBound]) as NSString).length
-                insert.removeSubrange(r)
-            }
-            hidePopup()
-            tv.replace(NSRange(location: startUTF16, length: max(cursor - startUTF16, 0)), withText: insert)
-            tv.selectedRange = NSRange(location: startUTF16 + caretOffset, length: 0)
-        }
-
-        private func charOffset(_ utf16: Int, in text: String) -> Int {
-            let u = text.utf16
-            guard let idx = u.index(u.startIndex, offsetBy: min(utf16, u.count), limitedBy: u.endIndex)
-            else { return text.count }
-            return text.distance(from: text.startIndex, to: idx)
-        }
-
-        private func utf16Offset(_ chars: Int, in text: String) -> Int {
-            guard let idx = text.index(text.startIndex, offsetBy: min(chars, text.count), limitedBy: text.endIndex)
-            else { return (text as NSString).length }
-            return text.utf16.distance(from: text.utf16.startIndex, to: idx)
-        }
+        // `offerCompletions`, `accept`, o contexto por janela, o índice de palavras e as
+        // teclas da lista moram numa extensão em `Decorations.swift`, junto da lista.
     }
 }
 
 /// O Runestone traz o gutter para a frente a cada layout; as decorações da Odete vêm depois dele.
-final class OdeteTextView: TextView {
+final class OdeteTextView: TextViewComSugestoes {
     var floating: [UIView] = []
     /// Chamado a cada passagem de layout: é aqui que as camadas flutuantes se
     /// reposicionam. Sem isto elas só se mexiam quando o conteúdo rolava.

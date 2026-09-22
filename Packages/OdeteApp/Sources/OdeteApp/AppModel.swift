@@ -1,9 +1,12 @@
+import CoreTransferable
 import Foundation
 import Observation
 import OdeteAccounts
 import OdeteAgent
 import OdeteCore
 import OdeteFiles
+import OdeteI18n
+import UniformTypeIdentifiers
 
 /// Estado do app fora de um projeto: lista do hub e projeto aberto.
 @MainActor
@@ -94,18 +97,29 @@ public final class AppModel {
         }
     }
 
-    /// Zip do projeto em Caches, para compartilhar.
+    /// Zip do projeto em Caches, para compartilhar. Síncrono: quem quer compartilhar pela
+    /// folha do sistema usa `compartilhavel(_:)`, que só zipa quando o destino pede.
     public func zip(_ p: Project) -> URL? {
-        let dir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0].appending(path: "share")
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let out = dir.appending(path: "\(p.name).zip")
         do {
-            try Zip.create(directory: url(for: p), to: out)
-            return out
+            return try compartilhavel(p).zipar()
         } catch {
             self.error = error.localizedDescription
             return nil
         }
+    }
+
+    /// O projeto como `.zip` para o `ShareLink`, zipado só quando alguém escolhe o destino.
+    ///
+    /// O menu de contexto do hub chamava `zip(_:)` para montar o `ShareLink` — e o menu é
+    /// montado junto com a grade. Resultado: cada projeto, `.git` incluído, era zipado no
+    /// ator principal toda vez que a grade aparecia; medido, todos os zips de
+    /// `Caches/share` eram reescritos na abertura do app sem ninguém compartilhar nada.
+    public func compartilhavel(_ p: Project) -> ProjetoZipado {
+        ProjetoZipado(
+            nome: p.name,
+            pasta: p.external ? nil : store.url(for: p),
+            externo: p.external ? ProjetoZipado.Externo(registro: external, id: p.id) : nil
+        )
     }
 
     /// Raiz dos projetos: iCloud Drive quando ligado e disponível, senão Documents.
@@ -255,5 +269,51 @@ public final class AppModel {
     public func closeWorkspace() {
         workspace?.stop()
         workspace = nil
+    }
+}
+
+/// Um projeto que vira `.zip` quando o destino da folha de compartilhar pede o arquivo.
+///
+/// Pastas pesadas (`node_modules`, `.build`, `dist`) ficam de fora, como sempre; o `.git`
+/// vai junto, porque mandar o projeto com a história é o que se quer ao compartilhar —
+/// agora só quando alguém compartilha de fato.
+public struct ProjetoZipado: Transferable, Sendable {
+    /// Projeto de fora do app: o zip lê a pasta com o acesso aberto só enquanto zipa.
+    struct Externo: Sendable {
+        let registro: ExternalProjects
+        let id: UUID
+    }
+
+    let nome: String
+    let pasta: URL?
+    let externo: Externo?
+
+    /// O bookmark da pasta externa não resolve mais.
+    struct SemPasta: LocalizedError {
+        let nome: String
+        var errorDescription: String? {
+            tr("não deu para ler %1$@", nome)
+        }
+    }
+
+    public static var transferRepresentation: some TransferRepresentation {
+        FileRepresentation(exportedContentType: .zip) { item in
+            try SentTransferredFile(item.zipar())
+        }
+    }
+
+    /// Zipa em `Caches/share` e devolve onde ficou. Roda fora do ator principal quando
+    /// vem do `ShareLink`.
+    func zipar() throws -> URL {
+        let dir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0].appending(path: "share")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let out = dir.appending(path: "\(nome).zip")
+        if let externo {
+            let feito: Void? = try externo.registro.comAcesso(externo.id) { try Zip.create(directory: $0, to: out) }
+            guard feito != nil else { throw SemPasta(nome: nome) }
+        } else if let pasta {
+            try Zip.create(directory: pasta, to: out)
+        }
+        return out
     }
 }

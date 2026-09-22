@@ -1,18 +1,50 @@
 import OdeteCore
+import Synchronization
 import SwiftUI
+
+/// Cores já convertidas, por texto hex.
+///
+/// Converter "#rrggbb" é recortar texto e ler número; o tema fazia isso a cada acesso a
+/// uma cor, dezenas de vezes por linha de lista, em todo corpo refeito. As paletas têm
+/// algumas dezenas de cores, então guardar todas custa nada.
+private let coresConvertidas = Mutex<[String: Color]>([:])
 
 public extension Color {
     /// "#rrggbb" → Color. Inválido vira magenta para ficar visível.
+    ///
+    /// O mesmo texto devolve sempre a mesma cor já pronta (ver `coresConvertidas`).
     init(hex: String) {
+        if let pronta = coresConvertidas.withLock({ $0[hex] }) {
+            self = pronta
+            return
+        }
+        let cor = Color.converter(hex)
+        coresConvertidas.withLock { $0[hex] = cor }
+        self = cor
+    }
+
+    /// A cor com opacidade, guardada como as outras: `opacity(_:)` monta uma cor nova a
+    /// cada chamada, e duas instâncias do mesmo tema deixariam de ser iguais byte a byte.
+    init(hex: String, opacidade: Double) {
+        let chave = "\(hex)@\(opacidade)"
+        if let pronta = coresConvertidas.withLock({ $0[chave] }) {
+            self = pronta
+            return
+        }
+        let cor = Color(hex: hex).opacity(opacidade)
+        coresConvertidas.withLock { $0[chave] = cor }
+        self = cor
+    }
+
+    private static func converter(_ hex: String) -> Color {
         var s = hex.trimmingCharacters(in: .whitespaces)
         if s.hasPrefix("#") {
             s.removeFirst()
         }
         guard s.count == 6, let v = UInt32(s, radix: 16) else {
-            self = .pink
-            return
+            return .pink
         }
-        self.init(
+        return Color(
             .sRGB,
             red: Double((v >> 16) & 0xFF) / 255,
             green: Double((v >> 8) & 0xFF) / 255,
@@ -39,6 +71,11 @@ public extension Color {
 }
 
 /// Tema pronto para SwiftUI, derivado de `ThemePalette`.
+///
+/// As cores são convertidas uma vez, quando o tema nasce, e não a cada leitura. A
+/// igualdade continua sendo a da paleta: duas instâncias da mesma paleta são o mesmo tema,
+/// e como a conversão devolve sempre a mesma cor pronta, são iguais até byte a byte — o
+/// ambiente do SwiftUI não enxerga tema novo onde não há.
 public struct Theme: Sendable, Hashable {
     public let palette: ThemePalette
     /// Quando o tema acompanha o claro/escuro do iPad, o app não força esquema nenhum:
@@ -46,9 +83,57 @@ public struct Theme: Sendable, Hashable {
     /// de impor, e a escolha nunca mais mudaria sozinha.
     public var seguirSistema = false
 
+    public let bg: Color
+    public let bgElevated: Color
+    public let bgSubtle: Color
+    public let fg: Color
+    public let fgMuted: Color
+    public let fgSubtle: Color
+    public let border: Color
+    public let borderStrong: Color
+    public let accent: Color
+    public let accentFg: Color
+    public let danger: Color
+    public let ok: Color
+    /// Separador discreto (a borda a 60 %).
+    public let separator: Color
+    /// Tinta do vidro para seleção e destaque.
+    public let glassTint: Color
+
     public init(_ palette: ThemePalette, seguirSistema: Bool = false) {
         self.palette = palette
         self.seguirSistema = seguirSistema
+        bg = Color(hex: palette.bg)
+        bgElevated = Color(hex: palette.bgElevated)
+        bgSubtle = Color(hex: palette.bgSubtle)
+        fg = Color(hex: palette.fg)
+        fgMuted = Color(hex: palette.fgMuted)
+        fgSubtle = Color(hex: palette.fgSubtle)
+        border = Color(hex: palette.border)
+        borderStrong = Color(hex: palette.borderStrong)
+        accent = Color(hex: palette.accent)
+        accentFg = Color(hex: palette.accentFg)
+        danger = Color(hex: palette.danger)
+        ok = Color(hex: palette.ok)
+        separator = Color(hex: palette.border, opacidade: 0.6)
+        glassTint = Color(hex: palette.accent, opacidade: 0.18)
+    }
+
+    public init(_ palette: ThemePalette) {
+        self.init(palette, seguirSistema: false)
+    }
+
+    public init(id: ThemeId) {
+        self.init(ThemePalette.by(id))
+    }
+
+    public static func == (a: Theme, b: Theme) -> Bool {
+        a.palette == b.palette && a.seguirSistema == b.seguirSistema
+    }
+
+    public func hash(into h: inout Hasher) {
+        h.combine(palette)
+        h.combine(seguirSistema)
     }
 
     public var id: ThemeId {
@@ -59,79 +144,13 @@ public struct Theme: Sendable, Hashable {
         palette.dark
     }
 
-    public var bg: Color {
-        Color(hex: palette.bg)
-    }
-
-    public var bgElevated: Color {
-        Color(hex: palette.bgElevated)
-    }
-
-    public var bgSubtle: Color {
-        Color(hex: palette.bgSubtle)
-    }
-
-    public var fg: Color {
-        Color(hex: palette.fg)
-    }
-
-    public var fgMuted: Color {
-        Color(hex: palette.fgMuted)
-    }
-
-    public var fgSubtle: Color {
-        Color(hex: palette.fgSubtle)
-    }
-
-    public var border: Color {
-        Color(hex: palette.border)
-    }
-
-    public var borderStrong: Color {
-        Color(hex: palette.borderStrong)
-    }
-
-    public var accent: Color {
-        Color(hex: palette.accent)
-    }
-
-    public var accentFg: Color {
-        Color(hex: palette.accentFg)
-    }
-
-    public var danger: Color {
-        Color(hex: palette.danger)
-    }
-
-    public var ok: Color {
-        Color(hex: palette.ok)
-    }
-
     /// Fundo de painel: um degrau acima do `bg`, sem borda.
     public var surface: Color {
         bgElevated
     }
 
-    /// Separador discreto (a borda a 60 %).
-    public var separator: Color {
-        border.opacity(0.6)
-    }
-
-    /// Tinta do vidro para seleção e destaque.
-    public var glassTint: Color {
-        accent.opacity(0.18)
-    }
-
     public var colorScheme: ColorScheme {
         dark ? .dark : .light
-    }
-
-    public init(_ palette: ThemePalette) {
-        self.palette = palette
-    }
-
-    public init(id: ThemeId) {
-        palette = ThemePalette.by(id)
     }
 
     public static let odete = Theme(id: .odete)

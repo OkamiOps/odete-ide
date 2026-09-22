@@ -165,6 +165,12 @@ extension CodeEditorView.Coordinator {
         s.toque.removeTarget(nil, action: nil)
         s.toque.addTarget(self, action: #selector(tocouNoTexto(_:)))
         s.toque.delegate = self
+        // ↑/↓/Esc vão para a lista de sugestões enquanto ela está aberta — ver
+        // `TextViewComSugestoes`. Cada aba tem o seu editor, então o gancho vai junto.
+        if let comLista = tv as? TextViewComSugestoes {
+            comLista.listaAberta = { [weak self] in self?.popup.isHidden == false }
+            comLista.naLista = { [weak self] tecla in self?.teclaNaLista(tecla) }
+        }
         s.barra.onSave = parent.onSave
         s.barra.onFind = parent.onFind
         s.barra.onDefinition = parent.onDefinition
@@ -185,6 +191,10 @@ extension CodeEditorView.Coordinator {
         tv.floating = []
         tv.aoLayout = nil
         s.toque.removeTarget(self, action: nil)
+        if let comLista = tv as? TextViewComSugestoes {
+            comLista.listaAberta = { false }
+            comLista.naLista = { _ in }
+        }
     }
 
     /// Tira o editor da tela e o devolve à fila.

@@ -302,6 +302,55 @@ public final class ChromeState {
     /// O iPad está no escuro? Alimentado pela view raiz; só vale quando `themeAuto`.
     public var sistemaEscuro = true
 
+    // MARK: arrasto dos divisores
+
+    /// Um divisor sendo arrastado agora, e onde ele está.
+    ///
+    /// Todas as preferências moram num `snapshot` só, e toda view que lê qualquer uma
+    /// delas lê o `snapshot` inteiro — a raiz, o workspace, o editor (que reaplica os
+    /// ajustes), a barra de status, cada linha do terminal. Escrever a largura no
+    /// `snapshot` a cada quadro do arrasto redesenhava tudo isso sessenta vezes por
+    /// segundo, e ainda agendava um salvamento do estado a cada quadro. Durante o arrasto
+    /// a medida mora aqui, que só o layout lê; ao soltar, vai para o `snapshot` uma vez.
+    public private(set) var arrasto: Arrasto?
+
+    public enum Divisor: Sendable, Hashable {
+        case lado, agente, terminal
+    }
+
+    public struct Arrasto: Sendable, Hashable {
+        public var divisor: Divisor
+        public var valor: Double
+    }
+
+    /// A medida do divisor: a do arrasto em curso, ou a guardada.
+    public func medida(_ d: Divisor) -> Double {
+        if let a = arrasto, a.divisor == d {
+            return a.valor
+        }
+        return switch d {
+        case .lado: snapshot.sideWidth
+        case .agente: snapshot.agentWidth
+        case .terminal: snapshot.termHeight
+        }
+    }
+
+    /// Um quadro do arrasto: muda só a medida ao vivo.
+    public func arrastar(_ d: Divisor, para valor: Double) {
+        arrasto = Arrasto(divisor: d, valor: valor)
+    }
+
+    /// Soltou: a medida vai para as preferências (e para o disco) uma vez só.
+    public func soltarArrasto() {
+        guard let a = arrasto else { return }
+        arrasto = nil
+        switch a.divisor {
+        case .lado: snapshot.sideWidth = a.valor
+        case .agente: snapshot.agentWidth = a.valor
+        case .terminal: snapshot.termHeight = a.valor
+        }
+    }
+
     public var palette: ThemePalette {
         var p = snapshot.themeAuto
             ? ThemePalette.by(sistemaEscuro ? snapshot.themeDark : snapshot.themeLight)

@@ -35,11 +35,16 @@ public struct Completion: Sendable, Hashable, Identifiable {
 public struct CompletionContext: Sendable, Hashable {
     public enum Mode: Sendable, Hashable { case word, path(String) }
     public var prefix: String
-    /// Offset (em `Character`s) onde o prefixo começa.
+    /// Offset onde o prefixo começa. Em `Character`s quando veio de `context(text:cursor:)`;
+    /// quando veio de `contexto(janela:inicioDaJanela:)` é o mesmo número de `inicioUTF16`,
+    /// porque contar Characters desde o começo do arquivo é justamente o custo que o
+    /// contexto por janela existe para evitar.
     public var start: Int
     public var mode: Mode
     /// Verdadeiro quando o trecho é um import de módulo (`from "…"`), e não um `src=`.
     public var modulo = false
+    /// Onde o prefixo começa em unidades UTF-16 — a medida do editor e do `NSString`.
+    public var inicioUTF16 = 0
 }
 
 public enum Complete {
@@ -111,14 +116,33 @@ public enum Complete {
     }
 
     /// Descobre o prefixo antes do cursor (offset em Characters).
+    ///
+    /// Copia o documento inteiro para um array de Characters. Serve para teste e para quem
+    /// só tem uma `String` na mão; o editor usa `contexto(janela:inicioDaJanela:)`, que
+    /// olha só a linha do cursor.
     public static func context(text: String, cursor: Int) -> CompletionContext? {
         let chars = Array(text)
         let end = min(max(cursor, 0), chars.count)
+        guard var ctx = contexto(chars: chars, fim: end, paraAntesDaLinha: false) else { return nil }
+        ctx.inicioUTF16 = chars[..<ctx.start].reduce(0) { $0 + $1.utf16.count }
+        return ctx
+    }
+
+    /// A regra do contexto, sobre Characters que terminam no cursor.
+    ///
+    /// `paraAntesDaLinha` decide o que vale como fim de linha na volta até as aspas. A
+    /// versão antiga só parava em `"\n"`, e num arquivo CRLF o `"\r\n"` é um Character só,
+    /// diferente de `"\n"` — a volta atravessava a linha de cima. A janela para em qualquer
+    /// quebra.
+    static func contexto(chars: [Character], fim end: Int, paraAntesDaLinha: Bool) -> CompletionContext? {
+        func quebra(_ c: Character) -> Bool {
+            c == "\n" || (paraAntesDaLinha && c.isNewline)
+        }
         // Caminho: dentro de aspas depois de from / import( / require( / src= / href=, ou começando com ./ ../ @/
         var q = end - 1
         var pathStart: Int?
         var moduloAqui = false
-        while q >= 0, chars[q] != "\n" {
+        while q >= 0, !quebra(chars[q]) {
             if chars[q] == "\"" || chars[q] == "'" || chars[q] == "`" {
                 let inside = String(chars[(q + 1) ..< end])
                 let before = String(chars[max(0, q - 12) ..< q])
@@ -157,6 +181,162 @@ public enum Complete {
 
     static func isWord(_ c: Character) -> Bool {
         c.isLetter || c.isNumber || c == "_" || c == "$"
+    }
+
+    // MARK: - Contexto por janela
+
+    /// Quantas unidades UTF-16 antes do cursor o contexto aceita olhar.
+    ///
+    /// Nenhum prefixo de palavra ou de caminho passa disso; o teto só existe para a linha
+    /// de um arquivo minificado, que pode ter um megabyte, não ser lida inteira a cada tecla.
+    public static let tetoDaJanela = 2000
+
+    /// Folga antes do começo da linha. A regra das aspas olha doze Characters antes delas
+    /// (`from `, `import(`), e as aspas podem abrir a linha.
+    public static let folgaAntesDaLinha = 32
+
+    /// Onde a janela do contexto começa, dado o começo da linha do cursor.
+    ///
+    /// O editor sabe o começo da linha sem varrer nada (o Runestone guarda as linhas numa
+    /// árvore), então quem chama passa o número e recebe de volta a faixa a pedir.
+    public static func inicioDaJanela(cursor: Int, inicioDaLinha: Int) -> Int {
+        max(0, max(inicioDaLinha - folgaAntesDaLinha, cursor - tetoDaJanela))
+    }
+
+    /// O mesmo que `context(text:cursor:)`, olhando só o trecho que termina no cursor.
+    ///
+    /// Antes o contexto copiava o documento inteiro para um array de Characters, duas vezes
+    /// por tecla — três com a lista aberta. Num arquivo de 2000 linhas era a maior parte do
+    /// que o autocompletar custava no ator principal. A regra só olha para trás até o
+    /// começo da linha, então a linha é tudo que ela precisa.
+    ///
+    /// - `janela`: o texto que termina exatamente no cursor.
+    /// - `inicioDaJanela`: onde a janela começa no documento, em UTF-16.
+    public static func contexto(janela: String, inicioDaJanela: Int) -> CompletionContext? {
+        let chars = Array(janela)
+        guard var ctx = contexto(chars: chars, fim: chars.count, paraAntesDaLinha: true) else { return nil }
+        ctx.inicioUTF16 = inicioDaJanela + chars[..<ctx.start].reduce(0) { $0 + $1.utf16.count }
+        ctx.start = ctx.inicioUTF16
+        return ctx
+    }
+
+    /// Recorta a janela de um `NSString` e chama `contexto(janela:inicioDaJanela:)`.
+    ///
+    /// Para quem tem o documento como `NSString`; o editor recorta direto do Runestone.
+    public static func contexto(em ns: NSString, cursor: Int) -> CompletionContext? {
+        let fim = min(max(cursor, 0), ns.length)
+        let inicio = inicioDaJanela(cursor: fim, inicioDaLinha: inicioDaLinha(em: ns, antesDe: fim))
+        let janela = ns.substring(with: NSRange(location: inicio, length: fim - inicio))
+        return contexto(janela: janela, inicioDaJanela: inicio)
+    }
+
+    /// Começo da linha que contém `fim`, procurando para trás até o teto da janela.
+    static func inicioDaLinha(em ns: NSString, antesDe fim: Int) -> Int {
+        var i = fim
+        let limite = max(0, fim - tetoDaJanela)
+        while i > limite {
+            let c = ns.character(at: i - 1)
+            if c == 10 || c == 13 {
+                break
+            }
+            i -= 1
+        }
+        return i
+    }
+
+    /// Sugestões para um contexto já calculado, com as palavras vindas do índice e a linha
+    /// do cursor lida agora.
+    public static func sugestoes(
+        para ctx: CompletionContext,
+        indice: IndiceDePalavras,
+        linha: LinhaDoCursor,
+        language: Language,
+        files: [String] = [],
+        currentPath: String = "",
+        packages: [String] = [],
+        limit: Int = 8
+    ) -> [Completion] {
+        switch ctx.mode {
+        case let .path(dir):
+            return paths(
+                dir: dir,
+                prefix: ctx.prefix,
+                files: files,
+                currentPath: currentPath,
+                packages: ctx.modulo && !dir.hasPrefix(".") && !dir.hasPrefix("/") && !dir.hasPrefix("@/")
+                    ? packages : [],
+                dir: dir,
+                limit: limit
+            )
+        case .word:
+            guard ctx.prefix.count >= 2 else { return [] }
+            return palavras(indice: indice, linha: linha, prefix: ctx.prefix, language: language, limit: limit)
+        }
+    }
+
+    /// `words(text:cursor:…)` sem varrer o documento: o documento vem contado no índice e
+    /// só a linha do cursor é lida agora.
+    ///
+    /// A conta é `índice − linha do cursor quando o índice foi montado + linha do cursor
+    /// agora`. Enquanto a pessoa digita numa linha só — que é quase sempre —, o resto do
+    /// documento não muda, e a conta dá exatamente o que a varredura inteira daria, mesmo
+    /// com o índice uma tecla atrasado. Quando o índice é de outra linha, ele está em dia
+    /// (o editor remonta ao trocar de linha) e basta tirar a palavra do cursor.
+    static func palavras(
+        indice: IndiceDePalavras,
+        linha: LinhaDoCursor,
+        prefix: String,
+        language: Language,
+        limit: Int
+    ) -> [Completion] {
+        let lower = prefix.lowercased()
+        var out: [Completion] = []
+        for s in snippets(for: language) where s.trigger.lowercased().hasPrefix(lower) && s.trigger != prefix {
+            out.append(Completion(label: s.trigger, insert: s.body, kind: .snippet, detail: s.detail))
+        }
+        // A linha como está agora, sem a palavra que o cursor está escrevendo.
+        var aoVivo: [String: Int] = [:]
+        var doCursor: String?
+        IndiceDePalavras.cada(em: linha.texto) { palavra, inicio, fim in
+            if inicio < linha.cursor, linha.cursor <= fim {
+                doCursor = palavra
+            } else {
+                aoVivo[palavra, default: 0] += 1
+            }
+        }
+        let mesmaLinha = indice.linha?.inicio == linha.inicio
+        func contagem(_ w: String) -> Int {
+            let total = indice.contagem(w)
+            if mesmaLinha {
+                return total - (indice.linha?.palavras[w] ?? 0) + (aoVivo[w] ?? 0)
+            }
+            return total - (w == doCursor ? 1 : 0)
+        }
+        var candidatas = Set(indice.comecandoCom(lower))
+        for w in aoVivo.keys where w.lowercased().hasPrefix(lower) {
+            candidatas.insert(w)
+        }
+        var contadas: [(palavra: String, n: Int)] = []
+        for w in candidatas where w != prefix {
+            let n = contagem(w)
+            if n > 0 {
+                contadas.append((w, n))
+            }
+        }
+        contadas.sort { a, b in
+            if a.n != b.n {
+                return a.n > b.n
+            }
+            let ca = a.palavra.count, cb = b.palavra.count
+            return ca != cb ? ca < cb : a.palavra < b.palavra
+        }
+        for (w, _) in contadas where !out.contains(where: { $0.label == w }) {
+            out.append(Completion(label: w, insert: w, kind: .word))
+            if out.count >= limit {
+                break
+            }
+        }
+        return Array(out.prefix(limit))
     }
 
     /// Sugestões para o texto e o cursor dados.
@@ -298,5 +478,111 @@ public enum Complete {
             out.append(Completion(label: w, insert: w, kind: .word))
         }
         return Array(out.prefix(limit))
+    }
+}
+
+/// A linha do cursor como está agora, em UTF-16: o texto inteiro dela, onde ela começa no
+/// documento e onde o cursor está dentro dela. `inicio` negativo quer dizer "linha longa
+/// demais para ler" (arquivo minificado) — a conta por linha fica de fora.
+public struct LinhaDoCursor: Sendable, Hashable {
+    public var texto: String
+    public var inicio: Int
+    public var cursor: Int
+
+    public init(texto: String, inicio: Int, cursor: Int) {
+        self.texto = texto
+        self.inicio = inicio
+        self.cursor = cursor
+    }
+}
+
+/// As palavras de um documento, contadas uma vez por versão do texto.
+///
+/// O autocompletar varria o arquivo inteiro a cada tecla: percorria Character por
+/// Character, montava cada palavra e passava cada uma para minúscula. Num arquivo de 2000
+/// linhas, isso e as cópias do contexto eram 9% do tempo do ator principal ao digitar.
+/// Aqui a varredura acontece fora do ator principal, quando o texto muda de um jeito que
+/// a linha do cursor não cobre, e cada palavra vai para minúscula uma vez só.
+public struct IndiceDePalavras: Sendable {
+    struct Entrada: Sendable {
+        let palavra: String
+        let minuscula: String
+    }
+
+    /// A linha onde estava o cursor quando o índice foi montado, com as palavras dela.
+    public struct Linha: Sendable, Hashable {
+        public var inicio: Int
+        public var palavras: [String: Int]
+    }
+
+    /// As palavras agrupadas pela primeira letra em minúscula: a busca por prefixo só olha
+    /// o grupo da letra digitada.
+    private let grupos: [Character: [Entrada]]
+    private let contagens: [String: Int]
+    public let linha: Linha?
+
+    public static let vazio = IndiceDePalavras(texto: "", linhaDoCursor: nil)
+
+    /// - `linhaDoCursor`: a faixa UTF-16 da linha do cursor, para a conta de
+    ///   `Complete.palavras` poder trocá-la pela versão de agora.
+    public init(texto: String, linhaDoCursor: NSRange?) {
+        var contagens: [String: Int] = [:]
+        var daLinha: [String: Int] = [:]
+        Self.cada(em: texto) { palavra, inicio, _ in
+            contagens[palavra, default: 0] += 1
+            if let l = linhaDoCursor, inicio >= l.location, inicio < NSMaxRange(l) {
+                daLinha[palavra, default: 0] += 1
+            }
+        }
+        var grupos: [Character: [Entrada]] = [:]
+        for palavra in contagens.keys {
+            let m = palavra.lowercased()
+            guard let primeira = m.first else { continue }
+            grupos[primeira, default: []].append(Entrada(palavra: palavra, minuscula: m))
+        }
+        self.grupos = grupos
+        self.contagens = contagens
+        linha = linhaDoCursor.map { Linha(inicio: $0.location, palavras: daLinha) }
+    }
+
+    /// Quantas vezes a palavra aparece no documento indexado.
+    public func contagem(_ palavra: String) -> Int {
+        contagens[palavra] ?? 0
+    }
+
+    /// As palavras cuja minúscula começa com `prefixo` (já em minúscula).
+    public func comecandoCom(_ prefixo: String) -> [String] {
+        guard let primeira = prefixo.first else { return Array(contagens.keys) }
+        return (grupos[primeira] ?? []).filter { $0.minuscula.hasPrefix(prefixo) }.map(\.palavra)
+    }
+
+    /// Cada palavra de três Characters ou mais, com início e fim em UTF-16.
+    ///
+    /// A mesma regra de palavra do autocompletar (`Complete.isWord`) e o mesmo mínimo de
+    /// três letras: palavra menor que isso não vale a sugestão.
+    static func cada(em texto: String, _ achou: (String, Int, Int) -> Void) {
+        var palavra = ""
+        var tamanho = 0
+        var inicio = 0
+        var i = 0
+        for c in texto {
+            if Complete.isWord(c) {
+                if palavra.isEmpty {
+                    inicio = i
+                }
+                palavra.append(c)
+                tamanho += 1
+            } else if !palavra.isEmpty {
+                if tamanho >= 3 {
+                    achou(palavra, inicio, i)
+                }
+                palavra = ""
+                tamanho = 0
+            }
+            i += c.utf16.count
+        }
+        if tamanho >= 3 {
+            achou(palavra, inicio, i)
+        }
     }
 }

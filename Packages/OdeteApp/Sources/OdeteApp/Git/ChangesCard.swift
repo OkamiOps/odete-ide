@@ -7,6 +7,13 @@ import SwiftUI
 
 // Cartão de alterações do painel Git: a lista de arquivos mexidos e cada linha dela.
 
+/// Linhas que entraram e saíram num arquivo, ou `binario` quando o git não conta linhas.
+struct ContaDoArquivo: Equatable {
+    var adicionadas = 0
+    var removidas = 0
+    var binario = false
+}
+
 struct ChangesCard: View {
     @Environment(WorkspaceModel.self) private var ws
     @Environment(\.theme) private var theme
@@ -14,42 +21,73 @@ struct ChangesCard: View {
         ws.git
     }
 
+    /// A conta de cada arquivo, feita uma vez por corpo.
+    ///
+    /// Cada linha procurava o seu arquivo no diff inteiro (`lineStat(for:)` e `ehBinario`
+    /// são buscas lineares), e somava as linhas dele: com milhares de arquivos mexidos a
+    /// lista custava o quadrado do número de arquivos. Um dicionário montado aqui troca
+    /// isso por uma passada.
+    func contas() -> [String: ContaDoArquivo] {
+        var out: [String: ContaDoArquivo] = [:]
+        for f in git.stat.files where out[f.path] == nil {
+            out[f.path] = f.isBinary
+                ? ContaDoArquivo(binario: true)
+                : ContaDoArquivo(adicionadas: f.additions, removidas: f.deletions)
+        }
+        return out
+    }
+
+    /// Os itens da lista vão direto para a lista preguiçosa do painel, um a um: dentro de
+    /// um cartão de pilha comum, milhares de arquivos alterados (um `node_modules` fora do
+    /// `.gitignore`) viravam milhares de linhas montadas de uma vez.
     var body: some View {
         // Medidas de docs/design/README.md: título fora do cartão, linhas com ícone
         // quadrado, números na mesma linha e chevron no fim.
-        VStack(alignment: .leading, spacing: 8) {
-            SectionTitle(
-                tr("Alterações"),
-                detail: git.isClean ? nil : "\(git.status.count)",
-                stat: git.isClean ? nil : git.lineStat
-            ) {
-                Button(tr("Mandar tudo para o stage"), systemImage: "plus.circle") { git.stageAll() }
-                    .disabled(git.unstaged.isEmpty || git.busy)
-                Button(tr("Tirar tudo do stage"), systemImage: "minus.circle") { git.unstageAll() }
-                    .disabled(git.staged.isEmpty || git.busy)
-                Divider()
-                Button(tr("Descartar tudo"), systemImage: "arrow.uturn.backward", role: .destructive) {
-                    git.discard(git.unstaged.map(\.path))
-                }
+        SectionTitle(
+            tr("Alterações"),
+            detail: git.isClean ? nil : "\(git.status.count)",
+            stat: git.isClean ? nil : git.lineStat
+        ) {
+            Button(tr("Mandar tudo para o stage"), systemImage: "plus.circle") { git.stageAll() }
                 .disabled(git.unstaged.isEmpty || git.busy)
+            Button(tr("Tirar tudo do stage"), systemImage: "minus.circle") { git.unstageAll() }
+                .disabled(git.staged.isEmpty || git.busy)
+            Divider()
+            Button(tr("Descartar tudo"), systemImage: "arrow.uturn.backward", role: .destructive) {
+                git.discard(git.unstaged.map(\.path))
             }
-            if git.isClean {
-                CardList {
-                    Text(tr("Nada mudou desde o último commit."))
-                        .font(.subheadline).foregroundStyle(.secondary)
-                        .padding(.horizontal, 12).padding(.vertical, 12)
-                }
-            } else {
-                CardList {
-                    ForEach(Array(git.staged.enumerated()), id: \.element.id) { i, e in
-                        ChangeRow(entry: e, staged: true, first: i == 0)
-                    }
-                    ForEach(Array(git.unstaged.enumerated()), id: \.element.id) { i, e in
-                        ChangeRow(entry: e, staged: false, first: i == 0 && git.staged.isEmpty)
-                    }
-                }
+            .disabled(git.unstaged.isEmpty || git.busy)
+        }
+        .padding(.bottom, 8)
+        if git.isClean {
+            CardList {
+                Text(tr("Nada mudou desde o último commit."))
+                    .font(.subheadline).foregroundStyle(.secondary)
+                    .padding(.horizontal, 12).padding(.vertical, 12)
+            }
+        } else {
+            let contas = contas()
+            let itens = git.staged.map { ItemDeAlteracao(entry: $0, staged: true) }
+                + git.unstaged.map { ItemDeAlteracao(entry: $0, staged: false) }
+            ForEach(Array(itens.enumerated()), id: \.element.id) { i, item in
+                ChangeRow(
+                    entry: item.entry,
+                    staged: item.staged,
+                    first: i == 0,
+                    ultimo: i == itens.count - 1,
+                    conta: contas[item.entry.path]
+                )
             }
         }
+    }
+}
+
+/// Um arquivo na lista: o mesmo caminho pode estar no stage e fora dele ao mesmo tempo.
+struct ItemDeAlteracao: Identifiable {
+    let entry: StatusEntry
+    let staged: Bool
+    var id: String {
+        "\(staged ? "s" : "u"):\(entry.path)"
     }
 }
 
@@ -64,6 +102,10 @@ struct ChangeRow: View {
     let staged: Bool
     /// A primeira linha do cartão não leva separador em cima.
     var first = false
+    /// A última fecha os cantos de baixo do cartão.
+    var ultimo = false
+    /// A conta de linhas do arquivo, vinda do cartão — ver `ChangesCard.contas()`.
+    var conta: ContaDoArquivo?
 
     var git: GitModel {
         ws.git
@@ -74,8 +116,7 @@ struct ChangeRow: View {
     }
 
     var body: some View {
-        let stat = git.lineStat(for: entry.path)
-        return Button {
+        Button {
             git.setDiff(staged ? .index : .workdir, path: entry.path)
             chrome.snapshot.center = .diff
         } label: {
@@ -99,7 +140,7 @@ struct ChangeRow: View {
                                     .lineLimit(1).truncationMode(.head)
                             }
                             Spacer(minLength: 4)
-                            numeros(stat)
+                            numeros
                         }
                     }
                 } else {
@@ -111,7 +152,7 @@ struct ChangeRow: View {
                         nome
                     }
                     Spacer(minLength: 8)
-                    numeros(stat)
+                    numeros
                     Image(systemName: "chevron.right").font(.caption2.bold()).foregroundStyle(theme.fgSubtle)
                 }
             }
@@ -126,6 +167,17 @@ struct ChangeRow: View {
                 Rectangle().fill(theme.separator).frame(height: 0.5).padding(.leading, 44)
             }
         }
+        // Cada linha pinta o seu pedaço do cartão; as pontas levam os cantos.
+        .background(
+            theme.bgElevated,
+            in: UnevenRoundedRectangle(
+                topLeadingRadius: first ? 14 : 0,
+                bottomLeadingRadius: ultimo ? 14 : 0,
+                bottomTrailingRadius: ultimo ? 14 : 0,
+                topTrailingRadius: first ? 14 : 0,
+                style: .continuous
+            )
+        )
         .contextMenu {
             Button(tr("Abrir no editor"), systemImage: "doc.text") { ws.openFile(entry.path) }
             Button(
@@ -164,16 +216,16 @@ struct ChangeRow: View {
         }
     }
 
-    @ViewBuilder func numeros(_ stat: (added: Int, removed: Int)?) -> some View {
-        if let stat {
+    @ViewBuilder var numeros: some View {
+        if let conta, !conta.binario {
             HStack(spacing: 6) {
-                Text("+\(stat.added)").foregroundStyle(theme.ok)
-                Text("−\(stat.removed)").foregroundStyle(theme.danger)
+                Text("+\(conta.adicionadas)").foregroundStyle(theme.ok)
+                Text("−\(conta.removidas)").foregroundStyle(theme.danger)
             }
             .font(.caption).monospacedDigit()
             .lineLimit(1)
             .fixedSize()
-        } else if git.ehBinario(entry.path) {
+        } else if conta?.binario == true {
             Text(tr("binário")).font(.caption).foregroundStyle(theme.fgSubtle).lineLimit(1).fixedSize()
         }
     }

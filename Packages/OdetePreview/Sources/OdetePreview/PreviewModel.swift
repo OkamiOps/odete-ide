@@ -116,12 +116,20 @@ public final class PreviewModel {
         backTick += 1
     }
 
+    /// Sobe a cada linha que entra no console.
+    ///
+    /// Quem rola o console até o fim deve olhar isto, e não `console.count`: no teto de
+    /// mil linhas cada linha nova tira uma velha, a contagem para de mudar e a rolagem
+    /// parava junto — em silêncio, justo quando o app está falando muito.
+    public private(set) var versaoDoConsole = 0
+
     public func log(_ level: ConsoleLine.Level, _ text: String, file: String? = nil, line: Int? = nil) {
         seq += 1
         console.append(ConsoleLine(id: seq, level: level, text: text, file: file, line: line))
         if console.count > 1000 {
             console.removeFirst(console.count - 1000)
         }
+        versaoDoConsole &+= 1
     }
 
     public var errorCount: Int {

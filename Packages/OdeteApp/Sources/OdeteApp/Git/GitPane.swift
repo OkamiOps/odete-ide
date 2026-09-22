@@ -32,16 +32,24 @@ struct GitPane: View {
                 ScrollPane { GitEmpty(largura: largura) }
             } else {
                 ScrollPane {
-                    VStack(spacing: 14) {
+                    // Preguiçosa porque as linhas das alterações entram aqui uma a uma, e
+                    // não dentro de um cartão — ver `ChangesCard`. O espaço entre cartões
+                    // vai em cada um, porque entre linhas do mesmo cartão não há espaço.
+                    LazyVStack(spacing: 0) {
                         HeroCard()
+                            .padding(.bottom, 14)
                         if !git.conflicts.isEmpty {
                             ConflictsCard()
+                                .padding(.bottom, 14)
                         }
                         ChangesCard()
+                        Color.clear.frame(height: 14)
                         if git.githubSlug != nil {
                             PullRequestsCard()
+                                .padding(.bottom, 14)
                         }
                         HistoryCard()
+                            .padding(.bottom, 14)
                         BranchesCard()
                     }
                     .padding(12)
@@ -133,11 +141,22 @@ struct GitButton: View {
 /// porque é a ação que se faz a partir dali.
 struct HeroCard: View {
     @Environment(WorkspaceModel.self) private var ws
+    @Environment(AccountStore.self) private var contas
     @Environment(\.theme) private var theme
     @State private var remoteURL = ""
     @State private var askingRemote = false
+    /// Há conta com token para o remoto? Perguntado ao Keychain quando o remoto ou a conta
+    /// mudam, e não a cada vez que o cartão se refaz — o cartão se refaz a cada `busy`,
+    /// a cada nota do git, e cada vez era uma consulta ao Keychain.
+    @State private var temConta = true
     var git: GitModel {
         ws.git
+    }
+
+    /// O que decide a resposta de `temConta`: o remoto e a conta que atende o host dele.
+    var chaveDaConta: String {
+        guard let o = git.origin else { return "" }
+        return "\(o.url)|\(contas.account(forRemote: o.url).map { String(describing: $0.id) } ?? "")"
     }
 
     var body: some View {
@@ -161,6 +180,7 @@ struct HeroCard: View {
             Rectangle().fill(theme.separator).frame(height: 0.5)
             CommitBox()
         }
+        .task(id: chaveDaConta) { temConta = git.hasCredentials }
         .alert(tr("Remoto origin"), isPresented: $askingRemote) {
             TextField("https://github.com/usuario/repo.git", text: $remoteURL)
                 .textInputAutocapitalization(.never)
@@ -191,7 +211,7 @@ struct HeroCard: View {
                     // cabe inteiro e é o que a pessoa reconhece.
                     Text(git.githubSlug ?? o.url.replacingOccurrences(of: "https://", with: ""))
                         .font(.caption2).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
-                    if !git.hasCredentials {
+                    if !temConta {
                         Text(tr("sem conta")).font(.caption2).foregroundStyle(theme.danger)
                     }
                 } else {

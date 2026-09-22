@@ -116,8 +116,12 @@ import Testing
 
     @Test func queProjetoCadaJanelaAbre() {
         let x = UUID(), ultimo = UUID()
-        // O que a janela lembra vale sempre.
+        // Com várias janelas, o que cada uma lembra vale.
         #expect(Janelas.projetoParaAbrir(guardado: x.uuidString, sessoes: 3, ultimo: ultimo) == x)
+        // Com uma só, o último aberto vence o que a janela lembra: a cena só grava o que
+        // lembra quando o app vai para o fundo, e depois de um fechamento à força ficava
+        // com o projeto de antes — o app reabria no projeto errado.
+        #expect(Janelas.projetoParaAbrir(guardado: x.uuidString, sessoes: 1, ultimo: ultimo) == ultimo)
         // Uma janela só: como sempre foi, volta o último projeto.
         #expect(Janelas.projetoParaAbrir(guardado: "", sessoes: 1, ultimo: ultimo) == ultimo)
         #expect(Janelas.projetoParaAbrir(guardado: "hub", sessoes: 1, ultimo: ultimo) == ultimo)

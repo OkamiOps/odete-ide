@@ -135,14 +135,18 @@ public final class Janelas {
     ///
     /// - `guardado` é o que a janela lembra (`SceneStorage`): o id do projeto, `hub` para
     ///   a lista de projetos, ou vazio para quem nunca escolheu.
-    /// - Com uma janela só, é como sempre foi: sem projeto lembrado, volta o último aberto.
+    /// - Com uma janela só, é como sempre foi: volta o último aberto, lembrado ou não.
     /// - Com mais de uma, janela sem projeto lembrado começa na lista. Senão toda janela
     ///   nova abriria o mesmo último projeto — que é justamente o que não pode.
     nonisolated static func projetoParaAbrir(guardado: String, sessoes: Int, ultimo: UUID?) -> UUID? {
-        if let id = UUID(uuidString: guardado) {
-            return id
+        // Uma janela só: o último projeto aberto, gravado na hora no state.json. O que a
+        // cena lembra (`@SceneStorage`) só é gravado quando o app vai para o fundo; depois
+        // de um fechamento à força ele ainda aponta para o projeto de antes, e o app
+        // reabria no projeto errado.
+        if sessoes <= 1 {
+            return ultimo
         }
-        return sessoes <= 1 ? ultimo : nil
+        return UUID(uuidString: guardado)
     }
 }
 

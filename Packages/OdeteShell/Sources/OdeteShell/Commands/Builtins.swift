@@ -33,7 +33,8 @@ enum Builtins {
         while let item = e.nextObject() as? URL {
             let n = item.lastPathComponent
             if skipNoise,
-               n == "node_modules" || n == ".git" || n == ".odete" || n == "dist"
+               n == "node_modules" || n == Ignore.modulosForaDaNuvem || n == ".git" || n == ".odete"
+               || n == "dist"
             {
                 e.skipDescendants(); continue
             }

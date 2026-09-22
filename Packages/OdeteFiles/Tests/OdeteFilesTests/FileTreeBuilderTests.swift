@@ -83,3 +83,52 @@ struct ArvoreComOcultosTests {
         #expect(arvore.find("node_modules")?.naoLido == false)
     }
 }
+
+/// Projeto no iCloud: `node_modules` é link para `node_modules.nosync`. Com "mostrar
+/// ocultos", o link tem que aparecer como pasta que abre — antes aparecia como arquivo.
+struct ArvoreComLinkTests {
+    func projeto() throws -> URL {
+        let raiz = try tempDir()
+        let fm = FileManager.default
+        try fm.createDirectory(
+            at: raiz.appending(path: "node_modules.nosync/left-pad"),
+            withIntermediateDirectories: true
+        )
+        try "{}".write(
+            to: raiz.appending(path: "node_modules.nosync/left-pad/package.json"),
+            atomically: true,
+            encoding: .utf8
+        )
+        try fm.createSymbolicLink(
+            atPath: raiz.appending(path: "node_modules").path,
+            withDestinationPath: "node_modules.nosync"
+        )
+        try fm.createDirectory(at: raiz.appending(path: "src"), withIntermediateDirectories: true)
+        try "a".write(to: raiz.appending(path: "src/app.ts"), atomically: true, encoding: .utf8)
+        return raiz
+    }
+
+    @Test func linkParaPastaApareceComoPastaPorLer() throws {
+        let raiz = try projeto()
+        let filhos = try FileTreeBuilder.children(of: raiz, prefix: "", ocultos: true)
+        let nm = try #require(filhos.first { $0.name == "node_modules" })
+        #expect(nm.isDirectory)
+        #expect(nm.children == nil)
+    }
+
+    @Test func abrirOLinkListaOsPacotes() throws {
+        let raiz = try projeto()
+        let filhos = try FileTreeBuilder.children(
+            of: raiz.appending(path: "node_modules"),
+            prefix: "node_modules",
+            ocultos: true
+        )
+        #expect(filhos.map(\.path) == ["node_modules/left-pad"])
+    }
+
+    @Test func semOcultosOLinkNemAPastaAparecem() throws {
+        let raiz = try projeto()
+        let tree = try FileTreeBuilder.build(at: raiz)
+        #expect(tree.children?.map(\.name) == ["src"])
+    }
+}

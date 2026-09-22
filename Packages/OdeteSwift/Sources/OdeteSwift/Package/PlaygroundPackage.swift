@@ -36,8 +36,8 @@ public struct PlaygroundPackage: Sendable {
         else { return out }
         while let u = e.nextObject() as? URL {
             let name = u.lastPathComponent
-            if name == ".build" || name == "node_modules" || name == ".git" || name ==
-                ".odete"
+            if name == ".build" || name == "node_modules" || name == Ignore.modulosForaDaNuvem
+                || name == ".git" || name == ".odete"
             {
                 e.skipDescendants(); continue
             }

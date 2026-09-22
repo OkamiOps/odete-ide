@@ -13,7 +13,13 @@ public enum FileTreeBuilder {
     /// abrir o projeto, e a pessoa só paga a leitura se abrir a pasta.
     public static func children(of dir: URL, prefix: String, ocultos: Bool = false) throws -> [FileNode] {
         let fm = FileManager.default
-        let items = try fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.isDirectoryKey], options: [])
+        // Listar pelo link não devolve nada: é o caso do `node_modules` de projeto no
+        // iCloud, que aponta para `node_modules.nosync`.
+        let items = try fm.contentsOfDirectory(
+            at: dir.resolvingSymlinksInPath(),
+            includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey],
+            options: []
+        )
         var out: [FileNode] = []
         for item in items {
             let name = item.lastPathComponent
@@ -22,9 +28,17 @@ public enum FileTreeBuilder {
             if pesada, !ocultos {
                 continue
             }
-            let isDir = (try? item.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
+            let valores = try? item.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
+            let link = valores?.isSymbolicLink == true
+            // `isDirectory` de um link diz respeito ao link, não ao destino: sem isto um
+            // link para pasta aparecia como arquivo que não abre.
+            let isDir = link
+                ? (try? item.resolvingSymlinksInPath().resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
+                : valores?.isDirectory ?? false
             if isDir {
-                let filhos = pesada ? nil : try children(of: item, prefix: rel, ocultos: ocultos)
+                // Link para pasta abre só quando pedido, como as pastas pesadas: descer
+                // por ele aqui poderia dar volta num link que aponta para cima.
+                let filhos = pesada || link ? nil : try children(of: item, prefix: rel, ocultos: ocultos)
                 out.append(FileNode(path: rel, isDirectory: true, children: filhos))
             } else {
                 out.append(FileNode(path: rel, isDirectory: false))

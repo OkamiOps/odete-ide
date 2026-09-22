@@ -139,6 +139,9 @@ public final class AppModel {
                     continue
                 }
                 if on {
+                    // Antes de mover: senão o iCloud começa a subir o node_modules no
+                    // próprio movimento. Ver `PastaDeModulos`.
+                    _ = PastaDeModulos.migrarSePreciso(item, nuvem: true)
                     try fm.setUbiquitous(true, itemAt: item, destinationURL: dest)
                 } else {
                     try fm.moveItem(at: item, to: dest)

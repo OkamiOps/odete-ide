@@ -297,7 +297,9 @@ public final class WorkspaceModel {
                 }
             }
         }
-        let nm = root.appending(path: "node_modules", directoryHint: .isDirectory)
+        // No iCloud, `node_modules` é link para `node_modules.nosync`, e listar pelo link
+        // não devolve nada — o autocomplete de import perdia os pacotes instalados.
+        let nm = PastaDeModulos.pastaReal(root)
         let fm = FileManager.default
         for item in (try? fm.contentsOfDirectory(at: nm, includingPropertiesForKeys: nil)) ?? [] {
             let nome = item.lastPathComponent

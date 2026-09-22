@@ -1317,6 +1317,34 @@
         }
       }
     },
+    ".gitignore: %1$@ adicionado(s)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": ".gitignore: %1$@ added"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": ".gitignore: %1$@ hinzugefügt"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": ".gitignore : %1$@ ajouté(s)"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": ".gitignore: %1$@ agregado(s)"
+          }
+        }
+      }
+    },
     ".gitignore: node_modules/ adicionado": {
       "localizations": {
         "en": {
@@ -26905,6 +26933,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "solo pregunta para escribir y ejecutar"
+          }
+        }
+      }
+    },
+    "tar inválido": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "invalid tar"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ungültiges Tar-Archiv"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "tar invalide"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "tar inválido"
           }
         }
       }

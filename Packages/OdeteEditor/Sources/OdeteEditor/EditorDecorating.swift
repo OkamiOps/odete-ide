@@ -347,12 +347,30 @@ extension CodeEditorView.Coordinator {
         guard let f = find, !f.texto.isEmpty else { return }
         let achados = tv.search(for: consulta(f), replacingMatchesWith: r.por)
         guard !achados.isEmpty else { return }
-        let alvo = r.todos ? achados : [achados[min(max(f.indice, 0), achados.count - 1)]]
-        tv.replaceText(in: BatchReplaceSet(replacements: alvo.map {
-            .init(range: $0.range, text: $0.replacementText)
-        }))
-        // Substituição em lote não passa pelo delegate de digitação, então o texto
-        // guardado — e o mapa de linhas junto — ficaria sendo o de antes da troca.
+        // Nada de `replaceText(in: BatchReplaceSet)`: o desfazer que o Runestone registra
+        // para ele fecha um grupo de desfazer de dentro do próprio desfazer, e o
+        // `UndoManager` levanta exceção — o ⌘Z depois de substituir derrubava o app. A
+        // edição comum (`replace`) registra o desfazer do jeito que a digitação registra.
+        if r.todos {
+            // Uma edição só com o documento inteiro, montado de trás para frente para os
+            // índices dos achados continuarem valendo: um passo no desfazer, uma análise.
+            let antes = tv.text as NSString
+            let novo = NSMutableString(string: antes)
+            for a in achados.reversed() {
+                novo.replaceCharacters(in: a.range, with: a.replacementText)
+            }
+            let selecao = tv.selectedRange
+            umPasso(tv) {
+                tv.replace(NSRange(location: 0, length: antes.length), withText: novo as String)
+                let de = min(selecao.location, novo.length)
+                tv.selectedRange = NSRange(location: de, length: 0)
+            }
+        } else {
+            let a = achados[min(max(f.indice, 0), achados.count - 1)]
+            umPasso(tv) { tv.replace(a.range, withText: a.replacementText) }
+        }
+        // O delegate de digitação já anotou o texto novo; anotar de novo aqui é barato e
+        // deixa o mapa de linhas certo mesmo se a troca não passar por ele.
         anotarTexto(tv.text)
         parent.text = textoAtual
         buscar(tv)

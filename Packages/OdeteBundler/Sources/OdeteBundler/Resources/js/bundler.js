@@ -19,11 +19,59 @@
   const LOADERS = { ".js": "js", ".mjs": "js", ".cjs": "js", ".jsx": "jsx", ".ts": "ts", ".mts": "ts", ".cts": "ts", ".tsx": "tsx", ".json": "json", ".css": "css", ".txt": "text", ".md": "text", ".svg": "dataurl", ".png": "dataurl", ".jpg": "dataurl", ".jpeg": "dataurl", ".gif": "dataurl", ".webp": "dataurl", ".woff": "dataurl", ".woff2": "dataurl", ".ttf": "dataurl", ".wasm": "binary" };
   const loaderFor = (p) => LOADERS[path.extname(p).toLowerCase()] || "file";
 
+  // ---- memória entre builds ----
+  // O rebuild incremental do esbuild só pula a análise de quem chegou igual: o plugin
+  // continua sendo chamado para cada import e cada arquivo, a cada build. Sem memória
+  // aqui, todo rebuild relia o react-dom inteiro do disco e o recodificava em UTF-8 no
+  // JS interpretado, só para o esbuild descobrir que era o mesmo texto. Os bytes ficam
+  // guardados até alguém dizer que o arquivo mudou (`__esqueceArquivos`, que o dev
+  // server chama com o que o observador viu).
+  const leituras = new Map(); // caminho → bytes lidos
+  // Data de modificação de cada arquivo do projeto quando um build o leu. O observador do
+  // lado nativo compara com a do disco ao começar a vigiar: se mudou entre o build ler e
+  // o observador armar, a mudança não se perde.
+  const mtimes = new Map();
+  // Resolução de import muda quando arquivo nasce ou some. Em vez de achar cada cache,
+  // quem guarda confere esta geração e se esvazia sozinho quando ela anda.
+  let geracaoDeResolucao = 0;
+  // `node_modules.nosync` é onde os pacotes moram de verdade em projeto do iCloud.
+  const ehDoProjeto = (p) => p.indexOf("/node_modules/") < 0 && p.indexOf("/node_modules.nosync/") < 0;
+
+  globalThis.__esqueceArquivos = (caminhos, estrutura) => {
+    for (const c of caminhos || []) { leituras.delete(c); mtimes.delete(c); }
+    if (estrutura) geracaoDeResolucao++;
+  };
+  globalThis.__esqueceTudo = () => { leituras.clear(); mtimes.clear(); geracaoDeResolucao++; };
+  // Só o que ainda é dependência de alguém fica: um arquivo que saiu do grafo deixa de
+  // ser vigiado, e bytes guardados dele ficariam velhos sem ninguém avisar.
+  globalThis.__guardaSo = (vivos) => {
+    for (const c of [...leituras.keys()]) if (!vivos.has(c)) leituras.delete(c);
+  };
+  globalThis.__mtimeLido = (p) => (mtimes.has(p) ? mtimes.get(p) : null);
+
+  function anotaMtime(p) {
+    if (!ehDoProjeto(p)) return;
+    try { mtimes.set(p, fs.statSync(p).mtimeMs); } catch (e) { mtimes.delete(p); }
+  }
+
   // plugin: resolve via o loader Node do host (node_modules, exports) e lê do disco
   const fsPlugin = (root, opts = {}) => ({
     name: "odete-fs",
     setup(build) {
+      // Com memória, a resolução de cada import também fica guardada entre rebuilds: são
+      // centenas de idas ao nativo por build num projeto de verdade, para a mesma resposta.
+      let resolvidos = new Map(), geracao = geracaoDeResolucao;
       build.onResolve({ filter: /.*/ }, (args) => {
+        if (!opts.memoria) return resolve(args);
+        if (geracao !== geracaoDeResolucao) { resolvidos = new Map(); geracao = geracaoDeResolucao; }
+        const chave = args.importer + "\0" + args.path;
+        const guardado = resolvidos.get(chave);
+        if (guardado) return guardado;
+        const r = resolve(args);
+        if (r && !r.errors) resolvidos.set(chave, r);
+        return r;
+      });
+      const resolve = (args) => {
         // O arquivo real por trás de uma ilha. Precisa ser tratado aqui, e não num
         // `onResolve` próprio: o genérico é registrado primeiro e engoliria o prefixo.
         if (args.path.startsWith("odete-real:")) {
@@ -55,11 +103,18 @@
         if (r && typeof r === "object") {
           const bare = !args.path.startsWith(".") && !args.path.startsWith("/");
           if (opts.externalMissing && bare) return { path: args.path, external: true }; // vai pelo import map (esm.sh)
+          // A pasta onde o arquivo que falta nasceria: o observador passa a olhar lá, e o
+          // import quebrado se conserta sozinho quando o arquivo aparece.
+          if (!bare && opts.faltando) opts.faltando.add(path.dirname(path.resolve(path.dirname(importer), args.path)));
           return { errors: [{ text: bare ? `Não achei o pacote "${args.path}" (importado por ${path.relative(root, importer)}). Rode npm install.` : `Não achei "${args.path}" importado por ${path.relative(root, importer)}.` }] };
         }
         if (r.startsWith("node:")) return { path: r, external: true };
-        return { path: r, namespace: "file" };
-      });
+        // O resolvedor do runtime devolve `src/./App.tsx` para `./App`. Normalizado, o
+        // caminho é o mesmo que o metafile e o observador usam — senão a memória de
+        // leituras guardava por uma chave e era esquecida por outra, e o rebuild servia o
+        // arquivo velho. E um mesmo arquivo importado por dois caminhos não vira dois módulos.
+        return { path: path.resolve(r), namespace: "file" };
+      };
       // Fronteira de cliente: um módulo que começa com "use client" roda nos dois lados.
       // No servidor ele vira uma ilha — o componente real renderiza dentro de uma marca
       // que diz ao navegador qual módulo montar ali e com que props. Sem isso o Preview
@@ -67,11 +122,13 @@
       build.onLoad({ filter: /.*/, namespace: "odete-virtual" }, (args) => ({
         contents: opts.virtuais[args.path], loader: "js", resolveDir: root,
       }));
-      build.onLoad({ filter: /.*/, namespace: "odete-real" }, (args) => ({
-        contents: fs.readFileSync(args.path, "utf8"), loader: loaderFor(args.path), resolveDir: path.dirname(args.path),
-      }));
+      build.onLoad({ filter: /.*/, namespace: "odete-real" }, (args) => {
+        anotaMtime(args.path);
+        return { contents: fs.readFileSync(args.path, "utf8"), loader: loaderFor(args.path), resolveDir: path.dirname(args.path) };
+      });
       build.onLoad({ filter: /.*/, namespace: "file" }, (args) => {
         if ((opts.ilhas || opts.acoes) && /\.(tsx|jsx|ts|js|mjs)$/i.test(args.path)) {
+          anotaMtime(args.path);
           const src = fs.readFileSync(args.path, "utf8");
           const rel = path.relative(root, args.path);
           if (opts.ilhas && /^\s*(["'])use client\1\s*;?/.test(src)) {
@@ -117,7 +174,20 @@
       });
       const carregaArquivo = (args) => {
         const loader = loaderFor(args.path);
-        if (loader === "dataurl" || loader === "binary" || loader === "file") return { contents: fs.readFileSync(args.path), loader: loader === "file" ? "dataurl" : loader, resolveDir: path.dirname(args.path) };
+        const final = loader === "file" ? "dataurl" : loader;
+        // Com memória, o que vai ao esbuild são bytes: texto seria recodificado em UTF-8 a
+        // cada build, e bytes atravessam para o wasm como estão.
+        if (opts.memoria) {
+          let bytes = leituras.get(args.path);
+          if (!bytes) {
+            anotaMtime(args.path);
+            bytes = fs.readFileSync(args.path);
+            leituras.set(args.path, bytes);
+          }
+          return { contents: bytes, loader: final, resolveDir: path.dirname(args.path) };
+        }
+        anotaMtime(args.path);
+        if (loader === "dataurl" || loader === "binary" || loader === "file") return { contents: fs.readFileSync(args.path), loader: final, resolveDir: path.dirname(args.path) };
         return { contents: fs.readFileSync(args.path, "utf8"), loader, resolveDir: path.dirname(args.path) };
       };
     },
@@ -172,11 +242,14 @@ const __odeteChama = (id) => async (...args) => {
     return { code: r.code, map: r.map, warnings: r.warnings.map(fmtMsg) };
   };
 
-  // só checa sintaxe: erros do esbuild sem gerar código útil
+  // Só checa sintaxe. O esbuild não tem modo "só analisar": a transformação sempre
+  // imprime código. Então ela imprime o mínimo — sem espaço, sem comentário legal, sem
+  // mapa — porque esse texto atravessa do wasm para o JS e é decodificado a cada pausa na
+  // digitação, para ser jogado fora. Daqui para o Swift só vão os diagnósticos.
   globalThis.__lint = async (code, loader, file) => {
     await ready;
     try {
-      const r = await globalThis.esbuild.transform(code, { loader, sourcefile: file, logLevel: "silent" });
+      const r = await globalThis.esbuild.transform(code, { loader, sourcefile: file, logLevel: "silent", minifyWhitespace: true, legalComments: "none", sourcemap: false });
       return { errors: [], warnings: r.warnings.map(fmtMsg) };
     } catch (e) {
       return { errors: (e.errors || [{ text: e.message }]).map(fmtMsg), warnings: (e.warnings || []).map(fmtMsg) };
@@ -194,24 +267,110 @@ const __odeteChama = (id) => async (...args) => {
 
   const fmtMsg = (m) => ({ text: m.text, file: m.location ? m.location.file : null, line: m.location ? m.location.line : null, column: m.location ? m.location.column : null, lineText: m.location ? m.location.lineText : null });
 
-  globalThis.__build = async (opts) => {
-    await ready;
+  // As opções do esbuild para um pedido de build, iguais no build avulso e no contexto.
+  //
+  // Sourcemap só quando pedido. O padrão era `inline` para tudo: o `vite build` saía com
+  // o mapa embutido no JS de produção, e o dev server gerava, codificava em base64 e
+  // decodificava no JS interpretado um mapa que dobrava o tamanho do bundle — para
+  // ninguém ler: o console do Preview pega arquivo e linha do evento de erro do WebKit,
+  // que não passa por sourcemap.
+  function opcoes(opts) {
     const root = opts.root;
+    return {
+      entryPoints: opts.entries.map((e) => (path.isAbsolute(e) ? e : path.join(root, e))),
+      bundle: true, write: false, format: opts.format || "esm", platform: opts.platform || "browser", target: opts.target || "es2022",
+      sourcemap: opts.sourcemap || false, outdir: path.join(root, opts.outdir || "dist"), outbase: root,
+      jsx: "automatic", jsxDev: opts.dev !== false, minify: !!opts.minify, splitting: false, metafile: !!opts.metafile, logLevel: "silent", absWorkingDir: root,
+      define: Object.assign({ "process.env.NODE_ENV": JSON.stringify(opts.dev === false ? "production" : "development"), "import.meta.env.DEV": String(opts.dev !== false), "import.meta.env.PROD": String(opts.dev === false), "import.meta.env.MODE": JSON.stringify(opts.dev === false ? "production" : "development"), "import.meta.env.BASE_URL": '"/"', "import.meta.env.SSR": "false", "import.meta.hot": "undefined", "global": "globalThis" }, envDefines(root, opts.dev === false), opts.define || {}),
+      loader: { ".png": "dataurl", ".jpg": "dataurl", ".svg": "dataurl", ".gif": "dataurl", ".webp": "dataurl", ".woff": "dataurl", ".woff2": "dataurl", ".ttf": "dataurl" },
+      plugins: [fsPlugin(root, opts)], nodePaths: [path.join(root, "node_modules")], resolveExtensions: [".tsx", ".ts", ".jsx", ".js", ".mjs", ".cjs", ".json", ".css"], mainFields: opts.platform === "node" ? ["module", "main"] : ["browser", "module", "main"], conditions: opts.platform === "node" ? ["node", "import", "default"] : ["browser", "import", "default"],
+    };
+  }
+
+  // Os arquivos que o build leu, em caminho absoluto, a partir do metafile. Módulos que
+  // só existem em memória (as entradas virtuais das ilhas) não são arquivo e ficam de fora.
+  function entradasDe(root, metafile) {
+    if (!metafile) return null;
+    const out = [];
+    for (const k of Object.keys(metafile.inputs)) {
+      if (k.startsWith("odete-real:")) { out.push(k.slice("odete-real:".length)); continue; }
+      if (k.startsWith("file:")) { out.push(path.resolve(root, k.slice(5))); continue; }
+      if (/^[a-z][a-z0-9-]*:/i.test(k)) continue;
+      out.push(path.resolve(root, k));
+    }
+    return out;
+  }
+
+  // Resultado cru, para quem está no JS: as saídas continuam sendo os objetos do esbuild,
+  // com `contents` (bytes), `hash` e o `text` preguiçoso. Comparar o hash diz se a saída
+  // mudou sem decodificar nada; servir os bytes evita decodificar e recodificar o bundle.
+  const sucesso = (r, opts) => ({
+    ok: true, saidas: r.outputFiles || [], warnings: r.warnings.map(fmtMsg), errors: [],
+    entradas: entradasDe(opts.root, r.metafile), faltando: opts.faltando ? [...opts.faltando] : [],
+  });
+  const falha = (e, opts) => ({
+    ok: false, saidas: [], warnings: (e.warnings || []).map(fmtMsg), errors: (e.errors || [{ text: e.message }]).map(fmtMsg),
+    entradas: null, faltando: opts.faltando ? [...opts.faltando] : [],
+  });
+
+  globalThis.__buildBruto = async (opts) => {
+    await ready;
+    if (opts.metafile) opts.faltando = new Set();
     try {
-      const r = await globalThis.esbuild.build({
-        entryPoints: opts.entries.map((e) => (path.isAbsolute(e) ? e : path.join(root, e))),
-        bundle: true, write: false, format: opts.format || "esm", platform: opts.platform || "browser", target: opts.target || "es2022",
-        sourcemap: opts.sourcemap === false ? false : "inline", outdir: path.join(root, opts.outdir || "dist"), outbase: root,
-        jsx: "automatic", jsxDev: opts.dev !== false, minify: !!opts.minify, splitting: false, metafile: false, logLevel: "silent", absWorkingDir: root,
-        define: Object.assign({ "process.env.NODE_ENV": JSON.stringify(opts.dev === false ? "production" : "development"), "import.meta.env.DEV": String(opts.dev !== false), "import.meta.env.PROD": String(opts.dev === false), "import.meta.env.MODE": JSON.stringify(opts.dev === false ? "production" : "development"), "import.meta.env.BASE_URL": '"/"', "import.meta.env.SSR": "false", "import.meta.hot": "undefined", "global": "globalThis" }, envDefines(root, opts.dev === false), opts.define || {}),
-        loader: { ".png": "dataurl", ".jpg": "dataurl", ".svg": "dataurl", ".gif": "dataurl", ".webp": "dataurl", ".woff": "dataurl", ".woff2": "dataurl", ".ttf": "dataurl" },
-        plugins: [fsPlugin(root, opts)], nodePaths: [path.join(root, "node_modules")], resolveExtensions: [".tsx", ".ts", ".jsx", ".js", ".mjs", ".cjs", ".json", ".css"], mainFields: opts.platform === "node" ? ["module", "main"] : ["browser", "module", "main"], conditions: opts.platform === "node" ? ["node", "import", "default"] : ["browser", "import", "default"],
-      });
-      return { ok: true, files: r.outputFiles.map((f) => ({ path: path.relative(root, f.path), text: f.text })), warnings: r.warnings.map(fmtMsg), errors: [] };
+      return sucesso(await globalThis.esbuild.build(opcoes(opts)), opts);
     } catch (e) {
-      return { ok: false, files: [], warnings: (e.warnings || []).map(fmtMsg), errors: (e.errors || [{ text: e.message }]).map(fmtMsg) };
+      return falha(e, opts);
     }
   };
+
+  // Para o Swift (`Esbuild.build`): texto, que é o que o `vite build` grava em dist/.
+  globalThis.__build = async (opts) => {
+    const r = await globalThis.__buildBruto(opts);
+    return { ok: r.ok, files: r.saidas.map((f) => ({ path: path.relative(opts.root, f.path), text: f.text })), warnings: r.warnings, errors: r.errors };
+  };
+
+  // ---- contextos incrementais ----
+  // Um contexto do esbuild por chave (o dev server usa um por entrada servida). O
+  // `rebuild()` reaproveita a análise de todo módulo cujo conteúdo não mudou, e é isso
+  // que faz o rebuild depois de editar o App.tsx não reanalisar o react-dom inteiro.
+  //
+  // Um rebuild por vez em cada contexto, em fila: pedir outro enquanto um corre devolve
+  // o resultado do que já estava correndo — que pode ter lido o arquivo antes da mudança.
+  const contextos = new Map(); // chave → { ctx, opts, fila }
+
+  globalThis.__rebuild = (chave, opts) => {
+    let c = contextos.get(chave);
+    if (!c) {
+      const o = Object.assign({}, opts, { memoria: true, metafile: true });
+      const ctx = (async () => { await ready; return globalThis.esbuild.context(opcoes(o)); })();
+      ctx.catch(() => {});
+      c = { opts: o, fila: Promise.resolve(), ctx };
+      contextos.set(chave, c);
+    }
+    const vez = c.fila.then(async () => {
+      c.opts.faltando = new Set();
+      try {
+        const ctx = await c.ctx;
+        return sucesso(await ctx.rebuild(), c.opts);
+      } catch (e) {
+        return falha(e, c.opts);
+      }
+    });
+    c.fila = vez.catch(() => {});
+    return vez;
+  };
+
+  // Descarta os contextos cujas chaves começam com o prefixo. Contexto vivo segura a
+  // memória de tudo o que analisou; servidor que para não pode deixá-los para trás.
+  globalThis.__descartaContextos = async (prefixo) => {
+    const alvos = [];
+    for (const [k, c] of contextos) if (k.startsWith(prefixo)) { contextos.delete(k); alvos.push(c); }
+    for (const c of alvos) {
+      try { await c.fila; const ctx = await c.ctx; await ctx.dispose(); } catch (e) { /* já era */ }
+    }
+    return alvos.length;
+  };
+  globalThis.__contextosVivos = () => contextos.size;
 
   function envDefines(root, prod) {
     const out = {};

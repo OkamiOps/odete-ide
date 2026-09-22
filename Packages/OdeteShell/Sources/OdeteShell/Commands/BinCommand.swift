@@ -105,7 +105,11 @@ struct BinCommand: ShellCommand {
             ctx.shell.services.onServer(jaTem.porta, jaTem.comando)
             return 0
         }
-        let dev = DevServer(root: ctx.root) { kind, text in kind == .out ? io.out(text) : io.err(text) }
+        // No esbuild do projeto, o mesmo que o lint e o `node x.ts` usam: subir o servidor
+        // não compila um segundo motor, e parar o servidor não derruba o dos outros.
+        let dev = DevServer(esbuild: ctx.shell.esbuildEngine(), root: ctx.root) { kind, text in
+            kind == .out ? io.out(text) : io.err(text)
+        }
         dev.onDiagnostics = ctx.shell.services.onDiagnostics
         do {
             io.out(tr("  %1$@: carregando esbuild…", "\(label)"))
@@ -199,7 +203,11 @@ struct BinCommand: ShellCommand {
     func serveStatic(_ ctx: CommandContext, dir: String) async -> Int32 {
         let io = ctx.io
         let base = ctx.resolve(dir)
-        let dev = DevServer(root: base) { k, t in k == .out ? io.out(t) : io.err(t) }
+        // `vite preview` serve dist/, mas no motor do projeto: servir estático não justifica
+        // compilar outro esbuild só porque a raiz servida é outra.
+        let dev = DevServer(esbuild: ctx.shell.esbuildEngine(), root: base) { k, t in
+            k == .out ? io.out(t) : io.err(t)
+        }
         do { try await dev.start(port: 4173, preset: .plain) } catch { io.err(error.localizedDescription); return 1 }
         let job = ctx.shell.registerJob("serve \(dir)", ports: [dev.port]) { dev.stop() }
         io.out(tr("  ➜  http://127.0.0.1:%1$@/   (job %2$@)", "\(dev.port)", "\(job.id)"))

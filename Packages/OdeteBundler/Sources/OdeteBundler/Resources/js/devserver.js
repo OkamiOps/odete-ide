@@ -1,23 +1,260 @@
 // Dev server: serve index.html, bundles do esbuild, estáticos e reload por WebSocket.
-(function () {
+//
+// Um motor de esbuild por projeto, e nele pode haver mais de um servidor (o `vite` e o
+// `vite preview`, por exemplo). Por isso isto é uma fábrica: cada servidor tem o próprio
+// estado, e o arquivo pode ser avaliado de novo sem derrubar quem já está no ar.
+//
+// O custo que importa aqui é o de um iPad sem JIT: JS interpretado e esbuild em wasm
+// interpretado. Um build do zero de um projeto React pequeno passa de seis segundos de
+// CPU, e o salvamento automático regrava o arquivo a cada pausa na digitação. Então:
+//   - nada é refeito sem mudança de conteúdo num arquivo que o build leu (quem decide é o
+//     observador do lado nativo, que compara conteúdo, e `mudou` aqui, que confere o grafo);
+//   - o que é refeito usa o contexto incremental do esbuild;
+//   - o navegador só recarrega se a saída mudou, e CSS sozinho troca sem recarregar.
+globalThis.__devCria = function () {
   const http = require("http"), fs = require("fs"), path = require("path");
   const MIME = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".mjs": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp", ".ico": "image/x-icon", ".txt": "text/plain; charset=utf-8", ".map": "application/json", ".woff": "font/woff", ".woff2": "font/woff2", ".ttf": "font/ttf", ".wasm": "application/wasm", ".md": "text/markdown; charset=utf-8" };
-  const CLIENT = `<script>(function(){var p=location.protocol==="https:"?"wss":"ws";var s=new WebSocket(p+"://"+location.host+"/@odete/ws");s.onmessage=function(e){if(e.data==="reload")location.reload();};s.onclose=function(){setTimeout(function(){location.reload()},1500)};})();</script>`;
-  const state = { root: "", server: null, port: 0, cache: new Map(), diagnostics: [], preset: "plain", sockets: new Set(), building: null };
-  const sendDiag = () => globalThis.__odete_diagnostics && globalThis.__odete_diagnostics(JSON.stringify(state.diagnostics));
+  // O cliente do Preview. "reload" recarrega; "css" troca só as folhas de estilo do
+  // bundle, que é o que o `<link>` de `html()` aponta — sem esse link na página (Astro,
+  // Next), não há o que trocar e a página recarrega. A folha nova entra antes de a velha
+  // sair, para a tela não piscar sem estilo.
+  const CLIENT = `<script>(function(){var p=location.protocol==="https:"?"wss":"ws";var s=new WebSocket(p+"://"+location.host+"/@odete/ws");function css(){var ls=document.querySelectorAll('link[rel="stylesheet"][href^="/@odete/css/"]');if(!ls.length){location.reload();return;}ls.forEach(function(l){var n=l.cloneNode();n.href=l.getAttribute("href").split("?")[0]+"?t="+Date.now();n.onload=function(){l.remove();};n.onerror=function(){location.reload();};l.parentNode.insertBefore(n,l.nextSibling);});}s.onmessage=function(e){if(e.data==="reload")location.reload();else if(e.data==="css")css();};s.onclose=function(){setTimeout(function(){location.reload()},1500)};})();</script>`;
+  // Onde moram os pacotes. Em projeto do iCloud a pasta de verdade é `node_modules.nosync`
+  // (o iCloud não sincroniza o que termina em .nosync) e `node_modules` é um atalho para
+  // ela: as duas são tratadas igual — fora do grafo vigiado, e mexer nelas refaz tudo.
+  const PASTAS_DE_PACOTES = ["node_modules", "node_modules.nosync"];
+  const ehDePacote = (f) => PASTAS_DE_PACOTES.some((n) => f.indexOf("/" + n + "/") >= 0);
+  const state = {
+    id: 0, root: "", server: null, port: 0, diagnostics: [], preset: "plain", sockets: new Set(),
+    // Um por entrada servida (`src/main.tsx`): o build mais recente e a assinatura do que saiu.
+    entradas: new Map(),
+    // Quem consome o quê: "b:<entrada>" (bundle), "next:<arquivo>", "ilhas:<rota>",
+    // "astro:<arquivo>", "est:<arquivo>" (estático e index.html) → caminhos absolutos lidos.
+    deps: new Map(),
+    // Pastas onde um import que falhou procuraria o arquivo, por consumidor.
+    faltando: new Map(),
+    // Data de modificação vista ao ler (estáticos e .astro; os do esbuild vêm do bundler.js).
+    mtimes: new Map(),
+    // Versão do retrato (dependências + diagnósticos) e quem espera a próxima.
+    versao: 0, esperas: [], retratoJSON: "",
+    fila: Promise.resolve(), parado: false,
+    // Contadores, para os testes provarem o que não aconteceu.
+    stats: { builds: 0, reload: 0, css: 0 },
+  };
 
-  async function bundle(entryRel) {
+  // ---- bundles ----
+  function bundle(entryRel) {
+    let e = state.entradas.get(entryRel);
+    if (!e) {
+      e = { ultimo: null };
+      state.entradas.set(entryRel, e);
+      e.ultimo = constroi(entryRel);
+    }
+    return e.ultimo;
+  }
+
+  // Um build de uma entrada. Incremental: o contexto do esbuild guarda a análise de quem
+  // não mudou. A saída fica em bytes, do jeito que o esbuild entregou — não precisa virar
+  // texto para ir ao navegador.
+  async function constroi(entryRel) {
     const key = entryRel;
-    if (state.cache.has(key)) return state.cache.get(key);
-    const p = (async () => {
-      const r = await globalThis.__build({ root: state.root, entries: [entryRel], format: "esm", platform: "browser", dev: true, outdir: "__odete", externalMissing: true });
-      state.diagnostics = state.diagnostics.filter((d) => d.entry !== key).concat(r.errors.map((e) => ({ ...e, kind: "error", entry: key })), r.warnings.map((w) => ({ ...w, kind: "warning", entry: key })));
-      sendDiag();
-      const js = r.files.find((f) => f.path.endsWith(".js")), css = r.files.find((f) => f.path.endsWith(".css"));
-      return { ok: r.ok, js: js ? js.text : errorOverlay(r.errors), css: css ? css.text : "" };
-    })();
-    state.cache.set(key, p);
-    return p;
+    state.stats.builds++;
+    const r = await globalThis.__rebuild("dev" + state.id + ":" + entryRel, { root: state.root, entries: [entryRel], format: "esm", platform: "browser", dev: true, outdir: "__odete", externalMissing: true });
+    state.diagnostics = state.diagnostics.filter((d) => d.entry !== key).concat(r.errors.map((e) => ({ ...e, kind: "error", entry: key })), r.warnings.map((w) => ({ ...w, kind: "warning", entry: key })));
+    defineDeps("b:" + key, r.entradas || lidosNaFalha("b:" + key, path.resolve(state.root, entryRel), r.errors));
+    defineFaltando("b:" + key, r.faltando);
+    const js = r.saidas.find((f) => f.path.endsWith(".js")), css = r.saidas.find((f) => f.path.endsWith(".css"));
+    const overlay = js ? null : errorOverlay(r.errors);
+    anuncia();
+    return {
+      ok: r.ok,
+      js: js ? js.contents : overlay, jsHash: js ? js.hash : "erro:" + overlay,
+      css: css ? css.contents : "", cssHash: css ? css.hash : "",
+    };
+  }
+
+  // Refaz uma entrada e diz o que mudou na saída, comparando os hashes que o próprio
+  // esbuild calcula — igual é igual, e o navegador não precisa saber de nada.
+  async function refaz(entryRel) {
+    const e = state.entradas.get(entryRel);
+    const antes = await e.ultimo.catch(() => null);
+    e.ultimo = constroi(entryRel);
+    const depois = await e.ultimo;
+    return { js: !antes || antes.jsHash !== depois.jsHash, css: !antes || antes.cssHash !== depois.cssHash, ok: depois.ok };
+  }
+
+  // ---- dependências ----
+  function iguais(a, b) {
+    if (!a || a.size !== b.size) return false;
+    for (const x of b) if (!a.has(x)) return false;
+    return true;
+  }
+
+  function defineDeps(consumidor, lista) {
+    const novo = new Set(lista);
+    if (iguais(state.deps.get(consumidor), novo)) return;
+    state.deps.set(consumidor, novo);
+    // A memória de leituras é do motor, e o motor pode ter outro servidor: quem decide o
+    // que continua guardado é a união dos grafos de todos.
+    globalThis.__devGuardaVivos();
+  }
+
+  function vivos() {
+    const todos = new Set();
+    for (const s of state.deps.values()) for (const f of s) todos.add(f);
+    return todos;
+  }
+
+  // Build que falha não tem metafile. O grafo fica o que era, mais a entrada e os
+  // arquivos onde os erros apontam — senão o erro de sintaxe do primeiro build deixaria o
+  // arquivo sem vigia, e consertá-lo não refaria nada.
+  function lidosNaFalha(consumidor, entrada, erros) {
+    const lidos = new Set(state.deps.get(consumidor) || []);
+    lidos.add(entrada);
+    for (const e of erros || []) if (e.file && !/^[a-z][a-z0-9-]*:/i.test(e.file)) lidos.add(path.resolve(state.root, e.file));
+    return [...lidos];
+  }
+
+  function defineFaltando(consumidor, lista) {
+    if (lista && lista.length) state.faltando.set(consumidor, new Set(lista));
+    else state.faltando.delete(consumidor);
+  }
+
+  function registraLido(consumidor, arquivo) {
+    try { state.mtimes.set(arquivo, fs.statSync(arquivo).mtimeMs); } catch (e) { /* sumiu entre servir e anotar */ }
+    const atual = state.deps.get(consumidor);
+    if (atual && atual.size === 1 && atual.has(arquivo)) return;
+    state.deps.set(consumidor, new Set([arquivo]));
+    anuncia();
+  }
+
+  // O que o observador nativo precisa vigiar: tudo o que foi lido fora de node_modules,
+  // mais o que muda o build inteiro (package.json, .env). node_modules é olhado só pela
+  // pasta de cima — instalar ou remover pacote mexe nela.
+  function retrato() {
+    const arquivos = new Map();
+    for (const s of state.deps.values()) {
+      for (const f of s) {
+        if (ehDePacote(f) || arquivos.has(f)) continue;
+        const m = state.mtimes.has(f) ? state.mtimes.get(f) : globalThis.__mtimeLido(f);
+        arquivos.set(f, m);
+      }
+    }
+    for (const n of ["package.json", ".env", ".env.local", ".env.development"]) {
+      const f = path.join(state.root, n);
+      if (!arquivos.has(f)) arquivos.set(f, null);
+    }
+    const pastas = new Set([state.root, ...PASTAS_DE_PACOTES.map((n) => path.join(state.root, n))]);
+    for (const s of state.faltando.values()) for (const d of s) pastas.add(d);
+    return { versao: state.versao, arquivos: [...arquivos].map(([f, m]) => [f, m]), pastas: [...pastas], diagnostics: state.diagnostics };
+  }
+
+  // Acorda quem espera o próximo retrato — mas só se ele mudou. Servir o mesmo estático
+  // cem vezes não pode virar cem idas e voltas ao nativo.
+  function anuncia() {
+    const r = retrato();
+    const json = JSON.stringify([r.arquivos, r.pastas, r.diagnostics]);
+    if (json === state.retratoJSON) return;
+    state.retratoJSON = json;
+    state.versao++;
+    r.versao = state.versao;
+    const w = state.esperas;
+    state.esperas = [];
+    for (const f of w) f(r);
+  }
+
+  // Espera longa: o nativo pergunta "o que há depois da versão N?" e a resposta só vem
+  // quando houver algo. Sem relógio e sem ida e volta à toa.
+  function espera(versao) {
+    if (state.parado) return Promise.resolve(null);
+    if (state.versao !== versao) return Promise.resolve(retrato());
+    return new Promise((resolve) => state.esperas.push(resolve));
+  }
+
+  // ---- mudanças ----
+  const ehAmbiente = (f) =>
+    PASTAS_DE_PACOTES.some((n) => f === path.join(state.root, n) || f.startsWith(path.join(state.root, n) + "/")) ||
+    (path.dirname(f) === state.root && (/^package(-lock)?\.json$/.test(path.basename(f)) || path.basename(f).startsWith(".env")));
+
+  const tronco = (f) => path.join(path.dirname(f), path.basename(f, path.extname(f)));
+
+  // O observador nativo já filtrou regravação com o mesmo conteúdo; o que chega aqui
+  // mudou de verdade. Falta saber se importa: só o que está no grafo de alguém importa,
+  // e arquivo novo só quando um import quebrado pode passar a achar ele (ou quando ele
+  // tem o mesmo nome de um que já era lido, com outra extensão — a resolução pode mudar).
+  function mudou(alterados, criados) {
+    const vez = state.fila.then(() => processaMudanca(alterados, criados));
+    state.fila = vez.catch(() => {});
+    return vez;
+  }
+
+  async function processaMudanca(alterados, criados) {
+    if (state.parado) return { acao: "nada", refeitos: 0 };
+    if (alterados.concat(criados).some(ehAmbiente)) { await invalida(); return { acao: "reload", refeitos: 0, tudo: true }; }
+    const afetados = new Set();
+    // Resolução de import só muda se sumiu um arquivo que alguém lia, ou se nasceu um com
+    // o mesmo nome e outra extensão (`App.tsx` ao lado do `App.jsx` que era lido).
+    let estrutura = false;
+    for (const f of alterados) {
+      for (const [c, s] of state.deps) {
+        if (!s.has(f)) continue;
+        afetados.add(c);
+        if (!fs.existsSync(f)) estrutura = true;
+      }
+    }
+    if (criados.length) {
+      const troncos = new Set(criados.map(tronco));
+      const pastasNovas = new Set(criados.map((f) => path.dirname(f)));
+      for (const [c, s] of state.faltando) for (const d of s) if (pastasNovas.has(d)) afetados.add(c);
+      for (const [c, s] of state.deps) for (const f of s) if (troncos.has(tronco(f))) { afetados.add(c); estrutura = true; }
+      for (const [k, e] of state.entradas) {
+        const r = await e.ultimo.catch(() => null);
+        if (r && !r.ok) afetados.add("b:" + k);
+      }
+    }
+    globalThis.__esqueceArquivos(alterados, estrutura);
+    if (!afetados.size) return { acao: "nada", refeitos: 0 };
+    let recarrega = false, estilo = false, refeitos = 0;
+    for (const c of afetados) {
+      if (c.startsWith("b:")) {
+        if (!state.entradas.has(c.slice(2))) continue;
+        const d = await refaz(c.slice(2));
+        refeitos++;
+        if (d.js) recarrega = true; else if (d.css) estilo = true;
+      } else {
+        // Página do Next, ilhas, .astro, estático: a saída deles só existe no próximo
+        // pedido, então o navegador pede de novo. O cache da página vai embora aqui — a
+        // data do arquivo da página não muda quando é o componente importado que muda.
+        if (c.startsWith("next:")) pacoteNext.delete(c.slice(5));
+        if (c.startsWith("astro:")) modAstro.clear();
+        recarrega = true;
+      }
+    }
+    const acao = recarrega ? "reload" : estilo ? "css" : "nada";
+    avisa(acao);
+    return { acao, refeitos };
+  }
+
+  function avisa(acao) {
+    if (acao === "nada") return;
+    state.stats[acao]++;
+    for (const s of state.sockets) s.send(acao);
+  }
+
+  // Tudo do zero: package.json, .env ou node_modules mudaram, ou alguém pediu Rebuild.
+  // Os defines do .env entram nas opções do contexto, então os contextos vão embora.
+  async function invalida() {
+    state.entradas.clear();
+    pacoteNext.clear();
+    modAstro.clear();
+    ctxNext = null;
+    for (const k of [...state.deps.keys()]) if (!k.startsWith("est:")) state.deps.delete(k);
+    state.faltando.clear();
+    globalThis.__esqueceTudo();
+    await globalThis.__descartaContextos("dev" + state.id + ":");
+    anuncia();
+    avisa("reload");
+    return state.sockets.size;
   }
 
   function errorOverlay(errors) {
@@ -120,14 +357,19 @@
     const mt = fs.statSync(arquivo).mtimeMs;
     const cache = pacoteNext.get(arquivo);
     if (cache && cache.mt === mt) return cache.exports;
-    const r = await globalThis.__build({
+    const r = await globalThis.__buildBruto({
       root: state.root, entries: [path.relative(state.root, arquivo)],
       format: "cjs", platform: "node", dev: true, outdir: "__odete_next",
       external: ["react", "react-dom", "react/jsx-runtime", "react/jsx-dev-runtime", "next/*"],
-      ilhas: ilhasDoBuild, acoes: "servidor",
+      ilhas: ilhasDoBuild, acoes: "servidor", metafile: true,
     });
+    // O que a página importa entra no grafo: mexer num componente dela tem de derrubar o
+    // cache da página, e a data do arquivo da página não muda quando é o componente.
+    defineDeps("next:" + arquivo, r.entradas || lidosNaFalha("next:" + arquivo, arquivo, r.errors));
+    defineFaltando("next:" + arquivo, r.faltando);
+    anuncia();
     if (!r.ok) throw new Error((r.errors[0] && r.errors[0].text) || "build da página falhou");
-    const saida = r.files.find((f) => f.path.endsWith(".js"));
+    const saida = r.saidas.find((f) => f.path.endsWith(".js"));
     if (!saida) throw new Error("build da página não produziu JS");
     const mod = { exports: {} };
     const ctx = contextoNext();
@@ -156,17 +398,18 @@
       `import { ${e.nome} as __c${i} } from ${JSON.stringify("odete-real:" + e.abs)};`).join("\n");
     const mapa = entradas.map((e, i) => `  ${JSON.stringify(e.id)}: __c${i},`).join("\n");
     const virtual = `${importa}\nexport const MODULOS = {\n${mapa}\n};\n`;
-    const r = await globalThis.__build({
+    const r = await globalThis.__buildBruto({
       root: state.root, entries: ["__odete_ilhas_entrada.js"], format: "esm", platform: "browser",
-      dev: true, outdir: "__odete_ilhas", externalMissing: true, acoes: "cliente",
+      dev: true, outdir: "__odete_ilhas", externalMissing: true, acoes: "cliente", metafile: true,
       virtuais: {
         "__odete_ilhas_entrada.js": globalThis.__ilhasClienteJS,
         "virtual:odete-ilhas": virtual,
       },
     });
+    if (r.entradas) { defineDeps("ilhas:" + rota, r.entradas); anuncia(); }
     if (!r.ok) throw new Error((r.errors[0] && r.errors[0].text) || "build das ilhas falhou");
-    const saida = r.files.find((f) => f.path.endsWith(".js"));
-    return saida ? saida.text : "// build das ilhas não produziu JS";
+    const saida = r.saidas.find((f) => f.path.endsWith(".js"));
+    return saida ? saida.contents : "// build das ilhas não produziu JS";
   }
 
   // `next/link` e `next/image` existem para o roteador e o otimizador do Next, que aqui
@@ -218,7 +461,7 @@
       let itens = [];
       try { itens = fs.readdirSync(dir); } catch (e) { continue; }
       for (const item of itens) {
-        if (item === "node_modules" || item[0] === ".") continue;
+        if (PASTAS_DE_PACOTES.includes(item) || item[0] === ".") continue;
         const f = path.join(dir, item);
         let st;
         try { st = fs.statSync(f); } catch (e) { continue; }
@@ -402,6 +645,7 @@
   const modAstro = new Map();
   function carregaAstro(arquivo) {
     const mt = fs.statSync(arquivo).mtimeMs;
+    registraLido("astro:" + arquivo, arquivo);
     const cache = modAstro.get(arquivo);
     if (cache && cache.mt === mt) return cache.exports;
     const js = globalThis.__astroCompila(fs.readFileSync(arquivo, "utf8"), arquivo);
@@ -483,8 +727,11 @@
         if (fs.existsSync(f) && fs.statSync(f).isDirectory()) f = path.join(f, "index.html");
         if (!fs.existsSync(f)) continue;
         const ext = path.extname(f).toLowerCase();
-        if (ext === ".html") return send(res, 200, MIME[".html"], html(f), extras);
         if ([".ts", ".tsx", ".jsx", ".mts"].includes(ext)) { const b = await bundle(path.relative(state.root, f)); return send(res, 200, MIME[".js"], b.js, extras); }
+        // O que foi servido entra no grafo: mudar o index.html ou uma imagem de public/
+        // que a página mostra tem de recarregar; mudar o que ninguém pediu, não.
+        registraLido("est:" + f, f);
+        if (ext === ".html") return send(res, 200, MIME[".html"], html(f), extras);
         return send(res, 200, MIME[ext] || "application/octet-stream", fs.readFileSync(f), extras);
       }
       // páginas de framework, antes do fallback: nem Astro nem Next têm index.html
@@ -572,7 +819,10 @@
       }
       // SPA fallback
       const index = path.join(state.root, "index.html");
-      if (!path.extname(p) && fs.existsSync(index)) return send(res, 200, MIME[".html"], html(index), extras);
+      if (!path.extname(p) && fs.existsSync(index)) {
+        registraLido("est:" + index, index);
+        return send(res, 200, MIME[".html"], html(index), extras);
+      }
       if (!path.extname(p) && ehProjetoNext()) {
         return await enviaEspecial(res, p, url, "not-found", 404, extras, null);
       }
@@ -582,15 +832,96 @@
     }
   }
 
-  globalThis.__devStart = (root, port, preset) => new Promise((resolve, reject) => {
-    state.root = root; state.preset = preset || "plain";
-    const srv = http.createServer(handle);
-    srv.on("odete:ws", (sock) => { state.sockets.add(sock); sock.on("close", () => state.sockets.delete(sock)); });
-    srv.on("error", reject);
-    srv.listen(port || 5173, () => { state.server = srv; state.port = srv.address().port; resolve({ port: state.port }); });
-  });
+  function inicia(id, root, port, preset) {
+    return new Promise((resolve, reject) => {
+      state.id = id; state.root = root; state.preset = preset || "plain";
+      const srv = http.createServer(handle);
+      srv.on("odete:ws", (sock) => { state.sockets.add(sock); sock.on("close", () => state.sockets.delete(sock)); });
+      srv.on("error", reject);
+      srv.listen(port || 5173, () => { state.server = srv; state.port = srv.address().port; resolve({ port: state.port }); });
+    });
+  }
 
-  globalThis.__devInvalidate = () => { state.cache.clear(); for (const s of state.sockets) s.send("reload"); return state.sockets.size; };
-  globalThis.__devStop = () => { if (state.server) state.server.close(); state.server = null; return true; };
-  globalThis.__devDiagnostics = () => state.diagnostics;
+  // Fecha a porta, acorda quem espera com `null` (o laço do nativo termina) e descarta
+  // os contextos — o motor continua vivo para o lint e para o próximo servidor.
+  //
+  // A resposta não espera o Go soltar a memória dos contextos: fechar o projeto logo
+  // depois para o motor, e uma chamada pendurada numa resposta que não vem mais
+  // seguraria o motor inteiro vivo. Os contextos saem da lista na hora; o descarte segue
+  // sozinho.
+  function para() {
+    state.parado = true;
+    if (state.server) state.server.close();
+    state.server = null;
+    const w = state.esperas;
+    state.esperas = [];
+    for (const f of w) f(null);
+    state.fila.catch(() => {}).then(() => globalThis.__descartaContextos("dev" + state.id + ":"));
+    return true;
+  }
+
+  function naFila(fn) {
+    const vez = state.fila.then(fn);
+    state.fila = vez.catch(() => {});
+    return vez;
+  }
+
+  return {
+    inicia, para, mudou, espera, vivos,
+    invalida: () => naFila(invalida),
+    diagnosticos: () => state.diagnostics,
+    estatisticas: () => Object.assign({ contextos: globalThis.__contextosVivos(), sockets: state.sockets.size }, state.stats),
+  };
+};
+
+// O que o Swift chama. Cada servidor tem um id; as chamadas antigas, sem id, valem para
+// todos (é assim que o botão Rebuild e o código de antes continuam funcionando).
+(function () {
+  const servidores = globalThis.__devServidores || (globalThis.__devServidores = new Map());
+  const um = (id) => {
+    const s = servidores.get(id);
+    if (!s) throw new Error("dev server " + id + " não está no ar");
+    return s;
+  };
+  const todos = (id) => (id == null ? [...servidores.values()] : [um(id)]);
+
+  globalThis.__devGuardaVivos = () => {
+    const uniao = new Set();
+    for (const s of servidores.values()) for (const f of s.vivos()) uniao.add(f);
+    globalThis.__guardaSo(uniao);
+  };
+
+  globalThis.__devStart = async (root, port, preset) => {
+    const id = (globalThis.__devProximoId = (globalThis.__devProximoId || 0) + 1);
+    const s = globalThis.__devCria();
+    servidores.set(id, s);
+    try {
+      const r = await s.inicia(id, root, port, preset);
+      return { id, port: r.port };
+    } catch (e) {
+      servidores.delete(id);
+      throw e;
+    }
+  };
+  globalThis.__devMudou = (id, alterados, criados) => um(id).mudou(alterados || [], criados || []);
+  globalThis.__devInvalidate = async (id) => {
+    let n = 0;
+    for (const s of todos(id)) n += await s.invalida();
+    return n;
+  };
+  globalThis.__devStop = async (id) => {
+    const alvos = id == null ? [...servidores.keys()] : [id];
+    for (const k of alvos) {
+      const s = servidores.get(k);
+      servidores.delete(k);
+      if (s) await s.para();
+    }
+    return true;
+  };
+  globalThis.__devDiagnostics = (id) => todos(id).flatMap((s) => s.diagnosticos());
+  globalThis.__devEspera = (id, versao) => {
+    const s = servidores.get(id);
+    return s ? s.espera(versao) : null;
+  };
+  globalThis.__devEstatisticas = (id) => um(id).estatisticas();
 })();

@@ -13,7 +13,7 @@ extension WorkspaceModel {
         analysisTasks[path] = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(350))
             guard !Task.isCancelled else { return }
-            self?.analyze(path)
+            self?.analyze(path, porEdicao: true)
         }
     }
 
@@ -43,6 +43,11 @@ extension WorkspaceModel {
     }
 
     func analyze(_ path: String) {
+        analyze(path, porEdicao: false)
+    }
+
+    /// `porEdicao`: veio de digitação (e não de abrir, restaurar ou recarregar do disco).
+    func analyze(_ path: String, porEdicao: Bool) {
         guard let text = buffers[path] else { return }
         let lang = Language.detect(path: path)
         // Bundle e minificado: o esboço vira uma lista de mil entradas inúteis, o lint
@@ -82,20 +87,88 @@ extension WorkspaceModel {
                 self.refreshPatchMarks(path)
             }
         }
-        switch lang {
-        case .javascript, .jsx, .typescript, .tsx:
-            let engine = run.active?.shell.bundler ?? lintEngine ?? {
-                let e = Esbuild(root: root)
-                lintEngine = e
-                return e
-            }()
-            Task { [weak self] in
-                let diags = await (try? engine.lint(text, file: path)) ?? []
-                guard let self, buffers[path] == text else { return }
-                syntax[path] = diags.filter { $0.kind == .error }
-            }
-        default:
+        if Self.lintaComEsbuild(lang) {
+            lintarSintaxe(path, text: text, porEdicao: porEdicao)
+        } else {
             syntax[path] = nil
+        }
+    }
+
+    // MARK: - Sintaxe pelo esbuild
+
+    /// Quanto o workspace espera, depois de aparecer, antes de subir o esbuild só para
+    /// conferir as abas restauradas.
+    static let janelaDeAbertura: Duration = .seconds(3)
+
+    /// Espera a mais, só para o esbuild, depois da pausa que já dispara a análise: 350 +
+    /// 250 ≈ 600 ms. Esboço e regras são nativos e baratos; a sintaxe é wasm interpretado.
+    static let esperaDoEsbuild: Duration = .milliseconds(250)
+
+    /// Chave da tarefa que roda os lints adiados da abertura. `analysisTasks` é por
+    /// caminho, e caminho nenhum tem byte nulo.
+    static let chaveDosAdiados = "\u{0}lint-adiado"
+
+    static func lintaComEsbuild(_ lang: Language) -> Bool {
+        switch lang {
+        case .javascript, .jsx, .typescript, .tsx: true
+        default: false
+        }
+    }
+
+    /// Sintaxe de JS/TS vem do esbuild do projeto — o mesmo do terminal e do dev server.
+    ///
+    /// O caro aqui é o esbuild: no iPad, wasm e JS rodam interpretados, e subir o motor
+    /// compila um módulo de 14 MB. Então:
+    /// - na abertura, uma aba `.tsx` restaurada não sobe o motor: o lint dela espera a
+    ///   pessoa editar o arquivo ou o workspace ter aparecido há `janelaDeAbertura`;
+    /// - digitando, o esbuild só entra depois de `esperaDoEsbuild` a mais;
+    /// - texto igual ao último lintado não volta ao esbuild (`Esbuild.lint` guarda).
+    func lintarSintaxe(_ path: String, text: String, porEdicao: Bool) {
+        let chave = path + "\u{0}lint"
+        analysisTasks[chave]?.cancel()
+        guard let motor = motorDoLint(porEdicao: porEdicao) else {
+            agendarLintsAdiados()
+            return
+        }
+        let espera = porEdicao ? Self.esperaDoEsbuild : .zero
+        analysisTasks[chave] = Task { [weak self] in
+            if espera > .zero {
+                try? await Task.sleep(for: espera)
+                guard !Task.isCancelled else { return }
+            }
+            let diags = await (try? motor.lint(text, file: path)) ?? []
+            guard let self, !Task.isCancelled, buffers[path] == text else { return }
+            syntax[path] = diags.filter { $0.kind == .error }
+        }
+    }
+
+    /// O esbuild para lintar agora, ou `nil` se é cedo demais para subir um.
+    ///
+    /// Se alguém já subiu o do projeto (o terminal, o dev server), ele é usado na hora: o
+    /// custo de criar já foi pago. Senão, só edição ou o fim da janela de abertura criam.
+    func motorDoLint(porEdicao: Bool) -> Esbuild? {
+        if let motor = lintEngine ?? Esbuild.existente(root) {
+            lintEngine = motor
+            return motor
+        }
+        guard porEdicao || ContinuousClock.now - run.criadoEm >= Self.janelaDeAbertura else { return nil }
+        let motor = Esbuild.doProjeto(root)
+        lintEngine = motor
+        return motor
+    }
+
+    /// No fim da janela de abertura, linta as abas de JS/TS que ficaram sem resposta.
+    private func agendarLintsAdiados() {
+        guard analysisTasks[Self.chaveDosAdiados] == nil else { return }
+        let falta = max(.zero, Self.janelaDeAbertura - (ContinuousClock.now - run.criadoEm))
+        analysisTasks[Self.chaveDosAdiados] = Task { [weak self] in
+            try? await Task.sleep(for: falta)
+            guard let self, !Task.isCancelled else { return }
+            analysisTasks[Self.chaveDosAdiados] = nil
+            for t in tabs where syntax[t.path] == nil && Self.lintaComEsbuild(Language.detect(path: t.path)) {
+                guard let texto = buffers[t.path], texto.utf8.count <= Limites.arquivoGrande else { continue }
+                lintarSintaxe(t.path, text: texto, porEdicao: false)
+            }
         }
     }
 

@@ -2,6 +2,7 @@ import Foundation
 import OdeteCore
 import OdeteI18n
 import OdeteRuntime
+import Synchronization
 
 public struct Diagnostic: Sendable, Hashable, Codable, Identifiable {
     public enum Kind: String, Sendable, Codable { case error, warning, info }
@@ -36,43 +37,153 @@ public struct BuildResult: Sendable {
     public var diagnostics: [Diagnostic]
 }
 
-/// Um JSEngine com o esbuild-wasm carregado. Um por projeto (o dev server vive nele) e um compartilhado
-/// para transformações avulsas (`node x.ts`).
+/// Um JSEngine com o esbuild-wasm carregado.
+///
+/// **Um por projeto**, via `doProjeto(_:)`: o dev server, o `vite build`, o `node x.ts` de
+/// qualquer aba e o lint do editor falam com o mesmo. Cada instância compila o módulo de
+/// 14 MB e segura a própria memória linear do Go, que só cresce — antes eram uma por aba
+/// de terminal, mais uma por `npm run dev`, mais a do lint, criada já na abertura do app.
+/// No iPad isso é memória e bateria gastas em cópias do mesmo compilador.
+///
+/// A fila do JSEngine é serial: um lint pode esperar atrás de um rebuild. Tudo aqui é
+/// `async` e nada bloqueia quem chama esperando pela própria fila, então esperar é tudo o
+/// que acontece — sem trava e sem engasgo na interface.
 public final class Esbuild: @unchecked Sendable {
     public let engine: JSEngine
     public let root: URL
-    private var initialized: Task<String, Error>?
-    public var onOutput: (@Sendable (OutputKind, String) -> Void)?
+    private let inicializacao = Mutex<Task<String, Error>?>(nil)
+    private let saida: SaidaDoMotor
+    private let paradas = Mutex<[Task<Void, Never>]>([])
+    private let ultimoLint = Mutex<[String: (texto: String, diagnosticos: [Diagnostic])]>([:])
+    /// Quantos lints chegaram de fato ao esbuild (os repetidos não contam). Para teste.
+    let lintsExecutados = Mutex(0)
 
     public static let version: String = {
         let u = Bundle.module.url(forResource: "esbuild", withExtension: nil)!.appending(path: "VERSION")
         return (try? String(contentsOf: u, encoding: .utf8))?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "?"
     }()
 
+    /// Um esbuild avulso, fora do registro. Quem quer o do projeto usa `doProjeto(_:)`.
     public init(root: URL, output: @escaping @Sendable (OutputKind, String) -> Void = { _, _ in }) {
         self.root = root
-        engine = JSEngine(cwd: root, output: output)
+        let caixa = SaidaDoMotor()
+        saida = caixa
+        engine = JSEngine(cwd: root) { tipo, texto in
+            (caixa.destino ?? output)(tipo, texto)
+        }
     }
 
-    /// Carrega o esbuild (uma vez; ~1-2 s).
+    deinit {
+        // Ninguém mais usa: timers e servidores do motor param junto, senão o Go dentro
+        // dele seguiria agendando despertares para um compilador que ninguém chama.
+        engine.stop()
+    }
+
+    // MARK: - Um por projeto
+
+    /// Referência fraca: fechar o projeto (e com ele as abas, o servidor e o editor) solta
+    /// o motor e a memória dele. Enquanto alguém segura, todo mundo recebe o mesmo.
+    private final class Fraca: @unchecked Sendable {
+        weak var valor: Esbuild?
+        init(_ valor: Esbuild) {
+            self.valor = valor
+        }
+    }
+
+    private static let registro = Mutex<[String: Fraca]>([:])
+
+    static func chave(_ root: URL) -> String {
+        root.standardizedFileURL.resolvingSymlinksInPath().path
+    }
+
+    /// O esbuild do projeto em `root`, criado na primeira vez que alguém pede.
+    public static func doProjeto(_ root: URL) -> Esbuild {
+        let k = chave(root)
+        return registro.withLock { tabela in
+            tabela = tabela.filter { $0.value.valor != nil }
+            if let vivo = tabela[k]?.valor {
+                return vivo
+            }
+            let novo = Esbuild(root: root)
+            tabela[k] = Fraca(novo)
+            return novo
+        }
+    }
+
+    /// O do projeto se alguém já criou — sem criar. O lint usa isto para não subir um
+    /// motor inteiro só porque o app abriu com um `.tsx` na aba.
+    public static func existente(_ root: URL) -> Esbuild? {
+        let k = chave(root)
+        return registro.withLock { $0[k]?.valor }
+    }
+
+    // MARK: - Saída
+
+    /// A saída do JS (console do dev server, erro de página do Next) vai para quem pediu por
+    /// último — o terminal que subiu o servidor. O token deixa quem saiu soltar só a sua.
+    func definirSaida(_ destino: @escaping @Sendable (OutputKind, String) -> Void) -> Int {
+        saida.definir(destino)
+    }
+
+    func soltarSaida(_ token: Int) {
+        saida.soltar(token)
+    }
+
+    public var onOutput: (@Sendable (OutputKind, String) -> Void)? {
+        get { saida.destino }
+        set {
+            if let newValue {
+                _ = saida.definir(newValue)
+            } else {
+                saida.soltar(nil)
+            }
+        }
+    }
+
+    // MARK: - Paradas pendentes
+
+    /// Um servidor que para manda o JS fechar a porta e descartar os contextos; o próximo a
+    /// subir no mesmo motor espera isso terminar, senão pegaria a porta ainda ocupada.
+    func enfileirarParada(_ corpo: @escaping @Sendable () async -> Void) {
+        let t = Task { await corpo() }
+        paradas.withLock { $0.append(t) }
+    }
+
+    func esperarParadas() async {
+        let pendentes = paradas.withLock { lista in
+            defer { lista.removeAll() }
+            return lista
+        }
+        for t in pendentes {
+            await t.value
+        }
+    }
+
+    // MARK: - Carga
+
+    /// Carrega o esbuild (uma vez; ~1-2 s). Chamadas simultâneas esperam a mesma carga:
+    /// carregar duas vezes faria o esbuild recusar o segundo `initialize`.
     public func ready() async throws -> String {
-        if let t = initialized {
-            return try await t.value
+        let t = inicializacao.withLock { atual -> Task<String, Error> in
+            if let atual {
+                return atual
+            }
+            let nova = Task<String, Error> { [engine] in
+                let res = Bundle.module.url(forResource: "esbuild", withExtension: nil)!
+                let js = Bundle.module.url(forResource: "js", withExtension: nil)!
+                try await engine.evaluate(
+                    String(contentsOf: js.appending(path: "bundler.js"), encoding: .utf8),
+                    name: "bundler.js"
+                )
+                let v = try await engine.call(
+                    "__esbuildInit",
+                    [res.appending(path: "browser.js").path, res.appending(path: "esbuild.wasm").path]
+                )
+                return v.trimmingCharacters(in: CharacterSet(charactersIn: "\""))
+            }
+            atual = nova
+            return nova
         }
-        let t = Task<String, Error> { [engine] in
-            let res = Bundle.module.url(forResource: "esbuild", withExtension: nil)!
-            let js = Bundle.module.url(forResource: "js", withExtension: nil)!
-            try await engine.evaluate(
-                String(contentsOf: js.appending(path: "bundler.js"), encoding: .utf8),
-                name: "bundler.js"
-            )
-            let v = try await engine.call(
-                "__esbuildInit",
-                [res.appending(path: "browser.js").path, res.appending(path: "esbuild.wasm").path]
-            )
-            return v.trimmingCharacters(in: CharacterSet(charactersIn: "\""))
-        }
-        initialized = t
         return try await t.value
     }
 
@@ -85,12 +196,22 @@ public final class Esbuild: @unchecked Sendable {
         return (obj?["code"] as? String) ?? ""
     }
 
-    /// Só sintaxe: diagnósticos do esbuild para um arquivo, sem gerar código.
+    // MARK: - Lint
+
+    /// Só sintaxe: diagnósticos do esbuild para um arquivo.
+    ///
+    /// O mesmo texto do mesmo arquivo não volta ao esbuild: salvar, recarregar do disco e
+    /// reabrir a aba pedem lint de novo com o texto que já foi conferido, e cada ida custa
+    /// uma análise inteira em wasm interpretado. A resposta guardada é a mesma que viria.
     public func lint(_ code: String, file: String) async throws -> [Diagnostic] {
+        if let guardado = ultimoLint.withLock({ $0[file] }), guardado.texto == code {
+            return guardado.diagnosticos
+        }
         _ = try await ready()
         let ext = (file as NSString).pathExtension.lowercased()
         let loader = ["ts": "ts", "mts": "ts", "cts": "ts", "tsx": "tsx", "jsx": "jsx", "css": "css",
                       "json": "json"][ext] ?? "js"
+        lintsExecutados.withLock { $0 += 1 }
         let json = try await engine.call("__lint", [code, loader, file])
         guard let obj = try JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any] else { return [] }
         func parse(_ key: String, _ kind: Diagnostic.Kind) -> [Diagnostic] {
@@ -106,22 +227,40 @@ public final class Esbuild: @unchecked Sendable {
                 )
             }
         }
-        return parse("errors", .error) + parse("warnings", .warning)
+        let diagnosticos = parse("errors", .error) + parse("warnings", .warning)
+        ultimoLint.withLock { tabela in
+            // Poucos arquivos ficam abertos; o teto só impede a tabela de crescer sem fim
+            // numa sessão longa que abre e fecha centenas deles.
+            if tabela.count >= 64, tabela[file] == nil {
+                tabela.removeAll()
+            }
+            tabela[file] = (code, diagnosticos)
+        }
+        return diagnosticos
     }
 
     /// TS/ESM → CJS, bloqueante (para o `require` de outro runtime).
+    ///
+    /// Bloqueia a fila de quem chama, nunca a deste motor: quem chama é o runtime de um
+    /// `node x.ts`, que tem fila própria. Chamar daqui de dentro travaria para sempre.
     public func transformCJSSync(_ code: String, file: String) throws -> String {
         let json = try engine.callSync("__transformCJS", [code, file])
         return try (JSONSerialization.jsonObject(with: Data(json.utf8), options: [.fragmentsAllowed]) as? String) ?? ""
     }
 
+    /// Build avulso (o `vite build`, por exemplo).
+    ///
+    /// Sem sourcemap por padrão: o bundler.js caía em `inline` quando ninguém dizia nada, e
+    /// o `vite build` saía com o mapa inteiro embutido no JS de produção — o dobro do
+    /// tamanho para quem abre o site.
     public func build(
         entries: [String],
         platform: String = "browser",
         format: String = "esm",
         dev: Bool = true,
         minify: Bool = false,
-        define: [String: String] = [:]
+        define: [String: String] = [:],
+        sourcemap: Bool = false
     ) async throws -> BuildResult {
         _ = try await ready()
         let json = try await engine.call(
@@ -135,6 +274,7 @@ public final class Esbuild: @unchecked Sendable {
                 "minify": minify,
                 "define": define,
                 "outdir": "dist",
+                "sourcemap": sourcemap ? "inline" : false,
             ] as [String: Any]]
         )
         return try Self.parseBuild(json)
@@ -168,5 +308,33 @@ public final class Esbuild: @unchecked Sendable {
     /// Transformador para injetar num `JSProcess`.
     public var cjsTransform: @Sendable (String, String) throws -> String {
         { [self] code, file in try transformCJSSync(code, file: file) }
+    }
+}
+
+/// Para onde vai o que o JS do motor escreve. Classe à parte porque o motor é criado
+/// antes de o `Esbuild` existir, e a saída precisa ser trocada depois.
+final class SaidaDoMotor: @unchecked Sendable {
+    private let trava = NSLock()
+    private var token = 0
+    private var atual: (@Sendable (OutputKind, String) -> Void)?
+
+    var destino: (@Sendable (OutputKind, String) -> Void)? {
+        trava.lock(); defer { trava.unlock() }
+        return atual
+    }
+
+    func definir(_ destino: @escaping @Sendable (OutputKind, String) -> Void) -> Int {
+        trava.lock(); defer { trava.unlock() }
+        token += 1
+        atual = destino
+        return token
+    }
+
+    /// Solta só se ninguém tiver definido outra depois (`nil` solta de qualquer jeito).
+    func soltar(_ dono: Int?) {
+        trava.lock(); defer { trava.unlock() }
+        if dono == nil || dono == token {
+            atual = nil
+        }
     }
 }

@@ -313,12 +313,17 @@ public final class Shell: @unchecked Sendable {
         esbuildEngine()
     }
 
+    /// O esbuild do projeto — o mesmo para todas as abas, o dev server e o lint do editor.
+    ///
+    /// Antes cada aba criava o seu, e cada um compila o módulo de 14 MB e segura a memória
+    /// do Go dele. A aba guarda a referência forte: enquanto houver aba aberta no projeto, o
+    /// motor não some entre um comando e outro.
     func esbuildEngine() -> Esbuild {
         lock.lock(); defer { lock.unlock() }
         if let e = esbuild {
             return e
         }
-        let e = Esbuild(root: root)
+        let e = Esbuild.doProjeto(root)
         esbuild = e
         return e
     }

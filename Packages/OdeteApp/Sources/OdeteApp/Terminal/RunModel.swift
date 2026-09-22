@@ -21,6 +21,10 @@ public final class RunModel {
     public var previewURL: URL?
     /// Tarefa que segura o app acordado enquanto ele está no fundo com servidor de pé.
     var tarefaDeFundo: UIBackgroundTaskIdentifier = .invalid
+    /// Quando o workspace nasceu (ele cria este modelo no próprio init). O lint do editor
+    /// usa para não subir o esbuild nos primeiros segundos só porque uma aba `.tsx` foi
+    /// restaurada — ver `Analysis.swift`.
+    let criadoEm = ContinuousClock.now
     private let authorBox: SendBox<Void, Signature>
     private let credBox: SendBox<String, Credentials?>
 

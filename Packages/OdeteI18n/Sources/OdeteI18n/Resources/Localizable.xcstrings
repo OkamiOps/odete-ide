@@ -14673,6 +14673,62 @@
         }
       }
     },
+    "Problema nesta linha · abrir Problemas": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Problem on this line · open Problems"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Problem in dieser Zeile · Probleme öffnen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Problème sur cette ligne · ouvrir Problèmes"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Problema en esta línea · abrir Problemas"
+          }
+        }
+      }
+    },
+    "Problema nesta linha: %1$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Problem on this line: %1$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Problem in dieser Zeile: %1$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Problème sur cette ligne : %1$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Problema en esta línea: %1$@"
+          }
+        }
+      }
+    },
     "Problemas": {
       "localizations": {
         "en": {

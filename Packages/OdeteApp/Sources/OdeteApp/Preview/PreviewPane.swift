@@ -273,7 +273,9 @@ struct PreviewConsole: View {
                     }
                     .padding(10)
                 }
-                .onChange(of: pv.console.count) {
+                // A versão, e não a contagem: no teto de 1000 linhas a contagem para de
+                // mudar e a rolagem até o fim parava junto.
+                .onChange(of: pv.versaoDoConsole) {
                     if let last = pv.console.last {
                         proxy.scrollTo(
                             last.id,

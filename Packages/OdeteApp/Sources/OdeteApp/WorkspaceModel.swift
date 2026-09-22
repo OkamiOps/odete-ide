@@ -107,6 +107,7 @@ public final class WorkspaceModel {
         active = chrome.activeTab(for: project.id).flatMap { p in tabs.contains { $0.path == p } ? p : nil } ?? tabs
             .first?.path
         expanded = Set(chrome.snapshot.expandedByProject[project.id] ?? ["src"])
+        PastaDeModulos.migrarSePreciso(root) // no iCloud, node_modules sai da sincronização
         reload()
         for t in tabs {
             load(t.path)

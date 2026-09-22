@@ -60,13 +60,34 @@ final class FakeRegistry: RegistryClient, @unchecked Sendable {
     var packuments: [String: Packument] = [:]
     var tarballs: [String: Data] = [:]
     let hits = Mutex<Int>(0)
+    let downloads = Mutex<[String]>([])
+    /// Atraso simulado de rede, por URL de tarball ou nome de packument. Sem isto o
+    /// registro fake responde na hora e não dá para ver o custo de esperar o mais lento.
+    var latencia: (@Sendable (String) -> Duration)?
+    /// Quantas buscas de packument estão no ar ao mesmo tempo, e o máximo visto.
+    let simultaneas = Mutex<(agora: Int, pico: Int)>((0, 0))
+
     func packument(_ name: String) async throws -> Packument {
         hits.withLock { $0 += 1 }
+        simultaneas.withLock { $0.agora += 1; $0.pico = max($0.pico, $0.agora) }
+        defer { simultaneas.withLock { $0.agora -= 1 } }
+        if let latencia {
+            try await Task.sleep(for: latencia(name))
+        }
         guard let p = packuments[name] else { throw NpmError.notFound(name) }
         return p
     }
 
+    /// Downloads no ar ao mesmo tempo, e o máximo visto.
+    let tarballsNoAr = Mutex<(agora: Int, pico: Int)>((0, 0))
+
     func tarball(_ url: String, integrity: String?) async throws -> Data {
+        downloads.withLock { $0.append(url) }
+        tarballsNoAr.withLock { $0.agora += 1; $0.pico = max($0.pico, $0.agora) }
+        defer { tarballsNoAr.withLock { $0.agora -= 1 } }
+        if let latencia {
+            try await Task.sleep(for: latencia(url))
+        }
         guard let d = tarballs[url] else { throw NpmError.tarball("404 \(url)") }
         return d
     }
@@ -75,9 +96,11 @@ final class FakeRegistry: RegistryClient, @unchecked Sendable {
         _ name: String,
         _ version: String,
         deps: [String: String] = [:],
+        optional: [String: String] = [:],
         bin: [String: String] = [:],
         files: [String: String] = [:],
         os: [String] = [],
+        cpu: [String] = [],
         install: Bool = false,
         latest: Bool = true
     ) {
@@ -88,12 +111,12 @@ final class FakeRegistry: RegistryClient, @unchecked Sendable {
         }
         var entries = [Tar.Entry(
             path: "package/package.json",
-            data: try! JSONSerialization.data(withJSONObject: pkgJSON),
+            data: try! JSONSerialization.data(withJSONObject: pkgJSON, options: [.sortedKeys]),
             isDir: false,
             mode: 0o644,
             link: nil
         )]
-        for (p, c) in files {
+        for (p, c) in files.sorted(by: { $0.key < $1.key }) {
             entries.append(Tar.Entry(
                 path: "package/" + p,
                 data: Data(c.utf8),
@@ -106,13 +129,13 @@ final class FakeRegistry: RegistryClient, @unchecked Sendable {
         let pv = PackumentVersion(
             version: Version(version)!,
             dependencies: deps,
-            optionalDependencies: [:],
+            optionalDependencies: optional,
             peerDependencies: [:],
             bin: bin,
             tarball: url,
             integrity: nil,
             os: os,
-            cpu: [],
+            cpu: cpu,
             hasInstallScript: install,
             deprecated: nil
         )

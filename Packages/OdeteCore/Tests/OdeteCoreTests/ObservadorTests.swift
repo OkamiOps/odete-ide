@@ -147,7 +147,7 @@ struct ObservadorTests {
     @Test func pastasPesadasFicamDeFora() throws {
         let raiz = try Self.pasta()
         defer { try? FileManager.default.removeItem(at: raiz) }
-        for nome in ["node_modules", ".git", "dist", "src"] {
+        for nome in ["node_modules", "node_modules.nosync", ".git", "dist", "src"] {
             try FileManager.default.createDirectory(
                 at: raiz.appending(path: nome),
                 withIntermediateDirectories: true
@@ -157,6 +157,8 @@ struct ObservadorTests {
             .map(\.lastPathComponent)
         #expect(achadas.contains("src"))
         #expect(!achadas.contains("node_modules"))
+        // Onde os pacotes moram num projeto do iCloud: milhares de pastas do mesmo jeito.
+        #expect(!achadas.contains("node_modules.nosync"))
         #expect(!achadas.contains(".git"))
         #expect(!achadas.contains("dist"))
     }

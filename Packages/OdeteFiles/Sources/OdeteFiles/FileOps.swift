@@ -96,7 +96,7 @@ public struct FileOps: Sendable {
             // No sandbox do iOS `trashItem` não funciona; na prática é sempre por aqui.
             // A lixeira do projeto faz o mesmo papel, e o desfazer traz de volta.
             try? FileManager.default.createDirectory(at: lixeira, withIntermediateDirectories: true)
-            let destino = lixeira.appending(path: "\(Int(Date().timeIntervalSince1970))-\(alvo.lastPathComponent)")
+            let destino = lixeira.appending(path: Self.nomeNaLixeira(rel, agora: Date()))
             do {
                 try FileManager.default.moveItem(at: alvo, to: destino)
                 podarLixeira()
@@ -106,6 +106,22 @@ public struct FileOps: Sendable {
                 return nil
             }
         }
+    }
+
+    /// Nome do item dentro da lixeira: a hora, para não colidir, e o nome original.
+    ///
+    /// O que vem de `node_modules` (ou de `node_modules.nosync`) ganha `.nosync` no fim.
+    /// A lixeira mora em `.odete/`, dentro do projeto, e num projeto do iCloud ela
+    /// sincroniza: um pacote apagado pela árvore viraria centenas de arquivos subindo
+    /// para a nuvem, para guardar o que um `npm install` refaz. O desfazer não sente a
+    /// diferença, porque devolve para o caminho de origem, não para o nome da lixeira.
+    static func nomeNaLixeira(_ rel: String, agora: Date) -> String {
+        let nome = rel.split(separator: "/").last.map(String.init) ?? rel
+        let base = "\(Int(agora.timeIntervalSince1970))-\(nome)"
+        let deModulos = rel.split(separator: "/").contains {
+            $0 == PastaDeModulos.nome || $0 == PastaDeModulos.nomeForaDaNuvem
+        }
+        return deModulos && !base.hasSuffix(".nosync") ? base + ".nosync" : base
     }
 
     /// Pasta da lixeira do projeto. Fica em `.odete/`, que o git já ignora por

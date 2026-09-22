@@ -1,5 +1,6 @@
 import Compression
 import Foundation
+import OdeteCore
 import OdeteI18n
 
 /// ZIP mínimo (store/deflate) para compartilhar e receber projetos. Sem dependências.
@@ -12,10 +13,13 @@ public enum Zip {
     }
 
     /// Compacta uma pasta. `skip` são nomes de pastas ignoradas em qualquer nível.
+    ///
+    /// `node_modules.nosync` é onde ficam os pacotes num projeto do iCloud (ver
+    /// `PastaDeModulos`); fica de fora pelo mesmo motivo que `node_modules`.
     public static func create(
         directory: URL,
         to output: URL,
-        skip: Set<String> = ["node_modules", ".build", "dist"]
+        skip: Set<String> = ["node_modules", Ignore.modulosForaDaNuvem, ".build", "dist"]
     ) throws {
         let fm = FileManager.default
         var files: [(rel: String, url: URL)] = []

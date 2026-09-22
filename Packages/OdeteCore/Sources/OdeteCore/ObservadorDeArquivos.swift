@@ -23,7 +23,7 @@ public final class ObservadorDeArquivos: @unchecked Sendable {
     /// Pastas que não entram: quem tem dezenas de milhares de subpastas gastaria o limite
     /// de descritores do processo para vigiar o que ninguém edita à mão.
     static let ignoradas: Set<String> = [
-        "node_modules", ".git", ".build", "dist", ".next", ".cache", "build", ".odete",
+        "node_modules", Ignore.modulosForaDaNuvem, ".git", ".build", "dist", ".next", ".cache", "build", ".odete",
     ]
 
     /// Teto de descritores. iOS dá alguns milhares por processo e o app usa os dele para

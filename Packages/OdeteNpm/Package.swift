@@ -7,15 +7,21 @@ let package = Package(
     products: [.library(name: "OdeteNpm", targets: ["OdeteNpm"])],
     dependencies: [
         .package(path: "../OdeteI18n"), .package(path: "../OdeteCore"),
+        // Onde mora o node_modules (pasta ou link para node_modules.nosync no iCloud).
+        .package(path: "../OdeteFiles"),
     ],
     targets: [
         .target(
             name: "OdeteNpm",
             dependencies: [
                 .product(name: "OdeteI18n", package: "OdeteI18n"), .product(name: "OdeteCore", package: "OdeteCore"),
+                .product(name: "OdeteFiles", package: "OdeteFiles"),
             ],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
-        .testTarget(name: "OdeteNpmTests", dependencies: ["OdeteNpm"]),
+        .testTarget(
+            name: "OdeteNpmTests",
+            dependencies: ["OdeteNpm", .product(name: "OdeteFiles", package: "OdeteFiles")]
+        ),
     ]
 )

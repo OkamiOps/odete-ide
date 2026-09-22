@@ -11,6 +11,18 @@ public struct Lockfile: Sendable, Equatable {
         public var bin: [String: String]
         public var dev: Bool
         public var native: Bool
+        /// Só chega por `optionalDependencies`. Junto com `os`/`cpu`, é assim que o npm
+        /// marca no lock os binários de plataforma — todos, de todos os sistemas, para o
+        /// lock servir em qualquer máquina; quem instala decide qual cabe.
+        public var optional = false
+        public var os: [String] = []
+        public var cpu: [String] = []
+
+        /// Binário de uma plataforma, opcional: fica no lock e não é baixado. Nenhum roda
+        /// no iPad — nem o de darwin/arm64, que é do macOS.
+        public var soDePlataforma: Bool {
+            optional && (!os.isEmpty || !cpu.isEmpty)
+        }
     }
 
     public var name: String
@@ -35,7 +47,10 @@ public struct Lockfile: Sendable, Equatable {
                 optionalDependencies: (m["optionalDependencies"] as? [String: String]) ?? [:],
                 bin: (m["bin"] as? [String: String]) ?? [:],
                 dev: (m["dev"] as? Bool) ?? false,
-                native: (m["odete:native"] as? Bool) ?? false
+                native: (m["odete:native"] as? Bool) ?? false,
+                optional: (m["optional"] as? Bool) ?? false,
+                os: (m["os"] as? [String]) ?? [],
+                cpu: (m["cpu"] as? [String]) ?? []
             )
         }
         return out
@@ -65,6 +80,15 @@ public struct Lockfile: Sendable, Equatable {
             }
             if e.native {
                 m["odete:native"] = true
+            }
+            if e.optional {
+                m["optional"] = true
+            }
+            if !e.os.isEmpty {
+                m["os"] = e.os
+            }
+            if !e.cpu.isEmpty {
+                m["cpu"] = e.cpu
             }
             pk[k] = m
         }

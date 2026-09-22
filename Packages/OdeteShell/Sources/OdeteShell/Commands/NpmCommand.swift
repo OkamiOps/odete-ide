@@ -5,21 +5,18 @@ import OdeteNpm
 /// `npm install|i|add|uninstall|remove|ls|run|start|dev|build|test|init|exec` (+ `npx`, `pnpm`, `yarn` como aliases).
 struct NpmCommand: ShellCommand {
     /// Sem .gitignore, node_modules viraria 500 arquivos no painel do git.
-    static func ensureGitignore(_ root: URL, io: CommandIO) {
-        let u = root.appending(path: ".gitignore")
-        if let s = try? String(contentsOf: u, encoding: .utf8) {
-            if s.contains("node_modules") {
-                return
-            }
-            try? (s + (s.hasSuffix("\n") || s.isEmpty ? "" : "\n") + "node_modules/\n").write(
-                to: u,
-                atomically: true,
-                encoding: .utf8
-            )
+    ///
+    /// No iCloud são duas linhas em vez de uma: `node_modules` (sem barra, porque ali é
+    /// um link, e para o git link não é pasta) e `node_modules.nosync/`, onde os pacotes
+    /// estão de verdade. Quem decide é o `Installer`.
+    static func ensureGitignore(_ installer: Installer, io: CommandIO) {
+        let novas = installer.garantirGitignore()
+        guard !novas.isEmpty else { return }
+        if novas == ["node_modules/"] {
+            io.out(tr(".gitignore: node_modules/ adicionado"))
         } else {
-            try? "node_modules/\ndist/\n.DS_Store\n".write(to: u, atomically: true, encoding: .utf8)
+            io.out(tr(".gitignore: %1$@ adicionado(s)", novas.joined(separator: ", ")))
         }
-        io.out(tr(".gitignore: node_modules/ adicionado"))
     }
 
     let name = "npm"
@@ -45,7 +42,7 @@ struct NpmCommand: ShellCommand {
                         )
                     io.out(tr("package.json criado"))
                 }
-                Self.ensureGitignore(ctx.root, io: io)
+                Self.ensureGitignore(installer, io: io)
                 let rep = try await installer.install(add: specs, dev: dev)
                 for a in rep.added {
                     io.out("+ \(a)")

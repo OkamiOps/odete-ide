@@ -61,16 +61,28 @@ public struct Packument: Sendable, Hashable {
 
     /// Escolhe a versão para uma faixa (ou tag).
     public func pick(_ spec: String) -> PackumentVersion? {
+        Self.escolher(spec, distTags: distTags, versoes: versions.keys).flatMap { versions[$0] }
+    }
+
+    /// A regra de `pick` só com o que ela precisa: as tags e a lista de versões.
+    ///
+    /// Separada para a resolução poder guardar só isso de um packument depois de
+    /// escolher — os dados de cada versão (dependências, tarball, binários) são a parte
+    /// pesada, e de milhares de versões só uma ou duas acabam usadas.
+    static func escolher(
+        _ spec: String,
+        distTags: [String: String],
+        versoes: some Collection<Version>
+    ) -> Version? {
         let s = spec.trimmingCharacters(in: .whitespaces)
-        if let tagged = distTags[s.isEmpty ? "latest" : s], let v = Version(tagged), let pv = versions[v] {
-            return pv
+        if let tagged = distTags[s.isEmpty ? "latest" : s], let v = Version(tagged), versoes.contains(v) {
+            return v
         }
         let range = SemverRange(s)
-        if range.isAny, let latest = distTags["latest"], let v = Version(latest), let pv = versions[v] {
-            return pv
+        if range.isAny, let latest = distTags["latest"], let v = Version(latest), versoes.contains(v) {
+            return v
         }
-        guard let v = range.maxSatisfying(Array(versions.keys)) else { return nil }
-        return versions[v]
+        return range.maxSatisfying(Array(versoes))
     }
 }
 
@@ -171,7 +183,11 @@ public struct HTTPRegistry: RegistryClient {
                 with: ""
             )
         let file = cacheDir.appending(path: key + ".tgz")
-        if let d = try? Data(contentsOf: file) {
+        // Mapeado em vez de lido: as páginas do arquivo são do cache do sistema, que as
+        // devolve sozinho quando falta memória, e não contam como memória do app. O
+        // arquivo nunca é reescrito no lugar (a gravação é atômica), então o mapa não
+        // muda por baixo da extração.
+        if let d = try? Data(contentsOf: file, options: .mappedIfSafe) {
             // Cache também passa pela conferência: arquivo pode ter sido truncado na
             // gravação ou mexido depois.
             if (try? Self.conferir(d, contra: integrity, nome: url)) != nil {

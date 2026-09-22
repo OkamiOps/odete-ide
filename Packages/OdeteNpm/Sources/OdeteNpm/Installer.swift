@@ -1,4 +1,5 @@
 import Foundation
+import OdeteFiles
 import OdeteI18n
 
 /// `npm install` de verdade: resolve, baixa, extrai, grava lock e .bin.
@@ -30,9 +31,9 @@ public struct Installer: Sendable {
         /// nada e não há o que a pessoa fazer.
         public var nativosCobertos: [String] = []
         public var skipped: [String] = []
-        /// Pacotes de outro sistema ou outra arquitetura. São rotina — rollup e esbuild
-        /// publicam um binário por plataforma — e não merecem o mesmo alarde de um
-        /// `file:` que não dá para resolver.
+        /// Pacotes de outro sistema ou outra arquitetura, e os binários de plataforma que
+        /// ficam só no lock. São rotina — rollup e esbuild publicam um binário por
+        /// plataforma — e não merecem o mesmo alarde de um `file:` que não dá para resolver.
         public var plataforma: [String] = []
         public var failed: [String: String] = [:]
         public var added: [String] = []
@@ -44,14 +45,20 @@ public struct Installer: Sendable {
     public var project: URL
     public var registry: any RegistryClient
     public var log: @Sendable (String) -> Void
-    public var concurrency = 4
+    /// Pacotes em voo ao mesmo tempo, cada um baixando e já extraindo. É também o teto
+    /// de tarballs comprimidos na memória: acabou de extrair, o tarball vai embora.
+    public var concurrency = 6
+    /// Packuments no ar ao mesmo tempo durante a resolução.
+    var buscasSimultaneas = 8
+    /// O projeto mora no iCloud Drive? Aí os pacotes vão para `node_modules.nosync` e
+    /// `node_modules` vira link — ver `PastaDeModulos`. Vem detectado do caminho; dá
+    /// para forçar, que é o que os testes fazem.
+    public var nuvem: Bool
+    var medidor: MedidorDeMemoria?
 
     public init(project: URL, registry: any RegistryClient, log: @escaping @Sendable (String) -> Void = { _ in }) {
         self.project = project; self.registry = registry; self.log = log
-    }
-
-    var nodeModules: URL {
-        project.appending(path: "node_modules")
+        nuvem = PastaDeModulos.naNuvem(project)
     }
 
     var lockURL: URL {
@@ -65,6 +72,7 @@ public struct Installer: Sendable {
         var pkg = PackageJSON(url: project.appending(path: "package.json"))
         var report = Report()
         var pinned: [String: String] = [:]
+        var jaBuscados: [String: Packument] = [:]
         for spec in add {
             let p = try await registry.packument(spec.name)
             guard let v = p.pick(spec.range) else { throw NpmError.noVersion(spec.name, spec.range) }
@@ -72,12 +80,14 @@ public struct Installer: Sendable {
             pkg.set(spec.name, range: range, dev: dev)
             pinned[spec.name] = v.version.description
             report.added.append("\(spec.name)@\(v.version)")
+            jaBuscados[spec.name] = p
         }
         if !add.isEmpty {
             try pkg.save()
         }
         let lock = force ? nil : Lockfile.load(lockURL)
-        let tree = try await resolve(pkg: pkg, lock: lock, pinned: pinned, report: &report)
+        let tree = try await resolve(pkg: pkg, lock: lock, pinned: pinned, jaBuscados: jaBuscados, report: &report)
+        try PastaDeModulos.preparar(project, nuvem: nuvem)
         try await materialize(tree, report: &report)
         var newLock = Lockfile(name: pkg.name)
         for (key, node) in tree {
@@ -110,209 +120,53 @@ public struct Installer: Sendable {
         guard let lock = Lockfile.load(lockURL) else { return [] }
         return lock.packages.compactMap { k, e in
             let rel = k.dropFirst("node_modules/".count)
-            guard !rel.contains("/node_modules/") else { return nil }
+            guard !rel.contains("/node_modules/"), !e.soDePlataforma else { return nil }
             return (String(rel), e.version, e.dev, e.native)
         }.sorted { $0.name < $1.name }
     }
 
-    // MARK: resolução
+    /// Acrescenta ao `.gitignore` o que falta para o git não ver os pacotes e devolve o
+    /// que acrescentou. No iCloud são duas linhas — ver `PastaDeModulos`.
+    public func garantirGitignore() -> [String] {
+        PastaDeModulos.garantirGitignore(project, nuvem: nuvem)
+    }
+}
 
-    struct Node { var name: String; var pv: PackumentVersion?; var entry: Lockfile.Entry; var parentKey: String }
+// MARK: - download + extração
 
-    func resolve(
-        pkg: PackageJSON,
-        lock: Lockfile?,
-        pinned: [String: String],
-        report: inout Report
-    ) async throws -> [String: Node] {
-        var tree: [String: Node] = [:]
-        var packuments: [String: Packument] = [:]
-        struct Want { var name: String; var range: String; var from: String; var dev: Bool; var optional: Bool }
-        var queue: [Want] = []
-        // ordem determinística: mesmo package.json → mesmo lock
-        for (n, r) in pkg.dependencies.sorted(by: { $0.key < $1.key }) {
-            queue.append(Want(
-                name: n,
-                range: pinned[n] ?? r,
-                from: "",
-                dev: false,
-                optional: false
-            ))
-        }
-        for (n, r) in pkg.devDependencies.sorted(by: { $0.key < $1.key }) {
-            queue.append(Want(
-                name: n,
-                range: pinned[n] ?? r,
-                from: "",
-                dev: true,
-                optional: false
-            ))
-        }
-        var i = 0
-        while i < queue.count {
-            let w = queue[i]; i += 1
-            if w.range.hasPrefix("file:") || w.range.hasPrefix("git") || w.range.hasPrefix("http") || w.range
-                .hasPrefix("link:") || w.range.hasPrefix("workspace:")
-            {
-                report.skipped.append("\(w.name)@\(w.range)"); continue
-            }
-            var range = w.range
-            if range.hasPrefix("npm:") {
-                range = String(range.split(separator: "@").last ?? "latest")
-            }
-            // já satisfeito em algum nível acima?
-            if let (key, existing) = find(w.name, from: w.from, in: tree), let ev = Version(existing.entry.version),
-               SemverRange(range).satisfies(ev) || SemverRange(range).isAny || pinned[w.name] == existing.entry
-               .version
-            {
-                _ = key; continue
-            }
-            // lock
-            var chosen: (
-                version: String,
-                resolved: String?,
-                integrity: String?,
-                deps: [String: String],
-                opt: [String: String],
-                bin: [String: String],
-                native: Bool
-            )?
-            if pinned[w.name] == nil, let lock, let (_, le) = lock.resolve(w.name, from: w.from),
-               let lv = Version(le.version), SemverRange(range).isAny || SemverRange(range).satisfies(lv)
-            {
-                chosen = (
-                    le.version,
-                    le.resolved,
-                    le.integrity,
-                    le.dependencies,
-                    le.optionalDependencies,
-                    le.bin,
-                    le.native
-                )
-            }
-            if chosen == nil {
-                let p: Packument
-                if let c = packuments[w.name] {
-                    p = c
-                } else {
-                    do { p = try await registry.packument(w.name) } catch {
-                        if w.optional {
-                            report.skipped.append(w.name); continue
-                        }
-                        report.failed[w.name] = error.localizedDescription; continue
-                    }
-                    packuments[w.name] = p
-                }
-                guard let pv = p.pick(pinned[w.name] ?? range) else {
-                    if w.optional {
-                        report.skipped.append(w.name); continue
-                    }
-                    report.failed[w.name] = NpmError.noVersion(w.name, range).localizedDescription; continue
-                }
-                if !pv.os.isEmpty, !pv.os.contains("darwin"), !pv.os.contains("!win32"),
-                   !pv.os
-                   .contains("any")
-                {
-                    report.plataforma.append(tr(
-                        "%1$@ (só %2$@)",
-                        "\(w.name)",
-                        "\(pv.os.joined(separator: ","))"
-                    )); continue
-                }
-                if !pv.cpu.isEmpty,
-                   !pv.cpu
-                   .contains("arm64")
-                {
-                    report.plataforma.append(tr(
-                        "%1$@ (só %2$@)",
-                        "\(w.name)",
-                        "\(pv.cpu.joined(separator: ","))"
-                    )); continue
-                }
-                let native = pv.hasInstallScript || w.name.hasSuffix("-darwin-arm64") || w.name
-                    .hasSuffix("-darwin-64") || w.name.contains("/darwin-") || w.name.hasPrefix("@esbuild/") || w.name
-                    .hasPrefix("@swc/core-") || w.name.hasPrefix("@rollup/rollup-") || w.name.hasPrefix("@next/swc-")
-                chosen = (
-                    pv.version.description,
-                    pv.tarball,
-                    pv.integrity,
-                    pv.dependencies,
-                    pv.optionalDependencies,
-                    pv.bin,
-                    native
-                )
-            }
-            guard let c = chosen else { continue }
-            // onde colocar: topo se livre, senão aninhado sob quem pediu
-            var key = "node_modules/\(w.name)"
-            if let top = tree[key],
-               top.entry.version != c.version
-            {
-                key = w.from.isEmpty ? key : "\(w.from)/node_modules/\(w.name)"
-            }
-            if let existing = tree[key], existing.entry.version == c.version {
-                continue
-            }
-            let entry = Lockfile.Entry(
-                version: c.version,
-                resolved: c.resolved,
-                integrity: c.integrity,
-                dependencies: c.deps,
-                optionalDependencies: c.opt,
-                bin: c.bin,
-                dev: w.dev,
-                native: c.native
-            )
-            tree[key] = Node(name: w.name, pv: nil, entry: entry, parentKey: w.from)
-            if c.native {
-                report.anotarNativo(w.name, c.version)
-            }
-            for (dn, dr) in c.deps.sorted(by: { $0.key < $1.key }) {
-                queue.append(Want(
-                    name: dn,
-                    range: dr,
-                    from: key,
-                    dev: w.dev,
-                    optional: false
-                ))
-            }
-            for (dn, dr) in c.opt.sorted(by: { $0.key < $1.key }) {
-                queue.append(Want(
-                    name: dn,
-                    range: dr,
-                    from: key,
-                    dev: w.dev,
-                    optional: true
-                ))
-            }
-        }
-        return tree
+extension Installer {
+    /// O resultado de um pacote, devolvido pela tarefa que o baixou e extraiu.
+    struct Extraido: Sendable {
+        var key: String
+        var name: String
+        var version: String
+        var nativo = false
+        var erro: String?
     }
 
-    func find(_ name: String, from: String, in tree: [String: Node]) -> (String, Node)? {
-        var base = from
-        while true {
-            let key = base.isEmpty ? "node_modules/\(name)" : "\(base)/node_modules/\(name)"
-            if let n = tree[key] {
-                return (key, n)
-            }
-            if base.isEmpty {
-                return nil
-            }
-            guard let r = base.range(of: "/node_modules/", options: .backwards) else { base = ""; continue }
-            base = String(base[..<r.lowerBound])
-        }
+    /// Profundidade de aninhamento: `node_modules/a` e `node_modules/@s/a` são 1,
+    /// `node_modules/a/node_modules/b` é 2.
+    static func nivel(_ key: String) -> Int {
+        key.split(separator: "/").count(where: { $0 == "node_modules" })
     }
 
-    // MARK: download + extração
-
+    /// Baixa e extrai o que falta, com `concurrency` pacotes em voo.
+    ///
+    /// Antes, todos os tarballs eram baixados primeiro (em lotes de quatro que esperavam
+    /// o mais lento) e só então extraídos: numa instalação grande, dezenas de megas
+    /// comprimidos na memória de uma vez, e a extração ainda triplicava o pacote do
+    /// momento. É o tipo de pico que faz o iPad matar o app. Agora cada pacote é extraído
+    /// assim que chega e o tarball é solto logo em seguida; quem termina abre vaga para o
+    /// próximo, sem esperar o lote.
+    ///
+    /// Pais antes dos aninhados: extrair `node_modules/c` mexe na pasta de `c` (e, se der
+    /// errado, apaga a pasta inteira), o que não pode acontecer ao mesmo tempo que um
+    /// `node_modules/c/node_modules/b` é extraído ali dentro. Por isso vai nível por
+    /// nível — quase tudo fica no primeiro, então quase nada se perde de paralelismo.
     func materialize(_ tree: [String: Node], report: inout Report) async throws {
-        let fm = FileManager.default
-        try fm.createDirectory(at: nodeModules, withIntermediateDirectories: true)
         var todo: [(String, Node)] = []
-        for (key, node) in tree {
-            let dir = project.appending(path: key)
-            let marker = dir.appending(path: "package.json")
+        for (key, node) in tree where !node.entry.soDePlataforma {
+            let marker = project.appending(path: key).appending(path: "package.json")
             if let d = try? Data(contentsOf: marker),
                let j = try? JSONSerialization.jsonObject(with: d) as? [String: Any],
                (j["version"] as? String) == node.entry.version
@@ -325,81 +179,126 @@ public struct Installer: Sendable {
         if total > 0 {
             log("baixando \(total) pacote(s)…")
         }
-        var done = 0
-        var results: [(String, Node, Result<Data, Error>)] = []
-        for chunk in stride(from: 0, to: todo.count, by: concurrency).map({ Array(todo[$0 ..< min(
-            $0 + concurrency,
-            todo.count
-        )]) }) {
-            let fetched: [(String, Node, Result<Data, Error>)] = await withTaskGroup(of: (
-                String,
-                Node,
-                Result<Data, Error>
-            ).self) { group in
-                for (key, node) in chunk {
-                    group.addTask { [registry] in
-                        guard let url = node.entry.resolved else { return (
-                            key,
-                            node,
-                            .failure(NpmError.tarball(tr("sem URL para %1$@", "\(node.name)")))
-                        ) }
-                        do { return try await (
-                            key,
-                            node,
-                            .success(registry.tarball(url, integrity: node.entry.integrity))
-                        ) } catch { return (key, node, .failure(error)) }
-                    }
+        var feitos: [Extraido] = []
+        let niveis = Dictionary(grouping: todo) { Self.nivel($0.0) }
+        for nivel in niveis.keys.sorted() {
+            let lote = (niveis[nivel] ?? []).sorted { $0.0 < $1.0 }
+            let jaFeitos = feitos.count
+            let doNivel = await withTaskGroup(of: Extraido.self) { group -> [Extraido] in
+                var proximo = 0
+                func lancar(_ group: inout TaskGroup<Extraido>) {
+                    let (key, node) = lote[proximo]
+                    proximo += 1
+                    group.addTask { await baixarEExtrair(key, node) }
                 }
-                var out: [(String, Node, Result<Data, Error>)] = []
+                while proximo < min(concurrency, lote.count) {
+                    lancar(&group)
+                }
+                var out: [Extraido] = []
                 for await r in group {
                     out.append(r)
+                    let done = jaFeitos + out.count
+                    if done % 10 == 0 || done == total {
+                        log("\(done)/\(total)")
+                    }
+                    if proximo < lote.count {
+                        lancar(&group)
+                    }
                 }
                 return out
             }
-            results += fetched
+            feitos += doNivel
         }
-        // pais antes dos aninhados: apagar node_modules/c não pode levar node_modules/c/node_modules/b junto
-        results.sort { a, b in
-            let da = a.0.split(separator: "/").count, db = b.0.split(separator: "/").count
-            return da != db ? da < db : a.0 < b.0
+        // Mesma ordem de relatório de antes: pais primeiro, depois pelo caminho.
+        feitos.sort { a, b in
+            let na = Self.nivel(a.key), nb = Self.nivel(b.key)
+            return na != nb ? na < nb : a.key < b.key
         }
-        for (key, node, r) in results {
-            switch r {
-            case let .success(data):
-                let dir = project.appending(path: key)
-                try? fm.removeItem(at: dir)
-                do {
-                    try Tar.extractPackage(data, to: dir)
-                    if node.entry.native || fm
-                        .fileExists(atPath: dir.appending(path: "binding.gyp").path)
-                    {
-                        report.anotarNativo(node.name, node.entry.version)
-                    }
-                    report.installed.append((node.name, node.entry.version))
-                } catch { report.failed[node.name] = error.localizedDescription }
-            case let .failure(e): report.failed[node.name] = e.localizedDescription
+        for f in feitos {
+            if let erro = f.erro {
+                report.failed[f.name] = erro
+                continue
             }
-            done += 1
-            if done % 10 == 0 || done == total {
-                log("\(done)/\(total)")
+            if f.nativo {
+                report.anotarNativo(f.name, f.version)
             }
+            report.installed.append((f.name, f.version))
         }
         report.native = Array(Set(report.native)).sorted()
         report.nativosCobertos = Array(Set(report.nativosCobertos)).sorted()
     }
+
+    /// Um pacote, do download ao disco. O tarball vive só dentro desta função.
+    func baixarEExtrair(_ key: String, _ node: Node) async -> Extraido {
+        var feito = Extraido(key: key, name: node.name, version: node.entry.version)
+        guard let url = node.entry.resolved else {
+            feito.erro = NpmError.tarball(tr("sem URL para %1$@", "\(node.name)")).localizedDescription
+            return feito
+        }
+        let data: Data
+        do {
+            data = try await registry.tarball(url, integrity: node.entry.integrity)
+        } catch {
+            feito.erro = error.localizedDescription
+            return feito
+        }
+        let segurado = data.count + Tar.tamanhoDoPedaco
+        medidor?.segurar(segurado)
+        defer { medidor?.soltar(segurado) }
+        let dir = project.appending(path: key)
+        let nativo = node.entry.native
+        do {
+            feito.nativo = try await Self.noDisco {
+                Self.limparVersaoVelha(dir)
+                do {
+                    try Tar.extractPackage(data, to: dir)
+                } catch {
+                    // Pela metade não serve: o package.json costuma vir primeiro, e com
+                    // ele no lugar o próximo install acharia que o pacote está completo.
+                    try? FileManager.default.removeItem(at: dir)
+                    throw error
+                }
+                return nativo || FileManager.default.fileExists(atPath: dir.appending(path: "binding.gyp").path)
+            }
+        } catch {
+            feito.erro = error.localizedDescription
+        }
+        return feito
+    }
+
+    /// Apaga a versão anterior do pacote, menos o `node_modules` de dentro dela.
+    ///
+    /// Os aninhados que não mudaram de versão não estão na lista para extrair de novo;
+    /// apagar a pasta inteira, como antes, levava eles junto e o pacote ficava sem as
+    /// dependências. O que sobrar ali sem estar na árvore sai no `pruneExtraneous`.
+    static func limparVersaoVelha(_ dir: URL) {
+        let fm = FileManager.default
+        guard let itens = try? fm.contentsOfDirectory(atPath: dir.path) else { return }
+        for item in itens where item != "node_modules" {
+            try? fm.removeItem(at: dir.appending(path: item))
+        }
+    }
+
+    /// Extração é disco e CPU sem pausa. Na fila própria ela não prende as threads do
+    /// pool das tarefas, que o resto do app também usa.
+    static let filaDeDisco = DispatchQueue(label: "odete.npm.extracao", qos: .utility, attributes: .concurrent)
+
+    static func noDisco<T: Sendable>(_ trabalho: @escaping @Sendable () throws -> T) async throws -> T {
+        try await withCheckedThrowingContinuation { continuacao in
+            filaDeDisco.async {
+                continuacao.resume(with: Result { try trabalho() })
+            }
+        }
+    }
 }
 
-/// Fora do corpo da struct só para caber no limite de tamanho de tipo: são as duas
-/// etapas finais do install, e não dependem de mais nada da Installer.
+/// As duas etapas finais do install, que não dependem de mais nada da Installer.
 extension Installer {
     func writeBins(_ tree: [String: Node], _ report: inout Report) throws {
         let fm = FileManager.default
-        for (key, node) in tree {
-            let binDir = URL(fileURLWithPath: key, relativeTo: project).deletingLastPathComponent()
-                .appending(path: ".bin")
+        for (key, node) in tree where !node.entry.soDePlataforma {
             let parentNM = key.hasSuffix("/" + node.name) ? String(key.dropLast(node.name.count + 1)) : "node_modules"
             let binDirURL = project.appending(path: parentNM).appending(path: ".bin")
-            _ = binDir
             for (bname, bpath) in node.entry.bin {
                 try fm.createDirectory(at: binDirURL, withIntermediateDirectories: true)
                 let link = binDirURL.appending(path: bname)
@@ -421,34 +320,41 @@ extension Installer {
     }
 
     /// Remove de node_modules o que não está na árvore.
+    ///
+    /// Compara pela chave do lock (`node_modules/a/node_modules/b`), não pelo caminho no
+    /// disco: no iCloud, `node_modules` é um link, e a listagem é feita na pasta real,
+    /// que tem outro nome.
     func pruneExtraneous(_ tree: [String: Node]) throws {
         let fm = FileManager.default
-        let keep = Set(tree.keys.map { project.appending(path: $0).path })
-        func walk(_ nm: URL) {
-            guard let items = try? fm.contentsOfDirectory(at: nm, includingPropertiesForKeys: nil) else { return }
-            for item in items {
-                let name = item.lastPathComponent
+        let keep = Set(tree.filter { !$0.value.entry.soDePlataforma }.keys)
+        func walk(_ chave: String, _ pasta: URL) {
+            // Pelo caminho, não pela URL: `contentsOfDirectory(at:)` não atravessa link.
+            guard let items = try? fm.contentsOfDirectory(atPath: pasta.path) else { return }
+            for name in items {
                 if name == ".bin" || name == ".package-lock.json" {
                     continue
                 }
+                let item = pasta.appending(path: name)
                 if name.hasPrefix("@") {
-                    for scoped in (try? fm.contentsOfDirectory(at: item, includingPropertiesForKeys: nil)) ?? [] {
-                        if !keep.contains(scoped.path) {
-                            try? fm.removeItem(at: scoped)
+                    for scoped in (try? fm.contentsOfDirectory(atPath: item.path)) ?? [] {
+                        let k = "\(chave)/\(name)/\(scoped)"
+                        if !keep.contains(k) {
+                            try? fm.removeItem(at: item.appending(path: scoped))
                         } else {
-                            walk(scoped.appending(path: "node_modules"))
+                            walk("\(k)/node_modules", item.appending(path: scoped).appending(path: "node_modules"))
                         }
                     }
                     continue
                 }
-                if !keep.contains(item.path) {
+                let k = "\(chave)/\(name)"
+                if !keep.contains(k) {
                     try? fm.removeItem(at: item)
                 } else {
-                    walk(item.appending(path: "node_modules"))
+                    walk("\(k)/node_modules", item.appending(path: "node_modules"))
                 }
             }
         }
-        walk(nodeModules)
+        walk("node_modules", PastaDeModulos.pastaReal(project))
     }
 }
 

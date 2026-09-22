@@ -22,12 +22,13 @@
     const id = fetchSeq++;
     const headers = {}; req.headers.forEach((v, k) => { headers[k] = v; });
     let body = null;
-    if (req._body != null) { const b = req._bytes(); body = globalThis.__b64.enc(b); if (!headers["content-type"]) { if (typeof req._body === "string") headers["content-type"] = "text/plain;charset=UTF-8"; else if (req._body instanceof URLSearchParams) headers["content-type"] = "application/x-www-form-urlencoded;charset=UTF-8"; } }
+    if (req._body != null) { body = req._bytes(); if (!headers["content-type"]) { if (typeof req._body === "string") headers["content-type"] = "text/plain;charset=UTF-8"; else if (req._body instanceof URLSearchParams) headers["content-type"] = "application/x-www-form-urlencoded;charset=UTF-8"; } }
     pendingFetch.set(id, { resolve, reject, url, redirect: req.redirect });
     if (req.signal) req.signal.addEventListener("abort", () => { if (pendingFetch.delete(id)) reject(Object.assign(new Error("The operation was aborted"), { name: "AbortError" })); });
     H.fetch(id, url, req.method, headers, body);
   });
-  globalThis.__odete_fetchDone = (id, status, headers, bodyB64, url) => { const p = pendingFetch.get(id); if (!p) return; pendingFetch.delete(id); const r = new Response(globalThis.__b64.dec(bodyB64), { status, statusText: "", headers, url }); r.redirected = url !== p.url; p.resolve(r); };
+  // O corpo chega como Uint8Array (string base64 no formato antigo ainda vale).
+  globalThis.__odete_fetchDone = (id, status, headers, body, url) => { const p = pendingFetch.get(id); if (!p) return; pendingFetch.delete(id); const r = new Response(typeof body === "string" ? globalThis.__b64.dec(body) : body, { status, statusText: "", headers, url }); r.redirected = url !== p.url; p.resolve(r); };
   globalThis.__odete_fetchFail = (id, msg) => { const p = pendingFetch.get(id); if (!p) return; pendingFetch.delete(id); p.reject(Object.assign(new TypeError("fetch failed: " + msg), { cause: new Error(msg) })); };
 
   // ---- require de arquivos ----

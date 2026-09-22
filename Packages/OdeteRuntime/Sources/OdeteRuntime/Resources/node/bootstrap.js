@@ -20,7 +20,7 @@
   // --- timers ---
   const timers = new Map();
   function makeTimer(fn, ms, args, repeats) {
-    const id = H.setTimer(Number(ms) || 0, repeats);
+    const id = H.setTimer(ms, repeats);
     timers.set(id, { fn, args, repeats });
     const t = { id, ref() { return t; }, unref() { return t; }, hasRef() { return true; }, refresh() { return t; }, [Symbol.toPrimitive]() { return id; } };
     return t;
@@ -31,8 +31,17 @@
     if (!t.repeats) timers.delete(id);
     try { t.fn(...t.args); } catch (e) { reportUncaught(e); }
   };
-  globalThis.setTimeout = (fn, ms, ...args) => makeTimer(fn, ms, args, false);
-  globalThis.setInterval = (fn, ms, ...args) => makeTimer(fn, ms, args, true);
+  // setInterval tem o piso de 1 ms do Node (atraso fora de [1, 2^31-1] vira 1): sem ele,
+  // setInterval(fn, 0) repetia a cada 0 ns e prendia a fila. setTimeout só leva o piso quando o
+  // atraso estoura 2^31-1; com 0, sem atraso, negativo ou NaN roda na próxima volta do laço, como
+  // sempre rodou aqui e como nos navegadores. É de propósito: o browser.js do esbuild manda cada
+  // mensagem ao Go com setTimeout(fn), e com o piso do Node um build de 100 módulos ficava 3× mais
+  // lento com JIT (67 → 214 ms) e até ~25% sem JIT. Para o Node exato: usar `intervalo` nos dois.
+  const LIMITE = 2147483647;
+  const intervalo = (ms) => { ms = Number(ms); return ms >= 1 && ms <= LIMITE ? ms : 1; };
+  const espera = (ms) => { ms = Number(ms); return ms > LIMITE ? 1 : ms >= 1 ? ms : 0; };
+  globalThis.setTimeout = (fn, ms, ...args) => makeTimer(fn, espera(ms), args, false);
+  globalThis.setInterval = (fn, ms, ...args) => makeTimer(fn, intervalo(ms), args, true);
   globalThis.setImmediate = (fn, ...args) => makeTimer(fn, 0, args, false);
   const clear = (t) => { if (t == null) return; const id = typeof t === "object" ? t.id : t; if (timers.delete(id)) H.clearTimer(id); };
   globalThis.clearTimeout = clear; globalThis.clearInterval = clear; globalThis.clearImmediate = clear;
@@ -73,7 +82,16 @@
   };
 
   // --- encoding ---
+  // A partir de NATIVO bytes (ou caracteres), a conversão vai para o Swift (HostBytes.swift).
+  // Sem JIT, o caso do iPad, o nativo já ganha com 8 bytes (0,3 µs contra 0,6–0,9 µs do laço
+  // interpretado) e com 256 ganha de 25×; com JIT o laço JS só perde a partir de ~32–64 bytes.
+  // 16 fica perto do melhor sem JIT e custa pouco com ele. As funções nativas seguem
+  // exatamente as regras destes laços: o resultado não depende do tamanho.
+  const NATIVO = 16;
+  // O teste do limiar fica dentro da função do laço: sem JIT, uma chamada a mais por
+  // conversão pequena já custa ~0,1 µs.
   function utf8Encode(str) {
+    if (str.length >= NATIVO) return H.utf8Encode(str);
     const out = [];
     for (let i = 0; i < str.length; i++) {
       let c = str.charCodeAt(i);
@@ -85,6 +103,23 @@
     }
     return new Uint8Array(out);
   }
+  // encodeInto como manda a especificação: só pontos de código inteiros, `read` em unidades UTF-16.
+  function utf8EncodeInto(str, dst) {
+    if (str.length >= NATIVO && dst instanceof Uint8Array) return H.utf8EncodeInto(str, dst);
+    const n = str.length, cap = dst.length;
+    let i = 0, w = 0;
+    while (i < n) {
+      let c = str.charCodeAt(i), u = 1;
+      if (c >= 0xd800 && c < 0xdc00 && i + 1 < n) { const d = str.charCodeAt(i + 1); if (d >= 0xdc00 && d < 0xe000) { c = 0x10000 + ((c - 0xd800) << 10) + (d - 0xdc00); u = 2; } }
+      if (c < 0x80) { if (w + 1 > cap) break; dst[w++] = c; }
+      else if (c < 0x800) { if (w + 2 > cap) break; dst[w++] = 0xc0 | (c >> 6); dst[w++] = 0x80 | (c & 63); }
+      else if (c < 0x10000) { if (w + 3 > cap) break; dst[w++] = 0xe0 | (c >> 12); dst[w++] = 0x80 | ((c >> 6) & 63); dst[w++] = 0x80 | (c & 63); }
+      else { if (w + 4 > cap) break; dst[w++] = 0xf0 | (c >> 18); dst[w++] = 0x80 | ((c >> 12) & 63); dst[w++] = 0x80 | ((c >> 6) & 63); dst[w++] = 0x80 | (c & 63); }
+      i += u;
+    }
+    return { read: i, written: w };
+  }
+  const utf8Length = (str) => (str.length >= NATIVO ? H.utf8Length(str) : utf8Encode(str).length);
   function toU8(v) {
     if (v instanceof Uint8Array) return v;
     if (v instanceof ArrayBuffer) return new Uint8Array(v);
@@ -94,6 +129,7 @@
   }
   function utf8Decode(bytes) {
     const b = toU8(bytes);
+    if (b.length >= NATIVO) return H.utf8Decode(b);
     let s = "", i = 0;
     const n = b.length;
     while (i < n) {
@@ -108,12 +144,27 @@
     }
     return s;
   }
-  globalThis.__utf8 = { encode: utf8Encode, decode: utf8Decode };
-  globalThis.TextEncoder = class TextEncoder { get encoding() { return "utf-8"; } encode(s = "") { return utf8Encode(String(s)); } encodeInto(s, dst) { const b = utf8Encode(s); dst.set(b.subarray(0, dst.length)); return { read: s.length, written: Math.min(b.length, dst.length) }; } };
-  globalThis.TextDecoder = class TextDecoder { constructor(enc = "utf-8", opts = {}) { this.encoding = String(enc).toLowerCase(); this.fatal = !!opts.fatal; this.ignoreBOM = !!opts.ignoreBOM; } decode(b) { if (!b) return ""; const u = toU8(b); if (this.encoding === "utf-16le" || this.encoding === "utf-16") { let s = ""; for (let i = 0; i + 1 < u.length; i += 2) s += String.fromCharCode(u[i] | (u[i + 1] << 8)); return s; } if (this.encoding === "latin1" || this.encoding === "iso-8859-1" || this.encoding === "ascii") { let s = ""; for (const x of u) s += String.fromCharCode(x); return s; } const t = utf8Decode(u); return !this.ignoreBOM && t.charCodeAt(0) === 0xfeff ? t.slice(1) : t; } };
+  // latin1: um byte por caractere. `Uint8Array.from(str, …)` anda por ponto de código, então um
+  // par substituto vira um byte só; o nativo repete isso.
+  const latin1Encode = (str) => (str.length >= NATIVO ? H.latin1Encode(str) : Uint8Array.from(str, (c) => c.charCodeAt(0) & 255));
+  function latin1Decode(bytes) {
+    const b = toU8(bytes);
+    if (b.length >= NATIVO) return H.latin1Decode(b);
+    let s = ""; for (const x of b) s += String.fromCharCode(x); return s;
+  }
+  function utf16leDecode(bytes) {
+    const u = toU8(bytes);
+    if (u.length >= NATIVO) return H.utf16leDecode(u);
+    let s = ""; for (let i = 0; i + 1 < u.length; i += 2) s += String.fromCharCode(u[i] | (u[i + 1] << 8)); return s;
+  }
+  globalThis.__utf8 = { encode: utf8Encode, decode: utf8Decode, encodeInto: utf8EncodeInto, byteLength: utf8Length };
+  globalThis.__latin1 = { encode: latin1Encode, decode: latin1Decode };
+  globalThis.__utf16le = { decode: utf16leDecode };
+  globalThis.TextEncoder = class TextEncoder { get encoding() { return "utf-8"; } encode(s = "") { return utf8Encode(String(s)); } encodeInto(s, dst) { return utf8EncodeInto(String(s), dst); } };
+  globalThis.TextDecoder = class TextDecoder { constructor(enc = "utf-8", opts = {}) { this.encoding = String(enc).toLowerCase(); this.fatal = !!opts.fatal; this.ignoreBOM = !!opts.ignoreBOM; } decode(b) { if (!b) return ""; const u = toU8(b); if (this.encoding === "utf-16le" || this.encoding === "utf-16") return utf16leDecode(u); if (this.encoding === "latin1" || this.encoding === "iso-8859-1" || this.encoding === "ascii") return latin1Decode(u); const t = utf8Decode(u); return !this.ignoreBOM && t.charCodeAt(0) === 0xfeff ? t.slice(1) : t; } };
 
   const B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-  function b64encBytes(bytes) {
+  function b64encJS(bytes) {
     let s = "";
     for (let i = 0; i < bytes.length; i += 3) {
       const a = bytes[i], b = bytes[i + 1], c = bytes[i + 2];
@@ -121,7 +172,7 @@
     }
     return s;
   }
-  function b64decBytes(str) {
+  function b64decJS(str) {
     const clean = String(str).replace(/[^A-Za-z0-9+/]/g, "");
     const out = [];
     for (let i = 0; i < clean.length; i += 4) {
@@ -132,9 +183,15 @@
     }
     return new Uint8Array(out);
   }
-  globalThis.__b64 = { enc: b64encBytes, dec: b64decBytes };
-  globalThis.btoa = (s) => b64encBytes(Uint8Array.from(String(s), (c) => c.charCodeAt(0) & 255));
-  globalThis.atob = (s) => Array.from(b64decBytes(s), (b) => String.fromCharCode(b)).join("");
+  const ehBytes = (v) => v instanceof ArrayBuffer || ArrayBuffer.isView(v);
+  const b64encBytes = (bytes) => (bytes.length >= NATIVO && ehBytes(bytes) ? H.b64Encode(toU8(bytes), false) : b64encJS(bytes));
+  function b64decBytes(str) { const s = String(str); return s.length >= NATIVO ? H.b64Decode(s, false) : b64decJS(s); }
+  // base64url: `-_` no lugar de `+/`, sem `=` no fim.
+  const b64encUrl = (bytes) => (bytes.length >= NATIVO && ehBytes(bytes) ? H.b64Encode(toU8(bytes), true) : b64encJS(bytes).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""));
+  function b64decUrl(str) { const s = String(str); return s.length >= NATIVO ? H.b64Decode(s, true) : b64decJS(s.replace(/-/g, "+").replace(/_/g, "/")); }
+  globalThis.__b64 = { enc: b64encBytes, dec: b64decBytes, encUrl: b64encUrl, decUrl: b64decUrl };
+  globalThis.btoa = (s) => b64encBytes(latin1Encode(String(s)));
+  globalThis.atob = (s) => latin1Decode(b64decBytes(s));
 
 
   // --- URL / URLSearchParams (o JSC não traz) ---
@@ -218,9 +275,9 @@
 
   // --- crypto (subset) ---
   globalThis.crypto = globalThis.crypto || {};
-  globalThis.crypto.getRandomValues = (arr) => { const bytes = H.randomBytes(arr.byteLength); const u8 = new Uint8Array(arr.buffer, arr.byteOffset, arr.byteLength); for (let i = 0; i < u8.length; i++) u8[i] = bytes[i]; return arr; };
+  globalThis.crypto.getRandomValues = (arr) => { H.randomFill(new Uint8Array(arr.buffer, arr.byteOffset, arr.byteLength)); return arr; };
   globalThis.crypto.randomUUID = () => { const b = H.randomBytes(16); b[6] = (b[6] & 15) | 64; b[8] = (b[8] & 63) | 128; const h = b.map((x) => x.toString(16).padStart(2, "0")).join(""); return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`; };
-  globalThis.crypto.subtle = { async digest(algo, data) { const name = String(algo && algo.name || algo).replace("-", "").toLowerCase(); const u8 = data instanceof ArrayBuffer ? new Uint8Array(data) : new Uint8Array(data.buffer, data.byteOffset, data.byteLength); const hex = H.hash(name, b64encBytes(u8)); const out = new Uint8Array(hex.length / 2); for (let i = 0; i < out.length; i++) out[i] = parseInt(hex.substr(i * 2, 2), 16); return out.buffer; } };
+  globalThis.crypto.subtle = { async digest(algo, data) { const name = String(algo && algo.name || algo).replace("-", "").toLowerCase(); const u8 = data instanceof ArrayBuffer ? new Uint8Array(data) : new Uint8Array(data.buffer, data.byteOffset, data.byteLength); return H.hashBytes(name, u8).buffer; } };
 
   globalThis.performance = globalThis.performance || { now: () => H.perfNow(), timeOrigin: H.now(), mark() {}, measure() {} };
   globalThis.structuredClone = globalThis.structuredClone || ((v) => JSON.parse(JSON.stringify(v)));

@@ -1,13 +1,14 @@
 __nodeDefine("buffer", (module) => {
-  const utf8 = globalThis.__utf8, b64 = globalThis.__b64;
+  // Conversões grandes vão para o Swift dentro destes objetos (ver bootstrap.js, NATIVO).
+  const utf8 = globalThis.__utf8, b64 = globalThis.__b64, latin1 = globalThis.__latin1, utf16le = globalThis.__utf16le;
   const encodings = ["utf8", "utf-8", "ascii", "latin1", "binary", "base64", "base64url", "hex", "ucs2", "ucs-2", "utf16le", "utf-16le"];
   function norm(enc) { return String(enc || "utf8").toLowerCase().replace("-", ""); }
   function bytesFrom(str, enc) {
     switch (norm(enc)) {
       case "utf8": return utf8.encode(str);
-      case "ascii": case "latin1": case "binary": return Uint8Array.from(str, (c) => c.charCodeAt(0) & 255);
+      case "ascii": case "latin1": case "binary": return latin1.encode(str);
       case "base64": return b64.dec(str);
-      case "base64url": return b64.dec(str.replace(/-/g, "+").replace(/_/g, "/"));
+      case "base64url": return b64.decUrl(str);
       case "hex": { const out = new Uint8Array(str.length >> 1); for (let i = 0; i < out.length; i++) out[i] = parseInt(str.substr(i * 2, 2), 16); return out; }
       case "ucs2": case "utf16le": { const out = new Uint8Array(str.length * 2); for (let i = 0; i < str.length; i++) { const c = str.charCodeAt(i); out[i * 2] = c & 255; out[i * 2 + 1] = c >> 8; } return out; }
       default: throw new TypeError("Unknown encoding: " + enc);
@@ -16,11 +17,11 @@ __nodeDefine("buffer", (module) => {
   function strFrom(bytes, enc) {
     switch (norm(enc)) {
       case "utf8": return utf8.decode(bytes);
-      case "ascii": case "latin1": case "binary": return Array.from(bytes, (b) => String.fromCharCode(b)).join("");
+      case "ascii": case "latin1": case "binary": return latin1.decode(bytes);
       case "base64": return b64.enc(bytes);
-      case "base64url": return b64.enc(bytes).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+      case "base64url": return b64.encUrl(bytes);
       case "hex": return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
-      case "ucs2": case "utf16le": { let s = ""; for (let i = 0; i + 1 < bytes.length; i += 2) s += String.fromCharCode(bytes[i] | (bytes[i + 1] << 8)); return s; }
+      case "ucs2": case "utf16le": return utf16le.decode(bytes);
       default: throw new TypeError("Unknown encoding: " + enc);
     }
   }
@@ -38,7 +39,7 @@ __nodeDefine("buffer", (module) => {
     static allocUnsafeSlow(n) { return wrap(new Uint8Array(n)); }
     static isBuffer(b) { return b instanceof Buffer; }
     static isEncoding(e) { return encodings.includes(String(e).toLowerCase()); }
-    static byteLength(s, enc) { return typeof s === "string" ? bytesFrom(s, enc).length : s.byteLength; }
+    static byteLength(s, enc) { return typeof s === "string" ? (norm(enc) === "utf8" ? utf8.byteLength(s) : bytesFrom(s, enc).length) : s.byteLength; }
     static concat(list, total) { const len = total ?? list.reduce((a, b) => a + b.length, 0); const out = Buffer.alloc(len); let o = 0; for (const b of list) { out.set(b.subarray(0, Math.min(b.length, len - o)), o); o += b.length; if (o >= len) break; } return out; }
     static compare(a, b) { return a.compare(b); }
     toString(enc, start = 0, end = this.length) { return strFrom(this.subarray(start, end), enc); }
@@ -76,6 +77,16 @@ __nodeDefine("buffer", (module) => {
     [Symbol.for("nodejs.util.inspect.custom")]() { return `<Buffer ${Array.from(this.subarray(0, 50), (b) => b.toString(16).padStart(2, "0")).join(" ")}${this.length > 50 ? " ... " + (this.length - 50) + " more bytes" : ""}>`; }
   }
   function wrap(u8) { return Object.setPrototypeOf(u8, Buffer.prototype); }
+  // Para os outros módulos: bytes de qualquer coisa que o Node aceita como dado binário, sem
+  // copiar o que já é typed array, e um Uint8Array (vindo do Swift) visto como Buffer, sem cópia.
+  globalThis.__comoBytes = (v, enc) => {
+    if (v instanceof Uint8Array) return v;
+    if (typeof v === "string") return bytesFrom(v, enc && enc !== "buffer" ? enc : "utf8");
+    if (ArrayBuffer.isView(v)) return new Uint8Array(v.buffer, v.byteOffset, v.byteLength);
+    if (v instanceof ArrayBuffer) return new Uint8Array(v);
+    return Buffer.from(v);
+  };
+  globalThis.__comoBuffer = (u8) => (u8 instanceof Buffer ? u8 : wrap(u8 || new Uint8Array(0)));
   Buffer.poolSize = 8192;
   globalThis.Buffer = Buffer;
   module.exports = { Buffer, kMaxLength: 2 ** 31 - 1, constants: { MAX_LENGTH: 2 ** 31 - 1, MAX_STRING_LENGTH: 2 ** 29 - 24 }, Blob: globalThis.Blob, SlowBuffer: Buffer, INSPECT_MAX_BYTES: 50 };

@@ -143,18 +143,19 @@ enum CRC32 {
 
 enum Hash {
     static func hex(algo: String, data: Data) -> String {
+        hexString(bytes(algo: algo, data: data))
+    }
+
+    /// O digest cru; algoritmo desconhecido cai no sha256, como sempre caiu.
+    static func bytes(algo: String, data: some DataProtocol) -> [UInt8] {
         switch algo.lowercased() {
-        case "sha1": Insecure.SHA1.hash(data: data) |> hexString
-        case "sha512": SHA512.hash(data: data) |> hexString
-        case "md5": Insecure.MD5.hash(data: data) |> hexString
-        default: SHA256.hash(data: data) |> hexString
+        case "sha1": Array(Insecure.SHA1.hash(data: data))
+        case "sha384": Array(SHA384.hash(data: data))
+        case "sha512": Array(SHA512.hash(data: data))
+        case "md5": Array(Insecure.MD5.hash(data: data))
+        default: Array(SHA256.hash(data: data))
         }
     }
-}
-
-infix operator |>: AdditionPrecedence
-func |> <A, B>(a: A, f: (A) -> B) -> B {
-    f(a)
 }
 
 func hexString(_ d: some Sequence<UInt8>) -> String {

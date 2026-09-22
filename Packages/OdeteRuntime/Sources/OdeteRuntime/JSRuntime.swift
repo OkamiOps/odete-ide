@@ -14,8 +14,7 @@ final class JSRuntime: @unchecked Sendable {
     var output: (@Sendable (OutputKind, String) -> Void)?
     var onExit: (@Sendable (Int32) -> Void)?
     private(set) var pending = 0 // trabalho assíncrono vivo (timers, fetch, servidores)
-    private var timers: [Int: DispatchSourceTimer] = [:]
-    private var nextTimer = 1
+    private let agenda: AgendaDeTimers
     private(set) var exited = false
     private(set) var exitCode: Int32 = 0
     var keepAlive = 0 // servidores abertos
@@ -26,7 +25,15 @@ final class JSRuntime: @unchecked Sendable {
     var transform: (@Sendable (String, String) throws -> String)? // (código, caminho) → CJS
 
     init(cwd: URL, env: [String: String], argv: [String]) {
-        queue = DispatchQueue(label: tr("odete.js.%1$@", "\(UUID().uuidString.prefix(6))"), qos: .userInitiated)
+        // `.workItem`: os JSValue que a ponte ObjC deixa no autorelease morrem ao fim de cada
+        // bloco, e não quando a thread do GCD resolver esvaziar o pool — sem isso um contexto
+        // encerrado podia ficar vivo por um tempo indeterminado.
+        queue = DispatchQueue(
+            label: tr("odete.js.%1$@", "\(UUID().uuidString.prefix(6))"),
+            qos: .userInitiated,
+            autoreleaseFrequency: .workItem
+        )
+        agenda = AgendaDeTimers(queue: queue)
         context = JSContext()!
         host = JSValue(newObjectIn: context)
         self.cwd = cwd
@@ -42,6 +49,14 @@ final class JSRuntime: @unchecked Sendable {
             lastError = RuntimeError(message: text)
             emit(.err, text)
         }
+        agenda.aoDisparar = { [weak self] id, terminou in
+            guard let self, !exited else { return }
+            call("__odete_fireTimer", [id])
+            // `exit` dentro do callback já zerou o trabalho pendente.
+            if terminou, !exited {
+                endWork()
+            }
+        }
         installHost()
     }
 
@@ -55,6 +70,7 @@ final class JSRuntime: @unchecked Sendable {
 
     private func installHost() {
         HostCore.install(self)
+        HostBytes.install(self)
         HostFs.install(self)
         HostFetch.install(self)
         HostHttp.install(self)
@@ -128,33 +144,18 @@ final class JSRuntime: @unchecked Sendable {
         }
     }
 
+    /// O atraso chega já normalizado pelo bootstrap.js (piso de 1 ms nos intervalos); `0` roda
+    /// na próxima volta do laço. Ver `AgendaDeTimers`.
     func addTimer(ms: Double, repeats: Bool) -> Int {
-        let id = nextTimer
-        nextTimer += 1
-        let t = DispatchSource.makeTimerSource(queue: queue)
-        let interval = DispatchTimeInterval.milliseconds(max(Int(ms), 0))
-        if repeats {
-            t.schedule(deadline: .now() + interval, repeating: interval)
-        } else {
-            t.schedule(deadline: .now() + interval)
-        }
-        t.setEventHandler { [weak self] in
-            guard let self, !exited else { return }
-            call("__odete_fireTimer", [id])
-            if !repeats {
-                clearTimer(id)
-            }
-        }
-        timers[id] = t
+        let id = agenda.agendar(ms: ms, repete: repeats)
         beginWork()
-        t.resume()
         return id
     }
 
     func clearTimer(_ id: Int) {
-        guard let t = timers.removeValue(forKey: id) else { return }
-        t.cancel()
-        endWork()
+        if agenda.cancelar(id) {
+            endWork()
+        }
     }
 
     /// `process.exitCode` definido pelo script, se houver.
@@ -168,13 +169,26 @@ final class JSRuntime: @unchecked Sendable {
         guard !exited else { return }
         exited = true
         exitCode = code
-        for (_, t) in timers {
-            t.cancel()
-        }
-        timers.removeAll()
+        agenda.cancelarTodos()
         pending = 0
         keepAlive = 0
         onExit?(code)
         checkIdle()
+    }
+
+    /// Solta o que prende o mundo de fora depois que o processo terminou: `onExit` (que
+    /// segurava o próprio runtime), a saída (que segura a sessão do terminal), o transformador
+    /// e os servidores. Sem isso cada `node`/`npx` deixava o contexto JS inteiro vivo.
+    func encerrar() {
+        onExit = nil
+        idleWaiters.removeAll()
+        output = nil
+        transform = nil
+        serversBox?.stopAll()
+    }
+
+    /// Um `Uint8Array` com a cópia de `dados`, para passar a `call`.
+    func bytes(_ dados: Data) -> JSValue {
+        HostBytes.valor(dados, em: context)
     }
 }

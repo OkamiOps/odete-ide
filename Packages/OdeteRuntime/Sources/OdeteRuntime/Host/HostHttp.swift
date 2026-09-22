@@ -3,21 +3,38 @@ import JavaScriptCore
 import Network
 
 /// Servidor HTTP/1.1 real em 127.0.0.1 com Network.framework. Cada requisição vira uma chamada JS
-/// `__odete_httpRequest(serverId, reqId, method, url, headers, bodyB64)`; o JS responde com
-/// `__odete.httpRespond(reqId, status, headers, bodyB64, done)`.
+/// `__odete_httpRequest(serverId, reqId, method, url, headers, corpo)` com o corpo num `Uint8Array`;
+/// o JS responde com `__odete.httpWriteHead(...)` e `__odete.httpWrite(serverId, reqId, bytes, fim)`.
 final class HttpServer: @unchecked Sendable {
     let id: Int
     let port: UInt16
     let listener: NWListener
-    unowned let rt: JSRuntime
+    let fila: DispatchQueue
+    /// Fraco: um callback do Network já enfileirado pode chegar depois que o runtime morreu.
+    weak var rt: JSRuntime?
+    /// Todas as conexões abertas, por número de conexão — keep-alive ociosas e WebSockets
+    /// inclusive. Saem daqui quando fecham; `stop()` fecha o que sobrar.
     var connections: [Int: NWConnection] = [:]
+    var nextConn = 1
     var nextReq = 1
-    var pendingBodies: [Int: (conn: NWConnection, keepAlive: Bool, chunked: Bool, headersSent: Bool)] = [:]
+    /// Respostas em andamento, por reqId.
+    var pendingBodies: [Int: Resposta] = [:]
+    /// WebSockets abertos, por reqId (o id que o JS conhece).
     var wsClients: [Int: NWConnection] = [:]
+    private var wsConexao: [Int: Int] = [:] // reqId → conexão
+
+    struct Resposta {
+        var conn: NWConnection
+        var connId: Int
+        var keepAlive: Bool
+        var chunked = false
+        var headersSent = false
+    }
 
     init(id: Int, port: UInt16, rt: JSRuntime) throws {
         self.id = id
         self.rt = rt
+        fila = rt.queue
         let params = NWParameters.tcp
         params.allowLocalEndpointReuse = true
         params.requiredLocalEndpoint = NWEndpoint.hostPort(
@@ -28,13 +45,20 @@ final class HttpServer: @unchecked Sendable {
         self.port = port
     }
 
+    deinit {
+        listener.cancel()
+        for c in connections.values {
+            c.cancel()
+        }
+    }
+
     var actualPort: UInt16 {
         listener.port?.rawValue ?? port
     }
 
     func start() {
         listener.newConnectionHandler = { [weak self] conn in self?.accept(conn) }
-        listener.start(queue: rt.queue)
+        listener.start(queue: fila)
     }
 
     func stop() {
@@ -43,66 +67,133 @@ final class HttpServer: @unchecked Sendable {
             c.cancel()
         }
         connections.removeAll()
+        pendingBodies.removeAll()
         wsClients.removeAll()
+        wsConexao.removeAll()
     }
 
     private func accept(_ conn: NWConnection) {
-        conn.start(queue: rt.queue)
-        readRequest(conn, buffer: Data())
+        let cid = nextConn
+        nextConn += 1
+        connections[cid] = conn
+        conn.start(queue: fila)
+        readRequest(conn, cid, buffer: Data())
     }
 
-    private func readRequest(_ conn: NWConnection, buffer: Data) {
+    /// Fecha uma conexão e esquece o que era dela.
+    private func fechar(_ cid: Int) {
+        guard let conn = connections.removeValue(forKey: cid) else { return }
+        conn.cancel()
+        pendingBodies = pendingBodies.filter { $0.value.connId != cid }
+    }
+
+    private func readRequest(_ conn: NWConnection, _ cid: Int, buffer: Data) {
         conn.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] data, _, isComplete, error in
-            guard let self else { return }
+            guard let self else {
+                conn.cancel(); return
+            }
             var buf = buffer
             if let data {
                 buf.append(data)
             }
-            if error != nil || (isComplete && buf.isEmpty) {
-                conn.cancel(); return
+            if error != nil {
+                fechar(cid); return
             }
-            if let (req, rest) = HttpParser.parse(buf) {
-                handle(req, conn: conn)
-                readRequest(conn, buffer: rest)
-            } else if isComplete {
-                conn.cancel()
-            } else {
-                readRequest(conn, buffer: buf)
+            // Pode ter chegado mais de uma requisição no mesmo pacote.
+            while let (req, rest) = HttpParser.parse(buf) {
+                buf = rest
+                if handle(req, conn: conn, connId: cid) {
+                    return // virou WebSocket: `readWs` é o único a ler desta conexão agora
+                }
             }
+            if isComplete {
+                // O cliente parou de mandar. Com resposta em andamento, fecha quando ela terminar.
+                let emAndamento = pendingBodies.filter { $0.value.connId == cid }.map(\.key)
+                if emAndamento.isEmpty {
+                    fechar(cid)
+                } else {
+                    for rid in emAndamento {
+                        pendingBodies[rid]?.keepAlive = false
+                    }
+                }
+                return
+            }
+            readRequest(conn, cid, buffer: buf)
         }
     }
 
-    private func handle(_ req: HttpParser.Request, conn: NWConnection) {
+    /// Entrega a requisição ao JS. Devolve `true` se a conexão virou WebSocket.
+    private func handle(_ req: HttpParser.Request, conn: NWConnection, connId: Int) -> Bool {
+        guard let rt else { return false }
         let reqId = nextReq
         nextReq += 1
-        connections[reqId] = conn
         let keepAlive = (req.headers["connection"] ?? (req.version == "HTTP/1.1" ? "keep-alive" : "close"))
             .lowercased() != "close"
-        pendingBodies[reqId] = (conn, keepAlive, false, false)
         if req.headers["upgrade"]?.lowercased() == "websocket", let key = req.headers["sec-websocket-key"] {
             // handshake WebSocket (só para o reload do dev server)
             let accept = Data(SHA1Digest.digest(key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11")).base64EncodedString()
             let resp = "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: \(accept)\r\n\r\n"
             conn.send(content: Data(resp.utf8), completion: .contentProcessed { _ in })
             wsClients[reqId] = conn
-            pendingBodies[reqId] = nil
+            wsConexao[reqId] = connId
             rt.call("__odete_wsOpen", [id, reqId, req.url])
             readWs(conn, reqId: reqId)
-            return
+            return true
         }
-        rt.call("__odete_httpRequest", [id, reqId, req.method, req.url, req.headers, req.body.base64EncodedString()])
+        pendingBodies[reqId] = Resposta(conn: conn, connId: connId, keepAlive: keepAlive)
+        rt.call("__odete_httpRequest", [id, reqId, req.method, req.url, req.headers, rt.bytes(req.body)])
+        return false
     }
 
     private func readWs(_ conn: NWConnection, reqId: Int) {
-        conn.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] _, _, isComplete, error in
+        conn.receive(minimumIncompleteLength: 1, maximumLength: 65536) { [weak self] data, _, isComplete, error in
             guard let self else { return }
-            if isComplete || error != nil {
+            // O cliente do reload não manda mensagens; o que importa é o frame de fechamento
+            // (opcode 8) quando a página recarrega. Responder e fechar já, em vez de esperar o
+            // navegador desistir da conexão.
+            let fechamento = data.map(Self.temFechamento) ?? false
+            if isComplete || error != nil || fechamento {
                 wsClients[reqId] = nil
-                rt.call("__odete_wsClose", [id, reqId])
+                let cid = wsConexao.removeValue(forKey: reqId)
+                if fechamento {
+                    // Sai dos mapas já; a conexão só é cancelada depois que a resposta sair.
+                    if let cid {
+                        connections[cid] = nil
+                    }
+                    conn.send(content: Data([0x88, 0x00]), completion: .contentProcessed { _ in conn.cancel() })
+                } else if let cid {
+                    fechar(cid)
+                }
+                rt?.call("__odete_wsClose", [id, reqId])
                 return
             }
             readWs(conn, reqId: reqId)
         }
+    }
+
+    /// Algum frame inteiro neste pedaço é de fechamento? Anda de frame em frame pelo cabeçalho
+    /// (frames do cliente vêm mascarados) e para no primeiro que não coube inteiro.
+    static func temFechamento(_ d: Data) -> Bool {
+        let b = [UInt8](d)
+        var i = 0
+        while i + 2 <= b.count {
+            if b[i] & 0x0F == 0x8 {
+                return true
+            }
+            var tamanho = Int(b[i + 1] & 0x7F), cabecalho = 2
+            if tamanho == 126, i + 4 <= b.count {
+                tamanho = Int(b[i + 2]) << 8 | Int(b[i + 3]); cabecalho = 4
+            } else if tamanho == 127, i + 10 <= b.count {
+                tamanho = (0 ..< 8).reduce(0) { $0 << 8 | Int(b[i + 2 + $1]) }; cabecalho = 10
+            } else if tamanho >= 126 {
+                return false
+            }
+            if b[i + 1] & 0x80 != 0 {
+                cabecalho += 4
+            }
+            i += cabecalho + tamanho
+        }
+        return false
     }
 
     /// Envia um frame de texto WebSocket.
@@ -135,6 +226,8 @@ final class HttpServer: @unchecked Sendable {
         }
         if !lower.contains("connection") {
             hdrs["Connection"] = p.keepAlive ? "keep-alive" : "close"
+        } else if hdrs.contains(where: { $0.key.lowercased() == "connection" && $0.value.lowercased() == "close" }) {
+            p.keepAlive = false // o JS pediu para fechar: a conexão sai de `connections` ao fim
         }
         if !lower.contains("date") {
             hdrs["Date"] = HttpParser.httpDate()
@@ -167,10 +260,10 @@ final class HttpServer: @unchecked Sendable {
         }
         p.conn.send(content: out, completion: .contentProcessed { [weak self] _ in
             guard let self, end else { return }
-            pendingBodies[reqId] = nil
-            connections[reqId] = nil
-            if !p.keepAlive {
-                p.conn.cancel()
+            // `keepAlive` pode ter mudado depois (cliente fechou o lado dele): vale o de agora.
+            let atual = pendingBodies.removeValue(forKey: reqId)
+            if !(atual?.keepAlive ?? p.keepAlive) {
+                fechar(p.connId)
             }
         })
     }
@@ -219,12 +312,23 @@ enum HttpParser {
         }
     }
 
-    static func httpDate() -> String {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "en_US_POSIX")
-        f.timeZone = TimeZone(identifier: "GMT")
-        f.dateFormat = "EEE, dd MMM yyyy HH:mm:ss 'GMT'"
-        return f.string(from: .now)
+    private static let dias = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+    private static let meses = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+    /// Data HTTP (IMF-fixdate, RFC 9110): `Sun, 06 Nov 1994 08:49:37 GMT`.
+    ///
+    /// Montada à mão com `gmtime_r` em vez de um `DateFormatter` por resposta: não aloca
+    /// formatador, não depende de locale e pode rodar em qualquer fila ao mesmo tempo — cada
+    /// runtime tem a sua, e um formatador compartilhado precisaria de trava.
+    static func httpDate(_ data: Date = .now) -> String {
+        var t = time_t(data.timeIntervalSince1970)
+        var g = tm()
+        gmtime_r(&t, &g)
+        func dois(_ n: Int32) -> String {
+            n < 10 ? "0\(n)" : "\(n)"
+        }
+        return "\(dias[Int(g.tm_wday)]), \(dois(g.tm_mday)) \(meses[Int(g.tm_mon)]) \(g.tm_year + 1900) "
+            + "\(dois(g.tm_hour)):\(dois(g.tm_min)):\(dois(g.tm_sec)) GMT"
     }
 }
 
@@ -263,8 +367,10 @@ enum HostHttp {
             avisar(tr("não consegui abrir a porta %1$@", "\(porta)"))
             return
         }
-        server.listener.stateUpdateHandler = { [weak server] state in
-            guard let server else { return }
+        // `rt` fraco: o listener guarda este closure, o servidor fica na caixa e a caixa no
+        // runtime — forte, era um ciclo que prendia o runtime enquanto o servidor existisse.
+        server.listener.stateUpdateHandler = { [weak server, weak rt] state in
+            guard let server, let rt else { return }
             switch state {
             case .ready:
                 rt.call("__odete_httpListening", [id, Int(server.actualPort)])
@@ -274,9 +380,11 @@ enum HostHttp {
                 } else {
                     false
                 }
+                // O servidor que falhou sai da caixa: `httpClose` depois do erro não conta um
+                // servidor a menos, e nada fica preso a ele.
+                server.stop()
+                box.servers.removeValue(forKey: id)
                 if ocupada, porta != 0, restantes > 0 {
-                    server.stop()
-                    box.servers.removeValue(forKey: id)
                     abrir(
                         rt: rt,
                         box: box,
@@ -303,17 +411,22 @@ enum HostHttp {
             let id = nextId
             nextId += 1
             rt.keepAlive += 1
-            abrir(rt: rt, box: box, Tentativa(id: id, porta: UInt16(clamping: port), restantes: 20)) { msg in
+            abrir(rt: rt, box: box, Tentativa(id: id, porta: UInt16(clamping: port), restantes: 20)) { [weak rt] msg in
+                guard let rt else { return }
                 rt.keepAlive = max(rt.keepAlive - 1, 0)
                 rt.call("__odete_httpError", [id, msg])
+                rt.checkIdle()
             }
             return ["id": id]
         }
         h.setObject(listen, forKeyedSubscript: "httpListen" as NSString)
 
         let close: @convention(block) (Int) -> Void = { [unowned rt] id in
-            box.servers.removeValue(forKey: id)?.stop()
-            rt.keepAlive = max(rt.keepAlive - 1, 0)
+            // Só conta se o servidor ainda existia: um que falhou já descontou ao avisar.
+            if let s = box.servers.removeValue(forKey: id) {
+                s.stop()
+                rt.keepAlive = max(rt.keepAlive - 1, 0)
+            }
             rt.checkIdle()
         }
         h.setObject(close, forKeyedSubscript: "httpClose" as NSString)
@@ -323,8 +436,9 @@ enum HostHttp {
         }
         h.setObject(writeHead, forKeyedSubscript: "httpWriteHead" as NSString)
 
-        let write: @convention(block) (Int, Int, String, Bool) -> Void = { sid, rid, b64, end in
-            box.servers[sid]?.write(rid, chunk: Data(base64Encoded: b64) ?? Data(), end: end)
+        // O corpo chega como typed array; string base64 (o formato antigo) ainda é aceita.
+        let write: @convention(block) (Int, Int, JSValue?, Bool) -> Void = { sid, rid, corpo, end in
+            box.servers[sid]?.write(rid, chunk: HostBytes.dados(corpo), end: end)
         }
         h.setObject(write, forKeyedSubscript: "httpWrite" as NSString)
 

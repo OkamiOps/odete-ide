@@ -1,11 +1,20 @@
 import Foundation
 import JavaScriptCore
+import Synchronization
 
 /// Um processo JavaScript: `node arquivo.js` ou um script inline.
 public final class JSProcess: @unchecked Sendable {
-    let rt: JSRuntime
+    /// O runtime enquanto o processo não terminou. Ao terminar ele é solto: o contexto JS
+    /// (dezenas de MB) e o closure de saída (que prende a sessão do terminal) não sobrevivem
+    /// ao processo, mesmo que alguém ainda segure o `JSProcess` — um job na lista do shell,
+    /// por exemplo. Antes o `onExit` guardado no próprio runtime o prendia para sempre.
+    private let atual: Mutex<JSRuntime?>
     public let cwd: URL
-    private var exitContinuation: CheckedContinuation<Int32, Never>?
+
+    /// O runtime vivo, ou nil depois que o processo terminou.
+    var rt: JSRuntime? {
+        atual.withLock { $0 }
+    }
 
     public init(
         cwd: URL,
@@ -19,13 +28,15 @@ public final class JSProcess: @unchecked Sendable {
         e["PWD"] = cwd.path
         e["NODE_ENV"] = e["NODE_ENV"] ?? "development"
         e["ODETE"] = "1"
-        rt = JSRuntime(cwd: cwd, env: e, argv: argv)
+        let rt = JSRuntime(cwd: cwd, env: e, argv: argv)
         rt.output = output
         ModuleLoader.install(rt)
+        atual = Mutex(rt)
     }
 
     /// Transformador TS/ESM → CJS (esbuild) injetado pelo bundler.
     public func setTransform(_ t: @escaping @Sendable (String, String) throws -> String) {
+        guard let rt else { return }
         rt.queue.sync { rt.transform = t }
     }
 
@@ -46,13 +57,18 @@ public final class JSProcess: @unchecked Sendable {
     }
 
     private func start(_ body: @escaping @Sendable (JSRuntime) throws -> Void) async -> Int32 {
-        await withCheckedContinuation { (cont: CheckedContinuation<Int32, Never>) in
-            rt.queue.async { [rt] in
+        guard let rt else { return 1 } // já terminou: um JSProcess roda uma vez só
+        return await withCheckedContinuation { (cont: CheckedContinuation<Int32, Never>) in
+            rt.queue.async { [weak self, rt] in
                 var finished = false
                 let finish: () -> Void = {
                     guard !finished else { return }
                     finished = true
-                    cont.resume(returning: rt.exitCode)
+                    let codigo = rt.exitCode
+                    // Quebra o ciclo runtime → onExit → finish → runtime e solta o runtime.
+                    rt.encerrar()
+                    self?.atual.withLock { $0 = nil }
+                    cont.resume(returning: codigo)
                 }
                 rt.onExit = { _ in rt.queue.async { finish() } }
                 do {
@@ -83,6 +99,7 @@ public final class JSProcess: @unchecked Sendable {
 
     /// Encerra à força (Ctrl+C).
     public func kill() {
+        guard let rt else { return }
         rt.queue.async { [rt] in
             rt.serversBox?.stopAll()
             rt.exit(130)
@@ -91,11 +108,13 @@ public final class JSProcess: @unchecked Sendable {
 
     /// Portas HTTP abertas por este processo.
     public var ports: [Int] {
-        rt.queue.sync { rt.serversBox?.servers.values.map { Int($0.actualPort) } ?? [] }
+        guard let rt else { return [] }
+        return rt.queue.sync { rt.serversBox?.servers.values.map { Int($0.actualPort) } ?? [] }
     }
 
     /// Manda um evento de reload para todos os clientes WebSocket (dev server).
     public func broadcast(_ text: String) {
+        guard let rt else { return }
         rt.queue.async { [rt] in
             for s in Array(rt.serversBox?.servers.values ?? [:].values) {
                 for (rid, _) in s.wsClients {

@@ -6,11 +6,15 @@ __nodeDefine("fs", (module, exports, require) => {
   class Stats { constructor(s) { this.size = s.size; this.mtimeMs = s.mtime; this.mtime = new Date(s.mtime); this.atime = this.ctime = this.birthtime = this.mtime; this.atimeMs = this.ctimeMs = this.birthtimeMs = s.mtime; this.mode = (s.isDir ? 0o40000 : 0o100000) | s.mode; this._d = s.isDir; this._l = s.isLink; this.uid = 501; this.gid = 20; this.ino = 0; this.dev = 0; this.nlink = 1; this.blksize = 4096; this.blocks = Math.ceil(s.size / 512); } isDirectory() { return this._d; } isFile() { return !this._d; } isSymbolicLink() { return !!this._l; } isFIFO() { return false; } isSocket() { return false; } isBlockDevice() { return false; } isCharacterDevice() { return false; } }
   class Dirent { constructor(name, s, parent) { this.name = name; this.parentPath = parent; this.path = parent; this._d = s.isDir; this._l = s.isLink; } isDirectory() { return this._d; } isFile() { return !this._d; } isSymbolicLink() { return !!this._l; } }
   const enc = (o) => (typeof o === "string" ? o : o && o.encoding) || null;
+  const ehUtf8 = (e) => { e = String(e).toLowerCase(); return e === "utf8" || e === "utf-8"; };
   const fs = {
     constants: { F_OK: 0, R_OK: 4, W_OK: 2, X_OK: 1, O_RDONLY: 0, O_WRONLY: 1, O_RDWR: 2, O_CREAT: 64, O_TRUNC: 512, O_APPEND: 1024, COPYFILE_EXCL: 1 },
     existsSync: (p) => H.exists(abs(p)),
-    readFileSync(p, o) { const e = enc(o); const a = abs(p); if (e && e !== "buffer") { const r = check(H.readText(a), "open"); return e === "utf8" || e === "utf-8" ? r : Buffer.from(r, "utf8").toString(e); } return Buffer.from(check(H.readB64(a), "open"), "base64"); },
-    writeFileSync(p, data, o) { const a = abs(p); const flag = o && o.flag; const append = flag === "a" || flag === "a+"; if (typeof data === "string") check(H.writeText(a, data, append), "open"); else check(H.writeB64(a, Buffer.from(data).toString("base64"), append), "open"); },
+    // Binário atravessa a ponte como Uint8Array (readBytes/writeBytes), sem base64. Texto utf8
+    // continua por readText/writeText. Outras codificações leem os bytes e convertem: antes
+    // `readFileSync(png, "base64")` passava por UTF-8 e corrompia o arquivo.
+    readFileSync(p, o) { const e = enc(o); const a = abs(p); if (e && ehUtf8(e)) return check(H.readText(a), "open"); const b = globalThis.__comoBuffer(check(H.readBytes(a), "open")); return e && e !== "buffer" ? b.toString(e) : b; },
+    writeFileSync(p, data, o) { const a = abs(p); const flag = o && o.flag; const append = flag === "a" || flag === "a+"; const e = enc(o); if (typeof data === "string" && (!e || ehUtf8(e))) check(H.writeText(a, data, append), "open"); else check(H.writeBytes(a, globalThis.__comoBytes(data, e), append), "open"); },
     appendFileSync(p, data, o) { fs.writeFileSync(p, data, { ...(typeof o === "object" ? o : {}), flag: "a" }); },
     statSync(p, o) { const r = H.stat(abs(p)); if (r.error) { if (o && o.throwIfNoEntry === false) return undefined; throw mkErr(r, "stat"); } return new Stats(r); },
     lstatSync(p, o) { return fs.statSync(p, o); },

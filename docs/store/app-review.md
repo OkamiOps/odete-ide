@@ -134,3 +134,31 @@ licences, which are listed in the app under **Settings → About → Licences**.
 - [ ] Colar o texto acima na mensagem do App Review **e** no campo Notes de
       *App Review Information*.
 - [ ] Anexar o vídeo na mensagem.
+
+---
+
+# App Review — Guideline 5.2.5, marca da Apple no subtítulo
+
+Segunda rodada, 21/09/2026, revisada num iPad Air 11" (M3) sobre a build
+1.0 (32). Um ponto só, e nada de código:
+
+> The app's metadata includes content that is similar to designs or terms
+> used for Apple products and services and may cause confusion for users.
+> Specifically, your metadata includes:
+> - Terms for iPad in the app subtitle in an inappropriate manner.
+
+A regra vale para nome e subtítulo. Uso referencial na descrição continua
+permitido — e de fato a descrição, que cita o aparelho o tempo todo, passou
+sem ressalva nas duas rodadas. Os subtítulos novos estão em cada arquivo de
+idioma desta pasta. `playground` saiu das keywords em inglês por encostar em
+Swift Playgrounds pelo mesmo caminho, embora não tenha sido apontado.
+
+Resposta enviada na thread, 22/09/2026:
+
+> Thank you for the review. We have removed the term iPad from the app
+> subtitle in all five localizations. The subtitle now reads: "Real
+> development, on device" (English), "Dev de verdade, no aparelho"
+> (Portuguese), "Dev de verdad, en tu equipo" (Spanish), "Coder vraiment,
+> sur l'appareil" (French), "Echt entwickeln, auf dem Gerät" (German). We
+> also removed the keyword "playground" for the same reason. No binary
+> change was needed, so this is the same build, 1.0 (32).

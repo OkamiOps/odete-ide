@@ -79,7 +79,9 @@ struct AgentPane: View {
             HStack(spacing: 0) {
                 // A contagem em cima do relógio: sem ela o botão parecia desligado, como
                 // se não houvesse conversa nenhuma guardada.
-                PaneAction("clock.arrow.circlepath", label: tr("Conversas"), conta: ag.threads.count) { history = true }
+                PaneAction("clock.arrow.circlepath", label: tr("Conversas"), conta: ag.numeroDeConversas) {
+                    history = true
+                }
                 PaneAction("arrow.uturn.backward", label: tr("Desfazer último turno")) { _ = ag.undoLastTurn() }
                     .disabled(!ag.canUndoTurn)
                 PaneAction("square.and.pencil", label: tr("Nova conversa")) { ag.newChat() }

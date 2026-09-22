@@ -47,7 +47,7 @@ public final class AgentLoop: @unchecked Sendable {
     public init(provider: Provider, host: ToolHost, patches: PatchStore, checkpoints: CheckpointStore? = nil) {
         self.provider = provider
         self.host = host
-        runner = ToolRunner(host: host, patches: patches)
+        runner = ToolRunner(host: host, patches: patches, checkpoints: checkpoints)
         self.checkpoints = checkpoints
     }
 
@@ -195,6 +195,21 @@ public final class AgentLoop: @unchecked Sendable {
                 effort: config.effort,
                 conversationId: config.conversationId
             )
+            // O texto vai para a tela em lotes, não ficha a ficha — ver `Vazao`. O que se
+            // entrega é sempre o acumulado inteiro do item, então pular lotes não perde nada.
+            let vazao = Vazao(emitir: emit)
+            // O raciocínio aberto fecha quando a resposta começa. Uma vez só: fechar a cada
+            // ficha de texto reenviava o raciocínio inteiro junto com cada pedaço.
+            let pensando = Mutex(false)
+            let relogio = Task {
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: vazao.intervalo)
+                    if Task.isCancelled {
+                        break
+                    }
+                    vazao.tique()
+                }
+            }
             let streamTask = Task { [provider] in
                 do {
                     for try await e in provider.stream(turn) {
@@ -202,20 +217,16 @@ public final class AgentLoop: @unchecked Sendable {
                             break
                         }
                         switch e {
-                        case let .think(s): let t = think.withLock { $0 += s; return $0 }; emit(.item(.think(
-                                id: thinkId,
-                                text: t,
-                                live: true
-                            )))
+                        case let .think(s):
+                            think.withLock { $0 += s }
+                            pensando.withLock { $0 = true }
+                            vazao.marcar(thinkId) { .think(id: thinkId, text: think.withLock { $0 }, live: true) }
                         case let .text(s):
-                            if let t = think.withLock({ $0.isEmpty ? nil : $0 }) {
-                                emit(.item(.think(
-                                    id: thinkId,
-                                    text: t,
-                                    live: false
-                                )))
+                            if pensando.withLock({ let aberto = $0; $0 = false; return aberto }) {
+                                vazao.marcar(thinkId) { .think(id: thinkId, text: think.withLock { $0 }, live: false) }
                             }
-                            let t = text.withLock { $0 += s; return $0 }; emit(.item(.assistant(id: textId, text: t)))
+                            text.withLock { $0 += s }
+                            vazao.marcar(textId) { .assistant(id: textId, text: text.withLock { $0 }) }
                         case let .tools(c): calls.withLock { $0 = c }
                         case let .usage(u): use.withLock { $0 = $0.filled(with: u) }
                         case let .error(m): err.withLock { $0 = m }
@@ -232,6 +243,12 @@ public final class AgentLoop: @unchecked Sendable {
             current.withLock { $0 = streamTask }
             await streamTask.value
             current.withLock { $0 = nil }
+            // O relógio para antes do último lote: nada dele pode chegar depois do que o
+            // laço emite daqui em diante — um raciocínio "ao vivo" atrasado reabriria o
+            // cartão que já fechou.
+            relogio.cancel()
+            await relogio.value
+            vazao.esvaziar()
             let thinkText = think.withLock { $0 }, answer = text.withLock { $0 }, toolCalls = calls.withLock { $0 }
             if !thinkText.isEmpty {
                 emit(.item(.think(id: thinkId, text: thinkText, live: false)))

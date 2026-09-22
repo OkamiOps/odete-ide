@@ -19,8 +19,10 @@ struct Composer: View {
     @State private var modelos = false
     @State private var ditado = Dictation()
 
+    /// Só espaços? Para no primeiro caractere que não é espaço, em vez de copiar o rascunho
+    /// inteiro aparado a cada tecla.
     var vazio: Bool {
-        agent.draft.trimmingCharacters(in: .whitespaces).isEmpty
+        !agent.draft.unicodeScalars.contains { !CharacterSet.whitespaces.contains($0) }
     }
 
     var body: some View {
@@ -30,7 +32,7 @@ struct Composer: View {
                     kind: menu.kind,
                     query: menu.query,
                     files: ws.filePaths,
-                    skills: Skills.all(host: agent.host)
+                    skills: agent.skills
                 ) { pick($0, menu) }
             }
             if !agent.attachments.isEmpty {
@@ -303,15 +305,36 @@ struct Composer: View {
 
     /// Último `@x` ou `/x` sendo digitado no fim do texto.
     var menuState: MenuState? {
-        let t = agent.draft
-        guard let m = t.range(of: #"(?:^|\s)([@/])([\w./-]*)$"#, options: .regularExpression) else { return nil }
-        var token = String(t[m])
-        if token.first == " " || token.first == "\n" {
-            token.removeFirst()
+        Self.mencaoNoFim(agent.draft)
+    }
+
+    /// A mesma leitura da expressão `(?:^|\s)([@/])([\w./-]*)$`, mas do fim para trás.
+    ///
+    /// A expressão rodava sobre o rascunho inteiro a cada tecla — e a busca por um `$` no
+    /// fim começa pelo começo. Aqui a leitura anda só o tamanho da palavra que está sendo
+    /// digitada: volta pelos caracteres que podem estar num caminho ou nome de skill e olha
+    /// o que vem antes deles.
+    nonisolated static func mencaoNoFim(_ t: String) -> MenuState? {
+        var i = t.endIndex
+        while i > t.startIndex {
+            let antes = t.index(before: i)
+            let c = t[antes]
+            guard c.isLetter || c.isNumber || c == "_" || c == "." || c == "/" || c == "-" else { break }
+            i = antes
         }
-        let kind: MentionMenu.Kind = token.hasPrefix("@") ? .file : .skill
-        let start = t.index(m.upperBound, offsetBy: -token.count)
-        return MenuState(kind: kind, query: String(token.dropFirst()), range: start ..< m.upperBound)
+        func abre(_ k: String.Index) -> Bool {
+            k == t.startIndex || t[t.index(before: k)].isWhitespace
+        }
+        // `@` logo antes da palavra, no começo ou depois de um espaço.
+        if i > t.startIndex {
+            let arroba = t.index(before: i)
+            if t[arroba] == "@", abre(arroba) {
+                return MenuState(kind: .file, query: String(t[i...]), range: arroba ..< t.endIndex)
+            }
+        }
+        // Ou a própria palavra começando por `/`.
+        guard i < t.endIndex, t[i] == "/", abre(i) else { return nil }
+        return MenuState(kind: .skill, query: String(t[t.index(after: i)...]), range: i ..< t.endIndex)
     }
 
     func pick(_ value: String, _ m: MenuState) {

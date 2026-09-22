@@ -210,7 +210,27 @@ public final class AppModel {
 
     public let accounts: AccountStore
 
+    /// O registro das janelas do app — ver `Janelas`. Quem liga é a `RootView`; sem ele
+    /// (testes, atalho rodando sem tela) o projeto abre como sempre abriu.
+    @ObservationIgnored var janelas: Janelas?
+
     public func open(_ p: Project, chrome: ChromeState) {
+        // Já aberto aqui: nada a fazer. Reabrir montava uma segunda cópia viva do mesmo
+        // projeto por cima da primeira, que ninguém parava.
+        if workspace?.project.id == p.id {
+            return
+        }
+        // Aberto em outra janela: ela vem para a frente, e esta fica como está. Duas
+        // cópias vivas do mesmo projeto são dois observadores, dois shells e dois
+        // salvamentos automáticos gravando um por cima do outro.
+        if let dona = janelas?.dona(de: p.id, fora: self) {
+            dona.ativar()
+            return
+        }
+        // Outro projeto aberto nesta janela para antes de sair de cena.
+        if workspace != nil {
+            closeWorkspace()
+        }
         var touched = p
         if p.external {
             external.touch(p.id)

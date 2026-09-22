@@ -57,6 +57,14 @@ public protocol ToolHost: Sendable {
     func reveal(_ path: String)
     /// Pull requests do repositório. Quem não tem GitHub responde o porquê.
     func github(_ pedido: GitHubPedido) async -> String
+    /// Os problemas que o app já mostra na tela: lint e sintaxe dos arquivos abertos,
+    /// erros do build, do Swift e do preview. Quem não tem nada disso devolve vazio.
+    func problemas() -> [Problema]
+    /// As últimas `n` linhas do console do preview.
+    func consolePreview(_ n: Int) -> [LinhaDoConsole]
+    /// Pasta em que o shell do agente está, relativa à raiz ("" é a raiz). Serve para
+    /// saber em que arquivo um `rm x` vai mexer antes de ele rodar.
+    func pastaDoShell() -> String
 }
 
 /// Implementação direta sobre FileManager. Serve para testes e como base para o app.
@@ -158,4 +166,16 @@ open class FileToolHost: ToolHost, @unchecked Sendable {
     }
 
     open func reveal(_ path: String) {}
+
+    open func problemas() -> [Problema] {
+        []
+    }
+
+    open func consolePreview(_: Int) -> [LinhaDoConsole] {
+        []
+    }
+
+    open func pastaDoShell() -> String {
+        ""
+    }
 }

@@ -74,12 +74,19 @@ struct AppleFerramentasTests {
 
     /// O modelo local não é um modelo de segunda classe: ele recebe as mesmas ferramentas
     /// do modo, sem peneira minha no meio.
+    ///
+    /// A exceção é uma só e tem motivo escrito em `AppleProvider.soForaDoAparelho`: o
+    /// console do preview repete o que `read_problems` já entrega. Se a lista de exceções
+    /// crescer sem ninguém perceber, este teste reclama.
     @Test func oModeloLocalRecebeTodasAsFerramentasDoModo() {
         let local = AppleProvider.ferramentas(pedido()) { _, _ in }
-        #expect(local.count == Tools.all.count, "alguma ferramenta foi podada antes de chegar ao modelo local")
-        for spec in Tools.all {
+        #expect(AppleProvider.soForaDoAparelho == ["read_preview_console"])
+        let esperadas = Tools.all.filter { !AppleProvider.soForaDoAparelho.contains($0.name) }
+        #expect(local.count == esperadas.count, "alguma ferramenta foi podada antes de chegar ao modelo local")
+        for spec in esperadas {
             #expect(local.contains { $0.name == spec.name }, "\(spec.name) não chegou ao modelo local")
         }
+        #expect(local.contains { $0.name == "read_problems" }, "os erros da tela não chegaram ao modelo local")
     }
 
     // MARK: as instruções
@@ -239,7 +246,10 @@ struct AppleFerramentasTests {
             Issue.record("a transcrição não começa pelas instruções")
             return
         }
-        #expect(i.toolDefinitions.count == Tools.all.count, "as ferramentas não foram declaradas na transcrição")
+        #expect(
+            i.toolDefinitions.count == Tools.all.count - AppleProvider.soForaDoAparelho.count,
+            "as ferramentas não foram declaradas na transcrição"
+        )
     }
 
     /// A última fala é o pedido da vez, e vem com a primeira ordem concreta junto.

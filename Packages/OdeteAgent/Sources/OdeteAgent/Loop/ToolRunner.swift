@@ -9,8 +9,11 @@ public struct ToolOutcome: Sendable {
 public struct ToolRunner: Sendable {
     public var host: ToolHost
     public var patches: PatchStore
-    public init(host: ToolHost, patches: PatchStore) {
-        self.host = host; self.patches = patches
+    /// Onde guardar o original de cada arquivo antes de a ferramenta escrever nele — é o
+    /// que faz o "desfazer último turno" voltar tudo, e não só o retrato do começo.
+    public var checkpoints: CheckpointStore?
+    public init(host: ToolHost, patches: PatchStore, checkpoints: CheckpointStore? = nil) {
+        self.host = host; self.patches = patches; self.checkpoints = checkpoints
     }
 
     static func clean(_ p: String) -> String {
@@ -54,6 +57,16 @@ public struct ToolRunner: Sendable {
         case "read_terminal":
             let n = (args["n"] as? Int) ?? Int((args["n"] as? Double) ?? 80)
             return .init(text: host.terminalTail(min(200, max(1, n))))
+        case "read_problems":
+            let filtro = Self.clean(str("path"))
+            return .init(text: Self.clip(Diagnosticos.relatorio(
+                host.problemas(),
+                filtro: filtro.isEmpty ? nil : filtro
+            )))
+        case "read_preview_console":
+            let pedidas = (args["n"] as? Int) ?? (args["n"] as? Double).map(Int.init) ?? Diagnosticos.consolePadrao
+            let n = min(Diagnosticos.consoleMaximo, max(1, pedidas))
+            return .init(text: Self.clip(Diagnosticos.console(host.consolePreview(n), n: n)))
         case "str_replace", "write_file":
             return await edit(call.name, args: args, mode: mode)
         case "run_shell":
@@ -81,6 +94,13 @@ public struct ToolRunner: Sendable {
                     .clean(cmd.split(separator: " ").dropFirst().first { !$0.hasPrefix("-") }.map(String.init) ?? "")
                 if dest != ".odete", !dest.hasPrefix(".odete/") {
                     return .init(text: "plan só cria coisas em .odete/")
+                }
+            }
+            // O shell escreve por conta própria: antes de ele rodar, guarda o que dá para
+            // saber que ele vai tocar. Comando que só lê não mexe em nada.
+            if let checkpoints, !Tools.isReadShell(cmd) {
+                for alvo in Tools.alvosDoShell(cmd, pasta: host.pastaDoShell()) {
+                    checkpoints.capturar(alvo)
                 }
             }
             return await .init(text: Self.clip(host.runShell(cmd)))
@@ -156,12 +176,17 @@ public struct ToolRunner: Sendable {
         if mode == .plan {
             guard path == ".odete/plan.md"
             else { return .init(text: "plan só escreve .odete/plan.md — mude pra Build pra editar o resto") }
+            checkpoints?.capturar(path)
             do { try host.write(path, after) } catch {
                 return .init(text: "erro ao escrever: \(error.localizedDescription)")
             }
             return .init(text: "escrito \(path)")
         }
         let before = host.read(path) ?? ""
+        // O original vai para o checkpoint antes da primeira escrita do turno — inclusive
+        // num arquivo que o retrato do começo deixou de fora por ser grande ou por estar
+        // depois dos primeiros 220.
+        checkpoints?.capturar(path)
         do { try host.write(path, after) } catch {
             return .init(text: "erro ao escrever: \(error.localizedDescription)")
         }

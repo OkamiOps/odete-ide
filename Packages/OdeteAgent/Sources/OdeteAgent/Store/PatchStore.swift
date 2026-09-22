@@ -5,33 +5,115 @@ public struct Patch: Codable, Sendable, Hashable, Identifiable {
     public enum Status: String, Codable, Sendable { case pending, accepted, rejected, undone }
     public var id: String
     public var path: String
-    public var before: String
-    public var after: String
+    /// Texto de antes. Trocar refaz o diff — uma vez, aqui.
+    public var before: String {
+        get { antes }
+        set { antes = newValue; recalcular() }
+    }
+
+    /// Texto de depois. Idem.
+    public var after: String {
+        get { depois }
+        set { depois = newValue; recalcular() }
+    }
+
     public var orig: String
     public var status: Status
     public var at: Date
-    public var hunks: [Hunk] {
-        LineDiff.hunks(before, after)
+    /// O diff, guardado junto com o texto de que ele saiu.
+    ///
+    /// Eram propriedades calculadas: cada leitura rodava o LCS inteiro. O cartão do patch
+    /// lia `additions`, `deletions` e `hunks` — mais uma vez por hunk — a cada redesenho,
+    /// e o centro mais duas; com a tabela antiga isso chegava a dezenas de megabytes
+    /// alocados por quadro. Agora o diff nasce quando o texto muda e as leituras só leem.
+    public private(set) var hunks: [Hunk] = []
+    public private(set) var additions = 0
+    public private(set) var deletions = 0
+
+    private var antes: String
+    private var depois: String
+
+    public init(
+        id: String,
+        path: String,
+        before: String,
+        after: String,
+        orig: String,
+        status: Status,
+        at: Date
+    ) {
+        self.id = id
+        self.path = path
+        antes = before
+        depois = after
+        self.orig = orig
+        self.status = status
+        self.at = at
+        recalcular()
     }
 
-    public var additions: Int {
-        hunks.flatMap(\.lines).filter {
-            if case .added = $0 {
-                true
-            } else {
-                false
-            }
-        }.count
+    /// Troca os dois textos com um diff só, em vez de um por atribuição.
+    public mutating func trocar(before: String, after: String) {
+        antes = before
+        depois = after
+        recalcular()
     }
 
-    public var deletions: Int {
-        hunks.flatMap(\.lines).filter {
-            if case .removed = $0 {
-                true
-            } else {
-                false
+    private mutating func recalcular() {
+        hunks = LineDiff.hunks(antes, depois)
+        var mais = 0, menos = 0
+        for h in hunks {
+            for l in h.lines {
+                switch l {
+                case .added: mais += 1
+                case .removed: menos += 1
+                case .context: break
+                }
             }
-        }.count
+        }
+        additions = mais
+        deletions = menos
+    }
+
+    enum CodingKeys: String, CodingKey { case id, path, before, after, orig, status, at }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        try self.init(
+            id: c.decode(String.self, forKey: .id),
+            path: c.decode(String.self, forKey: .path),
+            before: c.decode(String.self, forKey: .before),
+            after: c.decode(String.self, forKey: .after),
+            orig: c.decode(String.self, forKey: .orig),
+            status: c.decode(Status.self, forKey: .status),
+            at: c.decode(Date.self, forKey: .at)
+        )
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(path, forKey: .path)
+        try c.encode(antes, forKey: .before)
+        try c.encode(depois, forKey: .after)
+        try c.encode(orig, forKey: .orig)
+        try c.encode(status, forKey: .status)
+        try c.encode(at, forKey: .at)
+    }
+
+    /// Igualdade pelo que o patch é, não pelo diff: o diff sai do texto, e comparar os
+    /// hunks de novo seria pagar duas vezes pela mesma resposta.
+    public static func == (l: Patch, r: Patch) -> Bool {
+        l.id == r.id && l.path == r.path && l.status == r.status && l.at == r.at && l.antes == r.antes
+            && l.depois == r.depois && l.orig == r.orig
+    }
+
+    public func hash(into h: inout Hasher) {
+        h.combine(id)
+        h.combine(path)
+        h.combine(status)
+        h.combine(antes)
+        h.combine(depois)
     }
 }
 
@@ -97,8 +179,7 @@ public final class PatchStore: @unchecked Sendable {
     public func queue(path: String, before: String, after: String) -> Patch {
         let result: Patch = items.withLock { list in
             if let i = list.firstIndex(where: { $0.status == .pending && $0.path == path }) {
-                list[i].after = after
-                list[i].before = list[i].orig
+                list[i].trocar(before: list[i].orig, after: after)
                 return list[i]
             }
             let p = Patch(
@@ -149,9 +230,10 @@ public final class PatchStore: @unchecked Sendable {
         }
         let next = LineDiff.applyOnly(hunk: index, before: p.before, after: p.after)
         write(p.path, next)
-        let left = LineDiff.hunks(next, p.after)
+        // Trocar `before` já refaz o diff; o que sobrou é o que ele diz.
         update(id) {
-            $0.before = next; if left.isEmpty {
+            $0.before = next
+            if $0.hunks.isEmpty {
                 $0.status = .accepted
             }
         }

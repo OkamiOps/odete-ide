@@ -88,11 +88,28 @@ public final class ChatStore: @unchecked Sendable {
             ) } }.sorted { $0.updated > $1.updated }
     }
 
-    public func load(_ id: String) -> ChatThread? {
-        list().first { $0.id == id }
+    /// Quantas conversas há, sem abrir nenhuma: a contagem do botão do histórico lia e
+    /// decodificava todas as conversas do projeto a cada redesenho do painel.
+    public func count() -> Int {
+        ((try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? []).count { $0.hasSuffix(".json") }
     }
 
-    public func save(_ t: ChatThread) {
+    /// Uma conversa, lida do arquivo dela — e não achada no meio de todas decodificadas.
+    public func load(_ id: String) -> ChatThread? {
+        let dec = JSONDecoder()
+        dec.dateDecodingStrategy = .iso8601
+        if !id.contains("/"), let d = try? Data(contentsOf: dir.appending(path: "\(id).json")),
+           let t = try? dec.decode(ChatThread.self, from: d), t.id == id
+        {
+            return t
+        }
+        return list().first { $0.id == id }
+    }
+
+    /// Grava e devolve o que ficou gravado — título calculado e hora da gravação —, para
+    /// quem salvou não precisar ler o arquivo de volta.
+    @discardableResult
+    public func save(_ t: ChatThread) -> ChatThread {
         var s = t
         s.items = Self.slim(t.items)
         s.messages = Array(t.messages.suffix(40))
@@ -104,6 +121,7 @@ public final class ChatStore: @unchecked Sendable {
         enc.dateEncodingStrategy = .iso8601
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         try? enc.encode(s).write(to: dir.appending(path: "\(s.id).json"), options: .atomic)
+        return s
     }
 
     public func remove(_ id: String) {

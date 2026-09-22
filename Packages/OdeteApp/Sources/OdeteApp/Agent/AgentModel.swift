@@ -36,6 +36,24 @@ public final class AgentModel {
     public var focusRequest = 0
     public private(set) var pendingPatches: [Patch] = []
     public var lastTurnUse = TokenUse()
+    /// Quantas conversas há guardadas. Contadas pela pasta, sem abrir nenhuma, na
+    /// abertura e depois de cada gravação: o botão do histórico mostrava `threads.count`,
+    /// que lia e decodificava todas as conversas do projeto a cada redesenho do painel.
+    public private(set) var numeroDeConversas = 0
+    /// Há um turno para desfazer? Guardado aqui e atualizado quando um turno termina ou é
+    /// desfeito — perguntar ao disco a cada redesenho decodificava os manifestos todos.
+    public private(set) var temCheckpoint = false
+    /// Sobe a cada mudança num item da conversa. É o que a lista observa para rolar até o
+    /// fim — comparar o último item era comparar a resposta inteira a cada ficha.
+    public private(set) var versaoDosItens = 0
+    /// Sobe quando as conversas do disco mudam; quem lê `threads` fica ligado a ela.
+    private var versaoDasConversas = 0
+    @ObservationIgnored private var cacheDasConversas: [ChatThread]?
+    @ObservationIgnored private var cacheDeSkills: [Skill]?
+    /// A estimativa da conversa guardada com as mensagens de que ela saiu. Enquanto as
+    /// mensagens forem as mesmas — o mesmo array, comparado de graça —, a conta não se
+    /// refaz: ela rodava a cada tecla digitada no compositor.
+    @ObservationIgnored private var estimativa: (mensagens: [AgentMessage], tokens: Int) = ([], 0)
     private var loop: AgentLoop?
     private var runTask: Task<Void, Never>?
     private var modelsFor: UUID?
@@ -57,6 +75,8 @@ public final class AgentModel {
             thread = chats.list().first ?? .blank()
         }
         items = thread.items
+        numeroDeConversas = chats.count()
+        temCheckpoint = checkpoints.last != nil
         pendingPatches = patches.pending
         porId = Self.indexar(patches.all)
         patches.onChange = { [weak self] in
@@ -153,8 +173,35 @@ public final class AgentModel {
 
     // MARK: conversa
 
+    /// As conversas guardadas, da mais recente para a mais antiga. Lidas do disco uma vez
+    /// e guardadas até a próxima gravação; o histórico lia isto três vezes por desenho.
     public var threads: [ChatThread] {
-        chats.list()
+        _ = versaoDasConversas
+        if let c = cacheDasConversas {
+            return c
+        }
+        let l = chats.list()
+        cacheDasConversas = l
+        return l
+    }
+
+    /// As conversas no disco mudaram: a lista é relida quando alguém pedir, e a contagem
+    /// é refeita pela pasta.
+    private func conversasMudaram() {
+        cacheDasConversas = nil
+        versaoDasConversas &+= 1
+        numeroDeConversas = chats.count()
+    }
+
+    /// As skills do projeto para o menu do `/`. Lidas uma vez e de novo ao fim de cada
+    /// turno — o agente pode ter criado uma —, em vez de a cada tecla com o menu aberto.
+    public var skills: [Skill] {
+        if let s = cacheDeSkills {
+            return s
+        }
+        let s = Skills.all(host: host)
+        cacheDeSkills = s
+        return s
     }
 
     public func newChat() {
@@ -176,25 +223,31 @@ public final class AgentModel {
 
     public func remove(_ t: ChatThread) {
         chats.remove(t.id)
+        conversasMudaram()
         if t.id == thread.id {
-            thread = chats.list().first ?? .blank(); items = thread.items
+            thread = threads.first ?? .blank(); items = thread.items
         }
     }
 
+    /// Procura do fim para o começo: quem muda enquanto o agente escreve é quase sempre o
+    /// último item, e a busca do começo andava a conversa inteira a cada lote.
     private func upsert(_ item: ChatItem) {
-        if let i = items.firstIndex(where: { $0.id == item.id }) {
+        if let i = items.lastIndex(where: { $0.id == item.id }) {
             items[i] = item
         } else {
             items.append(item)
         }
+        versaoDosItens &+= 1
     }
 
     private func persist() {
         thread.items = items
-        chats.save(thread)
-        if let t = chats.load(thread.id) {
-            thread.title = t.title; thread.updated = t.updated
-        }
+        // O título e a hora vêm de quem gravou — ler o arquivo de volta para saber o que
+        // acabou de ser escrito decodificava todas as conversas do projeto.
+        let gravada = chats.save(thread)
+        thread.title = gravada.title
+        thread.updated = gravada.updated
+        conversasMudaram()
     }
 
     /// A última pergunta que chegou a ser enviada, para o "Tentar de novo".
@@ -325,6 +378,8 @@ public final class AgentModel {
             running = false
             pendingPermit = nil
             self.loop = nil
+            temCheckpoint = checkpoints.last != nil
+            cacheDeSkills = nil
             persist()
             ws.reload()
             ws.git.agendarMarcas()
@@ -374,12 +429,14 @@ public final class AgentModel {
     }
 
     public var canUndoTurn: Bool {
-        checkpoints.last != nil && !running
+        temCheckpoint && !running
     }
 
     public func undoLastTurn() -> String {
         guard let cp = checkpoints.last else { return tr("nada pra desfazer") }
         let msg = checkpoints.restore(cp.id)
+        // O checkpoint desfeito sai da pilha: o próximo toque volta o turno anterior.
+        temCheckpoint = checkpoints.last != nil
         patches.rejectAll()
         for p in ws.tabs.map(\.path) {
             ws.reloadBuffer(p)
@@ -413,10 +470,23 @@ public final class AgentModel {
         }
     }
 
+    /// Fichas estimadas: quatro bytes por ficha.
+    ///
+    /// Em bytes UTF-8, e não em `count`: contar caracteres anda pelo texto inteiro, e isto
+    /// roda a cada tecla — o anel de contexto do compositor lê daqui.
     public var estimatedTokens: Int {
-        var n = thread.messages
-            .reduce(0) { $0 + $1.content.count / 4 + ($1.toolCalls ?? []).reduce(0) { $0 + $1.arguments.count / 4 } }
-        n += draft.count / 4 + attachments.count * 720
+        tokensDaConversa() + draft.utf8.count / 4 + attachments.count * 720
+    }
+
+    private func tokensDaConversa() -> Int {
+        let atuais = thread.messages
+        if atuais == estimativa.mensagens {
+            return estimativa.tokens
+        }
+        let n = atuais.reduce(0) {
+            $0 + $1.content.utf8.count / 4 + ($1.toolCalls ?? []).reduce(0) { $0 + $1.arguments.utf8.count / 4 }
+        }
+        estimativa = (atuais, n)
         return n
     }
 }

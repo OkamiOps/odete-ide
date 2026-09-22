@@ -175,7 +175,8 @@ struct HistorySheet: View {
 
     var grupos: [(titulo: String, threads: [ChatThread])] {
         let alvo = busca.lowercased()
-        let lista = alvo.isEmpty ? agent.threads : agent.threads.filter {
+        let todas = agent.threads
+        let lista = alvo.isEmpty ? todas : todas.filter {
             $0.title.lowercased().contains(alvo) || $0.messages.contains { $0.content.lowercased().contains(alvo) }
         }
         var out: [(String, [ChatThread])] = []

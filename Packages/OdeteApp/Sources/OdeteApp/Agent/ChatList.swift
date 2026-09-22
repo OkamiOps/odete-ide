@@ -7,6 +7,12 @@ import SwiftUI
 struct ChatList: View {
     @Environment(\.theme) private var theme
     let agent: AgentModel
+    /// A pessoa está no fim da conversa? Só aí a lista acompanha o que chega: quem subiu
+    /// para reler alguma coisa não é puxado de volta a cada lote da resposta.
+    @State private var colado = true
+    /// O dedo (ou o trackpad) está mexendo na lista. É o que separa "a pessoa subiu" de "a
+    /// resposta cresceu e empurrou o fim para baixo" — os dois tiram a tela do fim.
+    @State private var rolandoAMao = false
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -28,14 +34,38 @@ struct ChatList: View {
             // No iPhone o teclado tapa a barra de abas, e sem isto não havia como sair
             // da tela do agente: arrastar a conversa para baixo agora fecha o teclado.
             .scrollDismissesKeyboard(.interactively)
-            .onChange(of: agent.items.count) { withAnimation(.snappy(duration: 0.15)) { proxy.scrollTo(
-                "end",
-                anchor: .bottom
-            ) } }
-            .onChange(of: agent.items.last) { proxy.scrollTo("end", anchor: .bottom) }
+            .onScrollPhaseChange { _, fase in
+                rolandoAMao = fase == .tracking || fase == .interacting || fase == .decelerating
+            }
+            .onScrollGeometryChange(for: Bool.self) { g in
+                g.contentOffset.y + g.containerSize.height >= g.contentSize.height - 80
+            } action: { _, noFim in
+                // Só a mão da pessoa descola; voltar ao fim, por qualquer caminho, cola.
+                if rolandoAMao || noFim {
+                    colado = noFim
+                }
+            }
+            .onChange(of: agent.items.count) {
+                // Pergunta nova da pessoa: vai para o fim, esteja a lista onde estiver.
+                if case .user = agent.items.last {
+                    colado = true
+                }
+                guard colado else { return }
+                withAnimation(.snappy(duration: 0.15)) { proxy.scrollTo("end", anchor: .bottom) }
+            }
+            // A resposta crescendo. Era `onChange(of: items.last)`: comparava a resposta
+            // inteira com a anterior e rolava a cada ficha, estivesse a pessoa onde estivesse.
+            .onChange(of: agent.versaoDosItens) {
+                if colado {
+                    proxy.scrollTo("end", anchor: .bottom)
+                }
+            }
             // Ao abrir o app, ou ao trocar de conversa, a lista nascia no topo e a
             // pessoa tinha que rolar até o fim para ver a última resposta.
-            .task(id: agent.thread.id) { await irParaOFim(proxy) }
+            .task(id: agent.thread.id) {
+                colado = true
+                await irParaOFim(proxy)
+            }
         }
     }
 
@@ -95,21 +125,32 @@ struct ChatList: View {
         }
     }
 
+    /// Ferramentas seguidas viram um grupo só. O grupo cresce no lugar: refazer a lista
+    /// dele a cada ferramenta nova era copiar o grupo inteiro de novo.
     func grouped(_ items: [ChatItem]) -> [Group] {
         var out: [Group] = []
+        var aberto: (id: String, lista: [ChatItem])?
         for it in items {
             let isTool: Bool = switch it {
             case .tool: true
             case let .permit(_, _, _, s): s != .pending
             default: false
             }
-            if isTool, case let .tools(id, list)? = out.last {
-                out[out.count - 1] = .tools(id, list + [it])
-            } else if isTool {
-                out.append(.tools("g-" + it.id, [it]))
+            if isTool {
+                if aberto == nil {
+                    aberto = ("g-" + it.id, [])
+                }
+                aberto?.lista.append(it)
             } else {
+                if let g = aberto {
+                    out.append(.tools(g.id, g.lista))
+                    aberto = nil
+                }
                 out.append(.single(it))
             }
+        }
+        if let g = aberto {
+            out.append(.tools(g.id, g.lista))
         }
         return out
     }
@@ -393,8 +434,10 @@ struct PermitCard: View {
 struct MarkdownText: View {
     @Environment(\.theme) private var theme
     let text: String
+    /// Guarda o que já foi lido, para o próximo lote da resposta não reler tudo.
+    @State private var leitor = LeitorDeMarkdown()
 
-    enum Block: Identifiable {
+    enum Block: Identifiable, Hashable {
         case code(Int, String, String)
         case para(Int, String)
         case heading(Int, Int, String)
@@ -410,106 +453,15 @@ struct MarkdownText: View {
         }
     }
 
+    /// A leitura inteira, de uma vez. A tela usa o `leitor`, que chega ao mesmo resultado
+    /// relendo só a cauda enquanto a resposta chega — ver `LeitorDeMarkdown`.
     var blocks: [Block] {
-        var out: [Block] = []
-        var i = 0
-        var inCode = false
-        var lang = ""
-        var code: [String] = []
-        var para: [String] = []
-        var list: [String] = []
-        var ordered = false
-        var quote: [String] = []
-
-        func flushPara() {
-            if !para.isEmpty {
-                out.append(.para(i, para.joined(separator: "\n"))); i += 1; para = []
-            }
-        }
-        func flushList() {
-            if !list.isEmpty {
-                out.append(.list(i, ordered, list)); i += 1; list = []
-            }
-        }
-        func flushQuote() {
-            if !quote.isEmpty {
-                out.append(.quote(i, quote.joined(separator: " "))); i += 1; quote = []
-            }
-        }
-        func flushAll() {
-            flushPara(); flushList(); flushQuote()
-        }
-
-        for raw in text.split(separator: "\n", omittingEmptySubsequences: false) {
-            let line = String(raw)
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-
-            if trimmed.hasPrefix("```") {
-                if inCode {
-                    out.append(.code(i, lang, code.joined(separator: "\n"))); i += 1; code = []; inCode = false
-                } else {
-                    flushAll(); inCode = true
-                    lang = String(trimmed.dropFirst(3)).trimmingCharacters(in: .whitespaces)
-                }
-                continue
-            }
-            if inCode {
-                code.append(line); continue
-            }
-            if trimmed == "---" || trimmed == "***" || trimmed == "___" {
-                flushAll(); out.append(.rule(i)); i += 1; continue
-            }
-            if trimmed.hasPrefix("#") {
-                flushAll()
-                let level = trimmed.prefix { $0 == "#" }.count
-                out.append(.heading(i, level, trimmed.drop { $0 == "#" }.trimmingCharacters(in: .whitespaces)))
-                i += 1
-                continue
-            }
-            if trimmed.hasPrefix("> ") {
-                flushPara(); flushList()
-                quote.append(String(trimmed.dropFirst(2)))
-                continue
-            }
-            if let item = bullet(trimmed) {
-                flushPara(); flushQuote()
-                if !ordered, !list.isEmpty, item.ordered {
-                    flushList()
-                }
-                if ordered, !list.isEmpty, !item.ordered {
-                    flushList()
-                }
-                ordered = item.ordered
-                list.append(item.text)
-                continue
-            }
-            if trimmed.isEmpty {
-                flushAll(); continue
-            }
-            flushList(); flushQuote()
-            para.append(line)
-        }
-        if inCode {
-            out.append(.code(i, lang, code.joined(separator: "\n"))); i += 1
-        }
-        flushAll()
-        return out
-    }
-
-    /// Reconhece "- item", "* item" e "1. item".
-    func bullet(_ line: String) -> (text: String, ordered: Bool)? {
-        if line.hasPrefix("- ") || line.hasPrefix("* ") {
-            return (String(line.dropFirst(2)), false)
-        }
-        guard let dot = line.firstIndex(of: "."), line[line.startIndex ..< dot].allSatisfy(\.isNumber),
-              line.index(after: dot) < line.endIndex, line[line.index(after: dot)] == " "
-        else { return nil }
-        return (String(line[line.index(dot, offsetBy: 2)...]), true)
+        Self.ler(Substring(text)).blocos
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            ForEach(blocks) { b in
+            ForEach(leitor.blocos(text)) { b in
                 switch b {
                 case let .heading(_, level, t):
                     Text(t)
@@ -578,6 +530,10 @@ struct MarkdownText: View {
     }
 
     func inline(_ t: String) -> AttributedString {
+        leitor.inline(t, Self.interpretar)
+    }
+
+    nonisolated static func interpretar(_ t: String) -> AttributedString {
         (try? AttributedString(markdown: t, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ??
             AttributedString(t)
     }

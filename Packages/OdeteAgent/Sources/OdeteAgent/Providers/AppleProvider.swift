@@ -210,7 +210,36 @@ public struct AppleProvider: Provider {
         cont.finish()
     }
 
-    /// Todas as ferramentas do modo, sem peneira.
+    /// O que um retrato cumulativo da resposta trouxe de novo desde o último.
+    ///
+    /// O framework entrega a resposta inteira a cada passo, não o pedaço. Contar
+    /// `Character` e cortar com `dropFirst` anda pelo texto todo a cada retrato — trabalho
+    /// quadrático numa resposta longa. Em bytes UTF-8 as duas contas são diretas. E ainda
+    /// pega o que a contagem de caracteres perdia: um acento que chega depois da letra não
+    /// muda o número de caracteres, e sumia.
+    static func trechoNovo(_ texto: String, enviados: inout Int) -> String? {
+        let bytes = texto.utf8
+        guard bytes.count > enviados else { return nil }
+        let inicio = bytes.index(bytes.startIndex, offsetBy: enviados)
+        enviados = bytes.count
+        return String(decoding: bytes[inicio...], as: UTF8.self)
+    }
+
+    /// Ferramentas que ficam de fora do modelo **do aparelho**.
+    ///
+    /// A regra continua sendo não podar: o modelo local recebe o mesmo que os outros. A
+    /// exceção é o que só repete outra ferramenta. Os erros do console do preview já
+    /// chegam por `read_problems`; o console inteiro custaria umas duzentas letras de
+    /// schema, tiradas da conversa numa janela de quatro mil fichas, para dizer quase a
+    /// mesma coisa. A nuvem privada, com janela folgada, recebe tudo.
+    static let soForaDoAparelho: Set<String> = ["read_preview_console"]
+
+    /// As definições que vão para o modelo da vez.
+    static func especificacoes(_ turn: TurnRequest) -> [ToolSpec] {
+        turn.model == idNuvem ? turn.tools : turn.tools.filter { !soForaDoAparelho.contains($0.name) }
+    }
+
+    /// Todas as ferramentas do modo, sem peneira — fora a exceção de `soForaDoAparelho`.
     ///
     /// Aqui havia uma lista curta para o modelo local, tirando o `github` por ele ter a
     /// descrição mais longa. Era economia de mentira: a diferença é de algumas centenas
@@ -222,7 +251,7 @@ public struct AppleProvider: Provider {
         _ turn: TurnRequest,
         anotar: @escaping @Sendable (String, String) -> Void
     ) -> [any Tool] {
-        turn.tools.compactMap { spec in
+        especificacoes(turn).compactMap { spec in
             guard let esquema = try? EsquemaApple.esquema(de: spec) else { return nil }
             return FerramentaDaOdete(
                 name: spec.name,
@@ -246,7 +275,7 @@ public struct AppleProvider: Provider {
         // de ferramenta já ocuparam. Somar orçamentos independentes é como a sessão
         // acabava com mais texto do que a janela aguenta.
         let total = naNuvem ? janelaDaNuvem : orcamentoDeEntrada(comFerramentas: comFerramentas)
-        let sobra = max(1000, total - instrucoes.count - custoDasFerramentas(turn.tools))
+        let sobra = max(1000, total - instrucoes.count - custoDasFerramentas(especificacoes(turn)))
         let (transcricao, prompt) = TranscricaoApple.montar(
             turn.messages,
             instrucoes: instrucoes,
@@ -287,7 +316,7 @@ public struct AppleProvider: Provider {
                         }
                     }
                     let (sessao, prompt) = Self.sessao(turn, ferramentas: ferramentas)
-                    var anterior = ""
+                    var enviados = 0
                     let fluxo = sessao.streamResponse(
                         to: prompt,
                         options: GenerationOptions(
@@ -301,10 +330,8 @@ public struct AppleProvider: Provider {
                         if Task.isCancelled {
                             break
                         }
-                        let texto = pedaco.content
-                        if texto.count > anterior.count {
-                            cont.yield(.text(String(texto.dropFirst(anterior.count))))
-                            anterior = texto
+                        if let novo = Self.trechoNovo(pedaco.content, enviados: &enviados) {
+                            cont.yield(.text(novo))
                         }
                     }
                     Self.encerra(cont, pedidos.withLock { $0 })

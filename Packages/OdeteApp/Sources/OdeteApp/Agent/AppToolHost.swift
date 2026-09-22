@@ -12,6 +12,10 @@ final class AppToolHost: FileToolHost, @unchecked Sendable {
     private let runBox: SendBox<Void, TerminalSession>
     /// Slug, token e branch atual só existem no ator principal; o agente roda fora dele.
     private let ghBox: SendBox<Void, (slug: String?, token: String?, branch: String?)>
+    /// Problemas, console e pasta do shell também moram no ator principal.
+    private let problemasBox: SendBox<Void, [Problema]>
+    private let consoleBox: SendBox<Int, [LinhaDoConsole]>
+    private let pastaBox: SendBox<Void, String>
 
     @MainActor
     init(ws: WorkspaceModel) {
@@ -26,7 +30,22 @@ final class AppToolHost: FileToolHost, @unchecked Sendable {
         ghBox = SendBox { [weak ws] in
             (ws?.git.githubSlug, ws?.git.githubToken, ws?.git.current?.name ?? ws?.git.headName)
         }
+        problemasBox = SendBox { [weak ws] in ws?.problemasParaOAgente() ?? [] }
+        consoleBox = SendBox { [weak ws] (n: Int) in ws?.consoleParaOAgente(n) ?? [] }
+        pastaBox = SendBox { [weak ws] in ws?.pastaDoShellDoAgente() ?? "" }
         super.init(root: ws.root)
+    }
+
+    override func problemas() -> [Problema] {
+        problemasBox.value()
+    }
+
+    override func consolePreview(_ n: Int) -> [LinhaDoConsole] {
+        consoleBox.value(n)
+    }
+
+    override func pastaDoShell() -> String {
+        pastaBox.value()
     }
 
     override func write(_ path: String, _ text: String) throws {

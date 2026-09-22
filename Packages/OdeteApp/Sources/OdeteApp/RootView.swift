@@ -2,6 +2,7 @@ import OdeteCore
 import OdeteFiles
 import OdeteUI
 import SwiftUI
+import UIKit
 
 /// Raiz do app: carrega o estado persistido, aplica o tema e decide entre hub e workspace.
 public struct RootView: View {
@@ -15,26 +16,31 @@ public struct RootView: View {
     /// A janela tem controles do sistema por cima do canto? Vem da geometria, e é
     /// reavaliado a cada mudança de tamanho, que é quando pode mudar.
     @State private var emJanela = false
-    private let store: StateStore
+    /// Esta janela, para o registro de `Janelas`.
+    @State private var idDaJanela = UUID()
+    @State private var caixaDaCena = CaixaDaCena()
+    /// O projeto desta janela, para o sistema devolvê-lo quando recriar a cena: o id,
+    /// `hub` para a lista de projetos, vazio para quem nunca escolheu. Cada janela lembra
+    /// o seu — antes todas reabriam o mesmo último projeto do `state.json`.
+    @SceneStorage("odete.projetoDaJanela") private var projetoDaJanela = ""
+    /// A cena está indo embora: fechar o projeto agora não é "voltar para a lista", e
+    /// não pode ficar lembrado como se fosse.
+    @State private var saindoDeCena = false
 
     public init() {
         // Todo campo de texto do app ganha a barra com o botão de recolher o teclado.
         // Uma vez, aqui, em vez de um botão por tela — ver `Teclado`.
         Teclado.instalaBarra()
-        let store = StateStore()
-        self.store = store
-        var snap = store.load()
-        // Instalação nova com iCloud à mão: os projetos nascem no iCloud Drive. Dentro do
-        // container do app eles não sobrevivem a uma desinstalação — some tudo, incluindo
-        // o histórico git e as conversas do agente. Só vale para instalação nova: mudar o
-        // lugar de quem já tem projeto é decisão da pessoa, nos Ajustes.
-        if !snap.welcomeDone, !snap.projectsInCloud, AppModel.cloudRoot() != nil {
-            snap.projectsInCloud = true
-            try? store.saveNow(snap)
-        }
+        // O estado de todos: cada janela tem o seu `ChromeState`, mas todos nascem do mesmo
+        // e se falam por `Janelas` — ver `Janelas.mudou`.
+        let janelas = Janelas.shared
+        let snap = janelas.snapshotInicial()
         _chrome = State(initialValue: ChromeState(snapshot: snap))
-        _app =
-            State(initialValue: AppModel(store: ProjectStore(root: AppModel.projectsRoot(cloud: snap.projectsInCloud))))
+        _app = State(initialValue: AppModel(
+            store: ProjectStore(root: AppModel.projectsRoot(cloud: snap.projectsInCloud)),
+            accounts: janelas.accounts,
+            aiAccounts: janelas.aiAccounts
+        ))
     }
 
     /// O claro/escuro do iPad, para quando o tema segue o sistema.
@@ -81,6 +87,10 @@ public struct RootView: View {
                 .odeteTheme(Theme(chrome.palette, seguirSistema: chrome.snapshot.themeAuto))
         }
         .onChange(of: fase) { _, nova in
+            // Os atalhos falam com a janela que a pessoa usou por último.
+            if nova == .active {
+                IntentBridge.shared.bind(app: app, chrome: chrome)
+            }
             guard let ws = app.workspace else { return }
             switch nova {
             case .background:
@@ -113,14 +123,39 @@ public struct RootView: View {
             .presentationSizing(.page)
         }
         .onOpenURL { url in app.importURL(url, chrome: chrome) }
+        .background(LeitorDeCena { [caixaDaCena] cena in caixaDaCena.cena = cena }.frame(width: 0, height: 0))
         .onAppear {
-            chrome.onChange = { [store] snap in store.scheduleSave(snap) }
+            let outras = Janelas.shared.haOutras(alem: idDaJanela)
+            Janelas.shared.entrar(idDaJanela, app: app, chrome: chrome) { [caixaDaCena] in caixaDaCena.ativar() }
             IntentBridge.shared.bind(app: app, chrome: chrome)
-            if app.workspace == nil, let id = chrome.snapshot.lastProjectId,
-               let p = app.projects.first(where: { $0.id == id })
-            {
-                app.open(p, chrome: chrome)
-            }
+            abrirOProjetoDaJanela(sessoes: outras ? 2 : UIApplication.shared.openSessions.count)
         }
+        .onChange(of: app.workspace?.project.id) { _, id in
+            guard !saindoDeCena else { return }
+            projetoDaJanela = id?.uuidString ?? "hub"
+        }
+        // Janela fechada: o projeto dela para e fica livre para outra janela abrir.
+        .onReceive(NotificationCenter.default.publisher(for: UIScene.didDisconnectNotification)) { aviso in
+            guard let cena = aviso.object as? UIWindowScene, cena === caixaDaCena.cena else { return }
+            saindoDeCena = true
+            app.closeWorkspace()
+            Janelas.shared.sair(idDaJanela)
+        }
+    }
+
+    /// Reabre o projeto que esta janela tinha — ou, com uma janela só, o último aberto,
+    /// como sempre foi. Se ele já está aberto em outra janela, esta fica na lista: trazer
+    /// a outra para a frente na hora de restaurar as janelas seria roubar a tela.
+    private func abrirOProjetoDaJanela(sessoes: Int) {
+        guard app.workspace == nil,
+              let id = Janelas.projetoParaAbrir(
+                  guardado: projetoDaJanela,
+                  sessoes: sessoes,
+                  ultimo: chrome.snapshot.lastProjectId
+              ),
+              let p = app.projects.first(where: { $0.id == id }),
+              Janelas.shared.dona(de: id, fora: app) == nil
+        else { return }
+        app.open(p, chrome: chrome)
     }
 }

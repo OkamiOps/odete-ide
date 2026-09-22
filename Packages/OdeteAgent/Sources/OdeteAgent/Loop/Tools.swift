@@ -35,10 +35,16 @@ public enum PermitMode: String, Codable, CaseIterable, Sendable, Identifiable {
     }
 }
 
-/// As sete ferramentas, com os mesmos nomes e schemas do web.
+/// As ferramentas, com os mesmos nomes e schemas do web — mais as duas que leem o que o
+/// app já sabe (`read_problems` e `read_preview_console`).
 public enum Tools {
-    static let safe: Set<String> = ["read_file", "list_dir", "grep", "read_terminal"]
-    static let chatTools: Set<String> = ["read_file", "list_dir", "grep", "read_terminal", "run_shell", "github"]
+    static let safe: Set<String> = [
+        "read_file", "list_dir", "grep", "read_terminal", "read_problems", "read_preview_console",
+    ]
+    static let chatTools: Set<String> = [
+        "read_file", "list_dir", "grep", "read_terminal", "run_shell", "github", "read_problems",
+        "read_preview_console",
+    ]
     static let planTools: Set<String> = chatTools.union(["write_file", "str_replace"])
 
     public static let all: [ToolSpec] = [
@@ -83,6 +89,19 @@ public enum Tools {
             name: "read_terminal",
             description: "Lê as últimas linhas do terminal (stdout/stderr).",
             parameters: obj(["n": ["type": "number", "description": "quantas linhas (default 80)"]])
+        ),
+        // Descrições curtas de propósito: entram também no modelo do aparelho, onde cada
+        // caractere de schema sai do espaço da conversa — ver `AppleProvider.ferramentas`.
+        ToolSpec(
+            name: "read_problems",
+            description: "Erros e avisos que a Odete já mostra (lint, sintaxe, build, preview), "
+                + "um por linha: arquivo:linha:coluna gravidade mensagem (fonte).",
+            parameters: obj(["path": texto("Arquivo ou pasta para filtrar. Vazio traz o projeto todo.")])
+        ),
+        ToolSpec(
+            name: "read_preview_console",
+            description: "Últimas linhas do console do app no Preview, com o nível (log, info, warn, error).",
+            parameters: obj(["n": ["type": "number", "description": "quantas linhas (padrão 50, máximo 200)"]])
         ),
         ToolSpec(
             name: "run_shell",
@@ -218,6 +237,177 @@ public enum Tools {
         }
     }
 
+    /// Onde um comando do shell vai escrever, para o checkpoint guardar o original antes.
+    ///
+    /// Leitura de boa-fé, não um parser de shell: pega `rm`, `mv`, `cp`, `touch`, `>` e
+    /// `>>`, o `cd` no meio da linha e o `npm` que reescreve o `package.json` e o lock. O
+    /// que escapa daqui ainda tem o retrato do começo do turno. Anotar a mais não estraga
+    /// nada: guardar o original de um arquivo que não mudou só devolve o mesmo conteúdo.
+    ///
+    /// `pasta` é onde o shell do agente está, relativa à raiz. No shell da Odete, `/` e
+    /// `~` são a raiz do projeto.
+    public static func alvosDoShell(_ command: String, pasta: String = "") -> [String] {
+        var alvos: [String] = []
+        var cwd = pasta
+        for segmento in segmentosDoShell(command) {
+            var palavras: [String] = []
+            let todas = palavrasDoShell(segmento)
+            var i = 0
+            while i < todas.count {
+                let w = todas[i]
+                if [">", ">>", "2>", "&>"].contains(w) {
+                    if i + 1 < todas.count {
+                        alvos.append(caminhoNoShell(todas[i + 1], cwd: cwd))
+                    }
+                    i += 2
+                    continue
+                }
+                if let seta = ["2>", ">>", ">"].first(where: { w.hasPrefix($0) && w.count > $0.count }) {
+                    // `2>&1` aponta para outra saída, não para um arquivo.
+                    let alvo = String(w.dropFirst(seta.count))
+                    if !alvo.hasPrefix("&") {
+                        alvos.append(caminhoNoShell(alvo, cwd: cwd))
+                    }
+                    i += 1
+                    continue
+                }
+                palavras.append(w)
+                i += 1
+            }
+            guard let cmd = palavras.first else { continue }
+            let args = palavras.dropFirst().filter { !$0.hasPrefix("-") }
+            switch cmd {
+            case "cd":
+                cwd = args.first.map { caminhoNoShell($0, cwd: cwd) } ?? ""
+            case "rm", "touch":
+                alvos += args.map { caminhoNoShell($0, cwd: cwd) }
+            case "mv", "cp":
+                guard args.count >= 2, let destino = args.last else { continue }
+                let d = caminhoNoShell(destino, cwd: cwd)
+                alvos.append(d)
+                for origem in args.dropLast() {
+                    // `mv` tira da origem; e os dois podem cair dentro de uma pasta de destino.
+                    if cmd == "mv" {
+                        alvos.append(caminhoNoShell(origem, cwd: cwd))
+                    }
+                    let nome = (origem as NSString).lastPathComponent
+                    alvos.append(d.isEmpty ? nome : d + "/" + nome)
+                }
+            case "npm", "pnpm", "yarn", "bun":
+                let mexe: Set = ["install", "i", "add", "remove", "rm", "uninstall", "un", "update", "up", "ci"]
+                if args.contains(where: { mexe.contains($0) }) {
+                    let base = cwd.isEmpty ? "" : cwd + "/"
+                    alvos += [base + "package.json", base + "package-lock.json"]
+                }
+            case "git":
+                let mexe: Set = ["checkout", "restore", "rm", "mv"]
+                if let sub = args.first, mexe.contains(sub) {
+                    alvos += args.dropFirst().map { caminhoNoShell($0, cwd: cwd) }
+                }
+            default:
+                break
+            }
+        }
+        var vistos = Set<String>()
+        return alvos.filter { !$0.isEmpty && $0 != ".." && !$0.hasPrefix("../") && vistos.insert($0).inserted }
+    }
+
+    /// Os comandos de uma linha, separados por `&&`, `||`, `;`, `|` e quebra de linha.
+    static func segmentosDoShell(_ command: String) -> [String] {
+        var out: [String] = []
+        var atual = ""
+        var aspa: Character?
+        for c in command {
+            if let a = aspa {
+                atual.append(c)
+                if c == a {
+                    aspa = nil
+                }
+            } else if c == "\"" || c == "'" {
+                aspa = c
+                atual.append(c)
+            } else if c == ";" || c == "\n" || c == "|" || c == "&" {
+                // `&&` e `||` viram dois cortes seguidos; o segmento vazio do meio some
+                // no filtro. `&>` não chega aqui como corte porque vem colado à seta.
+                if c == "&", atual.hasSuffix(">") {
+                    atual.append(c)
+                    continue
+                }
+                out.append(atual)
+                atual = ""
+            } else {
+                atual.append(c)
+            }
+        }
+        out.append(atual)
+        return out.map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+    }
+
+    /// As palavras de um comando, sem as aspas.
+    static func palavrasDoShell(_ segmento: String) -> [String] {
+        var out: [String] = []
+        var atual = ""
+        var aspa: Character?
+        var temPalavra = false
+        for c in segmento {
+            if let a = aspa {
+                if c == a {
+                    aspa = nil
+                } else {
+                    atual.append(c)
+                }
+            } else if c == "\"" || c == "'" {
+                aspa = c
+                temPalavra = true
+            } else if c == " " || c == "\t" {
+                if temPalavra {
+                    out.append(atual)
+                }
+                atual = ""
+                temPalavra = false
+            } else {
+                atual.append(c)
+                temPalavra = true
+            }
+        }
+        if temPalavra {
+            out.append(atual)
+        }
+        return out
+    }
+
+    /// Caminho do shell — relativo à `cwd`, ou a partir de `/` e `~`, que são a raiz —
+    /// em caminho relativo à raiz do projeto. Quem sai do projeto com `..` volta como
+    /// `..`, e quem chama descarta.
+    static func caminhoNoShell(_ p: String, cwd: String) -> String {
+        var base: [String]
+        var resto = p
+        if resto == "~" || resto == "/" {
+            return ""
+        }
+        if resto.hasPrefix("~/") {
+            resto.removeFirst(2)
+            base = []
+        } else if resto.hasPrefix("/") {
+            resto.removeFirst()
+            base = []
+        } else {
+            base = cwd.split(separator: "/").map(String.init)
+        }
+        for parte in resto.split(separator: "/").map(String.init) {
+            switch parte {
+            case ".": continue
+            case "..":
+                if base.isEmpty {
+                    return ".."
+                }
+                base.removeLast()
+            default: base.append(parte)
+            }
+        }
+        return base.joined(separator: "/")
+    }
+
     /// Comandos que o agente nunca roda.
     public static func isForbiddenShell(_ command: String) -> String? {
         let c = command.trimmingCharacters(in: .whitespaces)
@@ -260,7 +450,9 @@ public enum Prompts {
         """
     }
 
-    static let read = "Você decide se precisa abrir arquivo, qual, e quando. Use read_file / list_dir / grep / read_terminal só se o conteúdo for necessário. Não invente conteúdo."
+    static let read = "Você decide se precisa abrir arquivo, qual, e quando. Use read_file / list_dir / grep / "
+        + "read_terminal só se o conteúdo for necessário. Os erros que a tela já mostra vêm de read_problems. "
+        + "Não invente conteúdo."
 
     public static func mode(_ m: AgentMode) -> String {
         switch m {

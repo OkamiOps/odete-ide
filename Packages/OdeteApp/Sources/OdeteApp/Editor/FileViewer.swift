@@ -19,7 +19,7 @@ struct FileViewer: View {
     var body: some View {
         Group {
             switch tipo {
-            case .imagem: ImagemView(url: url, medida: medida)
+            case .imagem: ImagemView(url: url)
             case .pdf: PDFVista(url: url)
             case .banco: DBView(url: url, nome: nome)
             case .outro: HexView(url: url, nome: nome, medida: medida)
@@ -60,12 +60,14 @@ struct FileViewer: View {
 struct ImagemView: View {
     @Environment(\.theme) private var theme
     var url: URL
-    var medida: String
     @State private var zoom: CGFloat = 1
+    @State private var carregada: ImagemCarregada?
+    @State private var falhou = false
 
     var body: some View {
         VStack(spacing: 12) {
-            if let img = UIImage(contentsOfFile: url.path) {
+            if let carregada {
+                let img = carregada.imagem
                 ScrollView([.horizontal, .vertical]) {
                     Image(uiImage: img)
                         .resizable().scaledToFit()
@@ -75,19 +77,86 @@ struct ImagemView: View {
                         .padding(24)
                 }
                 HStack(spacing: 12) {
-                    Text("\(Int(img.size.width)) × \(Int(img.size.height)) · \(medida)")
+                    Text("\(Int(img.size.width)) × \(Int(img.size.height)) · \(carregada.medida)")
                         .font(.caption).foregroundStyle(.secondary).monospacedDigit()
                     Slider(value: $zoom, in: 0.25 ... 4).frame(width: 180)
                     Button("100%") { zoom = 1 }.font(.caption).buttonStyle(.bordered).controlSize(.small)
                 }
                 .padding(.bottom, 12)
-            } else {
+            } else if falhou {
                 EmptyState(
                     "photo",
                     title: tr("Não deu para abrir"),
                     text: tr("O arquivo tem extensão de imagem mas não decodifica.")
                 )
+            } else {
+                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+        }
+        // Uma leitura por arquivo, fora do ator principal. Antes a imagem era lida do
+        // disco e decodificada dentro do `body`: cada passo do controle de zoom redesenha
+        // a view, e cada redesenho relia e redecodificava o arquivo inteiro.
+        .task(id: url) {
+            let marca = ImagemCarregada.marca(url)
+            if let guardada = CacheDeImagens.shared.imagem(url, marca: marca) {
+                carregada = guardada
+                falhou = false
+                return
+            }
+            carregada = nil
+            falhou = false
+            let lida = await Task.detached(priority: .userInitiated) { ImagemCarregada.ler(url) }.value
+            guard !Task.isCancelled else { return }
+            if let lida {
+                CacheDeImagens.shared.guardar(lida, url, marca: marca)
+            }
+            carregada = lida
+            falhou = lida == nil
+        }
+    }
+}
+
+/// Imagem já decodificada, com o tamanho do arquivo para a legenda.
+struct ImagemCarregada: Sendable {
+    let imagem: UIImage
+    let medida: String
+
+    /// Lê e decodifica de uma vez. `UIImage(contentsOfFile:)` sozinho adia a
+    /// decodificação para o primeiro desenho, que acontece no ator principal;
+    /// `preparingForDisplay()` a faz aqui mesmo.
+    static func ler(_ url: URL) -> ImagemCarregada? {
+        guard let img = UIImage(contentsOfFile: url.path) else { return nil }
+        let bytes = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int) ?? 0
+        return ImagemCarregada(imagem: img.preparingForDisplay() ?? img, medida: Tamanho.arquivo(bytes))
+    }
+
+    /// Data de modificação: imagem regravada (pelo agente, por um script) não pode vir
+    /// do cache com o desenho velho.
+    static func marca(_ url: URL) -> Date? {
+        (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date
+    }
+}
+
+/// As últimas imagens abertas, para ir e voltar entre abas sem reler o arquivo.
+@MainActor
+final class CacheDeImagens {
+    static let shared = CacheDeImagens()
+    private var itens: [(url: URL, marca: Date?, imagem: ImagemCarregada)] = []
+    /// Poucas: uma foto do iPad decodificada passa de 40 MB.
+    private let limite = 4
+
+    func imagem(_ url: URL, marca: Date?) -> ImagemCarregada? {
+        guard let i = itens.firstIndex(where: { $0.url == url && $0.marca == marca }) else { return nil }
+        let item = itens.remove(at: i)
+        itens.append(item)
+        return item.imagem
+    }
+
+    func guardar(_ imagem: ImagemCarregada, _ url: URL, marca: Date?) {
+        itens.removeAll { $0.url == url }
+        itens.append((url, marca, imagem))
+        if itens.count > limite {
+            itens.removeFirst(itens.count - limite)
         }
     }
 }

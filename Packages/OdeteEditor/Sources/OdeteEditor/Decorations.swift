@@ -41,16 +41,19 @@ public struct EditorIssue: Sendable, Hashable, Identifiable {
     public var length: Int
     public var severity: Severity
     public var message: String
+    /// De onde veio o aviso (a regra do lint, "sintaxe"), mostrado no balão da mensagem.
+    public var fonte: String?
     public var id: String {
         "\(line):\(column):\(message)"
     }
 
-    public init(line: Int, column: Int, length: Int, severity: Severity, message: String) {
+    public init(line: Int, column: Int, length: Int, severity: Severity, message: String, fonte: String? = nil) {
         self.line = line
         self.column = column
         self.length = length
         self.severity = severity
         self.message = message
+        self.fonte = fonte
     }
 }
 

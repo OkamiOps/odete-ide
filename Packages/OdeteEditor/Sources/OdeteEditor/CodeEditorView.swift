@@ -4,7 +4,11 @@ import SwiftUI
 import UIKit
 
 /// Editor de código nativo. Envolve `Runestone.TextView`.
-/// `documentId` muda quando o arquivo aberto muda; aí o estado é recriado com a linguagem certa.
+///
+/// Cada documento tem o seu `TextView`, guardado em `SessoesDoEditor`: quando
+/// `documentId` muda, o editor da aba anterior sai de cena inteiro — com o desfazer, o
+/// cursor e a rolagem — e o da aba nova entra. Recriar o estado a cada troca, como era,
+/// apagava o ⌘Z e reanalisava o arquivo.
 public struct CodeEditorView: UIViewRepresentable {
     @Binding public var text: String
     public var documentId: String
@@ -36,6 +40,10 @@ public struct CodeEditorView: UIViewRepresentable {
     public var onDefinition: () -> Void
     /// Mandar para o agente: o texto escolhido e as linhas (1-based) de onde ele veio.
     public var onSendSelection: (String, Int, Int) -> Void
+    /// ⌃Tab e ⌃⇧Tab com o cursor no editor: a aba seguinte (+1) ou a anterior (−1).
+    /// Vem por aqui, e não só pelo menu, porque a navegação de foco do sistema pega o
+    /// ⌃Tab antes do menu quando há texto em edição.
+    public var onTrocarAba: (Int) -> Void
 
     public init(
         text: Binding<String>,
@@ -58,7 +66,8 @@ public struct CodeEditorView: UIViewRepresentable {
         onOpenLink: @escaping (String) -> Void = { _ in },
         onFindResults: @escaping (Int) -> Void = { _ in },
         onDefinition: @escaping () -> Void = {},
-        onSendSelection: @escaping (String, Int, Int) -> Void = { _, _, _ in }
+        onSendSelection: @escaping (String, Int, Int) -> Void = { _, _, _ in },
+        onTrocarAba: @escaping (Int) -> Void = { _ in }
     ) {
         _text = text
         self.documentId = documentId
@@ -81,88 +90,50 @@ public struct CodeEditorView: UIViewRepresentable {
         self.onFindResults = onFindResults
         self.onDefinition = onDefinition
         self.onSendSelection = onSendSelection
+        self.onTrocarAba = onTrocarAba
     }
 
-    public func makeUIView(context: Context) -> TextView {
-        let tv = OdeteTextView()
-        tv.editorDelegate = context.coordinator
-        tv.backgroundColor = UIColor(hex: palette.bg)
-        tv.autocorrectionType = .no
-        tv.autocapitalizationType = .none
-        tv.smartQuotesType = .no
-        tv.smartDashesType = .no
-        tv.smartInsertDeleteType = .no
-        tv.spellCheckingType = .no
-        tv.keyboardType = .asciiCapable
-        tv.alwaysBounceVertical = true
-        // Trackpad e Magic Mouse mandam scroll contínuo; sem isto o editor só rola
-        // com o dedo ou clicando e arrastando.
-        tv.panGestureRecognizer.allowedScrollTypesMask = .all
-        tv.gutterLeadingPadding = 8
-        tv.gutterTrailingPadding = 12
-        tv.textContainerInset = UIEdgeInsets(top: 8, left: 0, bottom: 200, right: 8)
-        tv.lineSelectionDisplayType = .line
-        tv.characterPairs = Self.pairs
+    public func makeUIView(context: Context) -> HostDoEditor {
+        let host = HostDoEditor(frame: .zero)
         let c = context.coordinator
-        tv.inputAccessoryView = KeyboardBar(
-            textView: tv,
-            onSave: onSave,
-            onFind: onFind,
-            onDefinition: onDefinition,
-            onSendSelection: { [weak c] in c?.mandarSelecao() }
-        )
-        c.textView = tv
         c.overlay.onLongPress = { [weak c] line in c?.parent.onGutterLongPress(line) }
-        tv.addSubview(c.guides)
-        tv.addSubview(c.changeMarks)
-        tv.addSubview(c.overlay)
-        tv.addSubview(c.minimap)
-        tv.floating = [c.guides, c.changeMarks, c.overlay, c.minimap, c.popup]
-        tv.aoLayout = { [weak c] in c?.positionOverlay() }
-        c.minimap.aoNavegar = { [weak tv] f in
-            guard let tv else { return }
+        c.minimap.aoNavegar = { [weak c] f in
+            guard let tv = c?.textView else { return }
             let maximo = max(0, tv.contentSize.height - tv.bounds.height)
             tv.setContentOffset(CGPoint(x: tv.contentOffset.x, y: maximo * f), animated: false)
         }
         c.popup.onPick = { [weak c] item in c?.accept(item) }
-        // Toque no caminho do import. Não cancela o toque original: o cursor continua
-        // indo para onde a pessoa tocou, e só quando o ponto cai dentro do sublinhado é
-        // que o arquivo abre.
-        let toque = UITapGestureRecognizer(target: c, action: #selector(Coordinator.tocouNoTexto(_:)))
-        toque.cancelsTouchesInView = false
-        toque.delegate = c
-        tv.addGestureRecognizer(toque)
-        c.offsetObservation = tv.observe(\.contentOffset, options: [.new]) { [weak c] _, _ in
-            Task { @MainActor in c?.positionOverlay() }
-        }
-        apply(to: tv, context: context, fullReset: true)
-        return tv
+        c.exibir(em: host)
+        c.conferirTema()
+        return host
     }
 
-    public func updateUIView(_ tv: TextView, context: Context) {
+    public func updateUIView(_ host: HostDoEditor, context: Context) {
         let c = context.coordinator
-        let docChanged = c.documentId != documentId
+        c.parent = self
+        // Trocou de aba: sai o editor da anterior, entra o desta — cada um com o seu
+        // desfazer, cursor e rolagem. Ver `SessoesDoEditor`.
+        let docChanged = c.exibir(em: host)
+        guard let tv = c.textView else { return }
         // A família da fonte entra aqui: trocar de fonte é refazer o tema, não um ajuste
         // solto — o destaque de sintaxe carrega a fonte em cada faixa colorida.
-        let themeChanged = c.palette != palette || c.fontSize != prefs.fontSize
-            || c.fontFamily != prefs.fontFamily
-        if docChanged || themeChanged {
-            apply(to: tv, context: context, fullReset: true)
-        } else if !c.isEditing, c.textoAtual != text {
-            tv.text = text
-            c.anotarTexto(text)
+        c.conferirTema()
+        if !c.isEditing, c.textoAtual != text {
+            // O texto mudou por fora (disco, salvar arrumando, agente) — só nesta aba.
+            c.aplicarTextoDeFora(text, em: tv)
             c.scheduleDecorations()
         }
-        c.parent = self
         applyPrefs(tv, context: context)
         c.agendarMinimapa()
         if docChanged {
             DispatchQueue.main.async { c.positionOverlay() }
         }
-        (tv.inputAccessoryView as? KeyboardBar)?.onSave = onSave
-        (tv.inputAccessoryView as? KeyboardBar)?.onFind = onFind
-        (tv.inputAccessoryView as? KeyboardBar)?.onDefinition = onDefinition
-        (tv.inputAccessoryView as? KeyboardBar)?.onSendSelection = { [weak c] in c?.mandarSelecao() }
+        let barra = c.sessao?.barra
+        barra?.onSave = onSave
+        barra?.onFind = onFind
+        barra?.onDefinition = onDefinition
+        barra?.onSendSelection = { [weak c] in c?.mandarSelecao() }
+        barra?.onComentar = { [weak c] in c?.executar(.alternarComentario) }
         if c.marks != marks || c.issues != issues || c.changes != changes || c.links != links || docChanged {
             c.marks = marks
             c.issues = issues
@@ -191,6 +162,10 @@ public struct CodeEditorView: UIViewRepresentable {
         }
     }
 
+    public static func dismantleUIView(_: HostDoEditor, coordinator: Coordinator) {
+        coordinator.desmontar()
+    }
+
     private func applyPrefs(_ tv: TextView, context: Context) {
         let c = context.coordinator
         tv.showLineNumbers = prefs.lineNumbers
@@ -213,7 +188,9 @@ public struct CodeEditorView: UIViewRepresentable {
             tv.textContainerInset.bottom = fundo
         }
         tv.characterPairs = prefs.autoClosePairs ? Self.pairs : []
-        if c.lineHeight != prefs.lineHeight {
+        // Comparado com o do próprio editor, e não com o último aplicado: cada aba tem o
+        // seu `TextView`, e o que acabou de entrar pode ter vindo com o padrão.
+        if tv.lineHeightMultiplier != CGFloat(prefs.lineHeight) {
             c.lineHeight = prefs.lineHeight
             tv.lineHeightMultiplier = prefs.lineHeight
         }
@@ -245,42 +222,6 @@ public struct CodeEditorView: UIViewRepresentable {
         Pair("`", "`"),
     ]
 
-    private func apply(to tv: TextView, context: Context, fullReset: Bool) {
-        let c = context.coordinator
-        c.documentId = documentId
-        c.palette = palette
-        c.fontSize = prefs.fontSize
-        c.fontFamily = prefs.fontFamily
-        c.parent = self
-        c.hidePopup()
-        let theme = EditorTheme(palette: palette, fontSize: prefs.fontSize, familia: prefs.fontFamily)
-        tv.backgroundColor = UIColor(hex: palette.bg)
-        c.overlay.addedColor = UIColor(hex: palette.ok)
-        c.overlay.modifiedColor = UIColor(hex: palette.syntax.keyword)
-        c.overlay.deletedColor = UIColor(hex: palette.danger)
-        c.minimap.corCodigo = UIColor(hex: palette.fg).withAlphaComponent(palette.dark ? 0.45 : 0.40)
-        c.minimap.corComentario = UIColor(hex: palette.fgSubtle).withAlphaComponent(0.45)
-        c.minimap.corJanela = UIColor(hex: palette.fg).withAlphaComponent(palette.dark ? 0.10 : 0.09)
-        c.minimap.corFundo = UIColor(hex: palette.bg).withAlphaComponent(0.6)
-        c.guides.color = UIColor(hex: palette.fg).withAlphaComponent(palette.dark ? 0.09 : 0.12)
-        c.guides.activeColor = UIColor(hex: palette.accent).withAlphaComponent(0.45)
-        c.popup.fg = UIColor(hex: palette.fg)
-        c.popup.muted = UIColor(hex: palette.fgMuted)
-        c.popup.accent = UIColor(hex: palette.accent)
-        if let lang = LanguageMode.treeSitter(for: language) {
-            tv.setState(TextViewState(
-                text: text,
-                theme: theme,
-                language: lang,
-                languageProvider: LanguageMode.provider
-            ))
-        } else {
-            tv.setState(TextViewState(text: text, theme: theme))
-        }
-        c.anotarTexto(text)
-        c.scheduleDecorations()
-    }
-
     public func makeCoordinator() -> Coordinator {
         Coordinator(parent: self)
     }
@@ -310,6 +251,10 @@ public struct CodeEditorView: UIViewRepresentable {
         let changeMarks = ChangeMarks(frame: .zero)
         let popup = CompletionPopup(frame: .zero)
         let minimap = MinimapView(frame: .zero)
+        /// A mensagem do problema tocado, logo abaixo da onda.
+        let balao = BalaoDeProblema(frame: .zero)
+        /// Versão do texto quando o balão abriu; mudou, ele fecha.
+        var versaoDoBalao = -1
         var minimapSize: MinimapSize = .off
         var minimapTexto = ""
         var lineHeight: Double = 0
@@ -335,10 +280,18 @@ public struct CodeEditorView: UIViewRepresentable {
         /// Em que linha o cursor estava da última vez, para não refazer decoração
         /// quando ele só anda dentro da mesma.
         var ultimaLinhaDoCursor = -1
+        /// Onde os editores de cada documento ficam guardados entre uma aba e outra.
+        let sessoes: SessoesDoEditor
+        /// O documento na tela agora e o editor dele.
+        var sessao: SessoesDoEditor.Sessao?
+        weak var host: HostDoEditor?
+        /// SwiftUI já desmontou este editor: não adianta mais pedir um `TextView`.
+        var desmontado = false
         private var popupContext: CompletionContext?
 
-        init(parent: CodeEditorView) {
+        init(parent: CodeEditorView, sessoes: SessoesDoEditor = .shared) {
             self.parent = parent
+            self.sessoes = sessoes
         }
 
         public func textViewDidChange(_ textView: TextView) {

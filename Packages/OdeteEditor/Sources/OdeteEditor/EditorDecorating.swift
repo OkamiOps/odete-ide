@@ -112,15 +112,19 @@ extension CodeEditorView.Coordinator {
         minimap.avisos = issues.filter { $0.severity == .warning }.map(\.line)
     }
 
-    /// O toque caiu em cima de um caminho de import? Então abre o arquivo.
+    /// O toque caiu em cima de um caminho de import? Então abre o arquivo. Numa onda de
+    /// problema, mostra a mensagem dele.
     @objc func tocouNoTexto(_ g: UITapGestureRecognizer) {
-        guard !changeMarks.elos.isEmpty, let tv = textView else { return }
+        guard let tv = textView else { return }
         let p = g.location(in: tv)
         // Uma folga vertical pequena: o retângulo do cursor é mais baixo que a linha e
         // acertar o sublinhado com o dedo pede alguma margem.
-        guard let elo = changeMarks.elos.first(where: { $0.rect.insetBy(dx: -2, dy: -4).contains(p) })
-        else { return }
-        parent.onOpenLink(elo.destino)
+        if let elo = changeMarks.elos.first(where: { $0.rect.insetBy(dx: -2, dy: -4).contains(p) }) {
+            parent.onOpenLink(elo.destino)
+            return
+        }
+        // Fora de onda, o toque também fecha o balão que estiver aberto.
+        tocouEmProblema(p)
     }
 
     /// Convive com o reconhecedor do próprio Runestone: o toque precisa continuar levando

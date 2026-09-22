@@ -73,6 +73,13 @@ struct CenterPane: View {
             content
         }
         .background(theme.bg)
+        // Cada aba guarda o seu editor (e o desfazer dele); aba fechada solta o seu.
+        .onChange(of: ws.tabs.map(\.path), initial: true) { _, abas in
+            SessoesDoEditor.manterAbertos(
+                prefixo: ws.prefixoDosDocumentos,
+                documentos: Set(abas.map { ws.documento($0) })
+            )
+        }
         .sheet(item: Binding(
             get: { ws.historyPath.map { PathRef(path: $0) } },
             set: { ws.historyPath = $0?.path }
@@ -147,9 +154,19 @@ struct CenterPane: View {
             HStack(spacing: 0) {
                 editor(ws.active)
                 Rectangle().fill(theme.border).frame(width: 1)
-                PreviewPane()
+                previa
             }
-        case .preview: PreviewPane()
+        case .preview: previa
+        }
+    }
+
+    /// Markdown tem prévia própria, desenhada aqui mesmo; o resto vai para o preview do
+    /// projeto, que não sabe o que fazer com um README.
+    @ViewBuilder var previa: some View {
+        if let path = ws.active, Language.detect(path: path) == .markdown, !ws.naoEhTexto.contains(path) {
+            MarkdownPreview(path: path)
+        } else {
+            PreviewPane()
         }
     }
 
@@ -282,7 +299,8 @@ struct CenterPane: View {
                             column: $0.column,
                             length: $0.length,
                             severity: severity($0.severity),
-                            message: $0.message
+                            message: $0.message,
+                            fonte: $0.rule == "syntax" ? tr("sintaxe") : $0.rule
                         )
                     },
                     changes: ws.patchChanges[path] ?? [],
@@ -310,7 +328,8 @@ struct CenterPane: View {
                             linguagem: Language.detect(path: path).rawValue
                         )
                         chrome.snapshot.agentVisible = true
-                    }
+                    },
+                    onTrocarAba: { ws.irParaAba(deslocamento: $0) }
                 )
                 // Folha de ação, não popover: o popover reaparecia sozinho a cada
                 // redesenho e engolia o toque seguinte, que era o toque que devia levar

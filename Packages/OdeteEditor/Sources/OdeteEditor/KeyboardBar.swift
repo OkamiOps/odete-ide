@@ -12,19 +12,23 @@ final class KeyboardBar: UIInputView {
     var onDefinition: () -> Void
     /// Manda a seleção (ou a linha do cursor) para o compositor do agente.
     var onSendSelection: () -> Void
+    /// Comenta ou descomenta as linhas da seleção — o ⌘/ de quem não tem teclado físico.
+    var onComentar: () -> Void
 
     init(
         textView: TextView,
         onSave: @escaping () -> Void,
         onFind: @escaping () -> Void,
         onDefinition: @escaping () -> Void,
-        onSendSelection: @escaping () -> Void
+        onSendSelection: @escaping () -> Void,
+        onComentar: @escaping () -> Void = {}
     ) {
         self.textView = textView
         self.onSave = onSave
         self.onFind = onFind
         self.onDefinition = onDefinition
         self.onSendSelection = onSendSelection
+        self.onComentar = onComentar
         super.init(frame: CGRect(x: 0, y: 0, width: 0, height: 44), inputViewStyle: .keyboard)
         build()
     }
@@ -73,6 +77,7 @@ final class KeyboardBar: UIInputView {
             ("< >", nil, { [weak self] in self?.wrap("<", ">") }),
             ("\" \"", nil, { [weak self] in self?.wrap("\"", "\"") }),
             ("=>", nil, { [weak self] in self?.textView?.insertText("=>") }),
+            ("//", nil, { [weak self] in self?.onComentar() }),
             ("", "arrow.left", { [weak self] in self?.move(-1) }),
             ("", "arrow.right", { [weak self] in self?.move(1) }),
             ("", "arrow.uturn.backward", { [weak self] in self?.textView?.undoManager?.undo() }),
@@ -106,6 +111,9 @@ final class KeyboardBar: UIInputView {
         b.widthAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
         if symbol == "keyboard.chevron.compact.down" {
             b.accessibilityLabel = tr("Esconder o teclado")
+        }
+        if title == "//" {
+            b.accessibilityLabel = tr("Comentar linhas")
         }
         return b
     }

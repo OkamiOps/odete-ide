@@ -86,7 +86,7 @@ struct PoliticaDeNavegacaoTests {
 
     /// O erro para o outro lado é pior: bloquear o próprio projeto deixa o preview em
     /// branco e ninguém descobre por quê.
-    @Test func carregaAPaginaDoProjeto() async throws {
+    @Test(.semNavegadorNoCI) func carregaAPaginaDoProjeto() async throws {
         let raiz = FileManager.default.temporaryDirectory
             .appending(path: "odete-nav-\(UUID().uuidString)", directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: raiz, withIntermediateDirectories: true)

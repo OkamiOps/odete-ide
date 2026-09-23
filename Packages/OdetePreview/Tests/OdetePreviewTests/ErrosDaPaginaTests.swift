@@ -88,7 +88,7 @@ struct RecargaDentroDaPaginaTests {
         }
     }
 
-    @Test func locationReloadLimpaOsProblemas() async throws {
+    @Test(.semNavegadorNoCI) func locationReloadLimpaOsProblemas() async throws {
         let raiz = FileManager.default.temporaryDirectory
             .appending(path: "odete-recarga-\(UUID().uuidString)", directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: raiz, withIntermediateDirectories: true)

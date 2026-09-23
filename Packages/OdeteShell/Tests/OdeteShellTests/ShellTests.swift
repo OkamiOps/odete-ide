@@ -195,18 +195,27 @@ func project() throws -> URL {
 
     @Test func serverBecomesJob() async throws {
         let root = try project()
-        try "require('http').createServer((q, s) => s.end('pong')).listen(4611, () => console.log('ouvindo'));".write(
-            to: root.appending(path: "srv.js"),
-            atomically: true,
-            encoding: .utf8
-        )
+        // Porta sorteada: com uma fixa, outro teste (ou outro worker) na mesma máquina a
+        // ocupava e este falhava à toa.
+        let porta = Int.random(in: 41000 ... 48999)
+        try "require('http').createServer((q, s) => s.end('pong')).listen(\(porta), () => console.log('ouvindo'));"
+            .write(
+                to: root.appending(path: "srv.js"),
+                atomically: true,
+                encoding: .utf8
+            )
         let ports = Mutex<[Int]>([])
         let sh = Shell(root: root, services: ShellServices(onServer: { p, _ in ports.withLock { $0.append(p) } }))
         let o = Out()
         #expect(await sh.run("node srv.js", sink: o.sink) == 0)
-        #expect(sh.jobs.count == 1 && sh.jobs[0].ports == [4611] && ports.withLock { $0 } == [4611])
+        // Num simulador lento o aviso da porta chega um pouco depois de o comando voltar.
+        let fim = ContinuousClock.now + .seconds(10)
+        while ContinuousClock.now < fim, !(sh.jobs.first?.ports == [porta]) {
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        #expect(sh.jobs.count == 1 && sh.jobs[0].ports == [porta] && ports.withLock { $0 } == [porta])
         #expect(o.out.contains("job 1"))
-        let (d, _) = try await URLSession.shared.data(from: #require(URL(string: "http://127.0.0.1:4611/")))
+        let (d, _) = try await URLSession.shared.data(from: #require(URL(string: "http://127.0.0.1:\(porta)/")))
         #expect(String(decoding: d, as: UTF8.self) == "pong")
         _ = await sh.run("jobs && kill %1", sink: o.sink)
         try await Task.sleep(for: .milliseconds(300))

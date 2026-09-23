@@ -111,7 +111,14 @@ struct EscritasPropriasTests {
         )
         let pasta = store.url(for: p)
         ws.openFile("index.html")
-        try await Task.sleep(for: .milliseconds(600))
+        // Espera os avisos de criar o projeto e abrir o arquivo assentarem: num simulador
+        // lento eles chegavam depois do salvar e pareciam vir dele.
+        var anterior = -1
+        let prazo = ContinuousClock.now + .seconds(8)
+        while ContinuousClock.now < prazo, ws.reloadTick != anterior {
+            anterior = ws.reloadTick
+            try await Task.sleep(for: .milliseconds(700))
+        }
         ws.setText("<h1>oi</h1>\n", for: "index.html")
         ws.save("index.html")
         let depoisDeSalvar = ws.reloadTick

@@ -28225,6 +28225,34 @@
         }
       }
     },
+    "vite build: o index.html carrega %1$@, que não existe": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "vite build: index.html loads %1$@, which doesn't exist"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "vite build: index.html lädt %1$@, das es nicht gibt"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "vite build : index.html charge %1$@, qui n’existe pas"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "vite build: el index.html carga %1$@, que no existe"
+          }
+        }
+      }
+    },
     "vite build: sem index.html": {
       "localizations": {
         "en": {
@@ -28753,6 +28781,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "último commit deshecho, cambios en el stage"
+          }
+        }
+      }
+    },
+    "✓ build em %1$@/": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "✓ build in %1$@/"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "✓ Build in %1$@/"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "✓ build dans %1$@/"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "✓ build en %1$@/"
           }
         }
       }

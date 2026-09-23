@@ -1093,6 +1093,34 @@
         }
       }
     },
+    "%1$@: o TypeScript %2$@ é o compilador nativo (Go) e não roda no iPad. Para checar tipos aqui, instale o compilador em JavaScript: npm i -D typescript@6": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@: TypeScript %2$@ is the native (Go) compiler and doesn't run on iPad. To type-check here, install the JavaScript compiler: npm i -D typescript@6"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@: TypeScript %2$@ ist der native Compiler (Go) und läuft nicht auf dem iPad. Für die Typprüfung hier den JavaScript-Compiler installieren: npm i -D typescript@6"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ : TypeScript %2$@ est le compilateur natif (Go) et ne fonctionne pas sur iPad. Pour vérifier les types ici, installe le compilateur JavaScript : npm i -D typescript@6"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@: TypeScript %2$@ es el compilador nativo (Go) y no funciona en el iPad. Para comprobar tipos aquí, instala el compilador en JavaScript: npm i -D typescript@6"
+          }
+        }
+      }
+    },
     "%1$@:%2$@": {
       "localizations": {
         "en": {
@@ -12041,6 +12069,34 @@
         }
       }
     },
+    "Nenhum arquivo de teste encontrado (*.test.ts, *.spec.js, …)%1$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No test files found (*.test.ts, *.spec.js, …)%1$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keine Testdateien gefunden (*.test.ts, *.spec.js, …)%1$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucun fichier de test trouvé (*.test.ts, *.spec.js, …)%1$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se encontraron archivos de prueba (*.test.ts, *.spec.js, …)%1$@"
+          }
+        }
+      }
+    },
     "Nenhum commit ainda.": {
       "localizations": {
         "en": {
@@ -20749,6 +20805,62 @@
         }
       }
     },
+    "aviso: %1$@ usa %2$@, que o executor embutido não aplica": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "warning: %1$@ uses %2$@, which the built-in runner doesn't apply"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Warnung: %1$@ verwendet %2$@, was der integrierte Runner nicht anwendet"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "avertissement : %1$@ utilise %2$@, que l'exécuteur intégré n'applique pas"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "aviso: %1$@ usa %2$@, que el ejecutor integrado no aplica"
+          }
+        }
+      }
+    },
+    "aviso: typescript@%1$@ é o compilador nativo (Go); o tsc dele não roda no iPad. Para checar tipos aqui: npm i -D typescript@6": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "warning: typescript@%1$@ is the native (Go) compiler; its tsc doesn't run on iPad. To type-check here: npm i -D typescript@6"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Warnung: typescript@%1$@ ist der native Compiler (Go); sein tsc läuft nicht auf dem iPad. Für die Typprüfung hier: npm i -D typescript@6"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "avertissement : typescript@%1$@ est le compilateur natif (Go) ; son tsc ne fonctionne pas sur iPad. Pour vérifier les types ici : npm i -D typescript@6"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "aviso: typescript@%1$@ es el compilador nativo (Go); su tsc no funciona en el iPad. Para comprobar tipos aquí: npm i -D typescript@6"
+          }
+        }
+      }
+    },
     "banco aberto só para leitura": {
       "localizations": {
         "en": {
@@ -27661,6 +27773,62 @@
           "stringUnit": {
             "state": "translated",
             "value": "vite build: sin index.html"
+          }
+        }
+      }
+    },
+    "vitest %1$@ não existe no executor embutido da Odete; use vitest run": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "vitest %1$@ isn't available in Odete's built-in runner; use vitest run"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "vitest %1$@ gibt es in Odetes integriertem Runner nicht; verwende vitest run"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "vitest %1$@ n'existe pas dans l'exécuteur intégré d'Odete ; utilise vitest run"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "vitest %1$@ no existe en el ejecutor integrado de Odete; usa vitest run"
+          }
+        }
+      }
+    },
+    "vitest: o vitest de verdade não roda no iPad (precisa de worker_threads e do binário nativo do vite); usando o executor embutido da Odete": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "vitest: the real vitest doesn't run on iPad (it needs worker_threads and vite's native binary); using Odete's built-in runner"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "vitest: Das echte vitest läuft nicht auf dem iPad (es braucht worker_threads und die native Binärdatei von vite); Odetes integrierter Runner wird verwendet"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "vitest : le vrai vitest ne fonctionne pas sur iPad (il a besoin de worker_threads et du binaire natif de vite) ; utilisation de l'exécuteur intégré d'Odete"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "vitest: el vitest real no funciona en el iPad (necesita worker_threads y el binario nativo de vite); usando el ejecutor integrado de Odete"
           }
         }
       }

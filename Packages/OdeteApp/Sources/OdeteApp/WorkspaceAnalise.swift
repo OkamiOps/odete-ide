@@ -137,7 +137,8 @@ extension WorkspaceModel {
         for item in allLint {
             item.issue.severity == .error ? (c.erros += 1) : (c.avisos += 1)
         }
-        c.erros += preview.console.reduce(0) { $0 + ($1.level == .error ? 1 : 0) }
+        // Do console, os erros da página de agora — os mesmos que o painel lista.
+        c.erros += preview.errosDaPagina.count
         return c
     }
 

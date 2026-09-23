@@ -133,6 +133,25 @@ struct InvalidacaoTests {
         #expect(ws.contagemDeProblemas.erros == base.erros + 2)
     }
 
+    /// O console é história; os problemas são da página de agora. Depois que a página
+    /// recarrega, o erro de runtime de antes sai da contagem da barra de status e do que o
+    /// agente lê como problema — e continua no console.
+    @Test func recargaDaPaginaTiraOErroDeRuntimeDaContagem() async throws {
+        let (ws, _, _) = try make()
+        try await Task.sleep(for: .milliseconds(50))
+        let base = ws.contagemDeProblemas
+        ws.preview.log(.error, "src/App.tsx:17: Unexpected closing \"headr\" tag")
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(ws.contagemDeProblemas.erros == base.erros + 1)
+        #expect(ws.problemasParaOAgente().contains { $0.mensagem.contains("headr") })
+
+        ws.preview.paginaNova(URL(string: "http://127.0.0.1:5173/"))
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(ws.contagemDeProblemas.erros == base.erros, "o erro consertado seguiu na barra de status")
+        #expect(!ws.problemasParaOAgente().contains { $0.mensagem.contains("headr") })
+        #expect(ws.consoleParaOAgente(10).contains { $0.texto.contains("headr") }, "o console perdeu a história")
+    }
+
     // MARK: barra de status
 
     @Test func posicaoDoCursorEFimDeLinha() throws {

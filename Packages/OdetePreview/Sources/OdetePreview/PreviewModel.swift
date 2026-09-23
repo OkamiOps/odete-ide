@@ -106,6 +106,11 @@ public final class PreviewModel {
 
     public func go(_ u: URL?) {
         url = u; navTick += 1
+        // Sem URL o painel mostra a tela de "nada rodando": não há página, e o erro da
+        // página que estava ali (o servidor morreu) deixa de ser problema de agora.
+        if u == nil {
+            inicioDaPagina = seq
+        }
     }
 
     public func reload() {
@@ -132,8 +137,41 @@ public final class PreviewModel {
         versaoDoConsole &+= 1
     }
 
+    /// O `id` da última linha do console antes da página que está carregada agora.
+    ///
+    /// O console é histórico, como no Safari ou no Chrome com "preserve log": sobrevive a
+    /// recargas, e é bom que sobreviva — o erro de um segundo atrás continua lá para ser
+    /// lido. Os problemas não. Contando o console inteiro, um erro de build que o dev
+    /// server mostrou num overlay ficava no painel Problemas e na barra de status depois
+    /// do conserto, com a página já recarregada e limpa, até alguém tocar em "Limpar
+    /// console". Esta marca separa o que é da página de agora do que é história.
+    public private(set) var inicioDaPagina = 0
+
+    /// Os erros da página que está no painel agora — o que conta como problema.
+    ///
+    /// Todo lugar que conta erro de runtime (painel Problemas, barra de status, selo do
+    /// console, as ferramentas do agente) lê daqui, para mostrar o mesmo número.
+    public var errosDaPagina: [ConsoleLine] {
+        console.filter { $0.id > inicioDaPagina && $0.level == .error }
+    }
+
     public var errorCount: Int {
-        console.filter { $0.level == .error }.count
+        errosDaPagina.count
+    }
+
+    /// Uma página nova entrou no painel: navegação, o botão de recarregar ou o
+    /// `location.reload()` que o dev server manda depois de um build.
+    ///
+    /// Quem chama é a `PreviewView`, quando o WebKit confirma a navegação (`didCommit`) —
+    /// e não o `reload()` daqui, porque a recarga do dev server acontece dentro da página
+    /// e o modelo nunca fica sabendo dela por outro caminho. Se a página anterior escreveu
+    /// algo no console, uma linha marca a troca, para o erro que ficou lá em cima não
+    /// parecer da página de agora.
+    public func paginaNova(_ u: URL?) {
+        if let ultima = console.last, ultima.id > inicioDaPagina {
+            log(.info, tr("navegou para %1$@", u?.absoluteString ?? "about:blank"))
+        }
+        inicioDaPagina = seq
     }
 
     public func clearConsole() {

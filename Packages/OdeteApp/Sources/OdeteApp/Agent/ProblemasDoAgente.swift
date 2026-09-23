@@ -52,8 +52,10 @@ extension WorkspaceModel {
                 fonte: "swift"
             ))
         }
-        // Do console, só o que o painel também conta como problema: os erros.
-        for c in preview.console where c.level == .error {
+        // Do console, só o que o painel também conta como problema: os erros da página
+        // que está no preview agora. O que veio antes da última recarga é história, e o
+        // agente ainda a lê por `read_preview_console`.
+        for c in preview.errosDaPagina {
             out.append(Problema(
                 arquivo: Self.caminhoNoProjeto(c.file, root: root),
                 linha: c.line,

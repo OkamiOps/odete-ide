@@ -117,6 +117,13 @@ public struct PreviewView: UIViewRepresentable {
             model.log(level, (d["text"] as? String) ?? "", file: file, line: d["line"] as? Int)
         }
 
+        /// A página nova entrou no lugar da anterior. Vale para toda navegação do quadro
+        /// principal — inclusive o `location.reload()` que o dev server manda de dentro da
+        /// página depois de um build, que o modelo não tem outro jeito de saber.
+        public func webView(_ wv: WKWebView, didCommit nav: WKNavigation!) {
+            model.paginaNova(wv.url)
+        }
+
         public func webView(_ wv: WKWebView, didFail nav: WKNavigation!, withError e: Error) {
             model.log(
                 .error,

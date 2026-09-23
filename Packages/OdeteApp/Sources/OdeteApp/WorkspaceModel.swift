@@ -73,7 +73,7 @@ public final class WorkspaceModel {
     public var externalChange = false
     public var reveal: (line: Int, token: Int)?
     /// Incrementa a cada reload da árvore (salvar, watcher); o preview Swift recompila.
-    public private(set) var reloadTick = 0
+    public internal(set) var reloadTick = 0
     public var swiftDiagnostics: [SwiftDiagnostic] = []
     public var paletteOpen = false
     public var paletteQuery = ""
@@ -119,7 +119,7 @@ public final class WorkspaceModel {
 
     private let chrome: ChromeState
     private let rascunhos: Rascunhos
-    @ObservationIgnored private var observador: ObservadorDeArquivos?
+    @ObservationIgnored var observador: ObservadorDeArquivos?
     @ObservationIgnored private var saveTasks: [String: Task<Void, Never>] = [:]
     /// O que o próprio app gravou e ainda não teve o aviso do observador — ver
     /// `EscritasProprias`.
@@ -159,7 +159,11 @@ public final class WorkspaceModel {
         observador = obs
         acompanharAbas()
         agent = AgentModel(ws: self, chrome: chrome, accounts: aiAccounts)
-        git.onRefreshed = { [weak self] in self?.refreshGutters() }
+        git.onRefreshed = { [weak self] in
+            self?.refreshGutters()
+            // A lista de mudados pode ter mudado: o observador passa a vigiar os novos.
+            self?.acompanharAbas()
+        }
         git.painelAberto = { [weak chrome] in chrome?.snapshot.side == .git }
         for t in tabs {
             analyze(t.path)
@@ -247,35 +251,9 @@ public final class WorkspaceModel {
         }
     }
 
-    /// Data de modificação vista por último em cada arquivo aberto.
-    @ObservationIgnored private var marcaDisco: [String: Date] = [:]
-
-    /// Arquivo aberto reescrito por fora volta para a tela.
-    ///
-    /// Sem isto o editor seguia mostrando o texto velho depois de um `git checkout`, de um
-    /// script no terminal ou do agente escrevendo, e o salvamento automático gravava o
-    /// velho por cima do novo. Buffer com alteração não salva é deixado em paz: ali quem
-    /// manda é o que a pessoa digitou.
-    func conferirDisco(_ absoluto: String) {
-        // O observador fala em caminho absoluto, o resto do app em caminho relativo à
-        // raiz. Comparar os absolutos evita montar a conversão de volta e errar nela.
-        guard let t = tabs.first(where: { (try? ops.url($0.path))?.path == absoluto }) else { return }
-        guard let data = ops.modifiedAt(t.path) else { return }
-        let antes = marcaDisco[t.path]
-        marcaDisco[t.path] = data
-        guard antes != data, !t.isDirty else { return }
-        if let disco = try? ops.read(t.path), disco != buffers[t.path] {
-            buffers[t.path] = disco
-            reloadTick += 1
-            analyze(t.path)
-            refreshGutter(t.path)
-        }
-    }
-
-    /// Diz ao observador quais arquivos merecem vigilância própria: os abertos.
-    func acompanharAbas() {
-        observador?.acompanhar(tabs.compactMap { (try? ops.url($0.path))?.path })
-    }
+    /// Data de modificação vista por último em cada arquivo aberto — ver `conferirDisco`,
+    /// em `WorkspaceDisco.swift`.
+    @ObservationIgnored var marcaDisco: [String: Date] = [:]
 
     /// A mudança veio mesmo de fora: remonta a árvore e relê as abas limpas. Quem chama é
     /// `externalReload`, depois de descartar o aviso que foi só do salvamento do app.

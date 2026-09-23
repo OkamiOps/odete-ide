@@ -150,43 +150,99 @@ public final class GitModel {
         }
     }
 
+    /// Número da rodada mais nova que lê o estado dos arquivos — ver `atualizarMarcas()`.
+    @ObservationIgnored private var rodadaDasMarcas = 0
+    /// O mesmo, para o que só `refresh()` lê: log, ramos, remotos, diffs.
+    @ObservationIgnored private var rodadaCompleta = 0
+
+    /// Como o status é lido. Troca só em teste, para uma rodada demorar o quanto o teste
+    /// precisa.
+    @ObservationIgnored var lerStatus: @Sendable (Repository) async throws -> [StatusEntry] = {
+        try await $0.status()
+    }
+
     /// O estado dos arquivos, e nada além dele.
+    ///
+    /// Só a rodada mais nova grava. `agendarMarcas()` cancela a espera da rodada anterior,
+    /// mas não uma que já está lendo o disco — cancelar não interrompe o libgit2 —, e
+    /// rodadas também nascem das ações do painel. Uma rodada que leu o disco antes de o
+    /// arquivo voltar ao original e terminou depois da rodada nova gravava o status velho
+    /// por cima do novo, e o "M" ficava na árvore com o arquivo limpo no disco, até a
+    /// próxima mudança. O número da rodada diz quem é a mais nova; a velha descarta o que leu.
     public func atualizarMarcas() async {
         guard let repo else { return }
+        rodadaDasMarcas += 1
+        let minha = rodadaDasMarcas
         do {
-            status = try await repo.status()
-            conflicts = try await repo.conflictedPaths()
-            mergeInProgress = await repo.mergeInProgress
+            let st = try await lerStatus(repo)
+            guard minha == rodadaDasMarcas else { return }
+            status = st
+            let cf = try await repo.conflictedPaths()
+            guard minha == rodadaDasMarcas else { return }
+            conflicts = cf
+            let mg = await repo.mergeInProgress
+            guard minha == rodadaDasMarcas else { return }
+            mergeInProgress = mg
         } catch {
+            guard minha == rodadaDasMarcas else { return }
             self.error = error.localizedDescription
         }
         onRefreshed?()
     }
 
+    /// Tudo o que o painel mostra. A regra da rodada mais nova vale aqui também: o estado
+    /// dos arquivos disputa com `atualizarMarcas()`, o resto só com outro `refresh()`.
     public func refresh() async {
         guard let repo else { return }
+        rodadaDasMarcas += 1
+        rodadaCompleta += 1
+        let marcas = rodadaDasMarcas, completa = rodadaCompleta
+        var marcasValem: Bool {
+            marcas == rodadaDasMarcas
+        }
+        var restoVale: Bool {
+            completa == rodadaCompleta
+        }
+        let ler = lerStatus
         do {
-            async let st = repo.status()
+            async let st = ler(repo)
             async let lg = repo.log(limit: 200)
             async let br = repo.branches()
             async let sh = repo.stashes()
             async let rm = repo.remotes()
-            status = try await st
-            log = try await lg
-            branches = try await br
-            stashes = try await sh
-            remotes = try await rm
-            current = try await repo.currentBranch()
-            headName = await repo.headBranchName()
-            aheadBehind = try await repo.aheadBehind()
-            conflicts = try await repo.conflictedPaths()
-            mergeInProgress = await repo.mergeInProgress
-            diff = try await repo.diff(diffSource, path: diffPath)
-            stat = try await repo.diff(.headToWorkdir, context: 0)
+            let s = try await st
+            if marcasValem {
+                status = s
+            }
+            let l = try await lg, b = try await br, h = try await sh, r = try await rm
+            if restoVale {
+                log = l; branches = b; stashes = h; remotes = r
+            }
+            let cur = try await repo.currentBranch()
+            let hn = await repo.headBranchName()
+            let ab = try await repo.aheadBehind()
+            if restoVale {
+                current = cur; headName = hn; aheadBehind = ab
+            }
+            let cf = try await repo.conflictedPaths()
+            let mg = await repo.mergeInProgress
+            if marcasValem {
+                conflicts = cf; mergeInProgress = mg
+            }
+            let d = try await repo.diff(diffSource, path: diffPath)
+            let sd = try await repo.diff(.headToWorkdir, context: 0)
+            if restoVale {
+                diff = d; stat = sd
+            }
         } catch {
-            self.error = error.localizedDescription
+            if marcasValem || restoVale {
+                self.error = error.localizedDescription
+            }
         }
-        onRefreshed?()
+        // A rodada que já perdeu nas duas frentes não avisa: a mais nova avisa quando terminar.
+        if marcasValem || restoVale {
+            onRefreshed?()
+        }
     }
 
     public func setDiff(_ source: Repository.DiffSource, path: String? = nil) {

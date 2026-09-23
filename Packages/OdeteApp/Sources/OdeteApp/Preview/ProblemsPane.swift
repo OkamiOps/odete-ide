@@ -16,7 +16,9 @@ struct ProblemsPane: View {
     var body: some View {
         let diags = ws.run.diagnostics
         let swift = ws.swiftDiagnostics
-        let errors = ws.preview.console.filter { $0.level == .error }
+        // Só os erros da página que está no preview agora: o console guarda a história,
+        // e um erro já consertado não é mais problema.
+        let errors = ws.preview.errosDaPagina
         let lint = ws.allLint
         let total = diags.count + errors.count + swift.count + lint.count
         VStack(spacing: 0) {

@@ -205,6 +205,11 @@ public final class GitModel {
     /// Tudo o que o painel mostra. A regra da rodada mais nova vale aqui também: o estado
     /// dos arquivos disputa com `atualizarMarcas()`, o resto só com outro `refresh()`.
     public func refresh() async {
+        // `git init` no terminal (ou um clone para dentro da pasta) cria o repositório
+        // depois que o painel nasceu: sem isto ele ficava em "Criar repositório" para sempre.
+        if repo == nil, Repository.isRepository(root) {
+            repo = try? Repository.open(root)
+        }
         guard let repo else { return }
         rodadaDasMarcas += 1
         rodadaCompleta += 1

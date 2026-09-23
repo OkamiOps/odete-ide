@@ -51,6 +51,25 @@ struct GitSeguroTests {
 
     /// A caixa era esvaziada logo que o commit começava, antes de saber se ia dar certo:
     /// commit recusado levava a mensagem junto.
+    /// `git init` pelo terminal depois que o painel abriu: o painel passa a ver o repositório.
+    @Test func repositorioCriadoDepoisApareceNoPainel() async throws {
+        let base = FileManager.default.temporaryDirectory.appending(path: "odete-gitseguro-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: base) }
+        let git = GitModel(
+            root: base,
+            accounts: AccountStore(url: base.appending(path: ".odete/contas.json"), keychain: MemorySecrets())
+        )
+        #expect(!git.isRepo)
+        try "a\n".write(to: base.appending(path: "a.txt"), atomically: true, encoding: .utf8)
+        let repo = try Repository.initialize(at: base)
+        try await repo.stageAll()
+        try await repo.commit(message: "um", author: eu)
+        await git.refresh()
+        #expect(git.isRepo)
+        #expect(git.log.count == 1)
+    }
+
     @Test func mensagemSoSaiQuandoOCommitDaCerto() async throws {
         let (git, _, base) = try await modelo()
         git.commitMessage = "segundo"

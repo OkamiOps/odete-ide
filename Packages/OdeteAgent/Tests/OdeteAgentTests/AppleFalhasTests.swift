@@ -167,32 +167,38 @@ struct AppleFalhasTests {
         return ""
     }
 
-    /// O iPadOS 27 troca `GenerationError` por tipos novos; as frases são as mesmas. Só
-    /// roda num runtime 27.
-    @Test func asFalhasDoIPadOS27TemAsMesmasFrases() {
-        guard #available(iOS 27.0, *) else { return }
-        #expect(AppleProvider.falhaDoFramework(
-            LanguageModelError.contextSizeExceeded(.init(contextSize: 8192, tokenCount: 9000, debugDescription: "")),
-            motivo: nil
-        ) == .janelaEstourada(8192))
-        #expect(AppleProvider.falhaDoFramework(
-            LanguageModelError.rateLimited(.init(resetDate: nil, debugDescription: "")),
-            motivo: nil
-        ) == .pedidosDemais)
-        #expect(AppleProvider.falhaDoFramework(
-            LanguageModelError.timeout(.init(debugDescription: "")),
-            motivo: nil
-        ) == .demorou)
-        #expect(AppleProvider.falhaDoFramework(
-            SystemLanguageModel.Error.assetsUnavailable(.init(debugDescription: "")),
-            motivo: "motivo"
-        ) == .modeloIndisponivel(motivo: "motivo"))
-        #expect(AppleProvider.falhaDoFramework(LanguageModelSession.Error.concurrentRequests, motivo: nil)
-            == .pedidoEmAndamento)
-        #expect(AppleProvider.falhaDoFramework(
-            GeneratedContent.ParsingError(rawContent: "{", debugDescription: ""),
-            motivo: nil
-        ) == .respostaIlegivel)
-        #expect(AppleProvider.falhaDoFramework(ErroDeTeste.parou, motivo: nil) == nil)
-    }
+    #if compiler(>=6.4)
+        /// O iPadOS 27 troca `GenerationError` por tipos novos; as frases são as mesmas. Só
+        /// roda num runtime 27.
+        @Test func asFalhasDoIPadOS27TemAsMesmasFrases() {
+            guard #available(iOS 27.0, *) else { return }
+            #expect(AppleProvider.falhaDoFramework(
+                LanguageModelError.contextSizeExceeded(.init(
+                    contextSize: 8192,
+                    tokenCount: 9000,
+                    debugDescription: ""
+                )),
+                motivo: nil
+            ) == .janelaEstourada(8192))
+            #expect(AppleProvider.falhaDoFramework(
+                LanguageModelError.rateLimited(.init(resetDate: nil, debugDescription: "")),
+                motivo: nil
+            ) == .pedidosDemais)
+            #expect(AppleProvider.falhaDoFramework(
+                LanguageModelError.timeout(.init(debugDescription: "")),
+                motivo: nil
+            ) == .demorou)
+            #expect(AppleProvider.falhaDoFramework(
+                SystemLanguageModel.Error.assetsUnavailable(.init(debugDescription: "")),
+                motivo: "motivo"
+            ) == .modeloIndisponivel(motivo: "motivo"))
+            #expect(AppleProvider.falhaDoFramework(LanguageModelSession.Error.concurrentRequests, motivo: nil)
+                == .pedidoEmAndamento)
+            #expect(AppleProvider.falhaDoFramework(
+                GeneratedContent.ParsingError(rawContent: "{", debugDescription: ""),
+                motivo: nil
+            ) == .respostaIlegivel)
+            #expect(AppleProvider.falhaDoFramework(ErroDeTeste.parou, motivo: nil) == nil)
+        }
+    #endif
 }

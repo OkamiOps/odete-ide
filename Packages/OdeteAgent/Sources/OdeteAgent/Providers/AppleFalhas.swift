@@ -103,36 +103,40 @@ extension AppleProvider {
         }
     }
 
-    /// As falhas do iPadOS 27, que substituem `GenerationError`. Nada quando o erro não é
-    /// do modelo da Apple.
-    @available(iOS 27.0, *)
-    static func falhaDoFramework(_ erro: any Error, motivo: String?) -> FalhaApple? {
-        switch erro {
-        case let e as LanguageModelError:
-            switch e {
-            case let .contextSizeExceeded(c): return .janelaEstourada(c.contextSize)
-            case .rateLimited: return .pedidosDemais
-            case .guardrailViolation: return .filtroDeSeguranca
-            case .refusal: return .recusa(explicacao: nil)
-            case .unsupportedCapability, .unsupportedGenerationGuide, .unsupportedTranscriptContent:
-                return .recursoNaoSuportado
-            case .unsupportedLanguageOrLocale: return .idiomaNaoAtendido
-            case .timeout: return .demorou
-            @unknown default: return .outra(rotulo(erro))
+    // O SDK do iOS 27 (Xcode 27) é que tem `LanguageModelError`; com um Xcode mais velho
+    // (o do CI, por enquanto) estas falhas não existem.
+    #if compiler(>=6.4)
+        /// As falhas do iPadOS 27, que substituem `GenerationError`. Nada quando o erro não é
+        /// do modelo da Apple.
+        @available(iOS 27.0, *)
+        static func falhaDoFramework(_ erro: any Error, motivo: String?) -> FalhaApple? {
+            switch erro {
+            case let e as LanguageModelError:
+                switch e {
+                case let .contextSizeExceeded(c): return .janelaEstourada(c.contextSize)
+                case .rateLimited: return .pedidosDemais
+                case .guardrailViolation: return .filtroDeSeguranca
+                case .refusal: return .recusa(explicacao: nil)
+                case .unsupportedCapability, .unsupportedGenerationGuide, .unsupportedTranscriptContent:
+                    return .recursoNaoSuportado
+                case .unsupportedLanguageOrLocale: return .idiomaNaoAtendido
+                case .timeout: return .demorou
+                @unknown default: return .outra(rotulo(erro))
+                }
+            case is SystemLanguageModel.Error:
+                return .modeloIndisponivel(motivo: motivo)
+            case let e as LanguageModelSession.Error:
+                switch e {
+                case .concurrentRequests, .transcriptMutationWhileResponding: return .pedidoEmAndamento
+                @unknown default: return .outra(rotulo(erro))
+                }
+            case is GeneratedContent.ParsingError:
+                return .respostaIlegivel
+            default:
+                return nil
             }
-        case is SystemLanguageModel.Error:
-            return .modeloIndisponivel(motivo: motivo)
-        case let e as LanguageModelSession.Error:
-            switch e {
-            case .concurrentRequests, .transcriptMutationWhileResponding: return .pedidoEmAndamento
-            @unknown default: return .outra(rotulo(erro))
-            }
-        case is GeneratedContent.ParsingError:
-            return .respostaIlegivel
-        default:
-            return nil
         }
-    }
+    #endif
 
     /// O que vai para o cartão de erro da conversa.
     ///
@@ -143,10 +147,12 @@ extension AppleProvider {
             let explicacao = await explicacaoDaRecusa { try await recusa.explanation.content }
             return falha(g, motivo: motivo, explicacaoDaRecusa: explicacao).frase
         }
-        if #available(iOS 27.0, *), let e = erro as? LanguageModelError, case let .refusal(recusa) = e {
-            let explicacao = await explicacaoDaRecusa { try await recusa.explanation.content }
-            return FalhaApple.recusa(explicacao: explicacao).frase
-        }
+        #if compiler(>=6.4)
+            if #available(iOS 27.0, *), let e = erro as? LanguageModelError, case let .refusal(recusa) = e {
+                let explicacao = await explicacaoDaRecusa { try await recusa.explanation.content }
+                return FalhaApple.recusa(explicacao: explicacao).frase
+            }
+        #endif
         return explicarQualquer(erro, motivo: motivo)
     }
 
@@ -158,9 +164,11 @@ extension AppleProvider {
         if let erro = erro as? LanguageModelSession.GenerationError {
             return falha(erro, motivo: motivo).frase
         }
-        if #available(iOS 27.0, *), let falha = falhaDoFramework(erro, motivo: motivo) {
-            return falha.frase
-        }
+        #if compiler(>=6.4)
+            if #available(iOS 27.0, *), let falha = falhaDoFramework(erro, motivo: motivo) {
+                return falha.frase
+            }
+        #endif
         if let recado = explicarNuvem(erro) {
             return recado
         }

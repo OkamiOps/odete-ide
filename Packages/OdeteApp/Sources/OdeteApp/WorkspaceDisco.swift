@@ -8,8 +8,9 @@ extension WorkspaceModel {
     ///
     /// Sem isto o editor seguia mostrando o texto velho depois de um `git checkout`, de um
     /// script no terminal ou do agente escrevendo, e o salvamento automático gravava o
-    /// velho por cima do novo. Buffer com alteração não salva é deixado em paz: ali quem
-    /// manda é o que a pessoa digitou.
+    /// velho por cima do novo. Buffer com alteração não salva não recebe o disco — ali
+    /// quem manda é o que a pessoa digitou —, mas entra em conflito: antes o aviso era
+    /// ignorado, e o salvamento seguinte gravava por cima do que chegou de fora.
     ///
     /// E o git olha de novo. Escrever no lugar — o `cp`, o `>` do shell — não mexe na
     /// pasta, e este aviso é o único que chega. Ele relia o buffer e parava ali: um arquivo
@@ -30,13 +31,103 @@ extension WorkspaceModel {
         // Data igual à anotada é a gravação do próprio app, e `save` já chamou o git.
         guard antes != data else { return }
         git.agendarMarcas()
-        guard !t.isDirty else { return }
-        if let disco = try? ops.read(t.path), disco != buffers[t.path] {
-            guardarBuffer(t.path, antesDe: disco, origem: .externo)
-            buffers[t.path] = disco
+        guard let disco = try? ops.read(t.path) else { return }
+        guardarBuffer(t.path, antesDe: disco, origem: .externo)
+        if absorverDisco(t.path, disco: disco) {
             reloadTick += 1
-            analyze(t.path)
-            refreshGutter(t.path)
+        }
+    }
+
+    /// O disco de uma aba aberta mudou (ou pode ter mudado): decide o que fazer com ele.
+    ///
+    /// - aba limpa: o disco vai para a tela;
+    /// - aba suja, com o disco igual ao que ela tem: fica limpa;
+    /// - aba suja, com o disco igual ao que ela conheceu: nada mudou de verdade;
+    /// - aba suja, com o disco diferente do que ela conheceu: conflito. Nada é gravado nem
+    ///   descartado até a pessoa escolher na faixa do editor.
+    ///
+    /// Devolve se o buffer mudou.
+    @discardableResult
+    func absorverDisco(_ path: String, disco: String) -> Bool {
+        guard buffers[path] != nil else { return false }
+        let impressao = EscritasProprias.impressao(disco)
+        let suja = tabs.first { $0.path == path }?.isDirty == true
+        if suja {
+            if disco == buffers[path] {
+                baseDisco[path] = impressao
+                conflitos.remove(path)
+                markDirty(path, false)
+            } else if baseDisco[path] != impressao {
+                conflitos.insert(path)
+            }
+            return false
+        }
+        baseDisco[path] = impressao
+        conflitos.remove(path)
+        guard disco != buffers[path] else { return false }
+        buffers[path] = disco
+        analyze(path)
+        refreshGutter(path)
+        return true
+    }
+
+    /// O disco mudou por fora desde que a aba o leu ou gravou?
+    ///
+    /// A data é o atalho: igual à anotada, ninguém mexeu. Diferente, o conteúdo decide —
+    /// um `touch` ou um `git checkout` do mesmo conteúdo não é conflito, e o disco que já
+    /// tem o que se vai gravar (`gravando`) também não.
+    func discoMudouPorFora(_ path: String, gravando: [String]) -> Bool {
+        guard let base = baseDisco[path], ops.exists(path) else { return false }
+        let data = ops.modifiedAt(path)
+        if let data, data == marcaDisco[path] {
+            return false
+        }
+        guard let disco = try? ops.read(path) else { return false }
+        let impressao = EscritasProprias.impressao(disco)
+        if impressao == base || gravando.contains(disco) {
+            baseDisco[path] = impressao
+            marcaDisco[path] = data
+            return false
+        }
+        return true
+    }
+
+    // MARK: - Faixa de conflito
+
+    /// "Manter o meu": o texto da aba vai para o disco, por cima do que mudou lá. Devolve
+    /// se gravou.
+    @discardableResult
+    func manterOMeu(_ path: String) -> Bool {
+        conflitos.remove(path)
+        // O disco de agora passa a ser a base: é por cima dele, de propósito, que se grava.
+        if let disco = try? ops.read(path) {
+            baseDisco[path] = EscritasProprias.impressao(disco)
+            marcaDisco[path] = ops.modifiedAt(path)
+        }
+        return save(path)
+    }
+
+    /// "Recarregar do disco": o que está no disco volta para a aba. O texto que estava
+    /// nela não some de vez — o editor recebe a troca como um passo do desfazer, e o ⌘Z o
+    /// traz de volta.
+    func recarregarDoDisco(_ path: String) {
+        conflitos.remove(path)
+        saveTasks[path]?.cancel()
+        saveTasks[path] = nil
+        guard let disco = try? ops.read(path) else { return }
+        marcaDisco[path] = ops.modifiedAt(path)
+        markDirty(path, false)
+        absorverDisco(path, disco: disco)
+        reloadTick += 1
+    }
+
+    /// Carrega o estado do disco de um caminho para outro (renomear, mover).
+    func moverEstadoDoDisco(de antigo: String, para novo: String) {
+        baseDisco[novo] = baseDisco.removeValue(forKey: antigo)
+        marcaDisco[novo] = marcaDisco.removeValue(forKey: antigo)
+        cursores[novo] = cursores.removeValue(forKey: antigo)
+        if conflitos.remove(antigo) != nil {
+            conflitos.insert(novo)
         }
     }
 

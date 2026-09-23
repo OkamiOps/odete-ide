@@ -2689,6 +2689,34 @@
         }
       }
     },
+    "Abas abertas recebem a troca no editor, e dá para desfazer lá. Os outros arquivos são gravados no disco, e a versão de antes de cada um fica no histórico local.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open tabs get the replacement in the editor, where you can undo it. Other files are written to disk, and each one's previous version is kept in local history."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Offene Tabs bekommen die Ersetzung im Editor, dort kannst du sie rückgängig machen. Die anderen Dateien werden auf die Festplatte geschrieben, und die vorherige Version jeder Datei bleibt im lokalen Verlauf."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les onglets ouverts reçoivent le remplacement dans l'éditeur, où tu peux l'annuler. Les autres fichiers sont écrits sur le disque, et la version précédente de chacun est gardée dans l'historique local."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Las pestañas abiertas reciben el reemplazo en el editor, donde puedes deshacerlo. Los demás archivos se escriben en el disco, y la versión anterior de cada uno queda en el historial local."
+          }
+        }
+      }
+    },
     "Abortar merge": {
       "localizations": {
         "en": {
@@ -9213,6 +9241,34 @@
         }
       }
     },
+    "Disco → esta aba": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Disk → this tab"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Festplatte → dieser Tab"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Disque → cet onglet"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Disco → esta pestaña"
+          }
+        }
+      }
+    },
     "Distinguir maiúsculas": {
       "localizations": {
         "en": {
@@ -12825,34 +12881,6 @@
         }
       }
     },
-    "Isto grava nos arquivos. O desfazer da árvore não cobre troca em massa: confira no git depois.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "This writes to the files. The tree's undo doesn't cover bulk replace: check it in git afterwards."
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Das schreibt in die Dateien. Das Widerrufen im Baum deckt Massenersetzung nicht ab: prüf danach im git."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ça écrit dans les fichiers. L’annulation de l’arborescence ne couvre pas le remplacement en masse : vérifie dans git après."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Esto escribe en los archivos. El deshacer del árbol no cubre el reemplazo masivo: revísalo en git después."
-          }
-        }
-      }
-    },
     "JSON inválido": {
       "localizations": {
         "en": {
@@ -13661,6 +13689,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dejar el archivo como está"
+          }
+        }
+      }
+    },
+    "Manter o meu": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep mine"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Meins behalten"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Garder le mien"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mantener el mío"
           }
         }
       }
@@ -15653,6 +15709,62 @@
         }
       }
     },
+    "Não apaguei %1$@: as alterações de %2$@ não puderam ser salvas.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Didn't delete %1$@: the changes to %2$@ couldn't be saved."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ nicht gelöscht: Die Änderungen an %2$@ konnten nicht gespeichert werden."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ n'a pas été supprimé : les modifications de %2$@ n'ont pas pu être enregistrées."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No borré %1$@: los cambios de %2$@ no se pudieron guardar."
+          }
+        }
+      }
+    },
+    "Não descartei o trecho: as alterações de %1$@ não puderam ser salvas.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Didn't discard the change: the edits to %1$@ couldn't be saved."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abschnitt nicht verworfen: Die Änderungen an %1$@ konnten nicht gespeichert werden."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le passage n'a pas été annulé : les modifications de %1$@ n'ont pas pu être enregistrées."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No descarté el fragmento: los cambios de %1$@ no se pudieron guardar."
+          }
+        }
+      }
+    },
     "Não deu para abrir": {
       "localizations": {
         "en": {
@@ -15705,6 +15817,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "No se pudo compactar la conversación: %1$@"
+          }
+        }
+      }
+    },
+    "Não deu para gravar: %1$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't write: %1$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Konnte nicht schreiben: %1$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossible d'écrire : %1$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo escribir: %1$@"
           }
         }
       }
@@ -15929,6 +16069,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sin rastrear: %1$@. Van a la papelera del proyecto."
+          }
+        }
+      }
+    },
+    "Não salvar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Don't Save"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nicht speichern"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ne pas enregistrer"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No guardar"
           }
         }
       }
@@ -16297,6 +16465,34 @@
         }
       }
     },
+    "O arquivo mudou no disco, e esta aba tem alterações não salvas.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The file changed on disk, and this tab has unsaved changes."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Datei wurde auf der Festplatte geändert, und dieser Tab hat ungespeicherte Änderungen."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le fichier a changé sur le disque, et cet onglet a des modifications non enregistrées."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El archivo cambió en el disco y esta pestaña tiene cambios sin guardar."
+          }
+        }
+      }
+    },
     "O arquivo sai dos dois lados e o conflito fica resolvido assim.": {
       "localizations": {
         "en": {
@@ -16321,6 +16517,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "El archivo sale de los dos lados y el conflicto queda resuelto así."
+          }
+        }
+      }
+    },
+    "O arquivo também mudou no disco. Salvar grava o texto desta aba por cima.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The file also changed on disk. Saving writes this tab's text over it."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Datei wurde auch auf der Festplatte geändert. Speichern überschreibt sie mit dem Text dieses Tabs."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le fichier a aussi changé sur le disque. Enregistrer écrase son contenu avec le texte de cet onglet."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El archivo también cambió en el disco. Guardar escribe encima el texto de esta pestaña."
           }
         }
       }
@@ -19461,6 +19685,34 @@
         }
       }
     },
+    "Recarregar do disco": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reload from disk"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Von der Festplatte neu laden"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recharger depuis le disque"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recargar desde el disco"
+          }
+        }
+      }
+    },
     "Recolher tudo": {
       "localizations": {
         "en": {
@@ -20385,6 +20637,34 @@
         }
       }
     },
+    "Salvar as alterações de %1$@?": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save changes to %1$@?"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Änderungen an %1$@ speichern?"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enregistrer les modifications de %1$@ ?"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Guardar los cambios de %1$@?"
+          }
+        }
+      }
+    },
     "Salvar automaticamente": {
       "localizations": {
         "en": {
@@ -20549,6 +20829,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Scripts del proyecto"
+          }
+        }
+      }
+    },
+    "Se não salvar, o que foi digitado desde o último salvamento se perde.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "If you don't save, what you typed since the last save is lost."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wenn du nicht speicherst, geht verloren, was du seit dem letzten Speichern getippt hast."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Si tu n'enregistres pas, ce que tu as tapé depuis le dernier enregistrement est perdu."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Si no guardas, se pierde lo que escribiste desde la última vez que guardaste."
           }
         }
       }
@@ -23293,6 +23601,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ver como tabla"
+          }
+        }
+      }
+    },
+    "Ver diferença": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show diff"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unterschied ansehen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Voir la différence"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ver diferencia"
           }
         }
       }

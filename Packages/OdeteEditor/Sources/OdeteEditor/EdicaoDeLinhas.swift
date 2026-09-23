@@ -239,8 +239,10 @@ enum EdicaoDeLinhas {
         let faixa = bloco(ns, selecao: selecao)
         let trecho = ns.substring(with: faixa)
         // Olhando a unidade UTF-16, e não o `Character`: "\r\n" é um caractere só em Swift
-        // e `hasSuffix("\n")` diria que não termina em quebra.
-        let inserir = terminaSemQuebra(ns, faixa) ? "\n" + trecho : trecho
+        // e `hasSuffix("\n")` diria que não termina em quebra. A quebra que entra é a do
+        // arquivo: um `\n` solto num arquivo CRLF misturava as duas.
+        let quebra = QuebrasDeLinha.primeira(ns) ?? "\n"
+        let inserir = terminaSemQuebra(ns, faixa) ? quebra + trecho : trecho
         let desloca = (inserir as NSString).length
         return EdicaoDeTexto(
             faixa: NSRange(location: NSMaxRange(faixa), length: 0),
@@ -267,10 +269,13 @@ enum EdicaoDeLinhas {
             )
         }
         // Eram as últimas linhas, sem quebra no fim: sai também a quebra da linha de
-        // cima, senão sobraria uma linha vazia no fim do arquivo.
-        let apagar = NSRange(location: faixa.location - 1, length: faixa.length + 1)
+        // cima, senão sobraria uma linha vazia no fim do arquivo. A quebra inteira — com
+        // `faixa.location - 1` saía só o `\n` de um `\r\n`, e o arquivo ficava com um `\r`
+        // solto no fim.
         let anterior = ns.lineRange(for: NSRange(location: faixa.location - 1, length: 0))
         let tamanhoAnterior = tamanhoDoConteudo(ns, em: anterior.location)
+        let fimDoConteudoAnterior = anterior.location + tamanhoAnterior
+        let apagar = NSRange(location: fimDoConteudoAnterior, length: NSMaxRange(faixa) - fimDoConteudoAnterior)
         return EdicaoDeTexto(
             faixa: apagar,
             texto: "",

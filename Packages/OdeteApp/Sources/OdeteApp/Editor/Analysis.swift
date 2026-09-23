@@ -4,6 +4,7 @@ import OdeteBundler
 import OdeteCore
 import OdeteEditor
 import OdeteGit
+import OdeteI18n
 
 /// Esboço, lint e gutter do git para os arquivos abertos.
 extension WorkspaceModel {
@@ -242,13 +243,36 @@ extension WorkspaceModel {
     }
 
     /// Descarta o hunk no workdir e recarrega o buffer.
+    ///
+    /// Descarta só aquele trecho. O git trabalha no disco; com a aba suja, o disco não é o
+    /// que está na tela, e recarregar depois do descarte trocava o buffer inteiro pelo
+    /// disco — ia embora junto tudo o que estava digitado e não salvo, em qualquer lugar
+    /// do arquivo. Por isso a aba suja é gravada antes, e o trecho é achado de novo na
+    /// linha tocada, no disco já gravado. Se não dá para gravar (conflito com o disco),
+    /// nada é descartado.
     func discardHunk(at line: Int, in path: String) {
-        guard let (f, h) = hunk(at: line, in: path), let repo = git.repo else { return }
+        guard let repo = git.repo else { return }
+        let suja = tabs.first { $0.path == path }?.isDirty == true
+        if suja, !save(path) {
+            self.error = tr("Não descartei o trecho: as alterações de %1$@ não puderam ser salvas.", path)
+            return
+        }
+        let guardado = suja ? nil : hunk(at: line, in: path)
+        guard suja || guardado != nil else { return }
         Task { [weak self] in
             do {
+                var alvo = guardado
+                if alvo == nil {
+                    let r = try await repo.gutterMarks(path: path)
+                    if let f = r.file, let m = r.marks.first(where: { $0.line == line }), f.hunks.indices.contains(m.hunk) {
+                        alvo = (f, f.hunks[m.hunk])
+                    }
+                }
+                guard let (f, h) = alvo else { return }
                 try await repo.discardHunk(h, in: f)
                 self?.reloadBuffer(path)
                 self?.git.agendarMarcas()
+                self?.refreshGutter(path)
             } catch {
                 self?.error = error.localizedDescription
             }

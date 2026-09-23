@@ -70,8 +70,25 @@ public final class WorkspaceModel {
     public var lixeira = 0
     public var error: String?
     public var stack: Stack = .html
-    public var externalChange = false
-    public var reveal: (line: Int, token: Int)?
+    /// Pedido de levar o editor de um arquivo a uma linha. De uso único: o editor que o
+    /// atende avisa (`linhaRevelada`) e ele some — ficando aqui, todo editor que nascia
+    /// depois pulava de novo para a mesma linha.
+    public var reveal: PedidoDeLinha?
+    /// Abas com alteração não salva cujo arquivo mudou no disco por fora (agente, terminal,
+    /// git). Nada é gravado nem descartado nelas até a pessoa escolher na faixa do editor
+    /// — ver `WorkspaceDisco.swift`.
+    public internal(set) var conflitos: Set<String> = []
+    /// Abas esperando a pessoa dizer se salva antes de fechar, na ordem em que foram
+    /// fechadas.
+    public internal(set) var abasParaFechar: [String] = []
+    /// Impressão do conteúdo do disco que cada aba conhece: o que foi lido ao abrir ou
+    /// gravado por último. É contra ela que se decide se o disco mudou por fora.
+    @ObservationIgnored var baseDisco: [String: UInt64] = [:]
+    /// Onde está o cursor de cada arquivo aberto, em UTF-16. Só o salvamento automático lê:
+    /// é a linha que ele não apara.
+    @ObservationIgnored var cursores: [String: Int] = [:]
+    /// Ver `WorkspaceEditorConfig.swift`.
+    @ObservationIgnored var cacheDeEditorConfig = CacheDeEditorConfig()
     /// Incrementa a cada reload da árvore (salvar, watcher); o preview Swift recompila.
     public internal(set) var reloadTick = 0
     public var swiftDiagnostics: [SwiftDiagnostic] = []
@@ -121,7 +138,7 @@ public final class WorkspaceModel {
     private let chrome: ChromeState
     private let rascunhos: Rascunhos
     @ObservationIgnored var observador: ObservadorDeArquivos?
-    @ObservationIgnored private var saveTasks: [String: Task<Void, Never>] = [:]
+    @ObservationIgnored var saveTasks: [String: Task<Void, Never>] = [:]
     /// O que o próprio app gravou e ainda não teve o aviso do observador — ver
     /// `EscritasProprias`.
     @ObservationIgnored var escritas = EscritasProprias()
@@ -193,7 +210,7 @@ public final class WorkspaceModel {
     /// espera; sem ele, guarda o rascunho fora do projeto, sem tocar no arquivo.
     public func aoSairDeCena() {
         if chrome.snapshot.editor.autoSave {
-            saveAll()
+            saveAll(automatico: true)
         }
         guardarRascunhos()
     }
@@ -206,13 +223,18 @@ public final class WorkspaceModel {
         rascunhos.gravar(sujos)
     }
 
-    /// Recarrega o buffer de um arquivo que outra coisa (agente, shell) escreveu no disco.
+    /// Recarrega o buffer de um arquivo que outra coisa (agente, shell, git, a troca da
+    /// busca) escreveu no disco.
+    ///
+    /// Aba limpa recebe o disco. Aba com alteração não salva não: antes o buffer era
+    /// trocado e a aba marcada como limpa, e o que a pessoa tinha digitado sumia sem
+    /// aviso. Agora o texto dela fica, e a faixa de conflito pergunta — ver
+    /// `absorverDisco`.
     public func reloadBuffer(_ path: String) {
         guard buffers[path] != nil, let novo = try? ops.read(path) else { return }
+        marcaDisco[path] = ops.modifiedAt(path)
         guardarBuffer(path, antesDe: novo, origem: .recarregar)
-        buffers[path] = novo
-        markDirty(path, false)
-        analyze(path)
+        absorverDisco(path, disco: novo)
     }
 
     /// Mostra a gaveta do terminal (iPad) sem mexer no resto do layout.
@@ -247,6 +269,7 @@ public final class WorkspaceModel {
             preencherAbertas()
             indexarSimbolos()
             lixeira = ops.tamanhoDaLixeira()
+            esquecerEditorConfig()
             reloadTick += 1
         } catch {
             self.error = error.localizedDescription
@@ -265,12 +288,20 @@ public final class WorkspaceModel {
         // digitação toda vez que o agente ou um script mexesse em arquivo.
         recarregarArvoreEmSegundoPlano()
         git.agendarMarcas()
+        for t in tabs where t.isDirty && ops.exists(t.path) {
+            // Aba suja não recebe o disco, mas fica sabendo que ele mudou: sem isto o
+            // próximo salvamento gravava por cima do que chegou de fora.
+            if ops.modifiedAt(t.path) != marcaDisco[t.path], let disco = try? ops.read(t.path) {
+                marcaDisco[t.path] = ops.modifiedAt(t.path)
+                absorverDisco(t.path, disco: disco)
+            }
+        }
         for t in tabs where !t.isDirty {
             if ops.exists(t.path) {
                 if let disk = try? ops.read(t.path), disk != buffers[t.path] {
+                    marcaDisco[t.path] = ops.modifiedAt(t.path)
                     guardarBuffer(t.path, antesDe: disk, origem: .externo)
-                    buffers[t.path] = disk
-                    analyze(t.path)
+                    absorverDisco(t.path, disco: disk)
                 }
             } else {
                 // Ferramenta que reescreve o arquivo gravando um temporário e renomeando
@@ -376,6 +407,7 @@ public final class WorkspaceModel {
                 self.trocarScripts(scripts)
                 self.packages = pacotes
                 self.preencherAbertas()
+                self.esquecerEditorConfig()
                 self.reloadTick += 1
             }
         }
@@ -434,13 +466,38 @@ public final class WorkspaceModel {
 
     public func open(_ path: String, line: Int) {
         openFile(path)
-        reveal = (line, (reveal?.token ?? 0) + 1)
+        reveal = PedidoDeLinha(path: path, line: line, token: TokensDoEditor.proximo())
+    }
+
+    /// O pedido de linha deste arquivo, no formato do editor — `nil` para os outros: no
+    /// modo Dois só o lado que mostra o arquivo pedido pula.
+    public func pedidoDeLinha(para path: String) -> (line: Int, token: Int)? {
+        guard let r = reveal, r.path == path else { return nil }
+        return (r.line, r.token)
+    }
+
+    /// O editor atendeu o pedido de linha: ele não vale mais.
+    public func linhaRevelada(_ token: Int) {
+        if reveal?.token == token {
+            reveal = nil
+        }
+    }
+
+    /// Guarda onde está o cursor de um arquivo aberto.
+    public func anotarCursor(_ offset: Int, em path: String) {
+        cursores[path] = offset
+        if path == active {
+            cursorOffset = offset
+        }
     }
 
     private func load(_ path: String) {
+        var lido: String?
         if buffers[path] == nil {
             do {
-                buffers[path] = try ops.read(path)
+                let texto = try ops.read(path)
+                buffers[path] = texto
+                lido = texto
                 naoEhTexto.remove(path)
             } catch FileError.naoEhTexto {
                 // Sem buffer de propósito: com um buffer vazio o editor abriria em branco
@@ -449,20 +506,45 @@ public final class WorkspaceModel {
             } catch {
                 buffers[path] = ""
             }
+        } else {
+            lido = try? ops.read(path)
         }
         marcaDisco[path] = ops.modifiedAt(path)
+        // O disco como a aba o conheceu: é a base para saber, ao salvar, se alguém mexeu
+        // no arquivo por fora enquanto ela estava aberta.
+        if let lido {
+            baseDisco[path] = EscritasProprias.impressao(lido)
+        }
     }
 
+    /// Fecha a aba.
+    ///
+    /// Com alteração não salva: com salvamento automático ligado, grava e fecha — é o que
+    /// a pessoa espera dele. Com ele desligado, ou com o disco em conflito, pergunta
+    /// (`abasParaFechar`, respondido em `decidirFechamento`): antes gravava sem perguntar
+    /// mesmo com o salvamento automático desligado. `force` fecha sem gravar nada.
     public func closeTab(_ path: String, force: Bool = false) {
         guard let i = tabs.firstIndex(where: { $0.path == path }) else { return }
         if tabs[i].isDirty, !force {
-            save(path)
+            let gravou = chrome.snapshot.editor.autoSave && !conflitos.contains(path) && save(path)
+            guard gravou else {
+                if !abasParaFechar.contains(path) {
+                    abasParaFechar.append(path)
+                }
+                return
+            }
         }
         tabs.remove(at: i)
         acompanharAbas()
         if secondary == path {
             secondary = nil
         }
+        saveTasks[path]?.cancel()
+        saveTasks[path] = nil
+        abasParaFechar.removeAll { $0 == path }
+        conflitos.remove(path)
+        baseDisco[path] = nil
+        cursores[path] = nil
         buffers[path] = nil
         outlines[path] = nil
         links[path] = nil
@@ -483,6 +565,29 @@ public final class WorkspaceModel {
         }
     }
 
+    /// A resposta à pergunta de `closeTab` sobre uma aba com alteração não salva.
+    public enum DecisaoAoFechar {
+        case salvar
+        case descartar
+        case cancelar
+    }
+
+    public func decidirFechamento(_ path: String, _ decisao: DecisaoAoFechar) {
+        abasParaFechar.removeAll { $0 == path }
+        switch decisao {
+        case .salvar:
+            // Com o disco em conflito, "salvar" aqui é a pessoa escolhendo o texto dela.
+            let gravou = conflitos.contains(path) ? manterOMeu(path) : save(path)
+            if gravou {
+                closeTab(path, force: true)
+            }
+        case .descartar:
+            closeTab(path, force: true)
+        case .cancelar:
+            break
+        }
+    }
+
     public func text(for path: String) -> String {
         buffers[path] ?? ""
     }
@@ -499,19 +604,35 @@ public final class WorkspaceModel {
                 if Task.isCancelled {
                     return
                 }
-                self?.save(path)
+                self?.save(path, automatico: true)
             }
         }
     }
 
-    private func markDirty(_ path: String, _ dirty: Bool) {
+    func markDirty(_ path: String, _ dirty: Bool) {
         guard let i = tabs.firstIndex(where: { $0.path == path }), tabs[i].isDirty != dirty else { return }
         tabs[i].isDirty = dirty
     }
 
-    public func save(_ path: String? = nil) {
-        guard let path = path ?? active, let bruto = buffers[path], !naoEhTexto.contains(path) else { return }
-        let text = arrumado(bruto)
+    /// Grava a aba no disco. Devolve se gravou.
+    ///
+    /// Nunca por cima de uma mudança de fora: se o disco não é mais o que a aba conheceu
+    /// (o agente, um script ou o git escreveram nele), a aba entra em conflito e nada é
+    /// gravado — nem pelo salvamento automático, nem pelo ⌘S — até a pessoa escolher na
+    /// faixa do editor. Antes o salvamento gravava por cima, calado.
+    ///
+    /// `automatico`: veio do salvamento automático (a pausa na digitação, o app saindo de
+    /// cena). Aí a linha do cursor não é aparada — ver `arrumado`.
+    @discardableResult
+    public func save(_ path: String? = nil, automatico: Bool = false) -> Bool {
+        guard let path = path ?? active, let bruto = buffers[path], !naoEhTexto.contains(path) else { return false }
+        guard !conflitos.contains(path) else { return false }
+        let cursor = automatico ? (cursores[path] ?? (path == active ? cursorOffset : nil)) : nil
+        let text = arrumado(bruto, caminho: path, preservando: cursor)
+        if discoMudouPorFora(path, gravando: [bruto, text]) {
+            conflitos.insert(path)
+            return false
+        }
         do {
             if text != bruto {
                 buffers[path] = text
@@ -521,8 +642,12 @@ public final class WorkspaceModel {
             let existia = ops.exists(path)
             try ops.write(path, text)
             marcaDisco[path] = ops.modifiedAt(path)
+            baseDisco[path] = EscritasProprias.impressao(text)
             if existia {
                 registrarEscritaPropria(path, text)
+            }
+            if (path as NSString).lastPathComponent == ".editorconfig" {
+                esquecerEditorConfig()
             }
             markDirty(path, false)
             git.agendarMarcas()
@@ -531,8 +656,10 @@ public final class WorkspaceModel {
             // salvamento acordava o observador e remontava a árvore; agora que a gravação
             // do próprio app não remonta nada, o aviso sai daqui.
             reloadTick += 1
+            return true
         } catch {
             self.error = error.localizedDescription
+            return false
         }
     }
 
@@ -541,23 +668,32 @@ public final class WorkspaceModel {
     /// Os dois são o que todo editor de código faz e todo revisor de diff agradece: linha
     /// que termina em espaço e arquivo sem quebra no fim viram ruído no `git diff` de quem
     /// mexer no arquivo depois. Ficam desligados por padrão, porque mexer no arquivo de
-    /// alguém sem avisar é pior que o ruído.
-    func arrumado(_ texto: String) -> String {
+    /// alguém sem avisar é pior que o ruído; o `.editorconfig` do projeto, se diz algo,
+    /// manda sobre os Ajustes.
+    ///
+    /// As contas são em UTF-16 (`Arrumacao`): em Swift `"\r\n"` é um caractere só, e o
+    /// aparar por `split(separator: "\n")` não partia linha CRLF nenhuma, enquanto o
+    /// `hasSuffix("\n")` punha um `\n` a mais depois do `\r\n` do fim.
+    ///
+    /// `preservando`: posição do cursor cuja linha não é aparada. O salvamento automático
+    /// grava um segundo depois de a pessoa parar de digitar; aparar a linha dela comia o
+    /// espaço recém-digitado, e o texto sumia debaixo do cursor.
+    func arrumado(_ texto: String, caminho: String? = nil, preservando: Int? = nil) -> String {
+        let cfg = caminho.map(configDoArquivo)
         var t = texto
-        if chrome.snapshot.editor.trimOnSave {
-            t = t.split(separator: "\n", omittingEmptySubsequences: false)
-                .map { String($0.reversed().drop { $0 == " " || $0 == "\t" }.reversed()) }
-                .joined(separator: "\n")
+        if cfg?.aparar ?? chrome.snapshot.editor.trimOnSave {
+            t = Arrumacao.aparar(t, preservando: preservando)
         }
-        if chrome.snapshot.editor.finalNewline, !t.isEmpty, !t.hasSuffix("\n") {
-            t += "\n"
+        if cfg?.quebraNoFim ?? chrome.snapshot.editor.finalNewline {
+            t = Arrumacao.quebraNoFim(t, padrao: cfg?.fimDeLinha)
         }
         return t
     }
 
-    public func saveAll() {
+    /// `automatico`: o app saindo de cena, e não o ⌘⌥S — ver `save`.
+    public func saveAll(automatico: Bool = false) {
         for t in tabs where t.isDirty {
-            save(t.path)
+            save(t.path, automatico: automatico)
         }
     }
 
@@ -567,4 +703,12 @@ public final class WorkspaceModel {
         chrome.setTabs(tabs.map { EditorTab(path: $0.path) }, for: project.id)
         chrome.setActiveTab(active, for: project.id)
     }
+}
+
+/// Levar o editor de um arquivo a uma linha (1-based). O `token` vem de
+/// `TokensDoEditor`: é ele que diz ao editor que o pedido é novo.
+public struct PedidoDeLinha: Equatable, Sendable {
+    public var path: String
+    public var line: Int
+    public var token: Int
 }

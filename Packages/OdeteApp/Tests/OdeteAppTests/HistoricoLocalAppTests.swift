@@ -51,14 +51,15 @@ struct HistoricoLocalAppTests {
         #expect(conteudos(ws, "index.html") == [original])
     }
 
-    /// O agente escreveu com a aba suja: o texto não salvo não some ao recarregar.
+    /// O agente escreveu com a aba suja: o texto não salvo não some ao recarregar — a aba
+    /// fica com ele (em conflito com o disco) e ele também vira versão no histórico.
     @Test func recarregarGuardaOTextoNaoSalvo() throws {
         let (ws, _, root) = try make()
         ws.openFile("index.html")
         ws.setText("digitado e não salvo\n", for: "index.html")
         try "do agente\n".write(to: root.appending(path: "index.html"), atomically: true, encoding: .utf8)
         ws.reloadBuffer("index.html")
-        #expect(ws.text(for: "index.html") == "do agente\n")
+        #expect(ws.text(for: "index.html") == "digitado e não salvo\n")
         let v = ws.historico.versoes(de: "index.html", raiz: ws.root)
         #expect(v.first?.origem == .recarregar)
         #expect(conteudos(ws, "index.html").first == "digitado e não salvo\n")

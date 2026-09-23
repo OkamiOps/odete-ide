@@ -514,27 +514,28 @@ extension CodeEditorView.Coordinator {
         // `UndoManager` levanta exceção — o ⌘Z depois de substituir derrubava o app. A
         // edição comum (`replace`) registra o desfazer do jeito que a digitação registra.
         if r.todos {
-            // Uma edição só com o documento inteiro, montado de trás para frente para os
-            // índices dos achados continuarem valendo: um passo no desfazer, uma análise.
-            let antes = tv.text as NSString
-            let novo = NSMutableString(string: antes)
-            for a in achados.reversed() {
-                novo.replaceCharacters(in: a.range, with: a.replacementText)
-            }
+            // Uma troca por ocorrência, de trás para frente para os índices dos achados
+            // continuarem valendo, todas num passo só do desfazer. Trocar o documento
+            // inteiro de uma vez passava o arquivo todo pela conversão de quebras do
+            // Runestone — um arquivo CRLF virava LF inteiro — e jogava o cursor longe.
             let selecao = tv.selectedRange
-            umPasso(tv) {
-                tv.replace(NSRange(location: 0, length: antes.length), withText: novo as String)
-                let de = min(selecao.location, novo.length)
+            let trocas = DiferencaDeTexto.agrupar(
+                achados.map { DiferencaDeTexto.Troca(faixa: $0.range, texto: $0.replacementText) },
+                em: linhas().ns,
+                maximo: 60
+            )
+            editarPorDentro(tv, avisar: true) {
+                for t in trocas.reversed() {
+                    trocarTrecho(tv, t.faixa, por: t.texto)
+                }
+                let total = tamanhoDoDocumento(tv)
+                let de = min(DiferencaDeTexto.mapear(selecao.location, trocas), total)
                 tv.selectedRange = NSRange(location: de, length: 0)
             }
         } else {
             let a = achados[min(max(f.indice, 0), achados.count - 1)]
-            umPasso(tv) { tv.replace(a.range, withText: a.replacementText) }
+            editarPorDentro(tv, avisar: true) { trocarTrecho(tv, a.range, por: a.replacementText) }
         }
-        // O delegate de digitação já anotou o texto novo; anotar de novo aqui é barato e
-        // deixa o mapa de linhas certo mesmo se a troca não passar por ele.
-        anotarTexto(tv.text)
-        parent.text = textoAtual
         buscar(tv)
     }
 

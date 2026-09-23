@@ -17,7 +17,13 @@ public final class BuscaLocal {
     /// Substituir só aparece quando pedido: na maior parte das vezes a pessoa só quer achar.
     var mostrarTroca = false
     var troca = ""
-    var trocaToken = 0
+    /// O arquivo em que se procura. `nil` é o arquivo ativo. No modo Dois a busca é de um
+    /// lado só: antes os dois editores recebiam a mesma busca e a mesma substituição, e
+    /// "Todos" trocava nos dois arquivos.
+    var caminho: String?
+    /// O pedido de substituição ainda não atendido. Some quando o editor avisa que
+    /// substituiu — ver `EditorReplace`.
+    private(set) var pedidoDeTroca: EditorReplace?
 
     public var find: EditorFind? {
         aberta && !texto.isEmpty
@@ -26,14 +32,27 @@ public final class BuscaLocal {
     }
 
     public var replace: EditorReplace? {
-        trocaToken > 0 ? EditorReplace(por: troca, todos: trocaTodos, token: trocaToken) : nil
+        pedidoDeTroca
     }
 
-    private var trocaTodos = false
-
     func trocar(todos: Bool) {
-        trocaTodos = todos
-        trocaToken += 1
+        pedidoDeTroca = EditorReplace(por: troca, todos: todos, token: TokensDoEditor.proximo())
+    }
+
+    /// O editor substituiu: o pedido não vale mais.
+    public func trocaFeita(_ token: Int) {
+        if pedidoDeTroca?.token == token {
+            pedidoDeTroca = nil
+        }
+    }
+
+    /// Em que arquivo a busca vale, entre os que estão na tela (`visiveis`): o escolhido,
+    /// se ainda está à vista; senão o ativo.
+    public func alvo(visiveis: [String], ativo: String?) -> String? {
+        if let caminho, visiveis.contains(caminho) {
+            return caminho
+        }
+        return ativo
     }
 
     func proximo() {
@@ -55,7 +74,14 @@ public final class BuscaLocal {
         }
     }
 
-    public func abrir() {
+    /// Abre a barra para `caminho` — o lado do modo Dois cuja lupa foi tocada. Sem
+    /// caminho (⌘F, menu), vale o arquivo ativo.
+    public func abrir(_ caminho: String? = nil) {
+        if caminho != self.caminho {
+            total = 0
+            indice = 0
+        }
+        self.caminho = caminho
         aberta = true
     }
 
@@ -65,6 +91,8 @@ public final class BuscaLocal {
         total = 0
         indice = 0
         mostrarTroca = false
+        caminho = nil
+        pedidoDeTroca = nil
     }
 }
 

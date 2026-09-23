@@ -17,8 +17,19 @@ struct SearchPane: View {
     @State private var trocarAberto = false
     @State private var troca = ""
     @State private var confirmandoTroca = false
+    /// O que a troca vai fazer, calculado antes de perguntar — com a mesma conta da troca.
+    @State private var previa = WorkspaceModel.PreviaDaTroca()
     @State private var recado: String?
     @FocusState private var focused: Bool
+
+    var consulta: ConsultaDeTexto {
+        ConsultaDeTexto(texto: query, regex: regex, caseSensitive: caseSensitive)
+    }
+
+    /// Ocorrências de verdade, não linhas: uma linha com três vira três.
+    var totalDeOcorrencias: Int {
+        hits.reduce(0) { $0 + $1.ocorrencias }
+    }
 
     var grouped: [(path: String, hits: [SearchHit])] {
         var order: [String] = []
@@ -36,7 +47,7 @@ struct SearchPane: View {
         VStack(spacing: 0) {
             PaneHeader(
                 tr("Busca"),
-                detail: hits.isEmpty ? nil : tr("%1$@ em %2$@ arquivos", "\(hits.count)", "\(grouped.count)")
+                detail: hits.isEmpty ? nil : tr("%1$@ em %2$@ arquivos", "\(totalDeOcorrencias)", "\(grouped.count)")
             )
             VStack(spacing: 8) {
                 HStack(spacing: 8) {
@@ -83,7 +94,10 @@ struct SearchPane: View {
                     if searching {
                         ProgressView().controlSize(.small)
                     } else if trocarAberto, !hits.isEmpty {
-                        Button(tr("Trocar tudo")) { confirmandoTroca = true }
+                        Button(tr("Trocar tudo")) {
+                            previa = ws.previaDaTroca(consulta, por: troca, em: grouped.map(\.path))
+                            confirmandoTroca = true
+                        }
                             .font(.caption.weight(.medium))
                             .buttonStyle(.glass)
                             .controlSize(.small)
@@ -108,7 +122,8 @@ struct SearchPane: View {
                                 Text(g.path).font(OdeteFont.mono(11)).foregroundStyle(theme.fgMuted).lineLimit(1)
                                     .truncationMode(.middle)
                                 Spacer()
-                                Text("\(g.hits.count)").font(OdeteFont.mono(10)).foregroundStyle(theme.fgSubtle)
+                                Text("\(g.hits.reduce(0) { $0 + $1.ocorrencias })").font(OdeteFont.mono(10))
+                                    .foregroundStyle(theme.fgSubtle)
                             }
                             .padding(.horizontal, 12)
                             .frame(height: 30)
@@ -129,7 +144,15 @@ struct SearchPane: View {
                                                 width: 34,
                                                 alignment: .trailing
                                             )
-                                        Text(highlight(h.text)).font(OdeteFont.mono(12)).lineLimit(1)
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(highlight(h.text)).font(OdeteFont.mono(12)).lineLimit(1)
+                                            // A prévia da troca, linha a linha, com a mesma
+                                            // conta que a troca vai fazer.
+                                            if trocarAberto, let depois = previaDaLinha(h.text) {
+                                                Text(depois).font(OdeteFont.mono(12)).lineLimit(1)
+                                                    .foregroundStyle(theme.ok)
+                                            }
+                                        }
                                         Spacer(minLength: 0)
                                     }
                                     .padding(.horizontal, 12)
@@ -144,14 +167,15 @@ struct SearchPane: View {
             }
         }
         .confirmationDialog(
-            tr("Trocar %1$@ ocorrência(s) em %2$@ arquivo(s)?", "\(hits.count)", "\(grouped.count)"),
+            tr("Trocar %1$@ ocorrência(s) em %2$@ arquivo(s)?", "\(previa.total)", "\(previa.arquivos.count)"),
             isPresented: $confirmandoTroca,
             titleVisibility: .visible
         ) {
-            Button(tr("Trocar tudo"), role: .destructive) { trocar(em: grouped.map(\.path)) }
+            Button(tr("Trocar tudo"), role: .destructive) { trocar(em: previa.arquivos.map(\.path)) }
+                .disabled(previa.total == 0)
             Button(tr("Cancelar"), role: .cancel) {}
         } message: {
-            Text(tr("Isto grava nos arquivos. O desfazer da árvore não cobre troca em massa: confira no git depois."))
+            Text(mensagemDaTroca)
         }
         .onChange(of: query) { _, _ in schedule() }
         .onChange(of: regex) { _, _ in run() }
@@ -159,29 +183,34 @@ struct SearchPane: View {
         .onAppear { focused = true }
     }
 
-    /// Grava a troca nos arquivos escolhidos e refaz a busca.
-    func trocar(em paths: [String]) {
-        do {
-            let r = try TextSearch.replace(
-                root: ws.root,
-                query: query,
-                with: troca,
-                regex: regex,
-                caseSensitive: caseSensitive,
-                in: paths
-            )
-            for p in paths {
-                ws.reloadBuffer(p)
-            }
-            ws.reload()
-            ws.git.agendarMarcas()
-            recado = r.trocas == 0
-                ? tr("nada foi trocado")
-                : tr("%1$@ troca(s) em %2$@ arquivo(s)", "\(r.trocas)", "\(r.arquivos)")
-            run()
-        } catch {
-            ws.error = error.localizedDescription
+    /// Os arquivos que a troca vai mexer, com quantas trocas cada um — a prévia antes de
+    /// confirmar —, e onde fica a versão de antes de cada arquivo.
+    var mensagemDaTroca: String {
+        let lista = previa.arquivos.prefix(6).map { "\($0.path) (\($0.trocas))" }
+        let resto = previa.arquivos.count - lista.count
+        var linhas = lista
+        if resto > 0 {
+            linhas.append(tr("e mais %1$@", "\(resto)"))
         }
+        linhas.append("")
+        linhas.append(tr("Abas abertas recebem a troca no editor, e dá para desfazer lá. Os outros arquivos são gravados no disco, e a versão de antes de cada um fica no histórico local."))
+        return linhas.joined(separator: "\n")
+    }
+
+    /// A linha como fica depois da troca, ou `nil` se a troca não muda nada nela.
+    func previaDaLinha(_ linha: String) -> String? {
+        guard !query.isEmpty, let r = try? consulta.trocar(em: linha, por: troca), r.trocas > 0 else { return nil }
+        return r.texto.trimmingCharacters(in: .whitespaces)
+    }
+
+    /// Troca nos arquivos escolhidos — no texto das abas abertas, no disco dos outros — e
+    /// refaz a busca.
+    func trocar(em paths: [String]) {
+        let r = ws.trocarNoProjeto(consulta, por: troca, em: paths)
+        recado = r.trocas == 0
+            ? tr("nada foi trocado")
+            : tr("%1$@ troca(s) em %2$@ arquivo(s)", "\(r.trocas)", "\(r.arquivos)")
+        run()
     }
 
     func chip(_ text: String, on: Binding<Bool>, label: String) -> some View {
@@ -197,16 +226,17 @@ struct SearchPane: View {
         .accessibilityLabel(label)
     }
 
+    /// A linha com as ocorrências em destaque — todas, e também em regex, pela mesma
+    /// consulta da busca.
     func highlight(_ line: String) -> AttributedString {
         let trimmed = line.trimmingCharacters(in: .whitespaces)
         var a = AttributedString(trimmed)
         a.foregroundColor = theme.fg
-        if !regex, let r = trimmed.range(of: query, options: caseSensitive ? [] : [.caseInsensitive]),
-           let lo = AttributedString.Index(r.lowerBound, within: a), let hi = AttributedString.Index(
-               r.upperBound,
-               within: a
-           )
-        {
+        guard !query.isEmpty, let achados = try? consulta.ocorrencias(em: trimmed) else { return a }
+        for m in achados {
+            guard let r = Range(m.range, in: trimmed),
+                  let lo = AttributedString.Index(r.lowerBound, within: a),
+                  let hi = AttributedString.Index(r.upperBound, within: a) else { continue }
             a[lo ..< hi].foregroundColor = theme.accent
             a[lo ..< hi].font = OdeteFont.mono(12, weight: .bold)
         }
@@ -227,8 +257,11 @@ struct SearchPane: View {
         let q = query, re = regex, cs = caseSensitive, root = ws.root
         guard !q.isEmpty else { hits = []; return }
         searching = true
+        // As abas abertas entram com o texto delas, não com o disco: a lista mostra o que
+        // está na tela, e a troca trabalha sobre o mesmo texto.
+        let abertos = ws.textosAbertos()
         Task.detached(priority: .userInitiated) {
-            let found = (try? TextSearch.search(root: root, query: q, regex: re, caseSensitive: cs)) ?? []
+            let found = (try? TextSearch.search(root: root, query: q, regex: re, caseSensitive: cs, abertos: abertos)) ?? []
             await MainActor.run {
                 if query == q {
                     hits = found; searching = false

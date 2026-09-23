@@ -14,6 +14,10 @@ final class KeyboardBar: UIInputView {
     var onSendSelection: () -> Void
     /// Comenta ou descomenta as linhas da seleção — o ⌘/ de quem não tem teclado físico.
     var onComentar: () -> Void
+    /// ⇥ e ⇤: recuar e desrecuar como o Tab e o ⇧Tab do teclado físico, no recuo do
+    /// arquivo. O ⇥ inseria dois espaços fixos, mesmo em arquivo de tabs ou de quatro.
+    var onTab: () -> Void
+    var onDesindentar: () -> Void
 
     init(
         textView: TextView,
@@ -21,7 +25,9 @@ final class KeyboardBar: UIInputView {
         onFind: @escaping () -> Void,
         onDefinition: @escaping () -> Void,
         onSendSelection: @escaping () -> Void,
-        onComentar: @escaping () -> Void = {}
+        onComentar: @escaping () -> Void = {},
+        onTab: @escaping () -> Void = {},
+        onDesindentar: @escaping () -> Void = {}
     ) {
         self.textView = textView
         self.onSave = onSave
@@ -29,6 +35,8 @@ final class KeyboardBar: UIInputView {
         self.onDefinition = onDefinition
         self.onSendSelection = onSendSelection
         self.onComentar = onComentar
+        self.onTab = onTab
+        self.onDesindentar = onDesindentar
         super.init(frame: CGRect(x: 0, y: 0, width: 0, height: 44), inputViewStyle: .keyboard)
         build()
     }
@@ -70,7 +78,8 @@ final class KeyboardBar: UIInputView {
             stack.heightAnchor.constraint(equalTo: scroll.frameLayoutGuide.heightAnchor, constant: -10),
         ])
         let items: [(String, String?, () -> Void)] = [
-            ("⇥", nil, { [weak self] in self?.textView?.insertText("  ") }),
+            ("⇥", nil, { [weak self] in self?.onTab() }),
+            ("⇤", nil, { [weak self] in self?.onDesindentar() }),
             ("{ }", nil, { [weak self] in self?.wrap("{", "}") }),
             ("( )", nil, { [weak self] in self?.wrap("(", ")") }),
             ("[ ]", nil, { [weak self] in self?.wrap("[", "]") }),
@@ -114,6 +123,12 @@ final class KeyboardBar: UIInputView {
         }
         if title == "//" {
             b.accessibilityLabel = tr("Comentar linhas")
+        }
+        if title == "⇥" {
+            b.accessibilityLabel = tr("Aumentar recuo")
+        }
+        if title == "⇤" {
+            b.accessibilityLabel = tr("Diminuir recuo")
         }
         return b
     }

@@ -90,6 +90,7 @@ struct CenterPane: View {
         .sheet(item: Binding(get: { ws.blamePath.map { PathRef(path: $0) } }, set: { ws.blamePath = $0?.path })) { r in
             BlameSheet(path: r.path)
         }
+        .perguntaAoFecharAba()
     }
 
     /// Sidebar, terminal e agente já têm botão no rail; repetir aqui só enche a barra.
@@ -193,6 +194,20 @@ struct CenterPane: View {
         }
     }
 
+    /// Os arquivos com editor na tela agora.
+    var visiveis: [String] {
+        switch chrome.snapshot.center {
+        case .dual: [ws.active, direitaPath].compactMap(\.self)
+        case .code, .split: [ws.active].compactMap(\.self)
+        case .diff, .preview: []
+        }
+    }
+
+    /// O editor em que a busca do arquivo vale: o lado cuja lupa foi tocada, ou o ativo.
+    var alvoDaBusca: String? {
+        ws.busca.alvo(visiveis: visiveis, ativo: ws.active)
+    }
+
     /// Arquivo do lado direito no modo Dois: o escolhido, ou a primeira aba que não é a
     /// da esquerda enquanto ninguém escolheu.
     var direitaPath: String? {
@@ -279,10 +294,15 @@ struct CenterPane: View {
         {
             ConflictView(path: path)
         } else if let path {
+            // A busca do arquivo vale num editor só: no modo Dois, o lado escolhido.
+            let daBusca = path == alvoDaBusca
             VStack(spacing: 0) {
                 Crumbs(path: path, escolher: escolher, trocar: trocar)
-                if ws.busca.aberta {
+                if ws.busca.aberta, daBusca {
                     FindBar(busca: ws.busca)
+                }
+                if ws.conflitos.contains(path) {
+                    FaixaDeConflito(path: path)
                 }
                 if let p = ws.agent.pendingPatches.first(where: { $0.path == path }) {
                     PatchBanner(patch: p)
@@ -293,7 +313,7 @@ struct CenterPane: View {
                     language: Language.detect(path: path),
                     palette: theme.palette,
                     prefs: chrome.snapshot.editor,
-                    reveal: path == ws.active ? ws.reveal : nil,
+                    reveal: ws.pedidoDeLinha(para: path),
                     marks: (ws.gutter[path] ?? []).map { EditorGutterMark(line: $0.line, kind: kind($0.kind)) },
                     issues: ws.issues(for: path).map {
                         EditorIssue(
@@ -307,21 +327,22 @@ struct CenterPane: View {
                     },
                     changes: ws.patchChanges[path] ?? [],
                     links: ws.links[path] ?? [],
-                    find: ws.busca.find,
-                    replace: ws.busca.replace,
+                    find: daBusca ? ws.busca.find : nil,
+                    replace: daBusca ? ws.busca.replace : nil,
                     completion: CompletionSource(files: ws.filePaths, packages: ws.packages, path: path),
+                    config: ws.configDoArquivo(path),
                     onSave: { ws.save(path) },
                     // A lupa do teclado procura aqui dentro; a busca do projeto inteiro
                     // continua no painel lateral (⌘⇧F).
-                    onFind: { ws.busca.abrir() },
+                    onFind: { ws.busca.abrir(path) },
                     onGutterLongPress: { hunkAt = HunkRef(path: path, line: $0) },
-                    onCursor: {
-                        if path == ws.active {
-                            ws.cursorOffset = $0
+                    onCursor: { ws.anotarCursor($0, em: path) },
+                    onOpenLink: { ws.openFile($0) },
+                    onFindResults: {
+                        if path == alvoDaBusca {
+                            ws.busca.contagem($0)
                         }
                     },
-                    onOpenLink: { ws.openFile($0) },
-                    onFindResults: { ws.busca.contagem($0) },
                     onDefinition: { ws.irParaDefinicao() },
                     onSendSelection: { texto, de, ate in
                         ws.agent.anexarTrecho(
@@ -331,7 +352,9 @@ struct CenterPane: View {
                         )
                         chrome.snapshot.agentVisible = true
                     },
-                    onTrocarAba: { ws.irParaAba(deslocamento: $0) }
+                    onTrocarAba: { ws.irParaAba(deslocamento: $0) },
+                    aoConsumirTroca: { ws.busca.trocaFeita($0) },
+                    aoConsumirLinha: { ws.linhaRevelada($0) }
                 )
                 // Folha de ação, não popover: o popover reaparecia sozinho a cada
                 // redesenho e engolia o toque seguinte, que era o toque que devia levar

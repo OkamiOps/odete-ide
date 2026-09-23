@@ -40,6 +40,10 @@ public final class SessoesDoEditor {
         /// A aba foi fechada com o editor na tela: quando ele sair, vai embora em vez de
         /// ficar guardado.
         var descartarAoSair = false
+        /// O recuo e a quebra de linha que o próprio texto usa, lidos pelo Runestone ao
+        /// montar o estado. Quebra `nil` é texto de uma linha só.
+        var recuoDetectado: DetectedIndentStrategy = .unknown
+        var quebraDetectada: LineEnding?
 
         init(
             documento: String,
@@ -64,9 +68,20 @@ public final class SessoesDoEditor {
         var rolagem: CGPoint
     }
 
+    /// O último pedido de substituir e de ir para uma linha que cada documento atendeu.
+    struct PedidosAtendidos {
+        var troca = -1
+        var linha = -1
+    }
+
     let capacidade: Int
     private(set) var sessoes: [String: Sessao] = [:]
     private(set) var estados: [String: EstadoSalvo] = [:]
+    /// Por documento, e não por coordenador nem por editor: o coordenador nasce a cada
+    /// host novo (troca de modo, lados do modo Dois) e o editor pode ser despejado e
+    /// remontado, ou montado avulso. Cada um deles nascia sem lembrar de nada e refazia a
+    /// última substituição e o último salto de linha.
+    var atendidos: [String: PedidosAtendidos] = [:]
     private var relogio: UInt64 = 0
     /// Coordenadores com editor na tela, para os comandos do menu acharem o editor certo.
     private let coordenadores = NSHashTable<CodeEditorView.Coordinator>.weakObjects()
@@ -121,6 +136,7 @@ public final class SessoesDoEditor {
         }
         sessoes[documento] = nil
         estados[documento] = nil
+        atendidos[documento] = nil
     }
 
     /// Solta os editores dos documentos do projeto que não estão mais em aba nenhuma.
@@ -218,6 +234,9 @@ public final class HostDoEditor: UIView {
             comando(UIKeyCommand.inputDownArrow, [.alternate, .shift], #selector(duplicarLinhas)),
             comando("\t", [.control], #selector(proximaAba)),
             comando("\t", [.control, .shift], #selector(abaAnterior)),
+            // ⇧Tab desindenta, como em todo editor de código. Sem isto a tecla não fazia
+            // nada — ou tirava o foco do editor.
+            comando("\t", [.shift], #selector(desindentar)),
         ]
         if coordenador?.problemaVisivel == true {
             lista.append(comando(UIKeyCommand.inputEscape, [], #selector(esconderProblema)))
@@ -243,6 +262,10 @@ public final class HostDoEditor: UIView {
 
     @objc private func duplicarLinhas() {
         coordenador?.executar(.duplicarLinhas)
+    }
+
+    @objc private func desindentar() {
+        coordenador?.executar(.desindentar)
     }
 
     @objc private func proximaAba() {

@@ -116,9 +116,9 @@ extension CodeEditorView.Coordinator {
             tv.selectedRange = e.selecao
             return
         }
-        umPasso(tv) {
-            tv.replace(e.faixa, withText: e.texto)
-            let total = (textoAtual as NSString).length
+        editarPorDentro(tv, avisar: true) {
+            trocarTrecho(tv, e.faixa, por: e.texto)
+            let total = tamanhoDoDocumento(tv)
             let de = min(max(e.selecao.location, 0), total)
             tv.selectedRange = NSRange(location: de, length: min(e.selecao.length, total - de))
         }

@@ -60,6 +60,9 @@ extension CodeEditorView.Coordinator {
         tv.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         host.addSubview(tv)
         ligar(s)
+        // Recuo e quebra são do documento que entrou, não do que saiu.
+        aplicarRecuo(tv)
+        aplicarQuebra(tv)
         // Quem estava digitando e trocou de aba pelo teclado continua digitando. O foco
         // passa antes de o editor antigo sair da tela, senão o teclado de tela desce e
         // sobe de novo.
@@ -112,7 +115,9 @@ extension CodeEditorView.Coordinator {
             onFind: parent.onFind,
             onDefinition: parent.onDefinition,
             onSendSelection: { [weak self] in self?.mandarSelecao() },
-            onComentar: { [weak self] in self?.executar(.alternarComentario) }
+            onComentar: { [weak self] in self?.executar(.alternarComentario) },
+            onTab: { [weak self] in self?.tabularPelaBarra() },
+            onDesindentar: { [weak self] in self?.executar(.desindentar) }
         )
         tv.inputAccessoryView = barra
         // Toque no caminho do import ou na onda de um problema. Não cancela o toque
@@ -122,7 +127,8 @@ extension CodeEditorView.Coordinator {
         tv.addGestureRecognizer(toque)
         let a = assinaturaAtual
         tv.backgroundColor = UIColor(hex: a.palette.bg)
-        tv.setState(estado(texto: parent.text, a))
+        let inicial = estado(texto: parent.text, a)
+        tv.setState(inicial)
         let s = SessoesDoEditor.Sessao(
             documento: doc,
             textView: tv,
@@ -131,6 +137,11 @@ extension CodeEditorView.Coordinator {
             assinatura: a,
             avulsa: avulsa
         )
+        // O recuo e a quebra que o arquivo já usa. A quebra detectada era jogada fora e o
+        // Runestone ficava no `\n` padrão: Enter num arquivo CRLF misturava quebras.
+        s.recuoDetectado = RecuoDoTexto.detectar(parent.text)
+        s.quebraDetectada = inicial.detectedLineEndings
+        tv.lineEndings = inicial.detectedLineEndings ?? parent.config?.fimDeLinha?.runestone ?? .lf
         // Documento que já teve editor e foi despejado da fila: volta com o cursor e a
         // rolagem onde estavam.
         if let salvo = sessoes.estadoSalvo(doc) {
@@ -176,6 +187,8 @@ extension CodeEditorView.Coordinator {
         s.barra.onDefinition = parent.onDefinition
         s.barra.onSendSelection = { [weak self] in self?.mandarSelecao() }
         s.barra.onComentar = { [weak self] in self?.executar(.alternarComentario) }
+        s.barra.onTab = { [weak self] in self?.tabularPelaBarra() }
+        s.barra.onDesindentar = { [weak self] in self?.executar(.desindentar) }
         offsetObservation?.invalidate()
         offsetObservation = tv.observe(\.contentOffset, options: [.new]) { [weak self] _, _ in
             Task { @MainActor in self?.positionOverlay() }
@@ -269,7 +282,7 @@ extension CodeEditorView.Coordinator {
             s.assinatura = a
             hidePopup()
             s.textView.backgroundColor = UIColor(hex: a.palette.bg)
-            s.textView.setState(estado(texto: textoAtual, a), addUndoAction: true)
+            aplicarEstado(s.textView, estado(texto: textoAtual, a), texto: textoAtual, desfazivel: true)
         }
         if palette != a.palette {
             aplicarCores(a.palette)
@@ -307,10 +320,37 @@ extension CodeEditorView.Coordinator {
     /// não serve: desfazê-la derruba o app — o Runestone fecha, no meio do desfazer, o
     /// grupo que o próprio `UndoManager` abriu (`endUndoGrouping called with no
     /// matching begin`).
+    ///
+    /// Quando dá, entra só o que mudou (`DiferencaDeTexto`), como edição comum num passo
+    /// de desfazer: o cursor e a rolagem ficam onde estavam e o Runestone analisa só o
+    /// trecho. Era isto que fazia o salvamento automático com "remover espaços no fim"
+    /// jogar o cursor longe a cada pausa. O texto inteiro volta por `setState` quando a
+    /// troca é grande demais ou traz quebras que o editor converteria.
     func aplicarTextoDeFora(_ texto: String, em tv: TextView) {
         hidePopup()
-        tv.setState(estado(texto: texto, sessao?.assinatura ?? assinaturaAtual), addUndoAction: true)
-        anotarTexto(texto)
+        let trocas = DiferencaDeTexto.trocas(de: textoAtual, para: texto)
+        let cabem = !trocas.isEmpty && trocas.count <= 200
+            && trocas.allSatisfy { QuebrasDeLinha.inalterado($0.texto, por: tv.lineEndings) }
+        if cabem, tv.text == textoAtual {
+            let selecao = tv.selectedRange
+            let rolagem = tv.contentOffset
+            editarPorDentro(tv, avisar: false, rolar: false) {
+                for t in trocas.reversed() {
+                    trocarTrecho(tv, t.faixa, por: t.texto)
+                }
+                let total = tamanhoDoDocumento(tv)
+                let nova = DiferencaDeTexto.mapear(selecao, trocas)
+                let de = min(nova.location, total)
+                tv.selectedRange = NSRange(location: de, length: min(nova.length, total - de))
+            }
+            tv.contentOffset = rolagem
+        }
+        // Não coube, ou por algum motivo as trocas não chegaram ao texto pedido: o texto
+        // inteiro, como sempre foi.
+        if textoAtual != texto {
+            aplicarEstado(tv, estado(texto: texto, sessao?.assinatura ?? assinaturaAtual), texto: texto, desfazivel: true)
+            anotarTexto(texto)
+        }
     }
 
     /// Rola até `ponto`, preso ao que o conteúdo permite.

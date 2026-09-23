@@ -114,6 +114,9 @@ struct PhoneShell: View {
                     // branco com a linha 1 — nem o arquivo, nem um aviso.
                     FileViewer(path: path)
                 } else if let path = ws.active {
+                    if ws.conflitos.contains(path) {
+                        FaixaDeConflito(path: path)
+                    }
                     if let p = ws.agent.pendingPatches.first(where: { $0.path == path }) {
                         PatchBanner(patch: p)
                     }
@@ -123,15 +126,19 @@ struct PhoneShell: View {
                         language: Language.detect(path: path),
                         palette: theme.palette,
                         prefs: chrome.snapshot.editor,
-                        reveal: ws.reveal,
+                        reveal: ws.pedidoDeLinha(para: path),
                         changes: ws.patchChanges[path] ?? [],
-                        onSave: { ws.save(path) }
+                        config: ws.configDoArquivo(path),
+                        onSave: { ws.save(path) },
+                        onCursor: { ws.anotarCursor($0, em: path) },
+                        aoConsumirLinha: { ws.linhaRevelada($0) }
                     )
                 } else {
                     EmptyEditor()
                 }
             }
             .background(theme.bg)
+            .perguntaAoFecharAba()
         case .agent: AgentPane()
         case .term: TerminalPane()
         case .preview: PreviewPane()

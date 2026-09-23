@@ -44,6 +44,13 @@ public struct CodeEditorView: UIViewRepresentable {
     /// Vem por aqui, e não só pelo menu, porque a navegação de foco do sistema pega o
     /// ⌃Tab antes do menu quando há texto em edição.
     public var onTrocarAba: (Int) -> Void
+    /// O que o `.editorconfig` do projeto diz deste arquivo: recuo e quebra de linha.
+    public var config: ConfigDoArquivo?
+    /// O pedido de substituição (`replace`) com este `token` foi atendido: quem pediu pode
+    /// esquecê-lo. Chega fora da atualização da view.
+    public var aoConsumirTroca: (Int) -> Void
+    /// O mesmo para o pedido de ir à linha (`reveal`).
+    public var aoConsumirLinha: (Int) -> Void
 
     public init(
         text: Binding<String>,
@@ -59,6 +66,7 @@ public struct CodeEditorView: UIViewRepresentable {
         find: EditorFind? = nil,
         replace: EditorReplace? = nil,
         completion: CompletionSource? = nil,
+        config: ConfigDoArquivo? = nil,
         onSave: @escaping () -> Void = {},
         onFind: @escaping () -> Void = {},
         onGutterLongPress: @escaping (Int) -> Void = { _ in },
@@ -67,7 +75,9 @@ public struct CodeEditorView: UIViewRepresentable {
         onFindResults: @escaping (Int) -> Void = { _ in },
         onDefinition: @escaping () -> Void = {},
         onSendSelection: @escaping (String, Int, Int) -> Void = { _, _, _ in },
-        onTrocarAba: @escaping (Int) -> Void = { _ in }
+        onTrocarAba: @escaping (Int) -> Void = { _ in },
+        aoConsumirTroca: @escaping (Int) -> Void = { _ in },
+        aoConsumirLinha: @escaping (Int) -> Void = { _ in }
     ) {
         _text = text
         self.documentId = documentId
@@ -91,6 +101,9 @@ public struct CodeEditorView: UIViewRepresentable {
         self.onDefinition = onDefinition
         self.onSendSelection = onSendSelection
         self.onTrocarAba = onTrocarAba
+        self.config = config
+        self.aoConsumirTroca = aoConsumirTroca
+        self.aoConsumirLinha = aoConsumirLinha
     }
 
     public func makeUIView(context: Context) -> HostDoEditor {
@@ -134,6 +147,8 @@ public struct CodeEditorView: UIViewRepresentable {
         barra?.onDefinition = onDefinition
         barra?.onSendSelection = { [weak c] in c?.mandarSelecao() }
         barra?.onComentar = { [weak c] in c?.executar(.alternarComentario) }
+        barra?.onTab = { [weak c] in c?.tabularPelaBarra() }
+        barra?.onDesindentar = { [weak c] in c?.executar(.desindentar) }
         if c.marks != marks || c.issues != issues || c.changes != changes || c.links != links || docChanged {
             c.marks = marks
             c.issues = issues
@@ -145,21 +160,7 @@ public struct CodeEditorView: UIViewRepresentable {
             c.find = find
             c.buscar(tv)
         }
-        if let replace, c.replaceToken != replace.token {
-            c.replaceToken = replace.token
-            c.substituir(tv, replace)
-        }
-        if let reveal, c.revealToken != reveal.token {
-            c.revealToken = reveal.token
-            DispatchQueue.main.async {
-                _ = tv.goToLine(max(reveal.line - 1, 0), select: .line)
-                tv.becomeFirstResponder()
-                // O `goToLine` rola o mínimo, e a linha alvo acabava colada na borda de
-                // baixo — chegar na definição e não vê-la não serve de nada. Um terço a
-                // partir do topo deixa o contexto de cima e de baixo à vista.
-                c.centralizar(tv, linha: reveal.line)
-            }
-        }
+        c.atenderPedidos(tv)
     }
 
     public static func dismantleUIView(_: HostDoEditor, coordinator: Coordinator) {
@@ -170,7 +171,14 @@ public struct CodeEditorView: UIViewRepresentable {
         let c = context.coordinator
         tv.showLineNumbers = prefs.lineNumbers
         tv.isLineWrappingEnabled = prefs.wrap
-        tv.indentStrategy = .space(length: prefs.tabWidth)
+        // O recuo é do arquivo, não dos Ajustes: o `.editorconfig`, senão o que o texto já
+        // usa, e só por último o padrão. Forçar espaços dos Ajustes em todo arquivo fazia o
+        // Tab e o Enter recuarem com espaços num arquivo de tabs.
+        let recuo = c.estrategiaDeRecuo(prefs)
+        if tv.indentStrategy != recuo {
+            tv.indentStrategy = recuo
+        }
+        c.aplicarQuebra(tv)
         tv.showSpaces = prefs.showWhitespace
         tv.showTabs = prefs.showWhitespace
         tv.showNonBreakingSpaces = prefs.showWhitespace
@@ -194,9 +202,12 @@ public struct CodeEditorView: UIViewRepresentable {
             c.lineHeight = prefs.lineHeight
             tv.lineHeightMultiplier = prefs.lineHeight
         }
-        if c.guidesOn != prefs.indentGuides || c.tabWidth != prefs.tabWidth {
+        // As guias e o minimapa contam o recuo na mesma unidade que o Tab insere.
+        let largura = max(recuo.largura, 1)
+        if c.guidesOn != prefs.indentGuides || c.tabWidth != largura {
             c.guidesOn = prefs.indentGuides
-            c.tabWidth = prefs.tabWidth
+            c.tabWidth = largura
+            c.minimapTexto = ""
             c.scheduleDecorations()
         }
         if c.minimapSize != prefs.minimap {
@@ -237,13 +248,14 @@ public struct CodeEditorView: UIViewRepresentable {
         var fontSize: Double = 0
         var fontFamily: EditorFont = .plex
         var isEditing = false
-        var revealToken = -1
+        /// Uma edição do próprio editor está em curso (comando, substituição, texto que
+        /// chegou de fora) — ver `editarPorDentro`.
+        var editandoPorDentro = false
         var marks: [EditorGutterMark] = []
         var issues: [EditorIssue] = []
         var changes: [EditorLineChange] = []
         var links: [EditorLink] = []
         var find: EditorFind?
-        var replaceToken = -1
         /// Onde estão as ocorrências da busca no arquivo.
         var buscaRanges: [NSRange] = []
         let overlay = GutterOverlay(frame: .zero)
@@ -308,6 +320,11 @@ public struct CodeEditorView: UIViewRepresentable {
         }
 
         public func textViewDidChange(_ textView: TextView) {
+            // Edição do próprio editor: quem a fez anota o texto uma vez no fim, em vez de
+            // remontar o documento a cada trecho trocado — ver `editarPorDentro`.
+            if editandoPorDentro {
+                return
+            }
             isEditing = true
             textoAtual = textView.text
             versaoDoTexto &+= 1
@@ -364,12 +381,29 @@ public struct CodeEditorView: UIViewRepresentable {
         }
 
         public func textView(_ tv: TextView, shouldChangeTextIn range: NSRange, replacementText text: String) -> Bool {
-            if !popup.isHidden, let escolhida = popup.itemSelecionado, text == "\t" || text == "\n" {
+            // Edição do próprio editor não é tecla: nem Tab vira recuo, nem Enter aceita
+            // sugestão.
+            if editandoPorDentro {
+                return true
+            }
+            // Num arquivo CRLF o Runestone estraga o texto que já chega com `\r\n` (colar,
+            // envolver a seleção em parênteses): ver `QuebrasDeLinha.desfazerPreparoCRLF`.
+            // O texto volta ao que era e entra de novo, agora preparado uma vez só.
+            if tv.lineEndings == .crlf, text.contains("\r\r\n") {
+                tv.replace(range, withText: QuebrasDeLinha.desfazerPreparoCRLF(text))
+                return false
+            }
+            // Num arquivo CRLF o Enter chega como `\r\n`.
+            let enter = text == "\n" || text == "\r\n" || text == "\r"
+            if !popup.isHidden, let escolhida = popup.itemSelecionado, text == "\t" || enter {
                 accept(escolhida)
                 return false
             }
-            if text == "\n" || text == " " {
+            if enter || text == " " {
                 hidePopup()
+            }
+            if text == "\t", tabular(tv, faixa: range) {
+                return false
             }
             // Tecla dentro de uma linha não muda o resto do documento: o índice de palavras
             // segue valendo. Quebra de linha no texto novo ou no trecho trocado, não.

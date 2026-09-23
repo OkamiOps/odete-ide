@@ -1,6 +1,7 @@
 import Foundation
 import OdeteCore
 import OdeteFiles
+import OdeteI18n
 
 /// Criar, renomear, mover e apagar dentro do projeto — a parte do `WorkspaceModel` que
 /// mexe no disco. Mora aqui para o corpo da classe caber numa leitura.
@@ -67,6 +68,17 @@ public extension WorkspaceModel {
     }
 
     func delete(_ path: String) {
+        // Aba com alteração não salva dentro do que vai para a lixeira: o texto dela é
+        // gravado antes, e vai junto. Antes a aba era fechada à força e o que estava
+        // digitado sumia — nem o "desfazer" da árvore trazia de volta, porque o que foi
+        // para a lixeira era o arquivo sem as alterações. Se não dá para gravar (disco em
+        // conflito), nada é apagado.
+        for t in tabs where t.isDirty && (t.path == path || t.path.hasPrefix(path + "/")) {
+            guard save(t.path) else {
+                self.error = tr("Não apaguei %1$@: as alterações de %2$@ não puderam ser salvas.", path, t.path)
+                return
+            }
+        }
         do {
             let lixo = try ops.delete(path)
             ultimaAcao = .apagado(path: path, lixo: lixo)
@@ -84,6 +96,7 @@ public extension WorkspaceModel {
                 let np = new + p.dropFirst(old.count)
                 tabs[i].path = np
                 buffers[np] = buffers.removeValue(forKey: p)
+                moverEstadoDoDisco(de: p, para: np)
                 if active == p {
                     active = np
                 }

@@ -12,7 +12,8 @@ Editor, git, terminal, npm, preview ao vivo e um agente de código — sem Mac, 
 [![SwiftUI](https://img.shields.io/badge/SwiftUI-nativo-0A84FF?style=flat-square)](#arquitetura)
 [![No dispositivo](https://img.shields.io/badge/roda-100%25%20no%20dispositivo-34C759?style=flat-square)](#como-isso-funciona-de-verdade)
 [![Idiomas](https://img.shields.io/badge/idiomas-5-FF6B2C?style=flat-square)](#falando-cinco-idiomas)
-[![Testes](https://img.shields.io/badge/testes-223-8E8E93?style=flat-square)](#contribuindo)
+[![Testes](https://img.shields.io/badge/testes-1130-8E8E93?style=flat-square)](#contribuindo)
+[![Versão](https://img.shields.io/badge/vers%C3%A3o-1.5-FF6B2C?style=flat-square)](CHANGELOG.pt-BR.md)
 
 [English](README.md) · **Português** · [Deutsch](README.de.md) · [Français](README.fr.md) · [Español](README.es.md)
 
@@ -25,6 +26,13 @@ Editor, git, terminal, npm, preview ao vivo e um agente de código — sem Mac, 
 > com Node em cima do JavaScriptCore, esbuild compilado para WebAssembly, e um agente de IA que lê seus
 > arquivos, roda comandos e propõe patches que você aceita hunk por hunk. Nada é compilado na
 > nuvem. Nada é enviado para lugar nenhum. Feche a tampa do notebook — não existe notebook.
+
+> **Novidades da 1.5** — sem limite de saída nos modelos de nuvem e parâmetros descobertos por
+> modelo (lançamentos novos já funcionam de cara), compactação de conversa em 80% da janela de
+> contexto, histórico local para cada arquivo, um git que não reporta mais um push rejeitado como
+> "ok", Tailwind CSS v4 do jeito oficial, `npm run dev` que instala o que falta, e Next.js e Astro
+> de ponta a ponta.
+> [Changelog completo →](CHANGELOG.pt-BR.md)
 
 <div align="center">
   <img src="docs/img/preview.png" width="900" alt="Um projeto Vite rodando na Odete: código-fonte à esquerda, dev server no terminal, página ao vivo no Preview" />
@@ -52,7 +60,9 @@ Odete vai pelo outro caminho. Tudo o que precisa rodar, roda aqui.
 - Roda `npm install` contra o registro real
 - Roda `npm run dev` e serve seu app em `127.0.0.1`
 - Renderiza o app rodando num painel de Preview com hot reload
-- Roda um agente de IA com ferramentas, patches e checkpoints
+- Roda um agente de IA com ferramentas, patches, checkpoints e compactação automática
+- Mantém um histórico local de cada arquivo, então nenhuma versão se perde
+- Roda projetos com Tailwind CSS v4, Next.js e Astro como eles vêm
 - Fala 5 idiomas, das telas à saída do terminal
 
 </td>
@@ -61,7 +71,7 @@ Odete vai pelo outro caminho. Tudo o que precisa rodar, roda aqui.
 <h3>❌ O que ela não faz</h3>
 
 - Sem compilador Swift (a Apple não entrega um para iOS)
-- Sem SSH para git — só HTTPS e tokens
+- Sem SSH para git — remotes `git@host:` vão por HTTPS com a conta do host
 - Sem binários nativos (`esbuild`, `swc`, `lightningcss`) —
   a Odete substitui pelos equivalentes dela
 - Sem `astro build` / `next build` ainda — só modo dev
@@ -86,7 +96,14 @@ Runestone com tree-sitter. Marcas de git na margem (verde, azul, vermelho — to
 com **Descartar**), os símbolos do arquivo a um `@` de distância na paleta de comandos, lint leve por linguagem mais erros de sintaxe reais
 vindos do esbuild, e completion a partir das palavras do arquivo, caminhos do projeto e snippets.
 
-Abas, split view, diff view, visualizadores de imagem/PDF/SQLite. Buffers não salvos sobrevivem a um restart.
+Abas, split view, diff view, visualizadores de imagem/PDF/SQLite. Buffers não salvos sobrevivem a um restart. Se um
+arquivo muda no disco enquanto a aba tem edições não salvas, o editor mostra uma barra de conflito (manter o meu,
+recarregar, ver diff) em vez de sobrescrever qualquer um dos lados. Arquivos CRLF continuam CRLF, Tab/⇧Tab recuam uma
+seleção, e o `.editorconfig` é respeitado.
+
+**Histórico local**: antes de qualquer escrita — seu save, o agente, o git, o terminal, o Substituir tudo, um
+delete — a versão anterior fica guardada no dispositivo (fora do projeto e do iCloud). Toque e segure numa aba ou
+num arquivo para navegar, comparar e restaurar; arquivos deletados também podem voltar.
 
 </td>
 <td width="50%" valign="top">
@@ -99,6 +116,10 @@ de conflito, stash, remotes por HTTPS, blame e histórico por arquivo.
 Pull requests do GitHub vivem no painel: abra uma, leia o Markdown, veja o CI, comente, faça merge.
 ✨ escreve a mensagem de commit a partir do diff em stage.
 
+Ela não mente e não perde trabalho: um push que o servidor rejeita é reportado como rejeitado, **Commit**
+e **Commit & push** são separados, descartar pergunta antes e manda os arquivos para a lixeira do projeto
+com Desfazer, e abortar um merge mexe só nos arquivos do merge.
+
 </td>
 </tr>
 <tr>
@@ -110,6 +131,7 @@ O shell da própria Odete — pipes, redirecionamentos, `&&`, `||`, `;`, `&`, `$
 com Tab. `npm`, `node`, `git`, `npx`, mais os de sempre `ls`/`cat`/`grep`/`find`.
 
 Qualquer coisa que abra uma porta vira um job (`jobs`, `kill %1`) e o Preview segue o último.
+O shell fica confinado à pasta do projeto — `rm -rf ../other` é recusado, não executado.
 
 </td>
 <td valign="top">
@@ -140,6 +162,12 @@ e qualquer coisa que escreva no repositório de outra pessoa pergunta sempre, me
 Toda edição chega como um patch que você aceita, rejeita, ou aceita hunk por hunk. Um checkpoint é
 gravado antes de cada turno, então "desfazer o último turno" é um toque.
 
+Modelos de nuvem não têm limite artificial de saída: janela de contexto, limite de saída, raciocínio e níveis
+de esforço são descobertos por modelo (APIs dos provedores mais o catálogo público do models.dev), então um modelo
+lançado ontem já funciona hoje. Quando uma conversa passa de **80% da janela de contexto do modelo** ela é
+compactada do jeito que o opencode faz — as saídas de ferramenta antigas são podadas primeiro, depois o começo é
+resumido e o turno continua. O `/compact` faz isso sob demanda.
+
 </td>
 </tr>
 </table>
@@ -158,15 +186,18 @@ Essa é a parte em que ninguém acredita, então aqui vai o mecanismo honesto:
 
 | Peça | Como | Ressalva |
 |---|---|---|
-| **Node** | JavaScriptCore + uma camada Node escrita na mão: `fs`, `path`, `events`, `buffer`, `stream`, `timers`, `fetch`, `http`, `require` | Não é V8. Sem addons nativos. |
-| **npm** | Registro real, resolução de semver real, `package-lock.json` v3 real, tarballs reais, `.bin` real | Pacotes com binários nativos caem no `esm.sh` |
-| **Bundler** | `esbuild-wasm` rodando dentro do JavaScriptCore | Transformação e dev server; `build` só para Vite |
+| **Node** | JavaScriptCore + uma camada Node escrita na mão: `fs`, `path`, `events`, `buffer`, `stream`, `timers`, `crypto`, `fetch`, `http`, `require`/`import()` | Não é V8 (um shim de stack trace deixa o express e companhia satisfeitos). Sem addons nativos, sem Web Streams ainda. |
+| **npm** | Registro real, resolução de semver real, `package.json` e `package-lock.json` idênticos byte a byte aos do npm, aliases `npm:`, peers, dependências GitHub/tarball/`file:`/workspaces | Binários nativos e scripts de instalação são pulados |
+| **Bundler** | `esbuild-wasm` rodando dentro do JavaScriptCore, resolução por condição de browser, aliases `@/`, CSS Modules, Sass/Less | Transformação e dev server; `build` só para Vite |
+| **Tailwind** | O compilador do `tailwindcss` v4 rodando no mesmo engine, com um scanner de classes em JS em vez do oxide | Sem prefixing do lightningcss |
 | **Servidor HTTP** | Network.framework, atado a `127.0.0.1` | Local ao dispositivo, de propósito |
 | **git** | libgit2 1.9.7 como XCFramework, SecureTransport, sem SSH | HTTPS + token |
 | **Preview de Swift** | Um interpretador para um subconjunto de SwiftUI, renderizado como SwiftUI de verdade | Sem compilador — veja [Swift no iPad](#swift-no-ipad) |
 
-Dev servers que funcionam hoje: **Vite** (`dev`, `build`, `preview`), **Astro** (`dev`), **Next** (`dev`),
-**Nest** (via `node`).
+Dev servers que funcionam hoje: **Vite** (`dev`, `build`, `preview`), **Astro** (`dev`, incluindo
+content collections e MDX), **Next** (`dev`, App Router com CSS e Tailwind), **Nest** (via `node`).
+O `npm run dev` instala as dependências que faltam primeiro, e a primeira inicialização depois de um install leva
+uns 0,2 s porque o dev server é aquecido em segundo plano.
 
 ---
 
@@ -198,7 +229,7 @@ agente responde — é traduzido para **🇧🇷 Português · 🇺🇸 English 
 Por padrão a Odete segue o iPad. Mude em **Ajustes → Idioma** e a interface troca na hora, sem
 reabrir o app. Datas, tamanhos de arquivo, tempos relativos e o reconhecedor de fala seguem a mesma escolha.
 
-826 strings vivem num único String Catalog. `make i18n` compara ele com o código-fonte e falha se
+1.278 strings vivem num único String Catalog. `make i18n` compara ele com o código-fonte e falha se
 alguma frase foi adicionada sem traduções — é assim que continua desse jeito.
 
 ---
@@ -232,7 +263,7 @@ make run SIM="iPhone 17"
 | `make gen` | Gera `Odete.xcodeproj` a partir de `project.yml` |
 | `make build` | Compila para o simulador |
 | `make run` | Compila, instala e abre |
-| `make unit` | Testes unitários dos 15 pacotes (223 testes) |
+| `make unit` | Testes unitários dos 15 pacotes (1.130 testes) |
 | `make test` | Testes de UI (XCUITest) |
 | `make lint` | `swiftformat --lint` + `swiftlint` |
 | `make format` | `swiftformat` |
@@ -255,7 +286,7 @@ exceto o XCFramework do libgit2 com versão fixada, que está vendorizado.
 | `OdeteGit` | libgit2: ator `Repository`, diff/hunks, branches, merge, stash, remotes HTTPS |
 | `OdeteAccounts` | Keychain, contas por host, device flow do GitHub e API REST |
 | `OdeteRuntime` | JavaScriptCore com a camada Node, HTTP real em `127.0.0.1` |
-| `OdeteNpm` | Registro, semver, `package-lock` v3, tarballs, `.bin`, fallback para `esm.sh` |
+| `OdeteNpm` | Registro, semver, `package-lock` v3 idêntico ao do npm, tarballs, `.bin`, aliases, workspaces |
 | `OdeteBundler` | esbuild-wasm dentro do JSC: transformação TS/ESM, build, dev server com reload |
 | `OdeteShell` | Parser (`\|` `>` `>>` `<` `&&` `\|\|` `;` `&` `$VAR`), builtins, git, npm, node, jobs |
 | `OdetePreview` | O WKWebView do Preview, o esquema `odete://static/` e a ponte do console |
@@ -281,6 +312,7 @@ Especificações de design e planos de implementação das seis fases estão em
 | Metadados do projeto | `<projeto>/.odete/project.json` |
 | Conversas, patches, checkpoints, planos | `<projeto>/.odete/` (excluído do git) |
 | Layout e preferências | `Application Support/Odete/state.json` |
+| Histórico local de arquivos | `Application Support/Odete/Historico/` — só no dispositivo, nunca sincronizado |
 | Tokens e chaves | Keychain — nunca um arquivo, nunca um backup |
 
 `.odete/` é adicionado ao `.git/info/exclude`, então o histórico do agente nunca cai nos seus commits.
@@ -310,7 +342,7 @@ Os atalhos também estão ligados: *Abrir projeto*, *Rodar comando*, *Perguntar 
 Ditos sem rodeio, porque um README que só lista vitórias é um folheto:
 
 - `astro build` e `next build` ainda não rodam — Astro e Next só em modo dev
-- Páginas Astro renderizam; ilha com hidratação, MDX e content collections não
+- Ilhas do Astro com hidratação `client:*` e loaders de collection personalizados ainda não rodam
 - Next roda o App Router (segmento dinâmico, catch-all, grupo de rota, route handler,
   `metadata`, `not-found`, `error`) e o Pages Router, hidrata componente `'use client'` e roda
   middleware, `next/font` e Server Actions. Fica de fora: `useActionState` mostra o estado
@@ -320,6 +352,7 @@ Ditos sem rodeio, porque um README que só lista vitórias é um folheto:
 - Sem SourceKit, então sem autocomplete de Swift; `GeometryReader` e `Canvas` não estão no subconjunto do preview
 - O completion não navega com as setas — Tab/Enter pega o primeiro item, ou toque
 - Dois agentes em paralelo, MCP e voz não foram feitos
+- Um `for(;;){}` puro que nunca chama a aplicação não pode ser interrompido com Ctrl+C
 - iCloud Drive precisa do app assinado com o container `iCloud.com.okamiops.odete`
 - O device flow do GitHub precisa do `OdeteGitHubClientId` preenchido; até lá, um token pessoal
 - Entrar com uma **assinatura** do Claude ou do Codex usa os clientes OAuth desses CLIs, que
@@ -329,7 +362,7 @@ Ditos sem rodeio, porque um README que só lista vitórias é um folheto:
 
 ## Contribuindo
 
-`make check` é o portão: format, lint, catálogo de traduções, build, 223 testes. O CI roda a mesma
+`make check` é o portão: format, lint, catálogo de traduções, build, 1.130 testes. O CI roda a mesma
 coisa a cada push.
 
 Duas regras que não são óbvias:

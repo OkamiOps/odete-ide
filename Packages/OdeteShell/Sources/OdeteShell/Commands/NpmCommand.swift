@@ -47,9 +47,10 @@ struct NpmCommand: ShellCommand {
                 for a in rep.added {
                     io.out("+ \(a)")
                 }
-                io
-                    .out("\(rep.installed.count) pacote(s) instalado(s)" +
-                        (rep.installed.isEmpty ? tr(" (já estava tudo lá)") : ""))
+                io.out(
+                    tr("%1$@ pacote(s) instalado(s)", "\(rep.installed.count)")
+                        + (rep.installed.isEmpty ? tr(" (já estava tudo lá)") : "")
+                )
                 if !rep.nativosCobertos.isEmpty {
                     io.out(tr(
                         "%1$@ ferramenta(s) nativa(s) com equivalente embutido na Odete",
@@ -83,10 +84,10 @@ struct NpmCommand: ShellCommand {
                 }
                 // Estes são de verdade: a dependência não vai estar lá.
                 for s in rep.skipped {
-                    io.err("ignorado: \(s)")
+                    io.err(tr("ignorado: %1$@", "\(s)"))
                 }
                 for a in rep.avisos {
-                    io.err("aviso: \(a)")
+                    io.err(tr("aviso: %1$@", "\(a)"))
                 }
                 for (n, e) in rep.failed {
                     io.err(tr("falhou: %1$@: %2$@", "\(n)", "\(e)"))
@@ -101,7 +102,8 @@ struct NpmCommand: ShellCommand {
                     io.out(tr("nenhum pacote instalado (rode npm install)"))
                 }
                 for p in list {
-                    io.out("\(p.name)@\(p.version)\(p.dev ? " (dev)" : "")\(p.native ? "  [nativo, não roda]" : "")")
+                    let nativo = p.native ? tr("  [nativo, não roda]") : ""
+                    io.out("\(p.name)@\(p.version)\(p.dev ? " (dev)" : "")\(nativo)")
                 }
             case "init":
                 if FileManager.default

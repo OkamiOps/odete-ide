@@ -177,7 +177,7 @@ extension Installer {
         }
         let total = todo.count
         if total > 0 {
-            log("baixando \(total) pacote(s)…")
+            log(tr("baixando %1$@ pacote(s)…", "\(total)"))
         }
         var feitos: [Extraido] = []
         let niveis = Dictionary(grouping: todo) { Self.nivel($0.0) }

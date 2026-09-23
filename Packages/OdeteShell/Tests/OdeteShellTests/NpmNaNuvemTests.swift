@@ -1,5 +1,6 @@
 import Foundation
 import OdeteCore
+import OdeteI18n
 @testable import OdeteNpm
 @testable import OdeteShell
 import Testing
@@ -38,6 +39,12 @@ struct RegistroDeUmPacote: RegistryClient {
 /// `npm install` num projeto do iCloud pelo terminal, e o `rm -rf node_modules` de
 /// quem quer começar de novo.
 struct NpmNaNuvemTests {
+    /// O teste confere o resumo do install na frase em português; no simulador em inglês
+    /// ele chegaria traduzido.
+    init() {
+        Texto.escolher(.ptBR)
+    }
+
     func projetoNaNuvem() throws -> URL {
         let u = FileManager.default.temporaryDirectory
             .appending(path: "odete-sh-\(UUID().uuidString)/Mobile Documents/iCloud~odete/Documents/Projects/app")

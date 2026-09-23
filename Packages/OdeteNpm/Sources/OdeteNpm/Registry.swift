@@ -90,7 +90,7 @@ public enum NpmError: LocalizedError, Sendable {
     case registry(String), notFound(String), noVersion(String, String), tarball(String), io(String), native(String)
     public var errorDescription: String? {
         switch self {
-        case let .registry(m): "registro: \(m)"
+        case let .registry(m): tr("registro: %1$@", "\(m)")
         case let .notFound(n): tr("pacote não encontrado: %1$@", "\(n)")
         case let .noVersion(n, r): tr("nenhuma versão de %1$@ satisfaz %2$@", "\(n)", "\(r)")
         case let .tarball(m): "tarball: \(m)"

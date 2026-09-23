@@ -19,6 +19,9 @@ settings:
     DEVELOPMENT_TEAM: ""
     ENABLE_USER_SCRIPT_SANDBOXING: "YES"
     SWIFT_UPCOMING_FEATURE_EXISTENTIAL_ANY: "YES"
+    # O libgit2 vendorizado só tem a fatia arm64 do simulador: sem isto o build genérico
+    # ("generic/platform=iOS Simulator", o do CI) tenta ligar x86_64 e não acha git_*.
+    "EXCLUDED_ARCHS[sdk=iphonesimulator*]": x86_64
 packages:
   OdeteI18n:
     path: Packages/OdeteI18n

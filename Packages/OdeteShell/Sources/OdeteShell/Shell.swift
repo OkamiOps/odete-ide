@@ -94,6 +94,17 @@ public final class Shell: @unchecked Sendable {
     public var devServer: DevServer?
     private var cancelFlag = false
     public var onJobsChanged: (@Sendable () -> Void)?
+    /// Código de saída do último pipeline que terminou em primeiro plano neste terminal:
+    /// o `$?`. Fica de uma linha para a outra, como no sh.
+    public private(set) var ultimoCodigo: Int32 = 0
+
+    /// Ligado enquanto a linha do terminal roda os comandos dela.
+    ///
+    /// O `npm run` roda o script chamando `run` de novo, de dentro do comando. Essa linha de
+    /// dentro é o `sh -c` do script: tem o próprio `$?`, que começa em 0, e não pode mexer
+    /// no do terminal — num job em segundo plano ela terminaria quando bem entendesse, no
+    /// meio de outra linha.
+    @TaskLocal static var dentroDeUmComando = false
 
     public init(root: URL, services: ShellServices = ShellServices()) {
         self.root = root
@@ -140,27 +151,56 @@ public final class Shell: @unchecked Sendable {
         guard !trimmed.isEmpty else { return 0 }
         remember(trimmed)
         cancelFlag = false
-        let parsed: CommandLine
-        do { parsed = try Parser.parse(trimmed, env: env) } catch { sink(
-            .err,
-            "odete: \(error.localizedDescription)"
-        ); return 2 }
-        var last: Int32 = 0
-        for (link, pipeline) in parsed.items {
-            switch link {
-            case .andThen where last != 0: continue
-            case .orElse where last == 0: continue
-            default: break
+        let deDentro = Self.dentroDeUmComando
+        // O `$?` que esta linha enxerga: o da linha anterior, ou 0 no script de um comando.
+        var status: Int32 = deDentro ? 0 : ultimoCodigo
+        func anotar(_ codigo: Int32) {
+            status = codigo
+            if !deDentro {
+                ultimoCodigo = codigo
             }
-            if pipeline.background {
-                let text = pipeline.commands.map { $0.argv.joined(separator: " ") }.joined(separator: " | ")
-                startJob(text) { [self] in await runPipeline(pipeline, sink: sink) }
-                last = 0
-            } else {
-                last = await runPipeline(pipeline, sink: sink)
+        }
+        let linha: LinhaCrua
+        do { linha = try Parser.separar(trimmed) } catch {
+            sink(.err, "odete: \(error.localizedDescription)")
+            anotar(2)
+            return 2
+        }
+        var last: Int32 = 0
+        await Self.$dentroDeUmComando.withValue(true) {
+            for (link, crua) in linha.items {
+                switch link {
+                case .andThen where last != 0: continue
+                case .orElse where last == 0: continue
+                default: break
+                }
+                // Expandido agora, e não antes da linha: em `cmd; echo $?` o `$?` é o do `cmd`,
+                // e em `export X=1; echo $X` o `X` já é o novo.
+                let pipeline = crua.expandido { [self] in valor(de: $0, status: status) }
+                if pipeline.background {
+                    let text = pipeline.commands.map { $0.argv.joined(separator: " ") }.joined(separator: " | ")
+                    startJob(text) { [self] in await runPipeline(pipeline, sink: sink) }
+                    last = 0 // como no sh: `cmd &` sai com 0 na hora
+                } else {
+                    last = await runPipeline(pipeline, sink: sink)
+                }
+                anotar(last)
             }
         }
         return last
+    }
+
+    /// O valor de `$nome` agora. `status` é o `$?` da linha que está expandindo.
+    func valor(de nome: String, status: Int32) -> String {
+        switch nome {
+        case "?": String(status)
+        // Não há processo por comando: tudo roda no processo do app, e o `$$` é o dele.
+        case "$": String(ProcessInfo.processInfo.processIdentifier)
+        // O terminal não recebe argumentos, então não há `$1`, `$2`…: `$#` é 0.
+        case "#": "0"
+        case "0": "odete"
+        default: env[nome] ?? ""
+        }
     }
 
     func runPipeline(_ p: CommandLine.Pipeline, sink: @escaping @Sendable (StreamKind, String) -> Void) async -> Int32 {

@@ -165,8 +165,12 @@ public final class TerminalSession: Identifiable {
             self?.receber(kind, text)
         }
         Task { [shell] in
-            let code = await shell.run(line) { kind, text in
-                receber(kind == .out ? .out : .err, text)
+            // Linha do terminal é sempre a de fora, com o `$?` do terminal, mesmo que quem
+            // a pediu seja uma tarefa nascida dentro de um comando (que herdaria a marca).
+            let code = await Shell.$dentroDeUmComando.withValue(false) {
+                await shell.run(line) { kind, text in
+                    receber(kind == .out ? .out : .err, text)
+                }
             }
             await MainActor.run {
                 // O que ainda está no lote vem antes do código de saída, na ordem.

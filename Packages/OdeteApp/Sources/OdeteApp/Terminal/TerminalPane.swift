@@ -156,6 +156,20 @@ struct TerminalView: View {
     @Environment(ChromeState.self) private var chrome
     @Bindable var session: TerminalSession
     @FocusState private var focused: Bool
+    /// Segura o Tab até as letras digitadas antes dele chegarem ao campo — ver `FilaDeTeclas`.
+    @State private var teclas = FilaDeTeclas()
+
+    /// O texto do prompt. O `set` é chamado a cada edição do campo, na ordem do sistema de
+    /// texto; é assim que a fila sabe que a tecla de uma letra já virou texto.
+    var entrada: Binding<String> {
+        Binding(
+            get: { session.input },
+            set: { novo in
+                session.input = novo
+                teclas.chegouTexto()
+            }
+        )
+    }
 
     /// O terminal tem tamanho e fonte próprios: ler log e escrever código não pedem o
     /// mesmo corpo, e quem deixa o terminal numa faixa estreita quer letra menor ali.
@@ -208,7 +222,7 @@ struct TerminalView: View {
             }
             HStack(spacing: 8) {
                 Text(session.prompt).font(fonte).foregroundStyle(theme.accent).lineLimit(1).fixedSize()
-                TextField(tr("comando"), text: $session.input)
+                TextField(tr("comando"), text: entrada)
                     .font(fonte)
                     .foregroundStyle(theme.fg)
                     .textFieldStyle(.plain)
@@ -218,9 +232,27 @@ struct TerminalView: View {
                     .submitLabel(.return)
                     .focused($focused)
                     .onSubmit { session.submit(); focused = true }
+                    // As setas trocam a linha inteira pelo histórico e não esperam a fila: letra
+                    // a caminho antes de uma seta só acontece digitando e apertando a seta no
+                    // mesmo instante, e a seta tem de responder na hora.
                     .onKeyPress(.upArrow) { session.historyUp(); return .handled }
                     .onKeyPress(.downArrow) { session.historyDown(); return .handled }
-                    .onKeyPress(.tab) { session.tab(); return .handled }
+                    // O Tab se usa no meio da digitação, que é quando há letras a caminho.
+                    .onKeyPress(.tab) {
+                        teclas.depoisDoTexto { session.tab() }
+                        return .handled
+                    }
+                    // Só anota: toda tecla que vai virar texto, na hora em que desce.
+                    .onKeyPress(phases: .down) { press in
+                        if FilaDeTeclas.produzTexto(
+                            caracteres: press.characters,
+                            modificadores: press.modifiers,
+                            temTexto: !session.input.isEmpty
+                        ) {
+                            teclas.desceuTexto()
+                        }
+                        return .ignored
+                    }
                     .onKeyPress(characters: CharacterSet(charactersIn: "cC"), phases: .down) { press in
                         if press.modifiers.contains(.control) {
                             session.cancel(); return .handled

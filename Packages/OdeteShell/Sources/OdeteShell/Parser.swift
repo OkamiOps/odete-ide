@@ -57,44 +57,125 @@ public enum ParseError: LocalizedError, Equatable {
     }
 }
 
-public enum Parser {
-    enum Token: Equatable { case word(String), op(String) }
+/// Uma palavra da linha antes da expansão: pedaços de texto e referências a variáveis,
+/// na ordem em que apareceram.
+///
+/// O shell expandia a linha inteira antes de rodar o primeiro comando. Em
+/// `npx vitest run; echo fim $?` o `$?` nem era reconhecido, mas mesmo reconhecido valeria
+/// o de antes da linha — e um `export X=1; echo $X` mostrava o `X` velho. Guardando a
+/// palavra crua, cada pipeline se expande logo antes de rodar, como no sh.
+struct Palavra: Equatable, Sendable {
+    enum Pedaco: Equatable, Sendable {
+        case texto(String)
+        case variavel(String)
+    }
 
-    /// Tokeniza com aspas simples/duplas, escapes e expansão de `$VAR`/`${VAR}`.
-    static func tokenize(_ line: String, env: [String: String]) throws -> [Token] {
-        var out: [Token] = []
-        var cur = ""
-        var hasWord = false
-        var i = line.startIndex
-        func flush() {
-            if hasWord {
-                out.append(.word(cur)); cur = ""; hasWord = false
+    var pedacos: [Pedaco] = []
+
+    /// A palavra com cada variável trocada pelo valor que `valor` der agora.
+    func expandida(_ valor: (String) -> String) -> String {
+        var s = ""
+        for p in pedacos {
+            switch p {
+            case let .texto(t): s += t
+            case let .variavel(nome): s += valor(nome)
             }
         }
-        func expand(_ from: inout String.Index) throws -> String {
-            var j = line.index(after: from)
-            if j < line.endIndex, line[j] == "(" {
+        return s
+    }
+}
+
+/// A linha já conferida e separada em pipelines, com as palavras ainda por expandir.
+struct LinhaCrua: Sendable {
+    struct Simples: Sendable {
+        var argv: [Palavra] = []
+        var stdinFile: Palavra?
+        var stdoutFile: Palavra?
+        var append = false
+        var stderrToStdout = false
+
+        func expandido(_ valor: (String) -> String) -> CommandLine.Simple {
+            CommandLine.Simple(
+                argv: argv.map { $0.expandida(valor) },
+                stdinFile: stdinFile?.expandida(valor),
+                stdoutFile: stdoutFile?.expandida(valor),
+                append: append,
+                stderrToStdout: stderrToStdout
+            )
+        }
+    }
+
+    struct Pipeline: Sendable {
+        var commands: [Simples]
+        var background: Bool
+
+        func expandido(_ valor: (String) -> String) -> CommandLine.Pipeline {
+            CommandLine.Pipeline(commands: commands.map { $0.expandido(valor) }, background: background)
+        }
+    }
+
+    var items: [(link: CommandLine.Link, pipeline: Pipeline)]
+}
+
+public enum Parser {
+    enum Token: Equatable { case word(Palavra), op(String) }
+
+    /// Tokeniza com aspas simples/duplas e escapes. `$VAR`, `${VAR}` e os especiais
+    /// (`$?`, `$$`, `$#`, `$0`) ficam anotados na palavra, sem valor: quem expande é
+    /// quem roda, pipeline a pipeline.
+    static func tokenize(_ line: String) throws -> [Token] {
+        var out: [Token] = []
+        var palavra = Palavra()
+        var cur = "" // texto literal que ainda não foi para `palavra`
+        var hasWord = false
+        var i = line.startIndex
+        func fecharTexto() {
+            if !cur.isEmpty {
+                palavra.pedacos.append(.texto(cur)); cur = ""
+            }
+        }
+        func flush() {
+            if hasWord {
+                fecharTexto()
+                out.append(.word(palavra)); palavra = Palavra(); hasWord = false
+            }
+        }
+        /// O nome da variável cujo `$` está em `from`, deixando `from` no último caractere
+        /// dela; nil quando o `$` é só um cifrão.
+        func variavel(_ from: inout String.Index) throws -> String? {
+            let j = line.index(after: from)
+            guard j < line.endIndex else { return nil }
+            let c = line[j]
+            if c == "(" {
                 throw ParseError.semSubstituicao
             }
-            if j < line.endIndex, line[j] == "{" {
-                if let close = line[j...]
-                    .firstIndex(of: "}")
-                {
-                    let name = String(line[line.index(after: j) ..< close]); from = close; return env[name] ?? ""
-                }
+            if c == "{", let close = line[j...].firstIndex(of: "}") {
+                from = close
+                return String(line[line.index(after: j) ..< close])
             }
+            // Especiais e posicionais têm um caractere só, como no sh: `$?x` é o código
+            // seguido de "x", e `$10` é `$1` seguido de "0".
+            if c == "?" || c == "$" || c == "#" || (c.isASCII && c.isNumber) {
+                from = j
+                return String(c)
+            }
+            var k = j
             var name = ""
-            while j < line.endIndex,
-                  line[j].isLetter || line[j]
-                  .isNumber || line[j] == "_"
-            {
-                name.append(line[j]); j = line.index(after: j)
+            while k < line.endIndex, line[k].isLetter || line[k].isNumber || line[k] == "_" {
+                name.append(line[k]); k = line.index(after: k)
             }
             if name.isEmpty {
-                return "$"
+                return nil
             }
-            from = line.index(before: j)
-            return env[name] ?? ""
+            from = line.index(before: k)
+            return name
+        }
+        func dolar(_ from: inout String.Index) throws {
+            if let nome = try variavel(&from) {
+                fecharTexto(); palavra.pedacos.append(.variavel(nome))
+            } else {
+                cur.append("$")
+            }
         }
         while i < line.endIndex {
             let c = line[i]
@@ -111,7 +192,7 @@ public enum Parser {
                     if d == "\\", line.index(after: j) < line.endIndex {
                         j = line.index(after: j); cur.append(line[j])
                     } else if d == "$" {
-                        cur += try expand(&j)
+                        try dolar(&j)
                     } else if d == "\"" {
                         closed = true; break
                     } else {
@@ -126,7 +207,7 @@ public enum Parser {
                 if n < line.endIndex {
                     cur.append(line[n]); hasWord = true; i = n
                 }
-            case "$": cur += try expand(&i); hasWord = true
+            case "$": try dolar(&i); hasWord = true
             case "`": throw ParseError.semSubstituicao
             case " ", "\t": flush()
             case "#" where !hasWord: i = line.endIndex; continue
@@ -163,16 +244,27 @@ public enum Parser {
         return out
     }
 
+    /// A linha inteira expandida de uma vez com `env`. O shell não usa isto — ver
+    /// `separar` —, mas é o jeito direto de ver o que uma linha vira.
     public static func parse(_ line: String, env: [String: String] = [:]) throws -> CommandLine {
-        let tokens = try tokenize(line, env: env)
-        var items: [(link: CommandLine.Link, pipeline: CommandLine.Pipeline)] = []
+        let crua = try separar(line)
+        return CommandLine(items: crua.items.map { item in
+            (item.link, item.pipeline.expandido { env[$0] ?? "" })
+        })
+    }
+
+    /// Confere a linha toda (aspas, `$(…)`, heredoc, `|` solto) antes de rodar qualquer
+    /// coisa e a separa em pipelines, sem expandir nada.
+    static func separar(_ line: String) throws -> LinhaCrua {
+        let tokens = try tokenize(line)
+        var items: [(link: CommandLine.Link, pipeline: LinhaCrua.Pipeline)] = []
         var link: CommandLine.Link = .always
-        var commands: [CommandLine.Simple] = []
-        var cur = CommandLine.Simple(argv: [])
+        var commands: [LinhaCrua.Simples] = []
+        var cur = LinhaCrua.Simples()
         var i = 0
         func endSimple() throws {
             guard !cur.argv.isEmpty else { throw ParseError.emptyCommand }
-            commands.append(cur); cur = CommandLine.Simple(argv: [])
+            commands.append(cur); cur = LinhaCrua.Simples()
         }
         func endPipeline(background: Bool) throws {
             // fim vazio (linha em branco, `;` ou `&` no final) é permitido; `a |` não é
@@ -183,7 +275,7 @@ public enum Parser {
             if !commands
                 .isEmpty
             {
-                items.append((link, CommandLine.Pipeline(commands: commands, background: background)))
+                items.append((link, LinhaCrua.Pipeline(commands: commands, background: background)))
             }
             commands = []
         }
@@ -217,6 +309,6 @@ public enum Parser {
             i += 1
         }
         try endPipeline(background: false)
-        return CommandLine(items: items)
+        return LinhaCrua(items: items)
     }
 }

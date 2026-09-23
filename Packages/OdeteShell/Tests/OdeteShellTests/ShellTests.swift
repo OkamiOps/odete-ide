@@ -35,6 +35,31 @@ struct ParserTests {
         #expect(empty.items.isEmpty)
     }
 
+    /// As variáveis ficam anotadas na palavra e só viram texto na hora de rodar; aspas
+    /// simples e `\$` continuam deixando o cifrão como texto.
+    @Test func variaveisFicamParaDepois() throws {
+        func palavras(_ linha: String) throws -> [Palavra] {
+            try Parser.separar(linha).items[0].pipeline.commands[0].argv
+        }
+        #expect(try palavras("echo $? ${?}x \"c=$?\"") == [
+            Palavra(pedacos: [.texto("echo")]),
+            Palavra(pedacos: [.variavel("?")]),
+            Palavra(pedacos: [.variavel("?"), .texto("x")]),
+            Palavra(pedacos: [.texto("c="), .variavel("?")]),
+        ])
+        #expect(try palavras(#"echo '$?' \$? "\$?" a$ "$""#).map { $0.expandida { _ in "X" } }
+            == ["echo", "$?", "$?", "$?", "a$", "$"])
+        // Especiais e posicionais têm um caractere só, como no sh.
+        #expect(try palavras("echo $?1 $10 $$ $# $HOME_x").map { $0.expandida { "<\($0)>" } }
+            == ["echo", "<?>1", "<1>0", "<$>", "<#>", "<HOME_x>"])
+        // Sem `}` o cifrão é texto, como era.
+        #expect(try palavras("echo ${x").map { $0.expandida { _ in "X" } } == ["echo", "${x"])
+        // Redirecionamento também expande na hora.
+        let s = try Parser.separar("cat < $A > ${B}.txt").items[0].pipeline.commands[0]
+        #expect(s.stdinFile == Palavra(pedacos: [.variavel("A")]))
+        #expect(s.stdoutFile == Palavra(pedacos: [.variavel("B"), .texto(".txt")]))
+    }
+
     /// `git push -u origin minha-branch`: contando pela posição crua, a branch virava
     /// "origin" e o push ia para o lugar errado.
     @Test func posicionaisDoPushIgnoramAsOpcoes() {
@@ -162,6 +187,62 @@ func project() throws -> URL {
         _ = await sh.run("jobs && kill %1", sink: o.sink)
         try await Task.sleep(for: .milliseconds(300))
         #expect(sh.jobs.isEmpty && o.out.contains("[1] node srv.js"))
+    }
+
+    /// `npx vitest run; echo fim $?` imprimia `fim $?`: o `$?` não era reconhecido e, pior,
+    /// a linha inteira se expandia antes do primeiro comando rodar.
+    @Test func codigoDeSaida() async throws {
+        let sh = try Shell(root: project())
+        func saida(_ linha: String) async -> String {
+            let o = Out()
+            _ = await sh.run(linha, sink: o.sink)
+            return o.out
+        }
+        #expect(await saida("false; echo $?") == "1")
+        #expect(await saida("true && echo $?") == "0")
+        #expect(await saida("false || echo $?") == "1")
+        #expect(await saida("echo '$?'") == "$?")
+        #expect(await saida(#"echo \$?"#) == "$?")
+        #expect(await saida(#"node -e "process.exit(2)"; echo "c=$?""#) == "c=2")
+        #expect(await saida("nao-existe; echo $?") == "127")
+        // Um `&&` pulado não mexe no `$?`: continua o do último que rodou.
+        #expect(await saida("false && echo nunca; echo $?") == "1")
+        // Cada `$?` é o do pipeline de antes, não o do começo da linha.
+        #expect(await saida("false; echo $?; echo $?") == "1\n0")
+        // De uma linha para a outra do mesmo terminal, e com chaves.
+        _ = await saida("false")
+        #expect(sh.ultimoCodigo == 1)
+        #expect(await saida("echo ${?}") == "1")
+        #expect(await saida("echo $?") == "0")
+        // Erro de sintaxe sai com 2, como no sh.
+        #expect(await sh.run("echo \"sem fechar", sink: Out().sink) == 2)
+        #expect(await saida("echo \"c=$?\"") == "c=2")
+        // Job em segundo plano: `$?` é 0 na hora.
+        #expect(await saida("false; true & echo $?") == "0")
+        // O resto também expande na hora: o `export` do começo da linha já vale no fim.
+        #expect(await saida("export COR=azul; echo $COR") == "azul")
+        #expect(await saida("export A=1 && echo $A") == "1")
+        #expect(await saida("export A=2 && echo \"a=${A}\"") == "a=2")
+        #expect(await saida("echo $$ $#") == "\(ProcessInfo.processInfo.processIdentifier) 0")
+    }
+
+    /// O script do `npm run` é um `sh -c`: tem o próprio `$?`, que começa em 0, e não mexe
+    /// no do terminal; quem fica no `$?` do terminal é o código do `npm`.
+    @Test func codigoDeSaidaDoScript() async throws {
+        let root = try project()
+        try #"{"name":"p","scripts":{"mostra":"echo dentro=$?","falha":"false; true; false"}}"#.write(
+            to: root.appending(path: "package.json"),
+            atomically: true,
+            encoding: .utf8
+        )
+        let sh = Shell(root: root)
+        let o = Out()
+        _ = await sh.run("false; npm run mostra; echo fora=$?", sink: o.sink)
+        #expect(o.out.contains("dentro=0") && o.out.contains("fora=0"))
+        let o2 = Out()
+        _ = await sh.run("npm run falha; echo fora=$?", sink: o2.sink)
+        #expect(o2.out.contains("fora=1"))
+        #expect(sh.ultimoCodigo == 0)
     }
 
     @MainActor

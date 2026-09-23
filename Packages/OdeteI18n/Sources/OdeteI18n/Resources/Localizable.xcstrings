@@ -1,6 +1,34 @@
 {
   "sourceLanguage": "pt-BR",
   "strings": {
+    "\n(interrompido: a pessoa parou o agente)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "\n(interrupted: the person stopped the agent)"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "\n(unterbrochen: Die Person hat den Agenten gestoppt)"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "\n(interrompu : la personne a arrêté l'agent)"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "\n(interrumpido: la persona detuvo al agente)"
+          }
+        }
+      }
+    },
     "\n… (ainda rodando após 5 min)": {
       "localizations": {
         "en": {
@@ -1289,6 +1317,34 @@
         }
       }
     },
+    "%1$@: de %2$@ para %3$@ tokens": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@: from %2$@ to %3$@ tokens"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@: von %2$@ auf %3$@ Tokens"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ : de %2$@ à %3$@ tokens"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@: de %2$@ a %3$@ tokens"
+          }
+        }
+      }
+    },
     "%1$@: módulos ES e TypeScript precisam do transformador (esbuild), que chega no marco 3": {
       "localizations": {
         "en": {
@@ -2069,6 +2125,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "La cuenta rechazó un parámetro de la solicitud. Cambia el modelo o baja el esfuerzo."
+          }
+        }
+      }
+    },
+    "A conversa ainda é curta: não há o que compactar.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The conversation is still short: there's nothing to compact."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Unterhaltung ist noch kurz: Es gibt nichts zu komprimieren."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La conversation est encore courte : il n'y a rien à compacter."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La conversación todavía es corta: no hay nada que compactar."
           }
         }
       }
@@ -3361,6 +3445,34 @@
         }
       }
     },
+    "Alguém mexeu nestes arquivos depois do patch: %1$@. Voltar ao original apaga essas mudanças também.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Someone changed these files after the patch: %1$@. Reverting to the original erases those changes too."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jemand hat diese Dateien nach dem Patch geändert: %1$@. Wenn du zum Original zurückkehrst, gehen diese Änderungen auch verloren."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quelqu'un a modifié ces fichiers après le patch : %1$@. Revenir à l'original efface aussi ces changements."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alguien cambió estos archivos después del patch: %1$@. Volver al original borra también esos cambios."
+          }
+        }
+      }
+    },
     "Alterações": {
       "localizations": {
         "en": {
@@ -3973,6 +4085,62 @@
           "stringUnit": {
             "state": "translated",
             "value": "Anthropic · suscripción Pro/Max"
+          }
+        }
+      }
+    },
+    "Ao passar de 80%, a Odete compacta a conversa: apaga saídas antigas de ferramenta e, se não bastar, resume o começo e segue o trabalho.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Past 80%, Odete compacts the conversation: it clears old tool outputs and, if that isn't enough, summarizes the beginning and keeps working."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ab 80 % komprimiert Odete die Unterhaltung: Sie entfernt alte Tool-Ausgaben und fasst, wenn das nicht reicht, den Anfang zusammen und arbeitet weiter."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Au-delà de 80 %, Odete compacte la conversation : elle efface les anciennes sorties d'outils et, si ça ne suffit pas, résume le début et continue le travail."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Al pasar del 80 %, Odete compacta la conversación: borra las salidas antiguas de herramientas y, si no basta, resume el comienzo y sigue trabajando."
+          }
+        }
+      }
+    },
+    "Apagados (tinham sido criados pelo turno): %1$@.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deleted (they had been created by the turn): %1$@."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gelöscht (sie wurden im Durchgang erstellt): %1$@."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprimés (ils avaient été créés par le tour) : %1$@."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Borrados (los había creado el turno): %1$@."
           }
         }
       }
@@ -6301,6 +6469,90 @@
         }
       }
     },
+    "Compacta a conversa: resume o começo e libera a janela": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compacts the conversation: summarizes the beginning and frees up the window"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Komprimiert die Unterhaltung: fasst den Anfang zusammen und macht im Fenster Platz"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compacte la conversation : résume le début et libère la fenêtre"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compacta la conversación: resume el comienzo y libera la ventana"
+          }
+        }
+      }
+    },
+    "Compactando a conversa…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compacting the conversation…"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unterhaltung wird komprimiert …"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compactage de la conversation…"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compactando la conversación…"
+          }
+        }
+      }
+    },
+    "Compactar agora": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compact now"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jetzt komprimieren"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compacter maintenant"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compactar ahora"
+          }
+        }
+      }
+    },
     "Comparar A → B": {
       "localizations": {
         "en": {
@@ -6833,34 +7085,6 @@
         }
       }
     },
-    "Conecte uma conta para saber o tamanho da janela.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Connect an account to see the window size."
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Verbinde ein Konto, um die Fenstergröße zu sehen."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Connecte un compte pour connaître la taille de la fenêtre."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Conecta una cuenta para saber el tamaño de la ventana."
-          }
-        }
-      }
-    },
     "Confira a conta em Ajustes → Contas.": {
       "localizations": {
         "en": {
@@ -7249,6 +7473,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Sigue desde donde se quedó."
+          }
+        }
+      }
+    },
+    "Conversa compactada": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conversation compacted"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unterhaltung komprimiert"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conversation compactée"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conversación compactada"
           }
         }
       }
@@ -11005,6 +11257,34 @@
         }
       }
     },
+    "Ficaram como a pessoa deixou, porque ela mexeu depois do turno: %1$@.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Left as the person left them, because they edited them after the turn: %1$@."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "So gelassen, wie die Person sie hinterlassen hat, weil sie sie nach dem Durchgang bearbeitet hat: %1$@."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Laissés tels que la personne les a laissés, car elle les a modifiés après le tour : %1$@."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quedaron como los dejó la persona, porque los tocó después del turno: %1$@."
+          }
+        }
+      }
+    },
     "Filtrar arquivos": {
       "localizations": {
         "en": {
@@ -13357,6 +13637,34 @@
         }
       }
     },
+    "Manter o arquivo como está": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keep the file as it is"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Datei so lassen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Garder le fichier tel quel"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dejar el archivo como está"
+          }
+        }
+      }
+    },
     "Marcar resolvido": {
       "localizations": {
         "en": {
@@ -14925,6 +15233,34 @@
         }
       }
     },
+    "Nota da Odete: a pessoa desfez o seu último turno. O que ele mudou no projeto não vale mais: releia os arquivos antes de continuar.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Note from Odete: the person undid your last turn. What it changed in the project no longer applies: reread the files before continuing."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hinweis von Odete: Die Person hat deinen letzten Durchgang rückgängig gemacht. Was er im Projekt geändert hat, gilt nicht mehr: Lies die Dateien erneut, bevor du weitermachst."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Note d'Odete : la personne a annulé ton dernier tour. Ce qu'il a changé dans le projet ne compte plus : relis les fichiers avant de continuer."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nota de Odete: la persona deshizo tu último turno. Lo que cambió en el proyecto ya no vale: vuelve a leer los archivos antes de seguir."
+          }
+        }
+      }
+    },
     "Nova": {
       "localizations": {
         "en": {
@@ -15341,6 +15677,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "No se pudo abrir"
+          }
+        }
+      }
+    },
+    "Não deu para compactar a conversa: %1$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't compact the conversation: %1$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Unterhaltung konnte nicht komprimiert werden: %1$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossible de compacter la conversation : %1$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo compactar la conversación: %1$@"
           }
         }
       }
@@ -15905,6 +16269,34 @@
         }
       }
     },
+    "O arquivo mudou depois do patch": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The file changed after the patch"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Datei wurde nach dem Patch geändert"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le fichier a changé après le patch"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El archivo cambió después del patch"
+          }
+        }
+      }
+    },
     "O arquivo sai dos dois lados e o conflito fica resolvido assim.": {
       "localizations": {
         "en": {
@@ -16433,6 +16825,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "El modelo de Apple se negó a responder: %1$@"
+          }
+        }
+      }
+    },
+    "O modelo do aparelho cuida da própria janela: não há o que compactar aqui.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The on-device model manages its own window: there's nothing to compact here."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das Modell auf dem Gerät verwaltet sein eigenes Fenster: Hier gibt es nichts zu komprimieren."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le modèle de l'appareil gère sa propre fenêtre : il n'y a rien à compacter ici."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El modelo del dispositivo gestiona su propia ventana: aquí no hay nada que compactar."
           }
         }
       }
@@ -18761,34 +19181,6 @@
         }
       }
     },
-    "Quando encher, os turnos mais antigos saem da conversa.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "When it fills up, the oldest turns drop out of the conversation."
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Wenn es voll ist, fallen die ältesten Runden aus der Unterhaltung."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Quand elle est pleine, les tours les plus anciens sortent de la conversation."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Cuando se llene, los turnos más viejos salen de la conversación."
-          }
-        }
-      }
-    },
     "Quando um arquivo com versões guardadas some do projeto, ele aparece aqui para voltar.": {
       "localizations": {
         "en": {
@@ -20073,6 +20465,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Salida"
+          }
+        }
+      }
+    },
+    "Saídas antigas de ferramenta apagadas": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Old tool outputs cleared"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alte Tool-Ausgaben entfernt"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anciennes sorties d'outils effacées"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Salidas antiguas de herramientas borradas"
           }
         }
       }
@@ -23241,6 +23661,34 @@
         }
       }
     },
+    "Voltar ao original mesmo assim": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Revert to the original anyway"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trotzdem zum Original zurück"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Revenir à l'original quand même"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Volver al original de todos modos"
+          }
+        }
+      }
+    },
     "Voltar aos projetos": {
       "localizations": {
         "en": {
@@ -23321,6 +23769,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Volvieron a como estaban antes del turno: %1$@"
+          }
+        }
+      }
+    },
+    "Voltaram ao que eram antes do turno: %1$@.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restored to what they were before the turn: %1$@."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auf den Stand vor dem Durchgang zurückgesetzt: %1$@."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Revenus à leur état d'avant le tour : %1$@."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Volvieron a como estaban antes del turno: %1$@."
           }
         }
       }
@@ -25421,6 +25897,62 @@
           "stringUnit": {
             "state": "translated",
             "value": "caché en Library/Caches/odete-npm"
+          }
+        }
+      }
+    },
+    "cancelado: esta chamada ficou sem resultado": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "cancelled: this call got no result"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "abgebrochen: Dieser Aufruf hat kein Ergebnis erhalten"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "annulé : cet appel est resté sans résultat"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "cancelado: esta llamada se quedó sin resultado"
+          }
+        }
+      }
+    },
+    "cancelado: o turno parou por repetição": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "cancelled: the turn stopped because of repetition"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "abgebrochen: Der Durchgang wurde wegen Wiederholung gestoppt"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "annulé : le tour s'est arrêté pour cause de répétition"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "cancelado: el turno se detuvo por repetición"
           }
         }
       }
@@ -30353,6 +30885,34 @@
         }
       }
     },
+    "o modelo não devolveu o resumo": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "the model didn't return the summary"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "das Modell hat keine Zusammenfassung zurückgegeben"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "le modèle n'a pas renvoyé le résumé"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "el modelo no devolvió el resumen"
+          }
+        }
+      }
+    },
     "o remoto %1$@ não existe": {
       "localizations": {
         "en": {
@@ -33821,6 +34381,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "último commit deshecho, cambios en el stage"
+          }
+        }
+      }
+    },
+    "… (as primeiras %1$@ linhas saíram da rolagem do terminal)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "… (the first %1$@ lines scrolled out of the terminal)"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "… (die ersten %1$@ Zeilen sind aus dem Terminalverlauf gefallen)"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "… (les %1$@ premières lignes sont sorties de l'historique du terminal)"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "… (las primeras %1$@ líneas salieron del historial de la terminal)"
           }
         }
       }

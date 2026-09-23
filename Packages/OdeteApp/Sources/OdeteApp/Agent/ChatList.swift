@@ -250,19 +250,23 @@ struct ChatRow: View {
             PermitCard(name: name, detail: detail, status: status) { agent.approve(id, $0) }
         case let .tool(_, name, detail):
             ToolGroup(items: [.tool(id: item.id, name: name, detail: detail)])
+        case let .compactado(_, resumo, antes, depois):
+            CompactacaoCard(resumo: resumo, antes: antes, depois: depois)
         case let .error(id, text):
             // Parar e desfazer são avisos, não falhas: cartão neutro, sem "Tentar de novo".
+            // E os avisos do laço (compactação), que também não são falha.
             let desfeito = AgentModel.ehAvisoDoDesfazer(id)
-            let parado = text == "parado" || desfeito
+            let aviso = AgentModel.ehAviso(id) && text != "parado"
+            let parado = text == "parado" || aviso
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .top, spacing: 9) {
                     Image(systemName: desfeito ? "arrow.uturn.backward.circle"
-                        : parado ? "stop.circle" : "exclamationmark.triangle.fill")
+                        : aviso ? "info.circle" : parado ? "stop.circle" : "exclamationmark.triangle.fill")
                         .font(.system(size: 13))
                         .foregroundStyle(parado ? theme.fgSubtle : theme.danger)
                     VStack(alignment: .leading, spacing: 3) {
                         // O resultado do desfazer é para ler inteiro: o que ficou e por quê.
-                        Text(text).font(.footnote).foregroundStyle(parado && !desfeito ? theme.fgMuted : theme.fg)
+                        Text(text).font(.footnote).foregroundStyle(parado && !aviso ? theme.fgMuted : theme.fg)
                             .textSelection(.enabled)
                             .fixedSize(horizontal: false, vertical: true)
                         // O texto cru do provedor é um HTTP com JSON dentro: sozinho não
@@ -323,6 +327,79 @@ struct ChatRow: View {
             Image(uiImage: ui).resizable().scaledToFill().frame(width: 72, height: 72)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
         }
+    }
+}
+
+/// A conversa foi compactada: quanto ocupava, quanto ficou, e o resumo que entrou no
+/// lugar do começo — recolhido, como o raciocínio, porque é contexto e não resposta.
+struct CompactacaoCard: View {
+    @Environment(\.theme) private var theme
+    let resumo: String
+    let antes: Int
+    let depois: Int
+    @State private var aberto = false
+
+    /// Ainda resumindo: o laço manda o cartão vazio antes do pedido ao modelo.
+    var andando: Bool {
+        resumo.isEmpty && depois == 0
+    }
+
+    var titulo: String {
+        if andando {
+            return tr("Compactando a conversa…")
+        }
+        return resumo.isEmpty ? tr("Saídas antigas de ferramenta apagadas") : tr("Conversa compactada")
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button { withAnimation(.snappy(duration: 0.2)) { aberto.toggle() } } label: {
+                HStack(spacing: 7) {
+                    if andando {
+                        ProgressView().controlSize(.mini)
+                    } else {
+                        Image(systemName: "rectangle.compress.vertical").font(.system(size: 10))
+                    }
+                    Text(titulo).font(.caption.weight(.medium)).lineLimit(1)
+                    if !andando {
+                        Text("\(fmtTok(antes)) → \(fmtTok(depois))").font(.caption2).monospacedDigit()
+                            .foregroundStyle(theme.fgSubtle).lineLimit(1)
+                    }
+                    Spacer(minLength: 4)
+                    if !resumo.isEmpty {
+                        Image(systemName: "chevron.right").font(.system(size: 9, weight: .bold))
+                            .rotationEffect(.degrees(aberto ? 90 : 0))
+                    }
+                }
+                .foregroundStyle(theme.fgMuted)
+                .padding(.horizontal, 10)
+                .frame(height: 30)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(resumo.isEmpty)
+            .accessibilityLabel(andando ? titulo : tr(
+                "%1$@: de %2$@ para %3$@ tokens",
+                titulo,
+                fmtTok(antes),
+                fmtTok(depois)
+            ))
+            if aberto, !resumo.isEmpty {
+                MarkdownText(text: resumo)
+                    .font(.caption)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 10)
+                    .padding(.bottom, 10)
+                    .overlay(alignment: .top) {
+                        Rectangle().fill(theme.separator).frame(height: 0.5).padding(.horizontal, 10)
+                    }
+            }
+        }
+        .background(theme.bg, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(theme.accent.opacity(0.25), style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
+        )
     }
 }
 

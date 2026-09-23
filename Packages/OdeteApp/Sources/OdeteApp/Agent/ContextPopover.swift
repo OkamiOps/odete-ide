@@ -58,11 +58,18 @@ struct ContextPopover: View {
                         ("Conversa", max(0, usado - uso.cache), theme.accent),
                         ("Cache", min(uso.cache, usado), .purple),
                     ])
-                    Text(agent.contextWindow > 0
-                        ? tr("Quando encher, os turnos mais antigos saem da conversa.")
-                        : tr("Conecte uma conta para saber o tamanho da janela."))
-                        .font(.caption).foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    Text(tr(
+                        "Ao passar de 80%, a Odete compacta a conversa: apaga saídas antigas de ferramenta e, se não bastar, resume o começo e segue o trabalho."
+                    ))
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    Button(tr("Compactar agora"), systemImage: "rectangle.compress.vertical") {
+                        agent.compactarAgora()
+                    }
+                    .font(.caption.weight(.medium))
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(agent.running || agent.thread.messages.isEmpty)
                 }
                 VStack(alignment: .leading, spacing: 8) {
                     SectionTitle(tr("Esta conversa"))

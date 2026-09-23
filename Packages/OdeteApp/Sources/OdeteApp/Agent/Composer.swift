@@ -154,7 +154,7 @@ struct Composer: View {
             // Sem prioridade o espaçador come a largura do nome e sobra só "…". Na versão
             // apertada o esforço também sai: ele está a um toque, no mesmo popover.
             modeloMenu(comEsforco: modoComTexto).layoutPriority(1)
-            anelContexto
+            anelContexto(comTexto: modoComTexto)
             enviar
         }
     }
@@ -164,12 +164,13 @@ struct Composer: View {
         return min(1, Double(usado) / Double(max(1, agent.contextWindow)))
     }
 
-    /// Anel do contexto sem percentual escrito: o número não cabe na mesma linha dos
-    /// controles, e o detalhe está a um toque.
-    var anelContexto: some View {
+    /// Anel do contexto. O percentual aparece quando a linha tem folga — na versão
+    /// apertada dos controles fica só o anel, e o detalhe está a um toque. Com a
+    /// compactação a 80%, o número é o que diz à pessoa quanto falta para ela acontecer.
+    func anelContexto(comTexto: Bool) -> some View {
         Button { janela = true } label: {
-            ContextGauge(fracao: fracaoContexto, mostrarTexto: false)
-                .frame(width: 24, height: 28)
+            ContextGauge(fracao: fracaoContexto, mostrarTexto: comTexto)
+                .frame(minWidth: 24, minHeight: 28)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(tr("Janela de contexto"))
@@ -364,7 +365,13 @@ struct MentionMenu: View {
                 $0.lowercased().hasPrefix(q) ? 0 : 1,
                 $0.count
             ) < ($1.lowercased().hasPrefix(q) ? 0 : 1, $1.count) }.prefix(8).map { ($0, "") }
-        case .skill: return skills.filter { q.isEmpty || $0.id.contains(q) }.prefix(8).map { ($0.id, $0.description) }
+        case .skill:
+            // Os comandos da Odete vêm antes das skills do projeto.
+            let comandos = [(String(AgentModel.comandoCompactar.dropFirst()), tr(
+                "Compacta a conversa: resume o começo e libera a janela"
+            ))].filter { q.isEmpty || $0.0.contains(q) }
+            let deSkills = skills.filter { q.isEmpty || $0.id.contains(q) }.prefix(8).map { ($0.id, $0.description) }
+            return comandos + deSkills
         }
     }
 

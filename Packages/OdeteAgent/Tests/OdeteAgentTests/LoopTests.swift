@@ -230,10 +230,14 @@ func runAll(
         let h = ps.queue(path: "h.txt", before: before, after: after)
         try after.write(to: root.appending(path: "h.txt"), atomically: true, encoding: .utf8)
         #expect(h.hunks.count == 2)
+        // Aceitar um hunk não mexe no disco — ele já tem o `depois` inteiro. O hunk passa
+        // para o `antes` do patch, e o que sobra pendente é o outro.
         ps.acceptHunk(h.id, index: 0)
         let mid = try String(contentsOf: root.appending(path: "h.txt"), encoding: .utf8)
-        #expect(mid.contains("dois") && mid.contains("19") && !mid.contains("dezenove") && ps.get(h.id)?
-            .status == .pending)
+        #expect(mid == after, "aceitar um hunk regravou o arquivo")
+        let meio = try #require(ps.get(h.id))
+        #expect(meio.status == .pending && meio.hunks.count == 1 && meio.before.contains("dois")
+            && !meio.before.contains("dezenove"))
         ps.acceptHunk(h.id, index: 0)
         let final = try String(contentsOf: root.appending(path: "h.txt"), encoding: .utf8)
         #expect(ps.get(h.id)?.status == .accepted && final == after)
@@ -342,8 +346,10 @@ func runAll(
         #expect(r.history.count == 2 && r.history[0].content.contains("Arquivo `a.txt`") && r.history[1]
             .content == "Oi!")
         let turn = p.turns.withLock { $0[0] }
-        #expect(turn.system.contains("Modo CHAT") && turn.system.contains("a.txt\nsrc/x.ts") && turn.tools.map(\.name)
-            .contains("run_shell") && !turn.tools.map(\.name).contains("write_file"))
+        // O modo vai na mensagem do turno; o sistema tem a lista de arquivos e fica igual
+        // a conversa inteira — ver `SistemaFixoTests`.
+        #expect(turn.messages.last?.content.contains("Modo CHAT") == true && turn.system.contains("a.txt\nsrc/x.ts"))
+        #expect(!turn.system.contains("Modo CHAT") && turn.tools.map(\.name) == Tools.all.map(\.name))
     }
 
     @Test func toolsThenAnswerWithPatch() async throws {
@@ -642,24 +648,42 @@ func runAll(
 
 /// O enunciado tem que chegar ao provedor.
 ///
-/// O laço mandava as últimas vinte e quatro mensagens. Num trabalho de vinte e tantas
-/// chamadas isso joga fora justamente a primeira — a que diz o que fazer — e aí não
-/// adianta o provedor protegê-la: o que não chega não dá para preservar.
+/// O laço mandava as últimas vinte e quatro mensagens e, para o enunciado não se perder,
+/// reinjetava o primeiro pedido da conversa. Num segundo pedido, isso mandava o pedido
+/// velho no lugar do atual. Agora a conversa vai inteira e quem cuida do tamanho é a
+/// compactação, que guarda o pedido deste turno.
 @Suite(.serialized) struct EnunciadoTests {
-    @Test func oPedidoVaiJuntoMesmoDepoisDeMuitasChamadas() {
-        let pedido = AgentMessage.user("troca a cor do botão para azul")
-        let muitas = (1 ... 60).map { AgentMessage(role: .tool, content: "resultado \($0)", toolCallId: "\($0)") }
-        let enviadas = AgentLoop.comOPedido([pedido] + muitas, ultimas: 24)
-        #expect(enviadas.first?.content == pedido.content, "o pedido não chegou ao provedor")
-        #expect(enviadas.count <= 25)
-        #expect(enviadas.last?.content == "resultado 60", "perdeu o fim da conversa")
+    init() {
+        Texto.escolher(.ptBR)
+    }
+
+    /// Um segundo pedido, trinta rodadas adentro: é ele que o provedor vê, e o primeiro
+    /// não volta como se fosse o atual.
+    @Test func oPedidoDoTurnoChegaMesmoDepoisDeMuitasRodadas() async throws {
+        let root = try tmpProject()
+        var roteiro: [[StreamEvent]] = (0 ..< 30).map { i in
+            [.tools([call("list_dir", ["path": "src/\(i)"])]), .done]
+        }
+        roteiro.append([.text("pronto"), .done])
+        let p = FakeProvider(roteiro)
+        let loop = AgentLoop(provider: p, host: TestHost(root: root), patches: PatchStore(root: root))
+        let antes: [AgentMessage] = [.user("primeiro pedido"), AgentMessage(role: .assistant, content: "feito")]
+        _ = await runAll(loop, "segundo pedido", LoopConfig(mode: .chat, permit: .full, model: "m"), history: antes)
+        let ultimo = try #require(p.turns.withLock { $0.last })
+        #expect(ultimo.messages.contains { $0.role == .user && Prompts.semContextoDoTurno($0.content) == "segundo pedido" },
+                "o pedido do turno não chegou ao provedor")
+        #expect(ultimo.messages.filter { $0.content == "primeiro pedido" }.count == 1,
+                "o primeiro pedido foi reinjetado")
+        #expect(ultimo.messages.last?.role == .tool, "a conversa foi cortada no fim")
     }
 
     /// Conversa curta não ganha cópia do pedido: ele já está lá.
-    @Test func semCorteNadaEhDuplicado() {
-        let msgs: [AgentMessage] = [.user("arruma"), AgentMessage(role: .assistant, content: "ok")]
-        let enviadas = AgentLoop.comOPedido(msgs, ultimas: 24)
-        #expect(enviadas.count == 2)
-        #expect(enviadas.filter { $0.role == .user }.count == 1, "duplicou o pedido")
+    @Test func semCorteNadaEhDuplicado() async throws {
+        let root = try tmpProject()
+        let p = FakeProvider([[.text("ok"), .done]])
+        let loop = AgentLoop(provider: p, host: TestHost(root: root), patches: PatchStore(root: root))
+        _ = await runAll(loop, "arruma", LoopConfig(mode: .chat, permit: .full, model: "m"))
+        let turno = try #require(p.turns.withLock { $0.first })
+        #expect(turno.messages.filter { $0.role == .user }.count == 1, "duplicou o pedido")
     }
 }

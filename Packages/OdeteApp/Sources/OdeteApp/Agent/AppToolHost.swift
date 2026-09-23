@@ -63,26 +63,58 @@ final class AppToolHost: FileToolHost, @unchecked Sendable {
 
     override func runShell(_ command: String) async -> String {
         let session = runBox.value()
-        let start = await MainActor.run { session.lines.count }
-        await MainActor.run { session.append(.input, "\(session.prompt) \(command)"); session.run(command) }
+        // A marca é o `id` da última linha, não a posição: a aba guarda 5000 linhas e
+        // apaga as primeiras, e o `clear` esvazia tudo. Com a posição, um comando que
+        // passava das 5000 linhas voltava "(sem saída)" — a posição de início já não
+        // existia — e um `clear` no meio fazia `lines[start...]` sair do fim da lista.
+        // O `id` só cresce, então "depois da marca" continua valendo.
+        let marca = await MainActor.run { () -> Int in
+            session.append(.input, "\(session.prompt) \(command)")
+            // A linha digitada acabou de entrar: o `id` dela é a marca. (A última linha de
+            // antes não serve: depois de um `clear` não há linha nenhuma.)
+            let m = session.lines.last?.id ?? 0
+            session.run(command)
+            return m
+        }
         var waited = 0
+        var interrompido = false
         while await MainActor.run(body: { session.running != nil }) {
+            // Parar interrompe o comando de verdade — o Ctrl-C da aba —, em vez de o
+            // agente ficar esperando até cinco minutos com a pessoa já tendo parado.
+            if Task.isCancelled {
+                if !interrompido {
+                    interrompido = true
+                    await MainActor.run { session.cancel() }
+                    waited = 0
+                } else if waited > 20 {
+                    break
+                }
+            }
             try? await Task.sleep(for: .milliseconds(100))
             waited += 1
-            if waited >
-                3000
-            {
-                return await MainActor
-                    .run { session.lines[start...].map(\.text).joined(
-                        separator: "\n"
-                    ) } + tr("\n… (ainda rodando após 5 min)")
+            if !interrompido, waited > 3000 {
+                let parcial = await MainActor.run { Self.saida(session.lines, depoisDe: marca) }
+                return parcial + tr("\n… (ainda rodando após 5 min)")
             }
         }
-        return await MainActor.run {
-            let out = session.lines[min(start, session.lines.count)...].filter { $0.kind != .input }
-                .map { ($0.kind == .err ? "! " : "") + $0.text }.joined(separator: "\n")
-            return out.isEmpty ? tr("(sem saída)") : out
+        let out = await MainActor.run { Self.saida(session.lines, depoisDe: marca) }
+        if interrompido {
+            return out + tr("\n(interrompido: a pessoa parou o agente)")
         }
+        return out.isEmpty ? tr("(sem saída)") : out
+    }
+
+    /// O que o comando escreveu: as linhas depois de `marca` (a linha digitada).
+    ///
+    /// Se o começo já saiu da rolagem (mais de 5000 linhas), diz quantas se perderam em vez
+    /// de fingir que o comando começou ali.
+    nonisolated static func saida(_ linhas: [TermLine], depoisDe marca: Int) -> String {
+        let novas = linhas.filter { $0.id > marca }
+        let texto = novas.filter { $0.kind != .input }
+            .map { ($0.kind == .err ? "! " : "") + $0.text }.joined(separator: "\n")
+        guard let primeira = novas.first, primeira.id > marca + 1 else { return texto }
+        let perdidas = primeira.id - marca - 1
+        return tr("… (as primeiras %1$@ linhas saíram da rolagem do terminal)", "\(perdidas)") + "\n" + texto
     }
 
     /// Pull requests do repositório, com a conta que está nos Ajustes.

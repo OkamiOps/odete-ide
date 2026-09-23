@@ -51,6 +51,25 @@ struct AgentPane: View {
         // O cartão de erro pede a lista de contas quando o modelo escolhido não pode
         // responder; quem desenha a lista é este painel.
         .onChange(of: ag.pedidoDeTrocarModelo) { abreContas() }
+        // Rejeitar esbarrou em edição feita depois do patch: voltar agora levaria junto
+        // o que a pessoa escreveu. Ela decide.
+        .alert(
+            tr("O arquivo mudou depois do patch"),
+            isPresented: Binding(get: { !ag.conflitos.isEmpty }, set: {
+                if !$0 {
+                    ag.esquecerConflitos()
+                }
+            })
+        ) {
+            Button(tr("Voltar ao original mesmo assim"), role: .destructive) { ag.resolverConflitos(voltar: true) }
+            Button(tr("Manter o arquivo como está")) { ag.resolverConflitos(voltar: false) }
+            Button(tr("Cancelar"), role: .cancel) { ag.esquecerConflitos() }
+        } message: {
+            Text(tr(
+                "Alguém mexeu nestes arquivos depois do patch: %1$@. Voltar ao original apaga essas mudanças também.",
+                VoltaDoTurno.lista(ag.conflitos.map(\.path))
+            ))
+        }
         .sheet(isPresented: $history) { HistorySheet(agent: ag) }
         .sheet(isPresented: $showAccounts) {
             NavigationStack {

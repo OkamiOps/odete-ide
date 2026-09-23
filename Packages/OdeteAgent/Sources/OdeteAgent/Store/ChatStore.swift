@@ -9,6 +9,10 @@ public enum ChatItem: Codable, Sendable, Hashable, Identifiable {
     case permit(id: String, name: String, detail: String, status: PermitStatus)
     case error(id: String, text: String)
     case patch(id: String, patchId: String, path: String)
+    /// A conversa foi compactada: `resumo` é o texto que entrou no lugar do começo (vazio
+    /// quando só as saídas antigas de ferramenta foram podadas), `antes` e `depois` os
+    /// tokens na janela. Com `depois` zero e resumo vazio, a compactação está em andamento.
+    case compactado(id: String, resumo: String, antes: Int, depois: Int)
 
     public enum PermitStatus: String, Codable, Sendable { case pending, ok, no }
 
@@ -19,7 +23,7 @@ public enum ChatItem: Codable, Sendable, Hashable, Identifiable {
             _,
             _,
             _
-        ), let .error(id, _), let .patch(id, _, _): id
+        ), let .error(id, _), let .patch(id, _, _), let .compactado(id, _, _, _): id
         }
     }
 }
@@ -32,6 +36,10 @@ public struct ChatThread: Codable, Sendable, Hashable, Identifiable {
     public var messages: [AgentMessage]
     public var usage: TokenUse
     public var lastInput: Int
+    /// O prompt de sistema desta conversa, montado no primeiro turno e mantido igual até o
+    /// fim — ver `Prompts.daConversa`. `nil` nas conversas de antes desta versão e nas que
+    /// ainda não tiveram turno.
+    public var sistema: String? = nil
 
     /// Conversa sem título ainda. Guardada vazia, e não com a frase pronta: o título
     /// fica no disco, e uma conversa criada em português não podia aparecer em
@@ -112,7 +120,11 @@ public final class ChatStore: @unchecked Sendable {
     public func save(_ t: ChatThread) -> ChatThread {
         var s = t
         s.items = Self.slim(t.items)
-        s.messages = Array(t.messages.suffix(40))
+        // Sem o corte fixo de 40: com a compactação a conversa já cabe na janela, e o
+        // corte cego podia começar a conversa guardada num resultado de ferramenta sem a
+        // chamada — o 400 de toda mensagem seguinte. O teto que sobra é folgado e corta
+        // no começo de uma mensagem da pessoa.
+        s.messages = Transcricao.consertar(Transcricao.aparar(t.messages, maximo: Self.mensagensGuardadas))
         if s.title == ChatThread.semTitulo {
             s.title = Self.title(of: s.items)
         }
@@ -123,6 +135,9 @@ public final class ChatStore: @unchecked Sendable {
         try? enc.encode(s).write(to: dir.appending(path: "\(s.id).json"), options: .atomic)
         return s
     }
+
+    /// Quantas mensagens da conversa (do modelo) ficam no disco, no máximo.
+    public static let mensagensGuardadas = 1500
 
     public func remove(_ id: String) {
         try? FileManager.default.removeItem(at: dir.appending(path: "\(id).json"))

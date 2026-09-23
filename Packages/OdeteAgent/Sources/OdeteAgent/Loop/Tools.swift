@@ -50,8 +50,14 @@ public enum Tools {
     public static let all: [ToolSpec] = [
         ToolSpec(
             name: "read_file",
-            description: "Lê um arquivo do projeto.",
-            parameters: obj(["path": caminho], required: ["path"])
+            description: "Lê um arquivo do projeto. Arquivo longo vem em partes: continue com offset.",
+            // Como o `read` do opencode (`tool/read.ts`): `offset` é a linha inicial (1 é a
+            // primeira) e `limit` quantas linhas; sem eles vêm as primeiras 2000.
+            parameters: obj([
+                "path": caminho,
+                "offset": ["type": "number", "description": "linha inicial (1 = primeira)"],
+                "limit": ["type": "number", "description": "quantas linhas (padrão 2000)"],
+            ], required: ["path"])
         ),
         ToolSpec(
             name: "str_replace",
@@ -164,6 +170,15 @@ public enum Tools {
         }
     }
 
+    /// A ferramenta existe neste modo?
+    public static func permitida(_ nome: String, no modo: AgentMode) -> Bool {
+        switch modo {
+        case .build: all.contains { $0.name == nome }
+        case .plan: planTools.contains(nome)
+        case .chat: chatTools.contains(nome)
+        }
+    }
+
     public static func needsPermit(_ mode: PermitMode, _ name: String) -> Bool {
         switch mode {
         case .full: false
@@ -184,56 +199,183 @@ public enum Tools {
     }
 
     /// Comandos que só leem (liberados em chat e plan).
+    ///
+    /// Lido com o mesmo corte de linha que o resto do shell usa (`segmentosDoShell`), e
+    /// não só no `|`: dividir só no cano deixava `ls && rm -rf src`, `echo x > f`,
+    /// `git branch -D main` e `find . -delete` passarem como leitura — no Chat e no Plan
+    /// eles rodavam, e no Build o desfazer do turno não tinha guardado nada antes.
+    ///
+    /// Na dúvida, não é leitura: o custo de errar para esse lado é pedir licença (ou
+    /// abrir a janela do checkpoint) à toa; o do outro é um arquivo apagado sem volta.
     public static func isReadShell(_ command: String) -> Bool {
-        let parts = command.split(separator: "|").map { $0.trimmingCharacters(in: .whitespaces) }
-        return !parts.isEmpty && parts.allSatisfy { seg in
-            let words = seg.split(separator: " ").map(String.init)
-            guard let cmd = words.first else { return false }
-            if [
-                "ls",
-                "cat",
-                "head",
-                "tail",
-                "grep",
-                "find",
-                "pwd",
-                "wc",
-                "echo",
-                "which",
-                "env",
-                "date",
-                "history",
-                "jobs",
-                "help",
-                "true",
-                "tree",
-            ].contains(cmd) {
-                return true
-            }
-            if cmd == "git", words.count > 1 {
-                return [
-                    "status",
-                    "log",
-                    "diff",
-                    "branch",
-                    "remote",
-                    "show",
-                    "rev-parse",
-                    "stash",
-                ].contains(words[1]) && !(words[1] == "stash" && words.count > 2 && words[2] != "list")
-            }
-            if cmd == "npm",
-               words
-               .count >
-               1
-            {
-                return ["ls", "list", "-v", "--version", "run"]
-                    .contains(words[1]) && !(words[1] == "run" && words.count > 2)
-            }
-            if cmd == "node", words.contains("-v") || words.contains("--version") {
-                return true
-            }
+        // `$(…)` e crase o shell da Odete não faz, mas quem pede não sabe disso — e o que
+        // está dentro não passa por esta leitura.
+        if temSubstituicao(command) {
             return false
+        }
+        let segmentos = segmentosDoShell(command)
+        return !segmentos.isEmpty && segmentos.allSatisfy(segmentoSoLe)
+    }
+
+    /// Um comando do meio da linha só lê?
+    static func segmentoSoLe(_ segmento: String) -> Bool {
+        if escreveComSeta(segmento) {
+            return false
+        }
+        let words = palavrasDoShell(segmento)
+        guard let cmd = words.first else { return false }
+        let args = Array(words.dropFirst())
+        switch cmd {
+        case "ls", "cat", "head", "tail", "grep", "pwd", "wc", "echo", "which", "date", "history", "jobs",
+             "help", "true", "tree", "cd":
+            return true
+        case "env":
+            // `env` sozinho lista; com argumento roda outro programa com eles.
+            return args.allSatisfy { $0.hasPrefix("-") }
+        case "find":
+            // Estes apagam, rodam comando ou escrevem arquivo.
+            let escreve: Set = ["-delete", "-exec", "-execdir", "-ok", "-okdir", "-fprint", "-fprint0", "-fprintf",
+                                "-fls"]
+            return !args.contains { escreve.contains($0) }
+        case "git":
+            return gitSoLe(args)
+        case "npm":
+            guard let sub = args.first else { return false }
+            if ["ls", "list", "-v", "--version"].contains(sub) {
+                return true
+            }
+            // `npm run` sozinho lista os scripts; com nome, roda um.
+            return sub == "run" && args.count == 1
+        case "node":
+            return args.contains("-v") || args.contains("--version")
+        default:
+            return false
+        }
+    }
+
+    /// `git` que só lê. Cada subcomando tem o seu jeito de escrever, então vai um a um.
+    static func gitSoLe(_ bruto: [String]) -> Bool {
+        var args = bruto
+        // `--no-pager` não muda o que o comando faz.
+        while args.first == "--no-pager" {
+            args.removeFirst()
+        }
+        guard let sub = args.first else { return false }
+        let resto = Array(args.dropFirst())
+        switch sub {
+        case "--version":
+            return true
+        case "status", "log", "diff", "show", "rev-parse", "blame", "shortlog", "ls-files", "describe":
+            // `--output` grava o resultado num arquivo.
+            return !resto.contains { $0 == "--output" || $0.hasPrefix("--output=") }
+        case "branch":
+            // Listar é sem nome e só com estas opções; nome cria, -d/-D apaga, -m move.
+            let listar: Set = ["-a", "-r", "-v", "-vv", "-l", "--list", "--all", "--remotes", "--show-current",
+                               "--merged", "--no-merged", "--contains", "--no-contains", "--color", "--no-color"]
+            return resto.allSatisfy { listar.contains($0) }
+        case "remote":
+            guard let acao = resto.first else { return true }
+            if acao == "-v" || acao == "--verbose" {
+                return resto.count == 1
+            }
+            return ["show", "get-url"].contains(acao)
+        case "stash":
+            return resto.first == "list" || resto.first == "show"
+        case "tag":
+            return resto.isEmpty || resto.allSatisfy { ["-l", "--list", "-n"].contains($0) }
+        case "config":
+            return resto.contains("--get") || resto.contains("--list") || resto.contains("-l")
+                || resto.contains("--get-all")
+        default:
+            return false
+        }
+    }
+
+    /// `>` ou `>>` fora de aspas mandando para arquivo. `2>&1` só junta as saídas, e
+    /// `/dev/null` não guarda nada.
+    static func escreveComSeta(_ segmento: String) -> Bool {
+        let chars = Array(segmento)
+        var aspa: Character?
+        var i = 0
+        while i < chars.count {
+            let c = chars[i]
+            if let a = aspa {
+                if c == a {
+                    aspa = nil
+                }
+                i += 1
+                continue
+            }
+            if c == "\"" || c == "'" {
+                aspa = c
+                i += 1
+                continue
+            }
+            guard c == ">" else {
+                i += 1
+                continue
+            }
+            var j = i + 1
+            if j < chars.count, chars[j] == ">" {
+                j += 1
+            }
+            while j < chars.count, chars[j] == " " {
+                j += 1
+            }
+            if j < chars.count, chars[j] == "&" {
+                i = j + 1
+                continue
+            }
+            var alvo = ""
+            while j < chars.count, !" ;|&".contains(chars[j]) {
+                alvo.append(chars[j])
+                j += 1
+            }
+            if alvo.trimmingCharacters(in: CharacterSet(charactersIn: "\"'")) != "/dev/null" {
+                return true
+            }
+            i = j
+        }
+        return false
+    }
+
+    /// `$(…)` ou crase fora de aspas simples.
+    static func temSubstituicao(_ command: String) -> Bool {
+        var simples = false
+        var anterior: Character = " "
+        for c in command {
+            if c == "'" {
+                simples.toggle()
+            } else if !simples, c == "`" || (anterior == "$" && c == "(") {
+                return true
+            }
+            anterior = c
+        }
+        return false
+    }
+
+    /// O que o Plan deixa o shell fazer: ler, e `mkdir`/`touch` só dentro de `.odete/`.
+    ///
+    /// Olha cada comando da linha. Antes bastava a linha começar com `mkdir` e o
+    /// primeiro argumento ser `.odete` — e `mkdir .odete && rm -rf src` passava inteiro.
+    /// `pasta` é onde o shell do agente está, como em `alvosDoShell`.
+    static func planPodeRodar(_ command: String, pasta: String = "") -> Bool {
+        if temSubstituicao(command) {
+            return false
+        }
+        let segmentos = segmentosDoShell(command)
+        return !segmentos.isEmpty && segmentos.allSatisfy { seg in
+            if segmentoSoLe(seg) {
+                return true
+            }
+            guard !escreveComSeta(seg) else { return false }
+            let palavras = palavrasDoShell(seg)
+            guard let cmd = palavras.first, cmd == "mkdir" || cmd == "touch" else { return false }
+            let alvos = palavras.dropFirst().filter { !$0.hasPrefix("-") }
+            return !alvos.isEmpty && alvos.allSatisfy { alvo in
+                let p = caminhoNoShell(alvo, cwd: pasta)
+                return p == ".odete" || p.hasPrefix(".odete/")
+            }
         }
     }
 
@@ -486,6 +628,45 @@ public enum Prompts {
             """
         case .build: "Modo BUILD: pode editar. \(read) Prefira str_replace. write_file só pra arquivo novo ou reescrita total. Depois dos patches, 1–3 linhas do que mudou."
         }
+    }
+
+    /// O prompt de sistema de uma conversa inteira: sem o modo e sem as skills do turno.
+    ///
+    /// Ele é montado no primeiro turno e fica igual até a conversa acabar
+    /// (`ChatThread.sistema`). Refazer o sistema a cada rodada — a lista de arquivos muda
+    /// assim que o agente cria um — invalida o cache de prompt do provedor e, nos modelos
+    /// da Anthropic com raciocínio preservado, todo bloco de raciocínio já devolvido: o
+    /// bloco é amarrado ao sistema, às ferramentas e às mensagens exatas que vieram antes
+    /// dele. O que muda de um turno para outro (o modo, as skills pedidas com `/nome`) vai
+    /// junto da mensagem da pessoa — ver `contextoDoTurno` —, que é sempre acréscimo.
+    public static func daConversa(fileList: [String], extras: [String]) -> String {
+        let list = fileList
+            .isEmpty ? "(vazio)" :
+            (fileList.count <= 400 ? fileList.joined(separator: "\n") : fileList.prefix(400)
+                .joined(separator: "\n") + "\n… e \(fileList.count - 400) mais")
+        let modos = """
+        A mensagem da pessoa traz, em <contexto_do_turno>, o modo em que ela está (Chat, Plan ou Build) e as skills que ela chamou. Siga o modo da mensagem mais recente: ele pode mudar de um turno para o outro, e as ferramentas que ele não permite são recusadas.
+        """
+        return ([
+            system,
+            modos,
+            "Arquivos no projeto quando esta conversa começou (use list_dir para ver como está agora):\n\(list)",
+        ] + extras.filter { !$0.isEmpty }).joined(separator: "\n\n")
+    }
+
+    /// O que muda a cada turno e por isso não mora no sistema: o modo e as skills.
+    public static func contextoDoTurno(mode: AgentMode, skills: String) -> String {
+        let partes = [Prompts.mode(mode), skills].filter { !$0.isEmpty }
+        return "<contexto_do_turno>\n" + partes.joined(separator: "\n\n") + "\n</contexto_do_turno>"
+    }
+
+    /// Tira o `<contexto_do_turno>` de uma mensagem, para mostrar ou repetir o que a pessoa
+    /// escreveu.
+    public static func semContextoDoTurno(_ texto: String) -> String {
+        guard let inicio = texto.range(of: "\n\n<contexto_do_turno>\n"),
+              let fim = texto.range(of: "\n</contexto_do_turno>", range: inicio.upperBound ..< texto.endIndex)
+        else { return texto }
+        return String(texto[..<inicio.lowerBound]) + String(texto[fim.upperBound...])
     }
 
     public static func build(mode: AgentMode, fileList: [String], extras: [String]) -> String {

@@ -47,6 +47,8 @@ public protocol ToolHost: Sendable {
     func read(_ path: String) -> String?
     func write(_ path: String, _ text: String) throws
     func exists(_ path: String) -> Bool
+    /// Tamanho em bytes, sem ler o conteúdo; `nil` se não existe ou está fora do projeto.
+    func tamanho(_ path: String) -> Int?
     func list(_ path: String) -> [String]
     /// Todos os caminhos relativos (sem ruído), para a lista do sistema e o checkpoint.
     func allPaths() -> [String]
@@ -78,8 +80,45 @@ open class FileToolHost: ToolHost, @unchecked Sendable {
         root.appending(path: path).standardizedFileURL
     }
 
+    /// O caminho está dentro do projeto — de verdade, com os links seguidos.
+    ///
+    /// Comparava o prefixo do texto, sem a barra: com o projeto em `…/meu-app`,
+    /// `../meu-app-2/.env` virava `…/meu-app-2/.env`, que começa com `…/meu-app` e
+    /// passava. E um link simbólico dentro do projeto apontando para fora também passava,
+    /// porque o texto do caminho não sai do lugar. Agora os dois lados são resolvidos
+    /// (links inclusive) e a comparação é com `raiz + "/"`.
     public func inside(_ path: String) -> Bool {
-        url(path).path.hasPrefix(root.standardizedFileURL.path)
+        guard let raiz = Self.caminhoReal(root.standardizedFileURL.path),
+              let alvo = Self.caminhoReal(url(path).path) else { return false }
+        return alvo == raiz || alvo.hasPrefix(raiz + "/")
+    }
+
+    /// O caminho com os links resolvidos, mesmo que o fim dele ainda não exista (um
+    /// arquivo que o agente vai criar): resolve o maior pedaço que existe e cola o resto.
+    ///
+    /// Link quebrado dá `nil`: não há como saber para onde a escrita iria.
+    static func caminhoReal(_ caminho: String) -> String? {
+        var atual = caminho
+        var sobra: [String] = []
+        while true {
+            if let r = realpath(atual, nil) {
+                defer { free(r) }
+                var base = String(cString: r)
+                for parte in sobra.reversed() {
+                    base = (base as NSString).appendingPathComponent(parte)
+                }
+                return base
+            }
+            // Existe (como link) e mesmo assim não resolve: link quebrado ou sem acesso.
+            var st = stat()
+            if lstat(atual, &st) == 0 {
+                return nil
+            }
+            let pai = (atual as NSString).deletingLastPathComponent
+            guard !pai.isEmpty, pai != atual else { return nil }
+            sobra.append((atual as NSString).lastPathComponent)
+            atual = pai
+        }
     }
 
     /// Padrão como método da classe, e não como extensão do protocolo: em extensão a
@@ -104,11 +143,18 @@ open class FileToolHost: ToolHost, @unchecked Sendable {
     }
 
     public func exists(_ path: String) -> Bool {
-        FileManager.default.fileExists(atPath: url(path).path)
+        inside(path) && FileManager.default.fileExists(atPath: url(path).path)
     }
 
+    public func tamanho(_ path: String) -> Int? {
+        guard inside(path) else { return nil }
+        return (try? FileManager.default.attributesOfItem(atPath: url(path).path)[.size]) as? Int
+    }
+
+    /// `list_dir("..")` listava a pasta de cima do projeto.
     public func list(_ path: String) -> [String] {
-        guard let items = try? FileManager.default.contentsOfDirectory(atPath: url(path).path) else { return [] }
+        guard inside(path),
+              let items = try? FileManager.default.contentsOfDirectory(atPath: url(path).path) else { return [] }
         return items.filter { !Ignore.isNoisePath($0) }.sorted().map { n in
             var d: ObjCBool = false
             FileManager.default.fileExists(atPath: url(path).appending(path: n).path, isDirectory: &d)
@@ -141,7 +187,7 @@ open class FileToolHost: ToolHost, @unchecked Sendable {
         var lines: [String] = []
         let paths = (path?.isEmpty == false ? allPaths().filter { $0.hasPrefix(path!) } : allPaths())
         for p in paths {
-            guard let text = read(p) else { continue }
+            guard let text = textoParaBusca(p) else { continue }
             for (i, line) in text.split(separator: "\n", omittingEmptySubsequences: false).enumerated() {
                 let s = String(line)
                 if re
@@ -156,6 +202,22 @@ open class FileToolHost: ToolHost, @unchecked Sendable {
             }
         }
         return lines.isEmpty ? "(nada encontrado)" : lines.joined(separator: "\n")
+    }
+
+    /// Acima disto o grep pula o arquivo: um bundle de 30 MB ou um vídeo não têm linha
+    /// que valha a pena, e lê-los inteiros para a memória a cada busca travava o turno.
+    public static let tetoDoGrep = 2_000_000
+
+    /// O texto de `p` para o grep, ou `nil` se é grande demais ou binário.
+    ///
+    /// Binário é quem tem byte zero no começo — a mesma leitura do `grep` de verdade.
+    func textoParaBusca(_ p: String) -> String? {
+        guard let n = tamanho(p), n <= Self.tetoDoGrep,
+              let dados = try? Data(contentsOf: url(p)) else { return nil }
+        if dados.prefix(8192).contains(0) {
+            return nil
+        }
+        return String(data: dados, encoding: .utf8)
     }
 
     open func terminalTail(_ n: Int) -> String {

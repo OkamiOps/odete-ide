@@ -13,6 +13,11 @@ import OdeteRuntime
 /// editor regrava o arquivo com o mesmo texto a cada pausa na digitação — antes cada
 /// regravação derrubava o cache e mandava o Preview recarregar, e o recarregar refazia o
 /// build do zero: seis segundos de CPU num iPad sem JIT, para nada.
+///
+/// Os pacotes de node_modules não entram no bundle do app: vêm de um pacote de
+/// dependências à parte (`dependencias.js`, o `optimizeDeps` do Vite), feito uma vez e
+/// guardado em `node_modules/.odete-deps/`. Sem isso, cada letra mudada no App.tsx
+/// religava e reimprimia o react-dom inteiro — 1,6 s de CPU sem JIT num projeto pequeno.
 public final class DevServer: @unchecked Sendable {
     public enum Preset: String, Sendable { case plain, vite, astro, next }
 
@@ -66,7 +71,8 @@ public final class DevServer: @unchecked Sendable {
             "globalThis.__ilhasClienteJS = \(Self.comoLiteralJS(ilhas));",
             name: "ilhas-cliente-fonte.js"
         )
-        for arquivo in ["astro.js", "next.js", "devserver.js"] {
+        // O pacote de dependências vem antes do servidor, que cria um por servidor.
+        for arquivo in ["astro.js", "next.js", "dependencias.js", "devserver.js"] {
             try await esbuild.engine.evaluate(
                 String(contentsOf: js.appending(path: arquivo), encoding: .utf8),
                 name: arquivo

@@ -54,6 +54,44 @@
     try { mtimes.set(p, fs.statSync(p).mtimeMs); } catch (e) { mtimes.delete(p); }
   }
 
+  // ---- dependências pré-empacotadas ----
+  // No dev server, o que um import de pacote resolve (`react`, `react-dom/client`) sai do
+  // bundle do app e vai para um pacote de dependências à parte, feito uma vez e guardado
+  // em disco (dependencias.js). O bundle do app fica só com o código do projeto: o
+  // rebuild depois de editar o App.tsx liga e imprime só isso, e não o react-dom inteiro.
+  //
+  // No lugar do pacote, o app recebe dois módulos pequenos:
+  //   - um CommonJS que pega o módulo no registro que o pacote de dependências preenche
+  //     (`globalThis.__odeteDep`), igual a um `require` — então o `import` do app passa
+  //     pela mesma interoperação CJS↔ESM do esbuild que teria se o pacote estivesse junto;
+  //   - um ESM na frente dele (`export *` e `export default`), para que `default` siga o
+  //     `__esModule` como no Vite (e num pacote ESM seja o default de verdade): direto, num
+  //     projeto `"type": "module"` o esbuild usaria a regra do Node e daria o objeto inteiro.
+  // Os caminhos virtuais não podem terminar em `.mjs`: a extensão decide o formato mesmo
+  // fora do disco. Por isso o sufixo.
+  const SUFIXO_DEP = "?odete", SUFIXO_DEP_CJS = "?odete.cjs";
+  const CODIGO_DE_PACOTE = /\.([mc]?[jt]s|[jt]sx)$/i;
+  const TIPOS_DE_IMPORT = new Set(["import-statement", "require-call", "dynamic-import"]);
+  const dentroDePacote = (p) => p.indexOf("/node_modules/") >= 0 || p.indexOf("/node_modules.nosync/") >= 0;
+
+  // Só código de pacote instalado entra: CSS e JSON de pacote seguem no bundle do app (a
+  // folha dele sai junto com a do app), e um pacote ligado (`npm link`, workspace) é
+  // código que a pessoa edita, então continua no app e é refeito como o resto.
+  function vaiParaAsDependencias(abs, kind) {
+    if (!TIPOS_DE_IMPORT.has(kind) || !CODIGO_DE_PACOTE.test(abs) || !dentroDePacote(abs)) return false;
+    try { return dentroDePacote(fs.realpathSync(abs)); } catch (e) { return false; }
+  }
+
+  // O que o bundle do app pediu ao pacote de dependências, a partir do metafile.
+  function dependenciasDe(metafile) {
+    if (!metafile) return null;
+    const out = [];
+    for (const k of Object.keys(metafile.inputs)) {
+      if (k.startsWith("odete-dep:")) out.push(k.slice("odete-dep:".length, -SUFIXO_DEP.length));
+    }
+    return out;
+  }
+
   // plugin: resolve via o loader Node do host (node_modules, exports) e lê do disco
   const fsPlugin = (root, opts = {}) => ({
     name: "odete-fs",
@@ -76,6 +114,9 @@
         // `onResolve` próprio: o genérico é registrado primeiro e engoliria o prefixo.
         if (args.path.startsWith("odete-real:")) {
           return { path: args.path.slice("odete-real:".length), namespace: "odete-real" };
+        }
+        if (args.path.startsWith("odete-dep-cjs:")) {
+          return { path: args.path.slice("odete-dep-cjs:".length), namespace: "odete-dep-cjs" };
         }
         // Módulos que só existem em memória: a entrada das ilhas e o mapa delas são
         // gerados por rota, e não faz sentido escrever isso no projeto de quem usa.
@@ -100,8 +141,8 @@
         const importer = args.importer || path.join(root, "index.js");
         // condição browser: tenta "browser"/"import" antes de "require"
         const r = H.resolve(args.path, importer);
+        const bare = !args.path.startsWith(".") && !args.path.startsWith("/");
         if (r && typeof r === "object") {
-          const bare = !args.path.startsWith(".") && !args.path.startsWith("/");
           if (opts.externalMissing && bare) return { path: args.path, external: true }; // vai pelo import map (esm.sh)
           // A pasta onde o arquivo que falta nasceria: o observador passa a olhar lá, e o
           // import quebrado se conserta sozinho quando o arquivo aparece.
@@ -113,8 +154,23 @@
         // caminho é o mesmo que o metafile e o observador usam — senão a memória de
         // leituras guardava por uma chave e era esquecida por outra, e o rebuild servia o
         // arquivo velho. E um mesmo arquivo importado por dois caminhos não vira dois módulos.
-        return { path: path.resolve(r), namespace: "file" };
+        const abs = path.resolve(r);
+        // A chave no registro é o arquivo resolvido, não o nome importado: dois nomes que
+        // chegam ao mesmo arquivo são o mesmo módulo, e o pacote de dependências o carrega
+        // pelo mesmo caminho que o react-dom usa por dentro — uma cópia só do React.
+        if (opts.preempacota && bare && vaiParaAsDependencias(abs, args.kind)) {
+          return { path: path.relative(root, abs) + SUFIXO_DEP, namespace: "odete-dep" };
+        }
+        return { path: abs, namespace: "file" };
       };
+      build.onLoad({ filter: /.*/, namespace: "odete-dep" }, (args) => {
+        const cjs = JSON.stringify("odete-dep-cjs:" + args.path.slice(0, -SUFIXO_DEP.length) + SUFIXO_DEP_CJS);
+        return { contents: `export * from ${cjs};\nexport { default } from ${cjs};\n`, loader: "js", resolveDir: root };
+      });
+      build.onLoad({ filter: /.*/, namespace: "odete-dep-cjs" }, (args) => {
+        const chave = JSON.stringify(args.path.slice(0, -SUFIXO_DEP_CJS.length));
+        return { contents: `module.exports = globalThis.__odeteDep(${chave});\n`, loader: "js" };
+      });
       // Fronteira de cliente: um módulo que começa com "use client" roda nos dois lados.
       // No servidor ele vira uma ilha — o componente real renderiza dentro de uma marca
       // que diz ao navegador qual módulo montar ali e com que props. Sem isso o Preview
@@ -185,6 +241,12 @@
             leituras.set(args.path, bytes);
           }
           return { contents: bytes, loader: final, resolveDir: path.dirname(args.path) };
+        }
+        // Bytes sem guardar: o pacote de dependências lê o react-dom inteiro, e raramente.
+        // Guardar seria segurar um megabyte que nenhum rebuild do app vai pedir.
+        if (opts.bytes) {
+          anotaMtime(args.path);
+          return { contents: fs.readFileSync(args.path), loader: final, resolveDir: path.dirname(args.path) };
         }
         anotaMtime(args.path);
         if (loader === "dataurl" || loader === "binary" || loader === "file") return { contents: fs.readFileSync(args.path), loader: final, resolveDir: path.dirname(args.path) };
@@ -276,7 +338,7 @@ const __odeteChama = (id) => async (...args) => {
   // que não passa por sourcemap.
   function opcoes(opts) {
     const root = opts.root;
-    return {
+    const o = {
       entryPoints: opts.entries.map((e) => (path.isAbsolute(e) ? e : path.join(root, e))),
       bundle: true, write: false, format: opts.format || "esm", platform: opts.platform || "browser", target: opts.target || "es2022",
       sourcemap: opts.sourcemap || false, outdir: path.join(root, opts.outdir || "dist"), outbase: root,
@@ -285,7 +347,18 @@ const __odeteChama = (id) => async (...args) => {
       loader: { ".png": "dataurl", ".jpg": "dataurl", ".svg": "dataurl", ".gif": "dataurl", ".webp": "dataurl", ".woff": "dataurl", ".woff2": "dataurl", ".ttf": "dataurl" },
       plugins: [fsPlugin(root, opts)], nodePaths: [path.join(root, "node_modules")], resolveExtensions: [".tsx", ".ts", ".jsx", ".js", ".mjs", ".cjs", ".json", ".css"], mainFields: opts.platform === "node" ? ["module", "main"] : ["browser", "module", "main"], conditions: opts.platform === "node" ? ["node", "import", "default"] : ["browser", "import", "default"],
     };
+    // O bundle do app com dependências pré-empacotadas começa importando o pacote delas:
+    // pela regra do ESM, ele roda antes de qualquer linha do app.
+    if (opts.banner) o.banner = { js: opts.banner };
+    return o;
   }
+
+  // O que, nas opções, muda o que sai do esbuild: entra na chave do cache do pacote de
+  // dependências. Um `.env` com VITE_X novo, por exemplo, muda os defines e a chave.
+  globalThis.__opcoesQueMudamASaida = (opts) => {
+    const o = opcoes(opts);
+    return JSON.stringify([o.format, o.platform, o.target, o.jsx, o.jsxDev, o.minify, o.define, o.loader, o.resolveExtensions, o.mainFields, o.conditions, !!opts.externalMissing]);
+  };
 
   // Os arquivos que o build leu, em caminho absoluto, a partir do metafile. Módulos que
   // só existem em memória (as entradas virtuais das ilhas) não são arquivo e ficam de fora.
@@ -307,10 +380,11 @@ const __odeteChama = (id) => async (...args) => {
   const sucesso = (r, opts) => ({
     ok: true, saidas: r.outputFiles || [], warnings: r.warnings.map(fmtMsg), errors: [],
     entradas: entradasDe(opts.root, r.metafile), faltando: opts.faltando ? [...opts.faltando] : [],
+    dependencias: opts.preempacota ? dependenciasDe(r.metafile) : null,
   });
   const falha = (e, opts) => ({
     ok: false, saidas: [], warnings: (e.warnings || []).map(fmtMsg), errors: (e.errors || [{ text: e.message }]).map(fmtMsg),
-    entradas: null, faltando: opts.faltando ? [...opts.faltando] : [],
+    entradas: null, faltando: opts.faltando ? [...opts.faltando] : [], dependencias: null,
   });
 
   globalThis.__buildBruto = async (opts) => {
@@ -338,14 +412,19 @@ const __odeteChama = (id) => async (...args) => {
   // o resultado do que já estava correndo — que pode ter lido o arquivo antes da mudança.
   const contextos = new Map(); // chave → { ctx, opts, fila }
 
+  // Com memória por padrão; quem não quer guardar leituras diz `memoria: false`. Os
+  // módulos virtuais podem mudar entre rebuilds (a entrada do pacote de dependências
+  // ganha um pacote novo): os de agora substituem os da criação.
   globalThis.__rebuild = (chave, opts) => {
     let c = contextos.get(chave);
     if (!c) {
-      const o = Object.assign({}, opts, { memoria: true, metafile: true });
+      const o = Object.assign({ memoria: true }, opts, { metafile: true });
       const ctx = (async () => { await ready; return globalThis.esbuild.context(opcoes(o)); })();
       ctx.catch(() => {});
       c = { opts: o, fila: Promise.resolve(), ctx };
       contextos.set(chave, c);
+    } else if (opts && opts.virtuais) {
+      c.opts.virtuais = opts.virtuais;
     }
     const vez = c.fila.then(async () => {
       c.opts.faltando = new Set();

@@ -22,14 +22,26 @@ struct MedicaoTests {
         }
     }
 
+    /// A primeira página como o Preview pede: o HTML, o bundle, o que ele importa e as
+    /// folhas. O que o servidor não tem (o pacote de dependências, antes de ele existir)
+    /// volta 404 e não pesa.
+    func pagina(_ dev: DevServer) async throws -> String {
+        _ = try await pega(dev.url)
+        let js = try await pega(dev.url.appending(path: "@odete/js/src/main.tsx"))
+        _ = try? await pega(dev.url.appending(path: "@odete/deps.js"))
+        _ = try? await pega(dev.url.appending(path: "@odete/deps.css"))
+        _ = try await pega(dev.url.appending(path: "@odete/css/src/main.tsx"))
+        return js
+    }
+
     @Test func medeDevServer() async throws {
         let raiz = try FixtureReact.projeto()
         let dev = DevServer(root: raiz)
         let partida = try await FixtureReact.mede { try await dev.start(port: 20000 + Int.random(in: 0 ..< 20000)) }
-        defer { dev.stop() }
         let js = dev.url.appending(path: "@odete/js/src/main.tsx")
         var primeiro = ""
-        let build1 = try await FixtureReact.mede { primeiro = try await pega(js) }
+        // Cache de dependências frio: projeto novo.
+        let build1 = try await FixtureReact.mede { primeiro = try await pagina(dev) }
         #expect(primeiro.contains("cliques"))
         let app = raiz.appending(path: "src/App.tsx")
         await ate { dev.arquivosVigiados.contains(app.path) }
@@ -54,17 +66,60 @@ struct MedicaoTests {
             await ate { await (dev.estatisticas()["reload"] ?? 0) >= 2 }
             _ = try await pega(js)
         }
-        // Do zero, como o botão Rebuild: contextos descartados, só sem o sourcemap.
+        // Um componente dois níveis abaixo do App.
+        let cartao = raiz.appending(path: "src/componentes/ui/Cartao.tsx")
+        let profundo = try await FixtureReact.mede {
+            try FixtureReact.cartaoTSX(rotulo: "total").write(to: cartao, atomically: true, encoding: .utf8)
+            await ate { await (dev.estatisticas()["reload"] ?? 0) >= 3 }
+            let t = try await pega(js)
+            #expect(t.contains("total"))
+        }
+        let antesDoImport = await dev.estatisticas()
+        // Um import de pacote que o projeto ainda não usava: até o Preview ter o que
+        // precisa para rodar (bundle e dependências).
+        let novoImport = try await FixtureReact.mede {
+            try FixtureReact.appTSX(rotulo: "vezes", importaNovo: true).write(to: app, atomically: true, encoding: .utf8)
+            await ate { await (dev.estatisticas()["reload"] ?? 0) >= 4 }
+            let t = try await pega(js)
+            #expect(t.contains("com-react-dom"))
+            _ = try? await pega(dev.url.appending(path: "@odete/deps.js"))
+        }
+        let estatisticas = await dev.estatisticas()
+        // `npm run dev` de novo, no mesmo motor: o servidor para e sobe outro.
+        dev.stop()
+        await dev.esbuild.esperarParadas()
+        let dev2 = DevServer(esbuild: dev.esbuild)
+        let reinicio = try await FixtureReact.mede {
+            try await dev2.start(port: 20000 + Int.random(in: 0 ..< 20000))
+            _ = try await pagina(dev2)
+        }
+        dev2.stop()
+        // O app reaberto: motor novo (o esbuild carrega de novo), cache em disco quente.
+        let motor = Esbuild(root: raiz)
+        let dev3 = DevServer(esbuild: motor)
+        defer { dev3.stop() }
+        let relancamento = try await FixtureReact.mede {
+            try await dev3.start(port: 20000 + Int.random(in: 0 ..< 20000))
+            _ = try await pagina(dev3)
+        }
+        // Do zero, como o botão Rebuild: contextos descartados.
         let frio = try await FixtureReact.mede {
-            await dev.invalidateNow()
-            _ = try await pega(js)
+            await dev3.invalidateNow()
+            _ = try await pega(dev3.url.appending(path: "@odete/js/src/main.tsx"))
         }
         print(String(
-            format: "ODETE_MEDIDA depois real=%@ start=%.2fs/%.2fcpu build1=%.2fs/%.2fcpu igual=%.2fs/%.2fcpu(builds=%d) mudanca=%.2fs/%.2fcpu mudanca2=%.2fs/%.2fcpu frio=%.2fs/%.2fcpu tamanho=%d",
+            format: "ODETE_MEDIDA depois real=%@ start=%.2fs/%.2fcpu pagina1=%.2fs/%.2fcpu "
+                + "igual=%.2fs/%.2fcpu(builds=%d) mudanca=%.2fs/%.2fcpu mudanca2=%.2fs/%.2fcpu "
+                + "profundo=%.2fs/%.2fcpu novoImport=%.2fs/%.2fcpu reinicio=%.2fs/%.2fcpu "
+                + "relancamento=%.2fs/%.2fcpu frio=%.2fs/%.2fcpu tamanho=%d",
             "\(FixtureReact.reactDeVerdade)",
             partida.parede, partida.cpu, build1.parede, build1.cpu, igual.parede, igual.cpu, buildsDepoisDoIgual,
-            mudou.parede, mudou.cpu, mudou2.parede, mudou2.cpu, frio.parede, frio.cpu, primeiro.utf8.count
+            mudou.parede, mudou.cpu, mudou2.parede, mudou2.cpu, profundo.parede, profundo.cpu,
+            novoImport.parede, novoImport.cpu, reinicio.parede, reinicio.cpu, relancamento.parede, relancamento.cpu,
+            frio.parede, frio.cpu, primeiro.utf8.count
         ))
+        print("ODETE_MEDIDA estatisticas antes do import novo \(antesDoImport.sorted { $0.key < $1.key })")
+        print("ODETE_MEDIDA estatisticas \(estatisticas.sorted { $0.key < $1.key })")
     }
 
     /// O lint de um componente de ~200 linhas: a transformação inteira (o que o lint fazia)

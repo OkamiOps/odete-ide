@@ -267,7 +267,8 @@ import Testing
         #expect(dev.esbuild === motor)
         try await dev.start(port: porta())
         _ = try await texto(dev.url.appending(path: "@odete/js/src/main.tsx"))
-        #expect(try await motor.engine.call("__contextosVivos") == "1")
+        // O bundle do app e o pacote de dependências (o `react/jsx-dev-runtime` do JSX).
+        #expect(try await motor.engine.call("__contextosVivos") == "2")
         dev.stop()
         await motor.esperarParadas()
         #expect(try await motor.engine.call("__contextosVivos") == "0", "o servidor parou e deixou o contexto vivo")

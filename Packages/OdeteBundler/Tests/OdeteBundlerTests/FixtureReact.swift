@@ -12,7 +12,7 @@ enum FixtureReact {
     static func projeto() throws -> URL {
         let fm = FileManager.default
         let u = fm.temporaryDirectory.appending(path: "odete-react-\(UUID().uuidString)", directoryHint: .isDirectory)
-        try fm.createDirectory(at: u.appending(path: "src"), withIntermediateDirectories: true)
+        try fm.createDirectory(at: u.appending(path: "src/componentes/ui"), withIntermediateDirectories: true)
         let arquivos: [String: String] = [
             "package.json": #"{"name":"app","private":true,"type":"module","dependencies":{"react":"^19.2.0","react-dom":"^19.2.0"}}"#,
             "index.html": """
@@ -35,6 +35,15 @@ enum FixtureReact {
             );
             """,
             "src/App.tsx": appTSX(rotulo: "cliques"),
+            "src/componentes/Painel.tsx": """
+            import { Cartao } from "./ui/Cartao";
+
+            export function Painel({ n }: { n: number }) {
+              return <section className="painel"><Cartao titulo="contagem" valor={n} /></section>;
+            }
+
+            """,
+            "src/componentes/ui/Cartao.tsx": cartaoTSX(rotulo: "valor"),
             "src/style.css": ":root { font-family: system-ui, sans-serif; }\n.page { text-align: center; }\n",
             "README.md": "# app\n",
         ]
@@ -58,19 +67,35 @@ enum FixtureReact {
         return FileManager.default.fileExists(atPath: d + "/react-dom/package.json")
     }
 
-    static func appTSX(rotulo: String) -> String {
+    /// O `App.tsx`. `importaNovo` acrescenta um import de pacote que o projeto ainda não
+    /// usava (`react-dom` puro, além do `react-dom/client` do main): é o caso de quem começa
+    /// a usar mais uma coisa de um pacote já instalado.
+    static func appTSX(rotulo: String, importaNovo: Bool = false) -> String {
         """
         import { useState } from "react";
+        \(importaNovo ? "import * as ReactDOM from \"react-dom\";" : "")
+        import { Painel } from "./componentes/Painel";
 
         export function App() {
           const [n, setN] = useState(0);
           return (
             <main className="page">
-              <h1>app</h1>
+              <h1>app\(importaNovo ? " {typeof ReactDOM} com-react-dom" : "")</h1>
               <p>React no iPad.</p>
               <button onClick={() => setN(n + 1)}>{n} \(rotulo)</button>
+              <Painel n={n} />
             </main>
           );
+        }
+
+        """
+    }
+
+    /// Um componente dois níveis abaixo do App, para medir a edição longe da entrada.
+    static func cartaoTSX(rotulo: String) -> String {
+        """
+        export function Cartao({ titulo, valor }: { titulo: string; valor: number }) {
+          return <div className="cartao"><h2>{titulo}</h2><p>\(rotulo): {valor}</p></div>;
         }
 
         """

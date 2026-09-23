@@ -10,6 +10,8 @@
 //   - nada é refeito sem mudança de conteúdo num arquivo que o build leu (quem decide é o
 //     observador do lado nativo, que compara conteúdo, e `mudou` aqui, que confere o grafo);
 //   - o que é refeito usa o contexto incremental do esbuild;
+//   - os pacotes de node_modules ficam num pacote de dependências à parte, feito uma vez e
+//     guardado em disco (dependencias.js): o rebuild liga e imprime só o código do app;
 //   - o navegador só recarrega se a saída mudou, e CSS sozinho troca sem recarregar.
 globalThis.__devCria = function () {
   const http = require("http"), fs = require("fs"), path = require("path");
@@ -38,8 +40,12 @@ globalThis.__devCria = function () {
     // Versão do retrato (dependências + diagnósticos) e quem espera a próxima.
     versao: 0, esperas: [], retratoJSON: "",
     fila: Promise.resolve(), parado: false,
-    // Contadores, para os testes provarem o que não aconteceu.
-    stats: { builds: 0, reload: 0, css: 0 },
+    // O pacote de dependências (criado em `inicia`). `ligado` cai se ele falhar: aí o
+    // bundle do app volta a levar os pacotes junto, como antes, até o próximo Rebuild.
+    pre: { ligado: true, deps: null },
+    // Contadores, para os testes provarem o que não aconteceu. `lidosDePacote` é quantos
+    // arquivos de node_modules o último bundle de app leu.
+    stats: { builds: 0, reload: 0, css: 0, lidosDePacote: 0 },
   };
 
   // ---- bundles ----
@@ -53,14 +59,38 @@ globalThis.__devCria = function () {
     return e.ultimo;
   }
 
+  // Com o pacote de dependências, os pacotes ficam de fora e o bundle começa importando
+  // ele. Os dois jeitos têm contextos separados: um não serve de cache para o outro.
+  function opcoesDoBundle(entryRel, pre) {
+    const o = { root: state.root, entries: [entryRel], format: "esm", platform: "browser", dev: true, outdir: "__odete", externalMissing: true };
+    if (pre) { o.preempacota = true; o.banner = 'import "/@odete/deps.js";'; }
+    return o;
+  }
+  const contextoDoBundle = (entryRel, pre) => "dev" + state.id + ":" + (pre ? "pre:" : "") + entryRel;
+
   // Um build de uma entrada. Incremental: o contexto do esbuild guarda a análise de quem
   // não mudou. A saída fica em bytes, do jeito que o esbuild entregou — não precisa virar
   // texto para ir ao navegador.
+  //
+  // O bundle só volta depois de o pacote de dependências ter tudo o que ele pede: o
+  // navegador pede /@odete/deps.js ao rodar o bundle, e a resposta já é a certa.
   async function constroi(entryRel) {
     const key = entryRel;
     state.stats.builds++;
-    const r = await globalThis.__rebuild("dev" + state.id + ":" + entryRel, { root: state.root, entries: [entryRel], format: "esm", platform: "browser", dev: true, outdir: "__odete", externalMissing: true });
-    state.diagnostics = state.diagnostics.filter((d) => d.entry !== key).concat(r.errors.map((e) => ({ ...e, kind: "error", entry: key })), r.warnings.map((w) => ({ ...w, kind: "warning", entry: key })));
+    let pre = state.pre.ligado;
+    let r = await globalThis.__rebuild(contextoDoBundle(entryRel, pre), opcoesDoBundle(entryRel, pre));
+    if (pre && r.ok && r.dependencias && r.dependencias.length) {
+      const d = await state.pre.deps.garante(r.dependencias);
+      if (!d.ok) {
+        await desligaPreEmpacotamento(entryRel, d);
+        pre = false;
+        r = await globalThis.__rebuild(contextoDoBundle(entryRel, false), opcoesDoBundle(entryRel, false));
+      }
+    }
+    // Os avisos do pacote de dependências são os que o bundle inteiro daria sobre os pacotes.
+    const avisosDosPacotes = state.pre.ligado ? state.pre.deps.avisos().map((w) => ({ ...w, kind: "warning", entry: "@deps" })) : [];
+    state.diagnostics = state.diagnostics.filter((d) => d.entry !== key && d.entry !== "@deps").concat(r.errors.map((e) => ({ ...e, kind: "error", entry: key })), r.warnings.map((w) => ({ ...w, kind: "warning", entry: key })), avisosDosPacotes);
+    if (r.entradas) state.stats.lidosDePacote = r.entradas.filter(ehDePacote).length;
     defineDeps("b:" + key, r.entradas || lidosNaFalha("b:" + key, path.resolve(state.root, entryRel), r.errors));
     defineFaltando("b:" + key, r.faltando);
     const js = r.saidas.find((f) => f.path.endsWith(".js")), css = r.saidas.find((f) => f.path.endsWith(".css"));
@@ -81,6 +111,42 @@ globalThis.__devCria = function () {
     e.ultimo = constroi(entryRel);
     const depois = await e.ultimo;
     return { js: !antes || antes.jsHash !== depois.jsHash, css: !antes || antes.cssHash !== depois.cssHash, ok: depois.ok };
+  }
+
+  // O pacote de dependências não saiu (um pacote ESM com `await` no topo, por exemplo,
+  // não pode virar fábrica). Os pacotes voltam para dentro do bundle do app — mais lento,
+  // mas o que funcionava antes continua funcionando. Erro de verdade num pacote aparece
+  // no build inteiro, com o overlay de sempre. O próximo Rebuild tenta de novo.
+  async function desligaPreEmpacotamento(entryRel, d) {
+    if (!state.pre.ligado) return;
+    state.pre.ligado = false;
+    const motivo = (d.errors && d.errors[0] && d.errors[0].text) || "erro desconhecido";
+    console.warn("[odete] o pacote de dependências falhou (" + motivo + "); os pacotes voltam para dentro do bundle do app.");
+    // Os outros bundles apontam para um registro que não vai existir: refeitos no próximo pedido.
+    for (const k of [...state.entradas.keys()]) if (k !== entryRel) state.entradas.delete(k);
+    await state.pre.deps.esquece();
+    await globalThis.__descartaContextos("dev" + state.id + ":pre:");
+    await globalThis.__descartaContextos("dev" + state.id + ":@deps");
+  }
+
+  // O pacote de dependências e a folha dele. A folha é pedida pelo `<link>`, que o
+  // navegador busca antes de rodar o bundle: espera o bundle da entrada (`?de=`), que é
+  // quem diz de quais pacotes precisa. Com ETag, recarregar a página vira um 304 e o
+  // megabyte do react-dom não passa de novo pelo servidor.
+  async function enviaDeps(req, res, p, url) {
+    const de = url.searchParams.get("de");
+    if (de && state.pre.ligado) await bundle(de).catch(() => null);
+    for (const e of [...state.entradas.values()]) await e.ultimo.catch(() => null);
+    await state.pre.deps.pronto();
+    const js = p.endsWith(".js");
+    const etag = state.pre.deps.etag();
+    const h = { "content-type": js ? MIME[".js"] : MIME[".css"], "cache-control": "no-cache", "access-control-allow-origin": "*", etag };
+    if (req.headers && req.headers["if-none-match"] === etag) {
+      res.writeHead(304, h);
+      return res.end();
+    }
+    res.writeHead(200, h);
+    res.end(js ? state.pre.deps.js() : state.pre.deps.css());
   }
 
   // ---- dependências ----
@@ -243,6 +309,9 @@ globalThis.__devCria = function () {
 
   // Tudo do zero: package.json, .env ou node_modules mudaram, ou alguém pediu Rebuild.
   // Os defines do .env entram nas opções do contexto, então os contextos vão embora.
+  //
+  // O pacote de dependências sai da memória, mas não do disco: o próximo bundle confere o
+  // cache, e só o refaz se o lockfile, o .env ou algum arquivo de pacote mudou.
   async function invalida() {
     state.entradas.clear();
     pacoteNext.clear();
@@ -251,6 +320,8 @@ globalThis.__devCria = function () {
     for (const k of [...state.deps.keys()]) if (!k.startsWith("est:")) state.deps.delete(k);
     state.faltando.clear();
     globalThis.__esqueceTudo();
+    state.pre.ligado = true;
+    await state.pre.deps.esquece();
     await globalThis.__descartaContextos("dev" + state.id + ":");
     anuncia();
     avisa("reload");
@@ -298,10 +369,12 @@ globalThis.__devCria = function () {
     let src = fs.readFileSync(file, "utf8");
     // <script type="module" src="/src/main.tsx"> → bundle + css
     const entries = [];
+    // A folha dos pacotes vem antes da do app, na ordem em que o bundle inteiro as juntaria.
     src = src.replace(/<script\s+type="module"\s+src="([^"]+)"\s*><\/script>/g, (m, s) => {
       const rel = s.replace(/^\//, "");
       entries.push(rel);
-      return `<link rel="stylesheet" href="/@odete/css/${rel}"><script type="module" src="/@odete/js/${rel}"></script>`;
+      const pacotes = state.pre.ligado ? `<link rel="stylesheet" href="/@odete/deps.css?de=${encodeURIComponent(rel)}">` : "";
+      return `${pacotes}<link rel="stylesheet" href="/@odete/css/${rel}"><script type="module" src="/@odete/js/${rel}"></script>`;
     });
     const head = importMap() + CLIENT;
     src = src.includes("</head>") ? src.replace("</head>", head + "</head>") : head + src;
@@ -398,14 +471,28 @@ globalThis.__devCria = function () {
       `import { ${e.nome} as __c${i} } from ${JSON.stringify("odete-real:" + e.abs)};`).join("\n");
     const mapa = entradas.map((e, i) => `  ${JSON.stringify(e.id)}: __c${i},`).join("\n");
     const virtual = `${importa}\nexport const MODULOS = {\n${mapa}\n};\n`;
-    const r = await globalThis.__buildBruto({
+    const opcoes = {
       root: state.root, entries: ["__odete_ilhas_entrada.js"], format: "esm", platform: "browser",
       dev: true, outdir: "__odete_ilhas", externalMissing: true, acoes: "cliente", metafile: true,
       virtuais: {
         "__odete_ilhas_entrada.js": globalThis.__ilhasClienteJS,
         "virtual:odete-ilhas": virtual,
       },
-    });
+    };
+    // Este build é avulso (sem contexto) e roda a cada página: com o React e o react-dom
+    // dentro, cada navegação reanalisava o react-dom do zero. Com o pacote de
+    // dependências, o React vem de /@odete/deps.js e aqui fica só o código das ilhas.
+    const pre = state.pre.ligado;
+    if (pre) { opcoes.preempacota = true; opcoes.banner = 'import "/@odete/deps.js";'; }
+    let r = await globalThis.__buildBruto(opcoes);
+    if (pre && r.ok && r.dependencias && r.dependencias.length) {
+      const d = await state.pre.deps.garante(r.dependencias);
+      if (!d.ok) {
+        await desligaPreEmpacotamento(null, d);
+        delete opcoes.preempacota; delete opcoes.banner;
+        r = await globalThis.__buildBruto(opcoes);
+      }
+    }
     if (r.entradas) { defineDeps("ilhas:" + rota, r.entradas); anuncia(); }
     if (!r.ok) throw new Error((r.errors[0] && r.errors[0].text) || "build das ilhas falhou");
     const saida = r.saidas.find((f) => f.path.endsWith(".js"));
@@ -700,6 +787,7 @@ globalThis.__devCria = function () {
     try {
       if (p.startsWith("/@odete/js/")) { const b = await bundle(p.slice(11)); return send(res, 200, MIME[".js"], b.js); }
       if (p.startsWith("/@odete/css/")) { const b = await bundle(p.slice(12)); return send(res, 200, MIME[".css"], b.css); }
+      if (p === "/@odete/deps.js" || p === "/@odete/deps.css") return await enviaDeps(req, res, p, url);
       if (p === "/@odete/diag") return send(res, 200, "application/json", JSON.stringify(state.diagnostics));
 
       // O middleware vem antes de tudo que é do projeto — e depois do que é da Odete,
@@ -835,6 +923,7 @@ globalThis.__devCria = function () {
   function inicia(id, root, port, preset) {
     return new Promise((resolve, reject) => {
       state.id = id; state.root = root; state.preset = preset || "plain";
+      state.pre.deps = globalThis.__depsCria(root, "dev" + id + ":");
       const srv = http.createServer(handle);
       srv.on("odete:ws", (sock) => { state.sockets.add(sock); sock.on("close", () => state.sockets.delete(sock)); });
       srv.on("error", reject);
@@ -870,7 +959,10 @@ globalThis.__devCria = function () {
     inicia, para, mudou, espera, vivos,
     invalida: () => naFila(invalida),
     diagnosticos: () => state.diagnostics,
-    estatisticas: () => Object.assign({ contextos: globalThis.__contextosVivos(), sockets: state.sockets.size }, state.stats),
+    estatisticas: () => Object.assign(
+      { contextos: globalThis.__contextosVivos(), sockets: state.sockets.size, preEmpacota: state.pre.ligado ? 1 : 0 },
+      state.stats, state.pre.deps ? state.pre.deps.estatisticas() : {},
+    ),
   };
 };
 

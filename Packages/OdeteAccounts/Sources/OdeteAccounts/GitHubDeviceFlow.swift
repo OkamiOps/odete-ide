@@ -115,7 +115,7 @@ public enum GitHubError: LocalizedError, Sendable {
         switch self {
         case let .auth(m): "GitHub: \(m)"
         case let .http(c, m): "GitHub \(c): \(m)"
-        case .invalid: "GitHub: resposta inválida"
+        case .invalid: tr("GitHub: resposta inválida")
         }
     }
 }

@@ -47,6 +47,7 @@ struct AccountsSettings: View {
             autor
         }
         .sheet(isPresented: $adding) { tokenSheet }
+        .task { await completarIds() }
         .confirmationDialog(
             tr("Remover %1$@?", "\(removendo?.login ?? "")"),
             isPresented: Binding(get: { removendo != nil }, set: {
@@ -342,6 +343,7 @@ struct AccountsSettings: View {
                 acc.name = u.name
                 acc.email = u.email
                 acc.avatarURL = u.avatarUrl
+                acc.userId = u.id
             }
             do {
                 try accounts.add(acc, token: t)
@@ -351,6 +353,18 @@ struct AccountsSettings: View {
             } catch {
                 self.error = error.localizedDescription
             }
+        }
+    }
+
+    /// Contas do GitHub salvas antes de a Odete guardar o id: sem ele, o noreply sai no
+    /// formato antigo, só com o login. Pergunta uma vez ao `/user` e guarda.
+    func completarIds() async {
+        for acc in accounts.accounts where acc.kind == .github && acc.host == "github.com" && acc.userId == nil {
+            guard let t = accounts.token(for: acc), let u = try? await GitHubAPI(token: t).user(),
+                  u.login == acc.login, let id = u.id else { continue }
+            var nova = acc
+            nova.userId = id
+            accounts.update(nova)
         }
     }
 
@@ -371,7 +385,8 @@ struct AccountsSettings: View {
                         login: u.login,
                         name: u.name,
                         email: u.email,
-                        avatarURL: u.avatarUrl
+                        avatarURL: u.avatarUrl,
+                        userId: u.id
                     ),
                     token: t
                 )

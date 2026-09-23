@@ -65,9 +65,20 @@ struct GitPane: View {
         .alert(tr("Git"), isPresented: Binding(get: { git.error != nil }, set: {
             if !$0 {
                 git.error = nil
+                git.errorExit = nil
             }
         })) {
-            Button(tr("OK")) { git.error = nil }
+            // O erro que tem saída mostra a saída: "suas alterações seriam sobrescritas"
+            // sem um botão de stash deixava a pessoa sem caminho no iPad.
+            switch git.errorExit {
+            case .stash:
+                Button(tr("Guardar em stash e continuar")) { git.stashAndRetry() }
+            case let .removeLock(caminho):
+                Button(tr("Remover o lock"), role: .destructive) { git.removeLock(caminho) }
+            case nil:
+                EmptyView()
+            }
+            Button(tr("OK"), role: .cancel) { git.error = nil; git.errorExit = nil }
         } message: { Text(git.error ?? "") }
     }
 
@@ -195,7 +206,9 @@ struct HeroCard: View {
             HStack(spacing: 7) {
                 Image(systemName: "arrow.triangle.branch").font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(theme.accent)
-                Text(git.current?.name ?? git.headName ?? "—").font(.headline).foregroundStyle(theme.fg)
+                // Sem branch nem nome no HEAD só sobra o HEAD solto — que antes aparecia
+                // como "—", sem dizer que o próximo commit ficaria fora de qualquer branch.
+                Text(git.current?.name ?? git.headName ?? tr("HEAD solto")).font(.headline).foregroundStyle(theme.fg)
                     .lineLimit(1).truncationMode(.middle)
                 Spacer(minLength: 4)
                 if git.busy {
@@ -211,7 +224,7 @@ struct HeroCard: View {
                     // cabe inteiro e é o que a pessoa reconhece.
                     Text(git.githubSlug ?? o.url.replacingOccurrences(of: "https://", with: ""))
                         .font(.caption2).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
-                    if !temConta {
+                    if !temConta, git.remoteNeedsAccount {
                         Text(tr("sem conta")).font(.caption2).foregroundStyle(theme.danger)
                     }
                 } else {
@@ -234,6 +247,10 @@ struct CommitBox: View {
     @Environment(\.theme) private var theme
     @State private var suggesting = false
     @State private var asking = false
+    /// O "nada no stage" pergunta antes; a resposta segue com o push que foi pedido.
+    @State private var pushPedido = false
+    @State private var desfazendoEnviado = false
+    @State private var abortando = false
     @FocusState private var writing: Bool
 
     var git: GitModel {
@@ -292,32 +309,47 @@ struct CommitBox: View {
                 .padding(4)
             }
             HStack(spacing: 6) {
+                // "Commit" só commita. Antes o botão dizia "Commit" em coluna estreita e,
+                // havendo conta, enviava do mesmo jeito; agora o push tem botão próprio.
                 GitButton(
-                    title: git.mergeInProgress ? (paneWidth < 300 ? "Merge" : tr("Commit de merge"))
-                        : git.origin == nil || paneWidth < 300 ? "Commit" : tr("Commit e push"),
+                    title: git.mergeInProgress ? (paneWidth < 300 ? tr("Merge") : tr("Commit de merge"))
+                        : tr("Commit"),
                     symbol: "checkmark",
                     accent: true,
                     disabled: !canCommit,
                     keepsLabel: true
                 ) {
-                    writing = false
-                    if nothingStaged {
-                        asking = true
+                    pedirCommit(push: false)
+                }
+                if git.origin != nil, !git.mergeInProgress {
+                    if paneWidth < 340 {
+                        Button(tr("Commit e push"), systemImage: "arrow.up.to.line") { pedirCommit(push: true) }
+                            .labelStyle(.iconOnly)
+                            .buttonStyle(.glass)
+                            .controlSize(.small)
+                            .disabled(!canCommit)
                     } else {
-                        git.commit()
+                        GitButton(title: tr("Commit e push"), symbol: "arrow.up.to.line", disabled: !canCommit) {
+                            pedirCommit(push: true)
+                        }
                     }
                 }
-                // A ação principal leva a largura; desfazer fica como ícone ao lado, para o
-                // rótulo "Commit e push" nunca precisar truncar.
+                // A ação principal leva a largura; desfazer fica como ícone ao lado.
                 if git.mergeInProgress {
-                    Button(tr("Abortar merge"), systemImage: "xmark") { git.abortMerge() }
+                    Button(tr("Abortar merge"), systemImage: "xmark") { abortando = true }
                         .labelStyle(.iconOnly)
                         .buttonStyle(.glass)
                         .controlSize(.small)
                         .disabled(git.busy)
                 } else {
                     Button(tr("Desfazer último commit"), systemImage: "arrow.uturn.backward") {
-                        git.undoLastCommit()
+                        // Desfazer o que ainda não saiu daqui é seguro (fica tudo no stage);
+                        // o que já está no remoto reescreveria história, e isso se pergunta.
+                        if git.headOnRemote {
+                            desfazendoEnviado = true
+                        } else {
+                            git.undoLastCommit()
+                        }
                     }
                     .labelStyle(.iconOnly)
                     .buttonStyle(.glass)
@@ -339,10 +371,42 @@ struct CommitBox: View {
             Button(
                 git.unstaged.count == 1 ? tr("Commitar 1 alteração")
                     : tr("Commitar %1$@ alterações", "\(git.unstaged.count)")
-            ) { git.commit(stagingEverything: true) }
+            ) { git.commit(stagingEverything: true, push: pushPedido) }
             Button(tr("Cancelar"), role: .cancel) {}
         } message: {
             Text(tr("Quer mandar tudo para o stage e commitar?"))
+        }
+        .confirmationDialog(
+            tr("Esse commit já está no remoto"),
+            isPresented: $desfazendoEnviado,
+            titleVisibility: .visible
+        ) {
+            Button(tr("Desfazer mesmo assim"), role: .destructive) { git.undoLastCommit() }
+            Button(tr("Cancelar"), role: .cancel) {}
+        } message: {
+            Text(tr(
+                "Desfazer aqui reescreve um histórico que o remoto já tem: o próximo push vai ser recusado. Para voltar atrás em algo já enviado, prefira um commit novo que desfaça a mudança."
+            ))
+        }
+        .confirmationDialog(
+            tr("Abortar o merge?"),
+            isPresented: $abortando,
+            titleVisibility: .visible
+        ) {
+            Button(tr("Abortar merge"), role: .destructive) { git.abortMerge() }
+            Button(tr("Cancelar"), role: .cancel) {}
+        } message: {
+            Text(MergeAbortText.message(git))
+        }
+    }
+
+    func pedirCommit(push: Bool) {
+        writing = false
+        pushPedido = push
+        if nothingStaged {
+            asking = true
+        } else {
+            git.commit(push: push)
         }
     }
 

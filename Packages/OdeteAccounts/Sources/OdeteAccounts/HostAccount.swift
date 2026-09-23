@@ -58,6 +58,9 @@ public struct HostAccount: Codable, Hashable, Identifiable, Sendable {
     public var name: String?
     public var email: String?
     public var avatarURL: String?
+    /// Id numérico da conta no host (o `id` do `/user` do GitHub). Opcional porque as
+    /// contas salvas antes não têm; é dele que sai o e-mail noreply do GitHub.
+    public var userId: Int?
     public var addedAt: Date
 
     public init(
@@ -68,6 +71,7 @@ public struct HostAccount: Codable, Hashable, Identifiable, Sendable {
         name: String? = nil,
         email: String? = nil,
         avatarURL: String? = nil,
+        userId: Int? = nil,
         addedAt: Date = .now
     ) {
         self.id = id
@@ -77,7 +81,15 @@ public struct HostAccount: Codable, Hashable, Identifiable, Sendable {
         self.name = name
         self.email = email
         self.avatarURL = avatarURL
+        self.userId = userId
         self.addedAt = addedAt
+    }
+
+    /// O e-mail noreply do GitHub, que liga o commit à conta sem expor o e-mail de
+    /// verdade: `ID+login@users.noreply.github.com`. Sem o id (conta salva antes dele),
+    /// o formato antigo, só com o login.
+    public var githubNoreplyEmail: String {
+        userId.map { "\($0)+\(login)@users.noreply.github.com" } ?? "\(login)@users.noreply.github.com"
     }
 
     public var keychainKey: String {

@@ -86,15 +86,26 @@ public final class AccountStore {
         accounts.first { $0.kind == .github && $0.host == "github.com" }
     }
 
+    /// Troca os dados de uma conta já salva (o id que faltava, um nome novo) sem mexer
+    /// no token.
+    public func update(_ account: HostAccount) {
+        guard let i = accounts.firstIndex(where: { $0.id == account.id }) else { return }
+        accounts[i] = account
+        save()
+    }
+
     /// Como o commit vai assinado: o que estiver escrito nos ajustes, ou o que dá para
     /// deduzir da conta conectada. A tela de contas mostra exatamente isto, para não
     /// prometer um nome e gravar outro.
     public var autor: (name: String, email: String) {
         let n = authorName.isEmpty ? (github?.name ?? github?.login ?? "Odete") : authorName
-        // O e-mail da conta vale mais que um endereço inventado: só se o host não mandar
-        // nenhum é que sobra o `@odete.local`.
+        // O e-mail da conta vale mais que um endereço inventado. Conta do GitHub sem
+        // e-mail público assina com o noreply dela: `@odete.local` fazia o commit
+        // aparecer no GitHub sem dono, fora do gráfico de contribuições da pessoa.
+        // Só sem conta nenhuma é que sobra o `@odete.local`.
         let e = authorEmail.isEmpty
-            ? (github?.email ?? "\(n.lowercased().replacingOccurrences(of: " ", with: ""))@odete.local")
+            ? (github.map { $0.email ?? $0.githubNoreplyEmail }
+                ?? "\(n.lowercased().replacingOccurrences(of: " ", with: ""))@odete.local")
             : authorEmail
         return (n, e)
     }

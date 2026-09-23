@@ -108,9 +108,11 @@ struct ConflictView: View {
     func block(_ b: ConflictBlock) -> some View {
         let chosen = choices[b.id]
         return VStack(alignment: .leading, spacing: 0) {
-            side("Meu (\(b.oursLabel))", b.ours, color: theme.accent, on: chosen == b.ours) { choices[b.id] = b.ours }
+            side(tr("Meu (%1$@)", b.oursLabel), b.ours, color: theme.accent, on: chosen == b.ours) {
+                choices[b.id] = b.ours
+            }
             Rectangle().fill(theme.border).frame(height: 1)
-            side("Deles (\(b.theirsLabel))", b.theirs, color: theme.ok, on: chosen == b.theirs) {
+            side(tr("Deles (%1$@)", b.theirsLabel), b.theirs, color: theme.ok, on: chosen == b.theirs) {
                 choices[b.id] = b.theirs
             }
             HStack(spacing: 8) {
@@ -138,7 +140,7 @@ struct ConflictView: View {
             HStack {
                 Text(title).font(OdeteFont.ui(11, weight: .medium)).foregroundStyle(color)
                 Spacer()
-                Button(on ? "escolhido" : tr("manter este")) { pick() }.font(OdeteFont.ui(11)).buttonStyle(.glass)
+                Button(on ? tr("escolhido") : tr("manter este")) { pick() }.font(OdeteFont.ui(11)).buttonStyle(.glass)
             }
             .padding(.horizontal, 10).frame(height: 32)
             ForEach(Array(lines.enumerated()), id: \.offset) { _, l in

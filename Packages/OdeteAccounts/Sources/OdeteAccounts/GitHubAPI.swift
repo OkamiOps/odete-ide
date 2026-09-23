@@ -2,11 +2,13 @@ import Foundation
 import OdeteI18n
 
 public struct GitHubUser: Codable, Sendable, Equatable {
+    /// Id numérico da conta: entra no e-mail noreply (`ID+login@users.noreply.github.com`).
+    public var id: Int?
     public var login: String
     public var name: String?
     public var email: String?
     public var avatarUrl: String?
-    enum CodingKeys: String, CodingKey { case login, name, email, avatarUrl = "avatar_url" }
+    enum CodingKeys: String, CodingKey { case id, login, name, email, avatarUrl = "avatar_url" }
 }
 
 public struct GitHubRepo: Codable, Sendable, Identifiable, Equatable {

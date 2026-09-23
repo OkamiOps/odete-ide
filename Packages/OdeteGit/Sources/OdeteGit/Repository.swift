@@ -29,6 +29,8 @@ public actor Repository {
 
     /// Garante `.odete/` em `.git/info/exclude`, sem tocar no `.gitignore` do usuário.
     static func excludeOdeteMetadata(_ url: URL) {
+        // Repositório bare (um remoto local) não tem `.git` nem working tree.
+        guard FileManager.default.fileExists(atPath: url.appending(path: ".git").path) else { return }
         let info = url.appending(path: ".git/info")
         let exclude = info.appending(path: "exclude")
         let current = (try? String(contentsOf: exclude, encoding: .utf8)) ?? ""
@@ -41,17 +43,25 @@ public actor Repository {
         )
     }
 
-    public static func initialize(at url: URL, defaultBranch: String = "main") throws -> Repository {
+    /// `bare` cria um repositório sem working tree, que serve de remoto local
+    /// (`git init --bare`): é para onde dá para mandar push sem servidor nenhum.
+    public static func initialize(
+        at url: URL,
+        defaultBranch: String = "main",
+        bare: Bool = false
+    ) throws -> Repository {
         Libgit2.start()
         var r: OpaquePointer?
         var opts = git_repository_init_options()
         git_repository_init_options_init(&opts, UInt32(GIT_REPOSITORY_INIT_OPTIONS_VERSION))
-        opts.flags = GIT_REPOSITORY_INIT_MKPATH.rawValue
+        opts.flags = GIT_REPOSITORY_INIT_MKPATH.rawValue | (bare ? GIT_REPOSITORY_INIT_BARE.rawValue : 0)
         try defaultBranch.withCString { cstr in
             opts.initial_head = cstr
             try check(git_repository_init_ext(&r, url.path, &opts), tr("iniciar repositório"))
         }
-        excludeOdeteMetadata(url)
+        if !bare {
+            excludeOdeteMetadata(url)
+        }
         return Repository(repo: r!, workdir: url)
     }
 
@@ -235,19 +245,26 @@ public actor Repository {
         try unstage(status().filter { $0.staged != nil }.map(\.path))
     }
 
-    /// Descarta alterações do workdir (volta ao índice). Untracked é apagado.
-    public func discard(_ paths: [String]) throws {
+    /// Descarta alterações do workdir (volta ao índice), só em arquivo rastreado.
+    ///
+    /// Não rastreado não tem versão no git para onde voltar: descartar é apagar, e isto
+    /// apagava de vez, sem lixeira. Agora ele fica onde está e volta na lista — quem
+    /// chama decide (o painel manda para a lixeira do projeto, com desfazer; o
+    /// `git restore` do terminal recusa, como o git).
+    @discardableResult
+    public func discard(_ paths: [String]) throws -> [String] {
         HistoricoDeArquivos.guardar(paths.map { workdir.appending(path: $0) }, raiz: workdir, origem: .git)
         let st = try status()
         var tracked: [String] = []
+        var untracked: [String] = []
         for p in paths {
             if st.first(where: { $0.path == p })?.unstaged == .untracked {
-                try? FileManager.default.removeItem(at: workdir.appending(path: p))
+                untracked.append(p)
             } else {
                 tracked.append(p)
             }
         }
-        guard !tracked.isEmpty else { return }
+        guard !tracked.isEmpty else { return untracked }
         var opts = git_checkout_options()
         git_checkout_options_init(&opts, UInt32(GIT_CHECKOUT_OPTIONS_VERSION))
         opts.checkout_strategy = GIT_CHECKOUT_FORCE.rawValue
@@ -255,6 +272,7 @@ public actor Repository {
         defer { Self.free(&arr) }
         opts.paths = arr.array
         try check(git_checkout_index(repo, nil, &opts), "descartar")
+        return untracked
     }
 
     // MARK: commit
@@ -316,6 +334,24 @@ public actor Repository {
         try check(git_revparse_single(&head, repo, "HEAD~1"), "commit anterior")
         defer { git_object_free(head) }
         try check(git_reset(repo, head, GIT_RESET_SOFT, nil), "desfazer commit")
+    }
+
+    /// Apaga um `.lock` que uma operação interrompida deixou no `.git`.
+    ///
+    /// Com o lock lá, todo stage e todo commit falham ("the index is locked") até alguém
+    /// apagar o arquivo — e no iPad não há terminal de verdade para isso. Só aceita
+    /// arquivo terminado em `.lock` dentro do `.git` deste repositório.
+    public func removeStaleLock(_ path: String) throws {
+        let gitDir = URL(fileURLWithPath: String(cString: git_repository_path(repo)))
+            .resolvingSymlinksInPath().path
+        let url = path.hasPrefix("/") ? URL(fileURLWithPath: path) : workdir.appending(path: path)
+        let alvo = url.resolvingSymlinksInPath().path
+        guard alvo.hasSuffix(".lock"), alvo.hasPrefix(gitDir) else {
+            throw GitError(kind: .invalid, code: -1, message: tr("isso não é um lock do git: %1$@", path))
+        }
+        if FileManager.default.fileExists(atPath: alvo) {
+            try FileManager.default.removeItem(atPath: alvo)
+        }
     }
 
     /// `git commit --amend`: desfaz o último e refaz com o que estiver no índice.

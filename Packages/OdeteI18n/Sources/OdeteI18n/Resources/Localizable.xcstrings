@@ -533,6 +533,62 @@
         }
       }
     },
+    "%1$@ arquivos descartados": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ files discarded"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ Dateien verworfen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ fichiers abandonnés"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ archivos descartados"
+          }
+        }
+      }
+    },
+    "%1$@ commit(s) dessa branch não estão na branch atual nem no remoto: eles somem com ela.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ commit(s) on this branch aren't on the current branch or on the remote: they go away with it."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ Commit(s) dieses Branches sind weder im aktuellen Branch noch auf dem Remote: sie verschwinden mit ihm."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ commit(s) de cette branche ne sont ni sur la branche actuelle ni sur le remote : ils disparaissent avec elle."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ commit(s) de esta rama no están en la rama actual ni en el remote: desaparecen con ella."
+          }
+        }
+      }
+    },
     "%1$@ cópia": {
       "localizations": {
         "en": {
@@ -725,6 +781,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "%1$@ job%2$@"
+          }
+        }
+      }
+    },
+    "%1$@ já existe": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ already exists"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ gibt es schon"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ existe déjà"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ ya existe"
           }
         }
       }
@@ -1565,6 +1649,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "/review en el archivo abierto"
+          }
+        }
+      }
+    },
+    "1 arquivo descartado": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 file discarded"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 Datei verworfen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 fichier abandonné"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 archivo descartado"
           }
         }
       }
@@ -2437,6 +2549,34 @@
         }
       }
     },
+    "Abortar o merge?": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abort the merge?"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Merge abbrechen?"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Annuler le merge ?"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Abortar el merge?"
+          }
+        }
+      }
+    },
     "Abra pastas de outros apps e compartilhe como .zip": {
       "localizations": {
         "en": {
@@ -3021,6 +3161,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ahora en %1$@"
+          }
+        }
+      }
+    },
+    "Agora em %1$@ (acompanhando %2$@)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Now on %1$@ (tracking %2$@)"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Jetzt auf %1$@ (folgt %2$@)"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Maintenant sur %1$@ (suit %2$@)"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ahora en %1$@ (siguiendo %2$@)"
           }
         }
       }
@@ -3809,6 +3977,90 @@
         }
       }
     },
+    "Apagar %1$@?": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete %1$@?"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ löschen?"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprimer %1$@ ?"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Borrar %1$@?"
+          }
+        }
+      }
+    },
+    "Apagar a branch %1$@?": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete branch %1$@?"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Branch %1$@ löschen?"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprimer la branche %1$@ ?"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Borrar la rama %1$@?"
+          }
+        }
+      }
+    },
+    "Apagar branch": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete branch"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Branch löschen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprimer la branche"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Borrar rama"
+          }
+        }
+      }
+    },
     "Apagar linha": {
       "localizations": {
         "en": {
@@ -3861,6 +4113,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Eliminar líneas"
+          }
+        }
+      }
+    },
+    "Apagar o arquivo": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete the file"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Datei löschen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprimer le fichier"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Borrar el archivo"
           }
         }
       }
@@ -5713,6 +5993,34 @@
         }
       }
     },
+    "Commit": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Commit"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Commit"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Commit"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Commit"
+          }
+        }
+      }
+    },
     "Commit de merge": {
       "localizations": {
         "en": {
@@ -6409,6 +6717,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Conecta una cuenta para saber el tamaño de la ventana."
+          }
+        }
+      }
+    },
+    "Confira a conta em Ajustes → Contas.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check the account in Settings → Accounts."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prüf das Konto unter Einstellungen → Konten."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vérifie le compte dans Réglages → Comptes."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Revisa la cuenta en Ajustes → Cuentas."
           }
         }
       }
@@ -7701,6 +8037,34 @@
         }
       }
     },
+    "Deles (%1$@)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Theirs (%1$@)"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ihres (%1$@)"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le leur (%1$@)"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Suyo (%1$@)"
+          }
+        }
+      }
+    },
     "Dentro do app": {
       "localizations": {
         "en": {
@@ -7785,6 +8149,34 @@
         }
       }
     },
+    "Descartar %1$@ arquivos?": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Discard %1$@ files?"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ Dateien verwerfen?"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abandonner %1$@ fichiers ?"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Descartar %1$@ archivos?"
+          }
+        }
+      }
+    },
     "Descartar alterações": {
       "localizations": {
         "en": {
@@ -7809,6 +8201,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Descartar cambios"
+          }
+        }
+      }
+    },
+    "Descartar as alterações deste arquivo?": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Discard this file's changes?"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Änderungen an dieser Datei verwerfen?"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abandonner les modifications de ce fichier ?"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Descartar los cambios de este archivo?"
           }
         }
       }
@@ -7925,6 +8345,34 @@
         }
       }
     },
+    "Desfazer": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Undo"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rückgängig"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Annuler"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deshacer"
+          }
+        }
+      }
+    },
     "Desfazer %1$@": {
       "localizations": {
         "en": {
@@ -7949,6 +8397,62 @@
           "stringUnit": {
             "state": "translated",
             "value": "Deshacer %1$@"
+          }
+        }
+      }
+    },
+    "Desfazer aqui reescreve um histórico que o remoto já tem: o próximo push vai ser recusado. Para voltar atrás em algo já enviado, prefira um commit novo que desfaça a mudança.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Undoing here rewrites history the remote already has: the next push will be rejected. To take back something already pushed, prefer a new commit that reverts the change."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das Rückgängigmachen hier schreibt eine Historie um, die das Remote schon hat: der nächste Push wird abgelehnt. Um etwas schon Gepushtes zurückzunehmen, mach lieber einen neuen Commit, der die Änderung umkehrt."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Annuler ici réécrit un historique que le remote a déjà : le prochain push sera refusé. Pour revenir sur quelque chose de déjà envoyé, préfère un nouveau commit qui annule la modification."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deshacer aquí reescribe un historial que el remote ya tiene: el próximo push será rechazado. Para revertir algo ya enviado, mejor un commit nuevo que deshaga el cambio."
+          }
+        }
+      }
+    },
+    "Desfazer mesmo assim": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Undo anyway"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trotzdem rückgängig machen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Annuler quand même"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deshacer de todos modos"
           }
         }
       }
@@ -8537,6 +9041,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Duplicar líneas"
+          }
+        }
+      }
+    },
+    "Dá para desfazer logo depois, no aviso que aparece na lista.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You can undo it right after, from the notice that shows up in the list."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Du kannst es gleich danach rückgängig machen, über den Hinweis in der Liste."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tu peux l'annuler juste après, depuis l'avis qui apparaît dans la liste."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se puede deshacer justo después, desde el aviso que aparece en la lista."
           }
         }
       }
@@ -9381,6 +9913,34 @@
         }
       }
     },
+    "Esse commit já está no remoto": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This commit is already on the remote"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dieser Commit ist schon auf dem Remote"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce commit est déjà sur le remote"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ese commit ya está en el remote"
+          }
+        }
+      }
+    },
     "Esta conversa": {
       "localizations": {
         "en": {
@@ -9825,6 +10385,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Fast-forward a %1$@"
+          }
+        }
+      }
+    },
+    "Fast-forward.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fast-forward."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fast-Forward."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fast-forward."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fast-forward."
           }
         }
       }
@@ -10613,6 +11201,34 @@
         }
       }
     },
+    "GitHub: resposta inválida": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GitHub: invalid response"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GitHub: ungültige Antwort"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GitHub : réponse invalide"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GitHub: respuesta no válida"
+          }
+        }
+      }
+    },
     "Gitea / Forgejo": {
       "localizations": {
         "en": {
@@ -10693,6 +11309,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Guardar"
+          }
+        }
+      }
+    },
+    "Guardar em stash e continuar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stash and continue"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stashen und weitermachen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mettre en stash et continuer"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Guardar en stash y seguir"
           }
         }
       }
@@ -10805,6 +11449,90 @@
           "stringUnit": {
             "state": "translated",
             "value": "Guías de indentación"
+          }
+        }
+      }
+    },
+    "HEAD solto": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Detached HEAD"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Losgelöster HEAD"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HEAD détaché"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HEAD suelto"
+          }
+        }
+      }
+    },
+    "HEAD solto: troque para uma branch antes do pull": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Detached HEAD: switch to a branch before pulling"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Losgelöster HEAD: wechsle vor dem Pull auf einen Branch"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HEAD détaché : passe sur une branche avant le pull"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HEAD suelto: cambia a una rama antes del pull"
+          }
+        }
+      }
+    },
+    "HEAD solto: você não está em nenhuma branch, então não há o que enviar. Crie uma branch a partir daqui antes do push.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Detached HEAD: you're not on any branch, so there's nothing to push. Create a branch from here before pushing."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Losgelöster HEAD: du bist auf keinem Branch, also gibt es nichts zu pushen. Leg vor dem Push hier einen Branch an."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HEAD détaché : tu n'es sur aucune branche, il n'y a donc rien à pousser. Crée une branche à partir d'ici avant le push."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HEAD suelto: no estás en ninguna rama, así que no hay nada que enviar. Crea una rama desde aquí antes del push."
           }
         }
       }
@@ -12321,6 +13049,34 @@
         }
       }
     },
+    "Marcar resolvido como está": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mark resolved as is"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "So wie es ist als gelöst markieren"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Marquer comme résolu tel quel"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Marcar como resuelto tal cual"
+          }
+        }
+      }
+    },
     "Mensagem do commit": {
       "localizations": {
         "en": {
@@ -12541,6 +13297,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Merge hecho: %1$@"
+          }
+        }
+      }
+    },
+    "Meu (%1$@)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mine (%1$@)"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Meins (%1$@)"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le mien (%1$@)"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mío (%1$@)"
           }
         }
       }
@@ -12797,6 +13581,34 @@
         }
       }
     },
+    "Mostrar menos": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show less"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Weniger zeigen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Afficher moins"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar menos"
+          }
+        }
+      }
+    },
     "Mostrar ocultos": {
       "localizations": {
         "en": {
@@ -12877,6 +13689,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mostrar saltos de línea"
+          }
+        }
+      }
+    },
+    "Mostrar todos": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show all"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alle zeigen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tout afficher"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mostrar todos"
           }
         }
       }
@@ -14253,6 +15093,34 @@
         }
       }
     },
+    "Não rastreados: %1$@. Vão para a lixeira do projeto.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Untracked: %1$@. They go to the project trash."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nicht verfolgt: %1$@. Sie landen im Papierkorb des Projekts."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non suivis : %1$@. Ils vont dans la corbeille du projet."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sin rastrear: %1$@. Van a la papelera del proyecto."
+          }
+        }
+      }
+    },
     "Não staged": {
       "localizations": {
         "en": {
@@ -14529,6 +15397,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "El agente solo edita con tu aprobación"
+          }
+        }
+      }
+    },
+    "O arquivo sai dos dois lados e o conflito fica resolvido assim.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The file is removed on both sides and the conflict is resolved that way."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Datei verschwindet auf beiden Seiten, und der Konflikt ist damit gelöst."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le fichier disparaît des deux côtés et le conflit est résolu ainsi."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El archivo sale de los dos lados y el conflicto queda resuelto así."
           }
         }
       }
@@ -15621,6 +16517,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Opciones de %1$@"
+          }
+        }
+      }
+    },
+    "Os %1$@ arquivos do merge voltam ao que eram antes dele, e o que você já resolveu nos conflitos se perde. Arquivos fora do merge ficam como estão.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The %1$@ files of the merge go back to how they were before it, and what you already resolved in the conflicts is lost. Files outside the merge stay as they are."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die %1$@ Dateien des Merges kehren zum Stand davor zurück, und was du in den Konflikten schon gelöst hast, geht verloren. Dateien außerhalb des Merges bleiben, wie sie sind."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les %1$@ fichiers du merge reviennent à leur état d'avant, et ce que tu as déjà résolu dans les conflits est perdu. Les fichiers hors du merge restent tels quels."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Los %1$@ archivos del merge vuelven a como estaban antes, y lo que ya resolviste en los conflictos se pierde. Los archivos fuera del merge se quedan como están."
           }
         }
       }
@@ -17305,6 +18229,34 @@
         }
       }
     },
+    "Rastreados: %1$@. Voltam à última versão que o git tem.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tracked: %1$@. They go back to the last version git has."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verfolgt: %1$@. Sie kehren zur letzten Version zurück, die Git hat."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Suivis : %1$@. Ils reviennent à la dernière version connue de git."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rastreados: %1$@. Vuelven a la última versión que tiene git."
+          }
+        }
+      }
+    },
     "React 19 com TypeScript e Vite.": {
       "localizations": {
         "en": {
@@ -17781,6 +18733,34 @@
         }
       }
     },
+    "Remover o lock": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove the lock"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sperre entfernen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprimer le verrou"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quitar el lock"
+          }
+        }
+      }
+    },
     "Renomear": {
       "localizations": {
         "en": {
@@ -17837,6 +18817,34 @@
         }
       }
     },
+    "Repositório bare iniciado em %1$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bare repository initialized in %1$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bare-Repository in %1$@ angelegt"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dépôt bare initialisé dans %1$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Repositorio bare iniciado en %1$@"
+          }
+        }
+      }
+    },
     "Repositório iniciado em %1$@": {
       "localizations": {
         "en": {
@@ -17889,6 +18897,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Resuelve cada archivo en el editor y haz el commit de merge."
+          }
+        }
+      }
+    },
+    "Resolver %1$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Resolve %1$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ auflösen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Résoudre %1$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Resolver %1$@"
           }
         }
       }
@@ -20301,6 +21337,34 @@
         }
       }
     },
+    "Tudo o que ela tem já está na branch atual ou no remoto.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Everything it has is already on the current branch or on the remote."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alles, was er enthält, ist schon im aktuellen Branch oder auf dem Remote."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tout ce qu'elle contient est déjà sur la branche actuelle ou sur le remote."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Todo lo que tiene ya está en la rama actual o en el remote."
+          }
+        }
+      }
+    },
     "Tudo roda no iPad: JavaScriptCore com camada Node, esbuild, libgit2, Runestone e um agente que edita com patches. Sem servidores da Odete.": {
       "localizations": {
         "en": {
@@ -20661,6 +21725,118 @@
           "stringUnit": {
             "state": "translated",
             "value": "Usar"
+          }
+        }
+      }
+    },
+    "Usar a deles (apaga o arquivo)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use theirs (deletes the file)"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ihre nehmen (löscht die Datei)"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Garder la leur (supprime le fichier)"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usar la suya (borra el archivo)"
+          }
+        }
+      }
+    },
+    "Usar a minha (apaga o arquivo)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use mine (deletes the file)"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Meine nehmen (löscht die Datei)"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Garder la mienne (supprime le fichier)"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usar la mía (borra el archivo)"
+          }
+        }
+      }
+    },
+    "Usar a minha versão": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use my version"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Meine Version nehmen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Garder ma version"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usar mi versión"
+          }
+        }
+      }
+    },
+    "Usar a versão deles": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use their version"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ihre Version nehmen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Garder leur version"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Usar su versión"
           }
         }
       }
@@ -22037,6 +23213,118 @@
         }
       }
     },
+    "a Odete não fala SSH. Conecte uma conta para %1$@ em Ajustes → Contas (o envio vai por HTTPS) ou troque o remoto para %2$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Odete doesn't speak SSH. Connect an account for %1$@ in Settings → Accounts (it will push over HTTPS) or change the remote to %2$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Odete spricht kein SSH. Verbinde unter Einstellungen → Konten ein Konto für %1$@ (übertragen wird per HTTPS) oder stell das Remote auf %2$@ um"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Odete ne parle pas SSH. Connecte un compte pour %1$@ dans Réglages → Comptes (l'envoi passe par HTTPS) ou change le remote en %2$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Odete no habla SSH. Conecta una cuenta para %1$@ en Ajustes → Cuentas (el envío va por HTTPS) o cambia el remote a %2$@"
+          }
+        }
+      }
+    },
+    "a Odete não fala SSH: use uma URL https://": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Odete doesn't speak SSH: use an https:// URL"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Odete spricht kein SSH: nimm eine https://-URL"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Odete ne parle pas SSH : utilise une URL https://"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Odete no habla SSH: usa una URL https://"
+          }
+        }
+      }
+    },
+    "a Odete não fala esse protocolo: use uma URL https://": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Odete doesn't speak this protocol: use an https:// URL"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Odete spricht dieses Protokoll nicht: nimm eine https://-URL"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Odete ne parle pas ce protocole : utilise une URL https://"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Odete no habla ese protocolo: usa una URL https://"
+          }
+        }
+      }
+    },
+    "a branch %1$@ é protegida no remoto e recusou o push direto: envie numa branch nova e abra um pull request": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "branch %1$@ is protected on the remote and rejected the direct push: push to a new branch and open a pull request"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "der Branch %1$@ ist auf dem Remote geschützt und hat den direkten Push abgelehnt: push in einen neuen Branch und öffne einen Pull Request"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "la branche %1$@ est protégée sur le remote et a refusé le push direct : pousse sur une nouvelle branche et ouvre une pull request"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "la rama %1$@ está protegida en el remote y rechazó el push directo: envía a una rama nueva y abre un pull request"
+          }
+        }
+      }
+    },
     "a fazer": {
       "localizations": {
         "en": {
@@ -22173,6 +23461,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "abierto %1$@"
+          }
+        }
+      }
+    },
+    "abortar merge": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "abort merge"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Merge abbrechen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "annuler le merge"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "abortar merge"
           }
         }
       }
@@ -22317,6 +23633,34 @@
         }
       }
     },
+    "agora em %1$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "now on %1$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "jetzt auf %1$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "maintenant sur %1$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ahora en %1$@"
+          }
+        }
+      }
+    },
     "aguardando você autorizar…": {
       "localizations": {
         "en": {
@@ -22341,6 +23685,90 @@
           "stringUnit": {
             "state": "translated",
             "value": "esperando a que autorices…"
+          }
+        }
+      }
+    },
+    "ainda há marcadores de conflito em %1$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "there are still conflict markers in %1$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "in %1$@ sind noch Konfliktmarker"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "il reste des marqueurs de conflit dans %1$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "todavía hay marcadores de conflicto en %1$@"
+          }
+        }
+      }
+    },
+    "ainda não há commit para enviar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "there's no commit to push yet"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "noch kein Commit zum Pushen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "pas encore de commit à pousser"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "todavía no hay commit para enviar"
+          }
+        }
+      }
+    },
+    "alterado na sua branch, apagado na outra": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "changed on your branch, deleted on the other"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "in deinem Branch geändert, im anderen gelöscht"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "modifié sur ta branche, supprimé sur l'autre"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "cambiado en tu rama, borrado en la otra"
           }
         }
       }
@@ -22425,6 +23853,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "borrado %1$@"
+          }
+        }
+      }
+    },
+    "apagado na sua branch, alterado na outra": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "deleted on your branch, changed on the other"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "in deinem Branch gelöscht, im anderen geändert"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "supprimé sur ta branche, modifié sur l'autre"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "borrado en tu rama, cambiado en la otra"
           }
         }
       }
@@ -22649,34 +24105,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "autenticación rechazada por el remote"
-          }
-        }
-      }
-    },
-    "autenticação recusada. Entre em Ajustes → Contas.": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "authentication refused. Go to Settings → Accounts."
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Authentifizierung abgelehnt. Geh zu Einstellungen → Konten."
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "authentification refusée. Va dans Réglages → Comptes."
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "autenticación rechazada. Entra en Ajustes → Cuentas."
           }
         }
       }
@@ -22929,6 +24357,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "binario · %1$@"
+          }
+        }
+      }
+    },
+    "binário: escolha uma das versões": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "binary: pick one of the versions"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "binär: wähl eine der Versionen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "binaire : choisis une des versions"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "binario: elige una de las versiones"
           }
         }
       }
@@ -23549,6 +25005,34 @@
         }
       }
     },
+    "commit feito": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "committed"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Commit erstellt"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "commit fait"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "commit hecho"
+          }
+        }
+      }
+    },
     "commit feito, mas o push falhou: %1$@": {
       "localizations": {
         "en": {
@@ -23629,6 +25113,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "conectar"
+          }
+        }
+      }
+    },
+    "conflito em %1$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "conflict in %1$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Konflikt in %1$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "conflit dans %1$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "conflicto en %1$@"
           }
         }
       }
@@ -23965,6 +25477,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "deflate falló: %1$@"
+          }
+        }
+      }
+    },
+    "descarte desfeito": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "discard undone"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verwerfen rückgängig gemacht"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "abandon annulé"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "descarte deshecho"
           }
         }
       }
@@ -24865,6 +26405,34 @@
         }
       }
     },
+    "fast-forward": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "fast-forward"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fast-Forward"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "fast-forward"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "fast-forward"
+          }
+        }
+      }
+    },
     "fatal: não é um repositório git (rode git init)": {
       "localizations": {
         "en": {
@@ -24917,6 +26485,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "hecho"
+          }
+        }
+      }
+    },
+    "fetch feito": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "fetched"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fetch erledigt"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "fetch fait"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "fetch hecho"
           }
         }
       }
@@ -25173,6 +26769,34 @@
         }
       }
     },
+    "git: %1$@ não é rastreado pelo git; nada para restaurar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "git: %1$@ isn't tracked by git; nothing to restore"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "git: %1$@ wird von git nicht verfolgt; nichts wiederherzustellen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "git : %1$@ n'est pas suivi par git ; rien à restaurer"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "git: %1$@ no está rastreado por git; nada que restaurar"
+          }
+        }
+      }
+    },
     "git: não achei o arquivo %1$@": {
       "localizations": {
         "en": {
@@ -25337,6 +26961,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "grep: patrón"
+          }
+        }
+      }
+    },
+    "guardado pela Odete": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "stashed by Odete"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "von Odete gestasht"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "mis en stash par Odete"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "guardado por Odete"
           }
         }
       }
@@ -25705,6 +27357,34 @@
         }
       }
     },
+    "isso não é um lock do git: %1$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "that's not a git lock: %1$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "das ist keine Git-Sperre: %1$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ce n'est pas un verrou git : %1$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "eso no es un lock de git: %1$@"
+          }
+        }
+      }
+    },
     "isto não é uma view": {
       "localizations": {
         "en": {
@@ -25929,6 +27609,34 @@
         }
       }
     },
+    "lock removido": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "lock removed"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sperre entfernt"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "verrou supprimé"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "lock quitado"
+          }
+        }
+      }
+    },
     "ls: %1$@: não existe": {
       "localizations": {
         "en": {
@@ -26037,6 +27745,62 @@
           "stringUnit": {
             "state": "translated",
             "value": "mensaje"
+          }
+        }
+      }
+    },
+    "merge abortado": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "merge aborted"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Merge abgebrochen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "merge annulé"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "merge abortado"
+          }
+        }
+      }
+    },
+    "merge feito": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "merged"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Merge erledigt"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "merge fait"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "merge hecho"
           }
         }
       }
@@ -27273,6 +29037,62 @@
         }
       }
     },
+    "não dá para apagar a branch atual (%1$@): troque de branch antes": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "can't delete the current branch (%1$@): switch branches first"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "den aktuellen Branch (%1$@) kannst du nicht löschen: wechsle zuerst den Branch"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "impossible de supprimer la branche actuelle (%1$@) : change de branche d'abord"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "no se puede borrar la rama actual (%1$@): cambia de rama antes"
+          }
+        }
+      }
+    },
+    "não dá para apagar a branch atual: troque de branch antes": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "can't delete the current branch: switch branches first"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "den aktuellen Branch kannst du nicht löschen: wechsle zuerst den Branch"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "impossible de supprimer la branche actuelle : change de branche d'abord"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "no se puede borrar la rama actual: cambia de rama antes"
+          }
+        }
+      }
+    },
     "não dá para iterar %1$@": {
       "localizations": {
         "en": {
@@ -27297,6 +29117,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "no se puede iterar %1$@"
+          }
+        }
+      }
+    },
+    "não encontrei %1$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "couldn't find %1$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ nicht gefunden"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ introuvable"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "no encontré %1$@"
           }
         }
       }
@@ -27549,6 +29397,202 @@
           "stringUnit": {
             "state": "translated",
             "value": "el código expiró; empieza de nuevo"
+          }
+        }
+      }
+    },
+    "o remoto %1$@ não existe": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "remote %1$@ doesn't exist"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "das Remote %1$@ gibt es nicht"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "le remote %1$@ n'existe pas"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "el remote %1$@ no existe"
+          }
+        }
+      }
+    },
+    "o remoto local não é bare: crie com git init --bare para poder enviar a ele": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "the local remote isn't bare: create it with git init --bare to push to it"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "das lokale Remote ist nicht bare: leg es mit git init --bare an, um dorthin zu pushen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "le remote local n'est pas bare : crée-le avec git init --bare pour pouvoir y pousser"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "el remote local no es bare: créalo con git init --bare para poder enviarle"
+          }
+        }
+      }
+    },
+    "o remoto negou acesso (403): a conta não tem permissão de escrita nesse repositório": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "the remote denied access (403): the account can't write to this repository"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "das Remote hat den Zugriff verweigert (403): das Konto darf nicht in dieses Repository schreiben"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "le remote a refusé l'accès (403) : le compte n'a pas le droit d'écrire dans ce dépôt"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "el remote negó el acceso (403): la cuenta no tiene permiso de escritura en este repositorio"
+          }
+        }
+      }
+    },
+    "o remoto recusou o push de %1$@ (hook pre-receive): %2$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "the remote rejected the push of %1$@ (pre-receive hook): %2$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "das Remote hat den Push von %1$@ abgelehnt (pre-receive-Hook): %2$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "le remote a refusé le push de %1$@ (hook pre-receive) : %2$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "el remote rechazó el push de %1$@ (hook pre-receive): %2$@"
+          }
+        }
+      }
+    },
+    "o remoto recusou o push de %1$@: %2$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "the remote rejected the push of %1$@: %2$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "das Remote hat den Push von %1$@ abgelehnt: %2$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "le remote a refusé le push de %1$@ : %2$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "el remote rechazó el push de %1$@: %2$@"
+          }
+        }
+      }
+    },
+    "o remoto tem commits que você ainda não tem: faça pull antes do push": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "the remote has commits you don't have yet: pull before you push"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "das Remote hat Commits, die du noch nicht hast: mach vor dem Push einen Pull"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "le remote a des commits que tu n'as pas encore : fais un pull avant le push"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "el remote tiene commits que aún no tienes: haz pull antes del push"
+          }
+        }
+      }
+    },
+    "o repositório está travado por %1$@. Se nenhuma outra operação do git estiver rodando, o lock ficou órfão e pode ser removido.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "the repository is locked by %1$@. If no other git operation is running, the lock is orphaned and can be removed."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "das Repository ist durch %1$@ gesperrt. Wenn keine andere Git-Operation läuft, ist die Sperre verwaist und kann entfernt werden."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "le dépôt est verrouillé par %1$@. Si aucune autre opération git n'est en cours, le verrou est orphelin et peut être supprimé."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "el repositorio está bloqueado por %1$@. Si no hay otra operación de git en curso, el lock quedó huérfano y se puede quitar."
           }
         }
       }
@@ -28281,6 +30325,90 @@
         }
       }
     },
+    "pull: fast-forward": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "pull: fast-forward"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pull: Fast-Forward"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "pull : fast-forward"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "pull: fast-forward"
+          }
+        }
+      }
+    },
+    "pull: merge feito": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "pull: merged"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pull: Merge erledigt"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "pull : merge fait"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "pull: merge hecho"
+          }
+        }
+      }
+    },
+    "push feito": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "pushed"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Push erledigt"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "push fait"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "push hecho"
+          }
+        }
+      }
+    },
     "rascunho": {
       "localizations": {
         "en": {
@@ -28393,6 +30521,34 @@
         }
       }
     },
+    "remoto %1$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "remote %1$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remote %1$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "remote %1$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "remote %1$@"
+          }
+        }
+      }
+    },
     "removido: %1$@": {
       "localizations": {
         "en": {
@@ -28449,6 +30605,34 @@
         }
       }
     },
+    "repositório não encontrado no remoto: confira a URL e se a conta tem acesso a ele": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "repository not found on the remote: check the URL and whether the account has access to it"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Repository auf dem Remote nicht gefunden: prüf die URL und ob das Konto Zugriff darauf hat"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dépôt introuvable sur le remote : vérifie l'URL et si le compte y a accès"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "repositorio no encontrado en el remote: revisa la URL y si la cuenta tiene acceso"
+          }
+        }
+      }
+    },
     "resolva os conflitos antes de commitar": {
       "localizations": {
         "en": {
@@ -28473,6 +30657,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "resuelve los conflictos antes de commitear"
+          }
+        }
+      }
+    },
+    "resolver %1$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "resolve %1$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ auflösen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "résoudre %1$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "resolver %1$@"
           }
         }
       }
@@ -29429,6 +31641,62 @@
         }
       }
     },
+    "suas alterações em %1$@ seriam sobrescritas: faça commit ou guarde em stash antes": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "your changes to %1$@ would be overwritten: commit or stash them first"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "deine Änderungen an %1$@ würden überschrieben: committe oder stashe sie vorher"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "tes modifications dans %1$@ seraient écrasées : fais un commit ou un stash avant"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "tus cambios en %1$@ se sobrescribirían: haz commit o guárdalos en stash antes"
+          }
+        }
+      }
+    },
+    "suas alterações locais seriam sobrescritas: faça commit ou guarde em stash antes": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "your local changes would be overwritten: commit or stash them first"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "deine lokalen Änderungen würden überschrieben: committe oder stashe sie vorher"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "tes modifications locales seraient écrasées : fais un commit ou un stash avant"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "tus cambios locales se sobrescribirían: haz commit o guárdalos en stash antes"
+          }
+        }
+      }
+    },
     "subindo de novo…": {
       "localizations": {
         "en": {
@@ -29705,6 +31973,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "token de acceso personal"
+          }
+        }
+      }
+    },
+    "trocar branch": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "switch branch"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Branch wechseln"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "changer de branche"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "cambiar de rama"
           }
         }
       }
@@ -30069,6 +32365,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "vitest: el vitest real no funciona en el iPad (necesita worker_threads y el binario nativo de vite); usando el ejecutor integrado de Odete"
+          }
+        }
+      }
+    },
+    "você mexeu em %1$@ depois do merge: abortar agora perderia isso. Faça commit, guarde em stash ou descarte antes.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "you changed %1$@ after the merge: aborting now would lose that. Commit, stash or discard it first."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "du hast %1$@ nach dem Merge geändert: ein Abbruch jetzt würde das verlieren. Committe, stashe oder verwirf es vorher."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "tu as modifié %1$@ après le merge : annuler maintenant le perdrait. Fais un commit, un stash ou abandonne-le avant."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "cambiaste %1$@ después del merge: abortar ahora lo perdería. Haz commit, guárdalo en stash o descártalo antes."
           }
         }
       }

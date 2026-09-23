@@ -12,9 +12,29 @@ struct GitCommand: ShellCommand {
         guard let sub = args.first else { io.out(help); return 0 }
         let rest = Array(args.dropFirst())
         if sub == "init" {
+            // `git init --bare pasta` cria um remoto local: dá para testar push, pull e
+            // recusa sem servidor, tudo dentro do iPad.
+            let bare = rest.contains("--bare")
+            // `-b nome` é a branch inicial, não a pasta.
+            var pasta: String?
+            var branch = "main"
+            var i = 0
+            while i < rest.count {
+                if rest[i] == "-b" || rest[i] == "--initial-branch", i + 1 < rest.count {
+                    branch = rest[i + 1]; i += 2; continue
+                }
+                if !rest[i].hasPrefix("-"), pasta == nil {
+                    pasta = rest[i]
+                }
+                i += 1
+            }
+            let alvo = pasta.map { ctx.resolve($0) } ?? ctx.root
             do {
-                _ = try Repository.initialize(at: ctx.root); io
-                    .out(tr("Repositório iniciado em %1$@", "\(ctx.display(ctx.root))")); return 0
+                _ = try Repository.initialize(at: alvo, defaultBranch: branch, bare: bare)
+                io.out(bare
+                    ? tr("Repositório bare iniciado em %1$@", "\(ctx.display(alvo))")
+                    : tr("Repositório iniciado em %1$@", "\(ctx.display(alvo))"))
+                return 0
             } catch {
                 io.err(error.localizedDescription); return 1
             }
@@ -83,7 +103,16 @@ struct GitCommand: ShellCommand {
                 } else if rest.first == "--staged" {
                     try await repo.unstage(Array(rest.dropFirst()))
                 } else if sub == "restore" {
-                    try await repo.discard(rest)
+                    // Como no git: arquivo não rastreado não tem versão para onde voltar.
+                    // O descarte apagava de vez; agora ele fica e o erro diz por quê.
+                    let naoRastreados = try await repo.discard(posicionais(rest))
+                    if !naoRastreados.isEmpty {
+                        io.err(tr(
+                            "git: %1$@ não é rastreado pelo git; nada para restaurar",
+                            naoRastreados.joined(separator: ", ")
+                        ))
+                        return 1
+                    }
                 } else if rest.isEmpty {
                     try await repo.unstageAll()
                 } else {
@@ -182,9 +211,21 @@ struct GitCommand: ShellCommand {
                         checkout: true
                     ); io.out(tr("Nova branch %1$@", "\(rest[1])"))
                 } else if let n = rest.first {
-                    try await repo.checkout(n); io.out(tr("Agora em %1$@", "\(n)"))
+                    // `origin/x` vira a branch local `x` que acompanha a remota: o nome
+                    // que vale é o de agora, não o que foi pedido.
+                    try await repo.checkout(n)
+                    let atual = try await repo.currentBranch()
+                    if let up = atual?.upstream, up == n || atual?.name != n {
+                        io.out(tr("Agora em %1$@ (acompanhando %2$@)", "\(atual?.name ?? n)", up))
+                    } else {
+                        io.out(tr("Agora em %1$@", "\(atual?.name ?? n)"))
+                    }
                 }
             case "merge":
+                if rest.first == "--abort" {
+                    try await repo.abortMerge(); io.out(tr("merge abortado"))
+                    return 0
+                }
                 guard let n = rest.first else { io.err(tr("git merge <branch>")); return 1 }
                 switch try await repo.merge(n, author: author) {
                 case .upToDate: io.out(tr("Já atualizado."))
@@ -211,13 +252,13 @@ struct GitCommand: ShellCommand {
                 }
             case "remote":
                 if rest.first == "add", rest.count >= 3 {
-                    try await repo.addRemote(name: rest[1], url: rest[2])
+                    try await repo.addRemote(name: rest[1], url: enderecoDoRemoto(rest[2], ctx))
                 } else if rest.first == "remove", rest.count >= 2 {
                     try await repo.removeRemote(name: rest[1])
                 } else if rest.first == "set-url", rest.count >= 3 {
                     try await repo.setRemoteURL(
                         name: rest[1],
-                        url: rest[2]
+                        url: enderecoDoRemoto(rest[2], ctx)
                     )
                 } else {
                     for r in try await repo.remotes() {
@@ -228,7 +269,7 @@ struct GitCommand: ShellCommand {
                 let remote = posicionais(rest).first ?? "origin"
                 let url = try await repo.remotes().first { $0.name == remote }?.url ?? ""
                 try await repo.fetch(remote: remote, credentials: ctx.shell.services.credentials(url)); io
-                    .out("fetch ok")
+                    .out(tr("fetch feito"))
             case "pull":
                 let remote = posicionais(rest).first ?? "origin"
                 let url = try await repo.remotes().first { $0.name == remote }?.url ?? ""
@@ -238,7 +279,7 @@ struct GitCommand: ShellCommand {
                     author: author
                 ) {
                 case .upToDate: io.out(tr("Já atualizado."))
-                case .fastForward: io.out("Fast-forward.")
+                case .fastForward: io.out(tr("Fast-forward."))
                 case .merged: io.out(tr("Merge feito."))
                 case let .conflicts(p): io.err(tr("CONFLITO em: %1$@", "\(p.joined(separator: ", "))")); return 1
                 }
@@ -251,7 +292,7 @@ struct GitCommand: ShellCommand {
                 let branch = args.count > 1 ? args[1] : nil
                 try await repo
                     .push(remote: remote, branch: branch, credentials: ctx.shell.services.credentials(url)); io
-                    .out("push ok")
+                    .out(tr("push feito"))
             case "rev-parse":
                 try await io
                     .out(rest
@@ -268,6 +309,14 @@ struct GitCommand: ShellCommand {
     /// Os argumentos que não são opção, na ordem: remoto e branch.
     func posicionais(_ rest: [String]) -> [String] {
         rest.filter { !$0.hasPrefix("-") }
+    }
+
+    /// Remoto que é pasta (`.odete/remoto.git`) vira `file://` com o caminho de verdade.
+    /// O libgit2 resolveria o caminho relativo a partir da pasta do processo, não do
+    /// projeto, e o "/" do terminal é a raiz do projeto, não a do iPad.
+    func enderecoDoRemoto(_ url: String, _ ctx: CommandContext) -> String {
+        guard !url.contains("://"), !Remote.isSSH(url) else { return url }
+        return ctx.resolve(url).standardizedFileURL.absoluteString
     }
 
     static let suportados = [

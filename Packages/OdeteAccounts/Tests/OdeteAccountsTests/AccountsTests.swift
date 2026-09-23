@@ -110,12 +110,45 @@ struct AccountStoreTests {
         #expect(store.autor.email == "odete@odete.local")
     }
 
-    @Test func contaSemEmailCaiNoEnderecoDaCasa() throws {
+    /// Conta do GitHub com e-mail privado: `marcos@odete.local` deixava o commit sem dono
+    /// no GitHub. O noreply da conta liga o commit a ela sem expor o e-mail.
+    @Test func contaSemEmailAssinaComONoreplyDoGitHub() throws {
         let store = vazio()
-        try store.add(HostAccount(kind: .github, host: "github.com", login: "marcos"), token: "t")
+        try store.add(HostAccount(kind: .github, host: "github.com", login: "marcos", userId: 583_231), token: "t")
         store.authorName = ""
         store.authorEmail = ""
         #expect(store.autor.name == "marcos")
-        #expect(store.autor.email == "marcos@odete.local")
+        #expect(store.autor.email == "583231+marcos@users.noreply.github.com")
+    }
+
+    /// Conta salva antes de a Odete guardar o id: o noreply no formato antigo, só com o
+    /// login, até a tela de contas completar o id.
+    @Test func contaAntigaSemIdUsaONoreplySoComLogin() throws {
+        let url = FileManager.default.temporaryDirectory.appending(path: "odete-acc-\(UUID().uuidString)/accounts.json")
+        let store = AccountStore(url: url, keychain: MemorySecrets())
+        try store.add(HostAccount(kind: .github, host: "github.com", login: "marcos"), token: "t")
+        store.authorName = ""
+        store.authorEmail = ""
+        #expect(store.autor.email == "marcos@users.noreply.github.com")
+        var comId = try #require(store.github)
+        comId.userId = 7
+        store.update(comId)
+        #expect(store.autor.email == "7+marcos@users.noreply.github.com")
+        #expect(AccountStore(url: url, keychain: MemorySecrets()).github?.userId == 7)
+    }
+
+    /// O que está escrito nos Ajustes continua valendo mais que qualquer dedução.
+    @Test func emailDosAjustesVenceONoreply() throws {
+        let store = vazio()
+        try store.add(HostAccount(kind: .github, host: "github.com", login: "marcos", userId: 1), token: "t")
+        store.authorEmail = "eu@exemplo.com"
+        #expect(store.autor.email == "eu@exemplo.com")
+    }
+
+    /// O `id` do `/user` chega na conta; é dele que sai o noreply.
+    @Test func usuarioDoGitHubTrazOId() throws {
+        let json = Data(#"{"id": 583231, "login": "marcos", "name": null, "email": null}"#.utf8)
+        let u = try JSONDecoder().decode(GitHubUser.self, from: json)
+        #expect(u.id == 583_231 && u.login == "marcos")
     }
 }

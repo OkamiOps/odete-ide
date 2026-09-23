@@ -148,6 +148,29 @@ func project() throws -> URL {
         #expect(o.out.contains("* feat"))
     }
 
+    /// Remoto bare dentro do próprio projeto: o jeito de testar push sem servidor no
+    /// iPad. E `git restore` de arquivo não rastreado recusa em vez de apagar de vez.
+    @Test func remotoLocalERestoreSemApagar() async throws {
+        Texto.escolher(.ptBR)
+        let root = try project()
+        let sh = Shell(root: root)
+        let o = Out()
+        #expect(await sh.run(
+            "git init && git add . && git commit -m \"primeiro\" && git init --bare .odete/remoto.git",
+            sink: o.sink
+        ) == 0)
+        #expect(o.out.contains("bare"))
+        #expect(await sh.run("git remote add origin .odete/remoto.git && git push origin main", sink: o.sink) == 0)
+        #expect(await sh.run("git remote -v", sink: o.sink) == 0)
+        #expect(o.out.contains("file://"))
+        #expect(FileManager.default.fileExists(atPath: root.appending(path: ".odete/remoto.git/refs/heads/main").path))
+
+        try "trabalho\n".write(to: root.appending(path: "novo.txt"), atomically: true, encoding: .utf8)
+        #expect(await sh.run("git restore novo.txt", sink: o.sink) == 1)
+        #expect(o.err.contains("não é rastreado"))
+        #expect(FileManager.default.fileExists(atPath: root.appending(path: "novo.txt").path))
+    }
+
     @Test func nodeAndScripts() async throws {
         let root = try project()
         let sh = Shell(root: root)

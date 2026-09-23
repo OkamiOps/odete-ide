@@ -17,6 +17,8 @@ struct ContaDoArquivo: Equatable {
 struct ChangesCard: View {
     @Environment(WorkspaceModel.self) private var ws
     @Environment(\.theme) private var theme
+    /// Os caminhos esperando a confirmação do "Descartar tudo".
+    @State private var descartando: [String]?
     var git: GitModel {
         ws.git
     }
@@ -53,12 +55,18 @@ struct ChangesCard: View {
             Button(tr("Tirar tudo do stage"), systemImage: "minus.circle") { git.unstageAll() }
                 .disabled(git.staged.isEmpty || git.busy)
             Divider()
+            // Descartava na hora, sem perguntar, e o não rastreado sumia de vez.
             Button(tr("Descartar tudo"), systemImage: "arrow.uturn.backward", role: .destructive) {
-                git.discard(git.unstaged.map(\.path))
+                descartando = git.unstaged.map(\.path)
             }
             .disabled(git.unstaged.isEmpty || git.busy)
         }
         .padding(.bottom, 8)
+        .modifier(ConfirmaDescarte(caminhos: $descartando))
+        if !git.discarded.isEmpty {
+            AvisoDeDescarte()
+                .padding(.bottom, 8)
+        }
         if git.isClean {
             CardList {
                 Text(tr("Nada mudou desde o último commit."))
@@ -79,6 +87,71 @@ struct ChangesCard: View {
                 )
             }
         }
+    }
+}
+
+/// Confirmação de descarte com a conta de cada tipo: o rastreado volta à versão do git,
+/// o não rastreado vai para a lixeira do projeto. Os dois têm desfazer, mas a pessoa
+/// precisa saber o que vai acontecer antes de tocar.
+struct ConfirmaDescarte: ViewModifier {
+    @Environment(WorkspaceModel.self) private var ws
+    @Binding var caminhos: [String]?
+
+    func body(content: Content) -> some View {
+        let conta = ws.git.discardCount(caminhos ?? [])
+        return content.confirmationDialog(
+            (caminhos?.count ?? 0) == 1 ? tr("Descartar as alterações deste arquivo?")
+                : tr("Descartar %1$@ arquivos?", "\(caminhos?.count ?? 0)"),
+            isPresented: Binding(get: { caminhos != nil }, set: {
+                if !$0 {
+                    caminhos = nil
+                }
+            }),
+            titleVisibility: .visible
+        ) {
+            Button(tr("Descartar"), role: .destructive) {
+                if let c = caminhos {
+                    ws.git.discard(c)
+                }
+                caminhos = nil
+            }
+            Button(tr("Cancelar"), role: .cancel) { caminhos = nil }
+        } message: {
+            Text(Self.mensagem(rastreados: conta.tracked, naoRastreados: conta.untracked))
+        }
+    }
+
+    static func mensagem(rastreados: Int, naoRastreados: Int) -> String {
+        var partes: [String] = []
+        if rastreados > 0 {
+            partes.append(tr("Rastreados: %1$@. Voltam à última versão que o git tem.", "\(rastreados)"))
+        }
+        if naoRastreados > 0 {
+            partes.append(tr("Não rastreados: %1$@. Vão para a lixeira do projeto.", "\(naoRastreados)"))
+        }
+        partes.append(tr("Dá para desfazer logo depois, no aviso que aparece na lista."))
+        return partes.joined(separator: "\n")
+    }
+}
+
+/// Aviso do último descarte, com o desfazer. Some na ação seguinte do painel.
+struct AvisoDeDescarte: View {
+    @Environment(WorkspaceModel.self) private var ws
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        let n = ws.git.discarded.count
+        HStack(spacing: 8) {
+            Image(systemName: "trash").font(.system(size: 11, weight: .semibold)).foregroundStyle(theme.fgMuted)
+            Text(n == 1 ? tr("1 arquivo descartado") : tr("%1$@ arquivos descartados", "\(n)"))
+                .font(.caption).foregroundStyle(theme.fgMuted).lineLimit(1)
+            Spacer(minLength: 4)
+            Button(tr("Desfazer")) { ws.git.undoDiscard() }
+                .font(.caption.weight(.semibold))
+                .disabled(ws.git.busy)
+        }
+        .padding(.horizontal, 12).padding(.vertical, 8)
+        .background(theme.bgElevated, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
 
@@ -106,6 +179,7 @@ struct ChangeRow: View {
     var ultimo = false
     /// A conta de linhas do arquivo, vinda do cartão — ver `ChangesCard.contas()`.
     var conta: ContaDoArquivo?
+    @State private var descartando: [String]?
 
     var git: GitModel {
         ws.git
@@ -189,10 +263,11 @@ struct ChangeRow: View {
             Button(tr("Histórico do arquivo"), systemImage: "clock.arrow.circlepath") { ws.historyPath = entry.path }
             if !staged {
                 Button(tr("Descartar alterações"), systemImage: "arrow.uturn.backward", role: .destructive) {
-                    git.discard([entry.path])
+                    descartando = [entry.path]
                 }
             }
         }
+        .modifier(ConfirmaDescarte(caminhos: $descartando))
     }
 
     var compacto: Bool {

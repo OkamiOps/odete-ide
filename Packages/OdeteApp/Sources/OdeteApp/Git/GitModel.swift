@@ -2,6 +2,7 @@ import Foundation
 import Observation
 import OdeteAccounts
 import OdeteCore
+import OdeteFiles
 import OdeteGit
 import OdeteI18n
 
@@ -21,6 +22,10 @@ public final class GitModel {
     public private(set) var aheadBehind: (ahead: Int, behind: Int)?
     public private(set) var conflicts: [String] = []
     public private(set) var mergeInProgress = false
+    /// O commit do HEAD já está numa branch remota: desfazê-lo reescreve o que foi enviado.
+    public private(set) var headOnRemote = false
+    /// O que cada conflito tem de cada lado — os sem marcador pedem "minha", "deles" ou apagar.
+    public private(set) var conflictInfos: [String: ConflictInfo] = [:]
     public var busy = false
     public var note = ""
     public var error: String?
@@ -106,6 +111,13 @@ public final class GitModel {
 
     public var hasCredentials: Bool {
         credentials(for: origin) != nil
+    }
+
+    /// O remoto é de rede (HTTPS ou SSH)? Um `file://` ou uma pasta não pede conta: o
+    /// "Commit e push" para um remoto local dizia "conecte uma conta" e não enviava.
+    public var remoteNeedsAccount: Bool {
+        guard let url = origin?.url.lowercased() else { return false }
+        return url.hasPrefix("http://") || url.hasPrefix("https://") || Remote.isSSH(url)
     }
 
     public var githubToken: String? {
@@ -221,13 +233,18 @@ public final class GitModel {
             let cur = try await repo.currentBranch()
             let hn = await repo.headBranchName()
             let ab = try await repo.aheadBehind()
+            let noRemoto = await repo.headIsOnRemote()
             if restoVale {
-                current = cur; headName = hn; aheadBehind = ab
+                current = cur; headName = hn; aheadBehind = ab; headOnRemote = noRemoto
             }
             let cf = try await repo.conflictedPaths()
             let mg = await repo.mergeInProgress
+            var infos: [String: ConflictInfo] = [:]
+            for p in cf {
+                infos[p] = try? await repo.conflictInfo(p)
+            }
             if marcasValem {
-                conflicts = cf; mergeInProgress = mg
+                conflicts = cf; mergeInProgress = mg; conflictInfos = infos
             }
             let d = try await repo.diff(diffSource, path: diffPath)
             let sd = try await repo.diff(.headToWorkdir, context: 0)
@@ -253,26 +270,38 @@ public final class GitModel {
 
     // MARK: ações
 
-    private func run(_ what: String, _ body: @escaping @Sendable (Repository) async throws -> String?) {
+    /// Saída que acompanha o `error` atual, se houver uma.
+    public var errorExit: ErrorExit?
+    /// A ação que esbarrou em alteração local, para repetir depois do stash.
+    @ObservationIgnored var retryAfterStash: (@Sendable (Repository) async throws -> String?)?
+
+    /// O último descarte, enquanto dá para desfazer: some na ação seguinte.
+    public internal(set) var discarded: [DiscardedFile] = []
+
+    /// `what` fica na nota só enquanto a ação roda, e enquanto roda o painel mostra o
+    /// indicador de progresso no lugar da nota: ninguém lê, e por isso não passa por
+    /// `tr()`. A frase que a ação devolve é a que aparece, e essa passa.
+    func run(
+        _ what: String,
+        keepsDiscard: Bool = false,
+        _ body: @escaping @Sendable (Repository) async throws -> String?
+    ) {
         guard let repo, !busy else { return }
         busy = true
         note = what
+        if !keepsDiscard {
+            discarded = []
+        }
         Task {
             defer { busy = false }
             do {
-                if let n = try await body(repo) {
-                    note = n
-                } else {
-                    note = ""
-                }
+                note = try await body(repo) ?? ""
             } catch let e as GitError {
-                error = e.message
                 note = ""
-                if e.kind == .auth {
-                    error = tr("autenticação recusada. Entre em Ajustes → Contas.")
-                }
+                show(e, retry: body)
             } catch {
                 self.error = error.localizedDescription
+                errorExit = nil
                 note = ""
             }
             await refresh()
@@ -302,10 +331,6 @@ public final class GitModel {
         run("unstage…") { try await $0.unstageAll(); return nil }
     }
 
-    public func discard(_ paths: [String]) {
-        run("descartando…") { try await $0.discard(paths); return nil }
-    }
-
     public func stageHunk(_ h: Hunk, in f: FileDiff) {
         run("stage…") { try await $0.stageHunk(h, in: f); return nil }
     }
@@ -321,20 +346,21 @@ public final class GitModel {
         ); return nil }
     }
 
-    /// `stageFirst` manda tudo para o stage antes de commitar, numa operação só: chamar
-    /// `stageAll()` e `commit()` em seguida não funciona porque a segunda cai no guarda de
-    /// ocupado enquanto a primeira ainda roda.
-    /// `stageFirst` manda tudo para o stage antes de commitar. Havendo remoto, o push sai
-    /// logo em seguida, no mesmo bloco: são etapas de uma ação só do ponto de vista de quem
-    /// usa, e chamadas separadas cairiam no guarda de ocupado.
-    public func commit(stagingEverything stageFirst: Bool = false) {
+    /// Commit, e o push só quando pedido.
+    ///
+    /// O botão dizia "Commit" em coluna estreita e mesmo assim enviava: havendo conta,
+    /// todo commit virava push. Agora são dois botões, e cada um faz o que diz.
+    ///
+    /// `stageFirst` manda tudo para o stage antes, na mesma operação: chamar
+    /// `stageAll()` e `commit()` em seguida não funciona porque a segunda cai no guarda
+    /// de ocupado enquanto a primeira ainda roda.
+    public func commit(stagingEverything stageFirst: Bool = false, push: Bool = false) {
         let msg = commitMessage.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !msg.isEmpty else { error = tr("escreva a mensagem do commit"); return }
         let author = author
         let merging = mergeInProgress
-        let cred = credentials(for: origin)
-        // Sem conta conectada não dá para enviar; o commit sai e a mensagem diz o porquê.
-        let semConta = origin != nil && cred == nil
+        let cred = push ? credentials(for: origin) : nil
+        let semConta = push && cred == nil && remoteNeedsAccount
         run("commit…") { repo in
             if stageFirst {
                 try await repo.stageAll()
@@ -344,22 +370,37 @@ public final class GitModel {
             } else {
                 try await repo.commit(message: msg, author: author)
             }
-            guard let cred else {
-                return semConta ? tr("commit feito; conecte uma conta para enviar") : "commit feito"
+            // O commit existe: a mensagem já mora nele e sai da caixa, mesmo que o push
+            // falhe logo abaixo. Se o commit falhar, ela fica — antes sumia nos dois casos.
+            await self.messageCommitted(msg)
+            guard push else { return tr("commit feito") }
+            // Sem conta conectada não dá para enviar; o commit sai e a nota diz o porquê.
+            // Remoto local (`file://`) não pede conta nenhuma.
+            if semConta {
+                return tr("commit feito; conecte uma conta para enviar")
             }
             do {
                 try await repo.push(credentials: cred)
                 return tr("commit e push feitos")
             } catch {
                 // O commit já está no repositório; só o envio falhou, e é isso que se diz.
+                let e = error as? GitError
                 throw GitError(
-                    kind: .network,
-                    code: 0,
-                    message: tr("commit feito, mas o push falhou: %1$@", "\(error.localizedDescription)")
+                    kind: e?.kind ?? .network,
+                    code: e?.code ?? 0,
+                    message: tr("commit feito, mas o push falhou: %1$@", "\(e?.message ?? error.localizedDescription)"),
+                    paths: e?.paths ?? []
                 )
             }
         }
-        commitMessage = ""
+    }
+
+    /// Limpa a caixa de mensagem depois do commit — se ninguém escreveu outra coisa nela
+    /// enquanto o commit rodava.
+    private func messageCommitted(_ msg: String) {
+        if commitMessage.trimmingCharacters(in: .whitespacesAndNewlines) == msg {
+            commitMessage = ""
+        }
     }
 
     public func undoLastCommit() {
@@ -374,11 +415,21 @@ public final class GitModel {
     }
 
     public func checkout(_ name: String) {
-        run("trocando…") { try await $0.checkout(name); return nil }
+        run("trocando…") { repo in
+            try await repo.checkout(name)
+            let atual = try await repo.currentBranch()?.name ?? name
+            return tr("agora em %1$@", atual)
+        }
     }
 
     public func deleteBranch(_ name: String) {
-        run("apagando…") { try await $0.deleteBranch(name); return nil }
+        run("apagando…") { try await $0.deleteBranch(name); return tr("branch %1$@ apagada", name) }
+    }
+
+    /// Commits que só a branch tem: a confirmação de apagar diz quantos somem com ela.
+    public func commitsOnlyIn(branch name: String) async -> Int {
+        guard let repo else { return 0 }
+        return await (try? repo.commitsOnlyIn(branch: name)) ?? 0
     }
 
     public func merge(_ name: String) {
@@ -386,15 +437,16 @@ public final class GitModel {
         run("merge…") { repo in
             switch try await repo.merge(name, author: author) {
             case .upToDate: tr("já atualizado")
-            case .fastForward: "fast-forward"
-            case .merged: "merge feito"
+            case .fastForward: tr("fast-forward")
+            case .merged: tr("merge feito")
             case let .conflicts(p): tr("conflitos em %1$@ arquivo(s)", "\(p.count)")
             }
         }
     }
 
+    /// Abortar o merge devolve ao HEAD só os arquivos dele — ver `Repository.abortMerge`.
     public func abortMerge() {
-        run("abortando merge…") { try await $0.abortMerge(); return nil }
+        run("abortando merge…") { try await $0.abortMerge(); return tr("merge abortado") }
     }
 
     public func resolve(path: String, contents: String) {
@@ -426,7 +478,7 @@ public final class GitModel {
 
     public func fetch() {
         let cred = credentials(for: origin)
-        run("fetch…") { try await $0.fetch(credentials: cred); return "fetch ok" }
+        run("fetch…") { try await $0.fetch(credentials: cred); return tr("fetch feito") }
     }
 
     public func pull() {
@@ -435,8 +487,8 @@ public final class GitModel {
         run("pull…") { repo in
             switch try await repo.pull(credentials: cred, author: author) {
             case .upToDate: tr("já atualizado")
-            case .fastForward: "pull: fast-forward"
-            case .merged: "pull: merge feito"
+            case .fastForward: tr("pull: fast-forward")
+            case .merged: tr("pull: merge feito")
             case let .conflicts(p): tr("pull: conflitos em %1$@ arquivo(s)", "\(p.count)")
             }
         }
@@ -444,7 +496,7 @@ public final class GitModel {
 
     public func push() {
         let cred = credentials(for: origin)
-        run("push…") { try await $0.push(credentials: cred); return "push ok" }
+        run("push…") { try await $0.push(credentials: cred); return tr("push feito") }
     }
 
     /// Cria o `origin` e sobe a branch atual numa tacada só. Em duas chamadas a segunda

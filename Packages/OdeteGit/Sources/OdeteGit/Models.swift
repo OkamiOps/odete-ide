@@ -88,6 +88,49 @@ public struct Remote: Sendable, Hashable, Identifiable {
         }
         return s.split(separator: "/").count == 2 ? s : nil
     }
+
+    public var isSSH: Bool {
+        Self.isSSH(url)
+    }
+
+    /// `ssh://…`, `git+ssh://…` ou o formato curto do scp, `git@host:dono/repo.git`.
+    public static func isSSH(_ url: String) -> Bool {
+        let u = url.lowercased()
+        if u.hasPrefix("ssh://") || u.hasPrefix("git+ssh://") || u.hasPrefix("ssh+git://") {
+            return true
+        }
+        guard !u.contains("://"), let colon = u.firstIndex(of: ":") else { return false }
+        // "host:caminho" sem barra antes dos dois-pontos; "/tmp/x:y" é caminho local.
+        return !u[..<colon].contains("/") && !u[..<colon].isEmpty
+    }
+
+    /// Host de um remoto em qualquer formato: "git@github.com:a/b" → "github.com".
+    public static func host(of url: String) -> String? {
+        if isSSH(url), !url.contains("://") {
+            let antes = url[..<url.firstIndex(of: ":")!]
+            return String(antes.split(separator: "@").last ?? antes).lowercased()
+        }
+        return URL(string: url)?.host()?.lowercased()
+    }
+
+    /// O endereço HTTPS do mesmo repositório de um remoto SSH. A libgit2 da Odete não
+    /// tem SSH, e o token da conta só vale por HTTPS. A porta do SSH não vale para o
+    /// HTTPS, então sai.
+    public static func httpsEquivalent(_ url: String) -> String? {
+        guard isSSH(url), let host = host(of: url) else { return nil }
+        var caminho: Substring
+        if url.contains("://") {
+            guard let u = URL(string: url) else { return nil }
+            caminho = Substring(u.path())
+        } else {
+            caminho = url[url.index(after: url.firstIndex(of: ":")!)...]
+        }
+        while caminho.hasPrefix("/") {
+            caminho = caminho.dropFirst()
+        }
+        guard !caminho.isEmpty else { return nil }
+        return "https://\(host)/\(caminho)"
+    }
 }
 
 public struct StashEntry: Sendable, Hashable, Identifiable {

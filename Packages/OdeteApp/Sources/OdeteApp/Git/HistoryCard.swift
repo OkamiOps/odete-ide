@@ -30,7 +30,7 @@ struct HistoryCard: View {
                 }
                 if git.log.count > 5 {
                     Button(
-                        expanded ? "Mostrar menos" : "Mostrar todos",
+                        expanded ? tr("Mostrar menos") : tr("Mostrar todos"),
                         systemImage: expanded ? "chevron.up" : "chevron.down"
                     ) {
                         withAnimation(.snappy) { expanded.toggle() }
@@ -126,6 +126,9 @@ struct BranchesCard: View {
     @State private var askingBranch = false
     @State private var stashMsg = ""
     @State private var askingStash = false
+    /// A branch que espera confirmação para ser apagada, e quantos commits só ela tem.
+    @State private var apagando: String?
+    @State private var soDela = 0
     var git: GitModel {
         ws.git
     }
@@ -179,6 +182,40 @@ struct BranchesCard: View {
             Button(tr("Guardar")) { git.stashPush(stashMsg) }
             Button(tr("Cancelar"), role: .cancel) {}
         }
+        .confirmationDialog(
+            tr("Apagar a branch %1$@?", apagando ?? ""),
+            isPresented: Binding(get: { apagando != nil }, set: {
+                if !$0 {
+                    apagando = nil
+                }
+            }),
+            titleVisibility: .visible
+        ) {
+            Button(tr("Apagar branch"), role: .destructive) {
+                if let n = apagando {
+                    git.deleteBranch(n)
+                }
+                apagando = nil
+            }
+            Button(tr("Cancelar"), role: .cancel) { apagando = nil }
+        } message: {
+            Text(
+                soDela > 0
+                    ? tr(
+                        "%1$@ commit(s) dessa branch não estão na branch atual nem no remoto: eles somem com ela.",
+                        "\(soDela)"
+                    )
+                    : tr("Tudo o que ela tem já está na branch atual ou no remoto.")
+            )
+        }
+    }
+
+    /// Conta antes de perguntar quantos commits só a branch tem: é o que a pessoa perde.
+    func pedirApagar(_ nome: String) {
+        Task {
+            soDela = await git.commitsOnlyIn(branch: nome)
+            apagando = nome
+        }
     }
 
     func branchRow(_ b: Branch, first: Bool) -> some View {
@@ -219,8 +256,9 @@ struct BranchesCard: View {
                 Button(tr("Trocar para %1$@", "\(b.name)"), systemImage: "arrow.right.circle") { git.checkout(b.name) }
                 Button(tr("Merge de %1$@", "\(b.name)"), systemImage: "arrow.triangle.merge") { git.merge(b.name) }
                 if !b.isRemote {
+                    // Apagava na hora, sem perguntar, e o commit que só ela tinha ia junto.
                     Button(tr("Apagar %1$@", "\(b.name)"), systemImage: "trash", role: .destructive) {
-                        git.deleteBranch(b.name)
+                        pedirApagar(b.name)
                     }
                 }
             }
@@ -256,9 +294,22 @@ struct BranchesCard: View {
     }
 }
 
+/// O texto da confirmação de abortar o merge, igual nos dois botões que abortam.
+enum MergeAbortText {
+    @MainActor static func message(_ git: GitModel) -> String {
+        let n = git.staged.count + git.conflicts.count
+        return tr(
+            "Os %1$@ arquivos do merge voltam ao que eram antes dele, e o que você já resolveu nos conflitos se perde. Arquivos fora do merge ficam como estão.",
+            "\(n)"
+        )
+    }
+}
+
 struct ConflictsCard: View {
     @Environment(WorkspaceModel.self) private var ws
     @Environment(\.theme) private var theme
+    @State private var abortando = false
+    @State private var apagando: String?
     var git: GitModel {
         ws.git
     }
@@ -268,19 +319,90 @@ struct ConflictsCard: View {
             Text(tr("Resolva cada arquivo no editor e faça o commit de merge.")).font(OdeteFont.ui(12))
                 .foregroundStyle(theme.fgMuted)
             ForEach(git.conflicts, id: \.self) { p in
-                Button { ws.openFile(p) } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(theme.danger)
-                        Text(p).font(OdeteFont.mono(12)).foregroundStyle(theme.fg).lineLimit(1)
-                        Spacer()
-                        Image(systemName: "chevron.right").font(.system(size: 10)).foregroundStyle(theme.fgSubtle)
-                    }
-                    .frame(height: 36)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
+                linha(p, info: git.conflictInfos[p])
             }
-            GitButton(title: tr("Abortar merge"), symbol: "xmark", disabled: git.busy) { git.abortMerge() }
+            GitButton(title: tr("Abortar merge"), symbol: "xmark", disabled: git.busy) { abortando = true }
         }
+        .confirmationDialog(tr("Abortar o merge?"), isPresented: $abortando, titleVisibility: .visible) {
+            Button(tr("Abortar merge"), role: .destructive) { git.abortMerge() }
+            Button(tr("Cancelar"), role: .cancel) {}
+        } message: {
+            Text(MergeAbortText.message(git))
+        }
+        .confirmationDialog(
+            tr("Apagar %1$@?", apagando ?? ""),
+            isPresented: Binding(get: { apagando != nil }, set: {
+                if !$0 {
+                    apagando = nil
+                }
+            }),
+            titleVisibility: .visible
+        ) {
+            Button(tr("Apagar o arquivo"), role: .destructive) {
+                if let p = apagando {
+                    git.resolveByDeleting(path: p)
+                }
+                apagando = nil
+            }
+            Button(tr("Cancelar"), role: .cancel) { apagando = nil }
+        } message: {
+            Text(tr("O arquivo sai dos dois lados e o conflito fica resolvido assim."))
+        }
+    }
+
+    /// Uma linha por conflito. O conflito sem marcadores (binário, apagado de um lado)
+    /// não tem bloco para escolher no editor: as escolhas ficam aqui, na própria linha.
+    /// Antes o "Marcar resolvido" do editor ficava apagado, o arquivo não aparecia para
+    /// stage, e o merge não tinha como terminar.
+    func linha(_ p: String, info: ConflictInfo?) -> some View {
+        HStack(spacing: 8) {
+            Button { ws.openFile(p) } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(theme.danger)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(p).font(OdeteFont.mono(12)).foregroundStyle(theme.fg).lineLimit(1)
+                        if let d = descricao(info) {
+                            Text(d).font(.caption2).foregroundStyle(theme.fgSubtle).lineLimit(1)
+                        }
+                    }
+                    Spacer(minLength: 4)
+                }
+                .frame(minHeight: 36)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            Menu {
+                Button(
+                    info?.ours == false ? tr("Usar a minha (apaga o arquivo)") : tr("Usar a minha versão"),
+                    systemImage: "person"
+                ) { git.resolve(path: p, using: .ours) }
+                Button(
+                    info?.theirs == false ? tr("Usar a deles (apaga o arquivo)") : tr("Usar a versão deles"),
+                    systemImage: "person.2"
+                ) { git.resolve(path: p, using: .theirs) }
+                Button(tr("Apagar o arquivo"), systemImage: "trash", role: .destructive) { apagando = p }
+                Divider()
+                Button(tr("Marcar resolvido como está"), systemImage: "checkmark") { git.markResolved(path: p) }
+            } label: {
+                Image(systemName: "ellipsis.circle").font(.system(size: 15))
+                    .foregroundStyle(theme.accent)
+                    .frame(width: 30, height: 30)
+                    .contentShape(Rectangle())
+            }
+            .disabled(git.busy)
+            .accessibilityLabel(tr("Resolver %1$@", p))
+        }
+    }
+
+    /// Por que o conflito não se resolve bloco a bloco, quando é o caso.
+    func descricao(_ info: ConflictInfo?) -> String? {
+        guard let info, !info.hasMarkers else { return nil }
+        if !info.ours {
+            return tr("apagado na sua branch, alterado na outra")
+        }
+        if !info.theirs {
+            return tr("alterado na sua branch, apagado na outra")
+        }
+        return tr("binário: escolha uma das versões")
     }
 }

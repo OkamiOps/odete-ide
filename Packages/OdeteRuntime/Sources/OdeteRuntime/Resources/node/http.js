@@ -54,20 +54,119 @@ __nodeDefine("http", (module, exports, require) => {
 });
 __nodeDefine("https", (module, exports, require) => { const http = require("http"); module.exports = { ...http, request: (u, o, cb) => http.request(u, { ...(typeof o === "object" ? o : {}), _https: true }, typeof o === "function" ? o : cb), get: (u, o, cb) => { const r = module.exports.request(u, o, cb); r.end(); return r; }, createServer: () => { throw new Error("Odete: https.createServer não existe no iPad; use http (o preview é local)"); }, Agent: http.Agent, globalAgent: new http.Agent() }; });
 __nodeDefine("net", (module, exports, require) => { const EE = require("events"); class Socket extends EE { constructor() { super(); this.remoteAddress = "127.0.0.1"; this.writable = true; } write() { return true; } end() {} destroy() {} setTimeout() { return this; } setNoDelay() { return this; } setKeepAlive() { return this; } connect() { queueMicrotask(() => this.emit("error", new Error("Odete: sockets TCP crus não existem no iPad"))); return this; } } module.exports = { Socket, createServer: () => { throw new Error("Odete: net.createServer não existe; use http.createServer"); }, connect: () => new Socket().connect(), createConnection: () => new Socket().connect(), isIP: (s) => (/^\d+\.\d+\.\d+\.\d+$/.test(s) ? 4 : s.includes(":") ? 6 : 0), isIPv4: (s) => /^\d+\.\d+\.\d+\.\d+$/.test(s), isIPv6: (s) => s.includes(":") }; });
+__nodeDefine("http2", (module) => {
+  // Carrega (o axios pede no topo) mas não conecta: HTTP/2 cru não existe no iPad.
+  const semHttp2 = () => { throw Object.assign(new Error("Odete: http2 não existe no iPad; use http/https ou fetch"), { code: "ERR_HTTP2_UNSUPPORTED" }); };
+  module.exports = { connect: semHttp2, createServer: semHttp2, createSecureServer: semHttp2, getDefaultSettings: () => ({}), getPackedSettings: () => Buffer.alloc(0), getUnpackedSettings: () => ({}), sensitiveHeaders: Symbol("nodejs.http2.sensitiveHeaders"),
+    constants: { HTTP2_HEADER_STATUS: ":status", HTTP2_HEADER_METHOD: ":method", HTTP2_HEADER_AUTHORITY: ":authority", HTTP2_HEADER_SCHEME: ":scheme", HTTP2_HEADER_PATH: ":path", HTTP2_HEADER_CONTENT_TYPE: "content-type", HTTP2_HEADER_CONTENT_LENGTH: "content-length", NGHTTP2_CANCEL: 8 } };
+});
 __nodeDefine("tls", (module) => { module.exports = { connect: () => { throw new Error("Odete: tls não existe no iPad"); }, createServer: () => { throw new Error("Odete: tls não existe no iPad"); } }; });
 __nodeDefine("dns", (module) => { const lookup = (h, o, cb) => { if (typeof o === "function") cb = o; queueMicrotask(() => cb(null, "127.0.0.1", 4)); }; module.exports = { lookup, promises: { lookup: async () => ({ address: "127.0.0.1", family: 4 }), resolve: async () => ["127.0.0.1"] }, resolve: (h, cb) => cb(null, ["127.0.0.1"]), setDefaultResultOrder() {} }; });
 __nodeDefine("crypto", (module, exports, require) => {
   const H = globalThis.__odete;
-  const hashObj = (algo) => { const chunks = []; const h = { update(d, e) { chunks.push(typeof d === "string" ? Buffer.from(d, e) : Buffer.from(d)); return h; }, digest(e) { const b = globalThis.__comoBuffer(H.hashBytes(algo, Buffer.concat(chunks))); return e ? b.toString(e) : b; }, copy: () => hashObj(algo) }; return h; };
-  module.exports = { randomBytes: (n, cb) => { const b = Buffer.alloc(n); H.randomFill(b); if (cb) { queueMicrotask(() => cb(null, b)); return; } return b; }, randomUUID: () => globalThis.crypto.randomUUID(), randomInt: (a, b) => { if (b === undefined) { b = a; a = 0; } return a + Math.floor(Math.random() * (b - a)); }, getRandomValues: (a) => globalThis.crypto.getRandomValues(a), createHash: (algo) => hashObj(String(algo).toLowerCase().replace("-", "")), createHmac: (algo, key) => { const k = Buffer.from(key); const ipad = Buffer.alloc(64, 0x36), opad = Buffer.alloc(64, 0x5c); const kk = k.length > 64 ? hashObj(algo).update(k).digest() : k; for (let i = 0; i < kk.length; i++) { ipad[i] ^= kk[i]; opad[i] ^= kk[i]; } const inner = hashObj(algo).update(ipad); return { update(d, e) { inner.update(d, e); return this; }, digest(e) { const b = hashObj(algo).update(opad).update(inner.digest()).digest(); return e ? b.toString(e) : b; } }; }, timingSafeEqual: (a, b) => a.length === b.length && Buffer.compare(a, b) === 0, webcrypto: globalThis.crypto, subtle: globalThis.crypto.subtle, getHashes: () => ["sha1", "sha256", "sha512", "md5"], constants: {}, pbkdf2Sync: () => { throw new Error("Odete: pbkdf2 ainda não existe no iPad"); }, createCipheriv: () => { throw new Error("Odete: cipher ainda não existe no iPad"); }, scryptSync: () => { throw new Error("Odete: scrypt ainda não existe no iPad"); }, hash: (algo, d, e = "hex") => hashObj(algo).update(d).digest(e) };
+  const bytesDe = (d, e) => (typeof d === "string" ? Buffer.from(d, e) : d instanceof KeyObject ? d._bytes : ArrayBuffer.isView(d) ? Buffer.from(d.buffer, d.byteOffset, d.byteLength) : d instanceof ArrayBuffer ? Buffer.from(d) : Buffer.from(d));
+  // Algoritmo que não existe lança já no createHash, como no Node — antes caía no SHA-256.
+  const ALGOS = ["md5", "sha1", "sha256", "sha384", "sha512", "sha3-256", "sha3-384", "sha3-512"];
+  const nomeAlgo = (a) => { const n = String(a).toLowerCase().replace(/^rsa-/, ""); return n.startsWith("sha3-") ? n : n.replace("-", ""); };
+  const conferir = (a) => { const n = nomeAlgo(a); if (!ALGOS.includes(n)) throw Object.assign(new Error("Digest method not supported"), { code: "ERR_CRYPTO_INVALID_DIGEST" }); return n; };
+  const hashObj = (algo) => { const chunks = []; let feito = false; const h = { update(d, e) { chunks.push(bytesDe(d, e)); return h; }, digest(e) { if (feito) throw Object.assign(new Error("Digest already called"), { code: "ERR_CRYPTO_HASH_FINALIZED" }); feito = true; const b = globalThis.__comoBuffer(H.hashBytes(algo, Buffer.concat(chunks))); return e && e !== "buffer" ? b.toString(e) : b; }, copy: () => { const c = hashObj(algo); for (const x of chunks) c.update(x); return c; } }; return h; };
+  class KeyObject {
+    constructor(tipo, bytes) { this.type = tipo; Object.defineProperty(this, "_bytes", { value: bytes }); }
+    get symmetricKeySize() { return this.type === "secret" ? this._bytes.length : undefined; }
+    get asymmetricKeyType() { return undefined; }
+    export(o) { if (o && o.format === "jwk") return { kty: "oct", k: this._bytes.toString("base64url") }; return Buffer.from(this._bytes); }
+    equals(o) { return o instanceof KeyObject && Buffer.compare(this._bytes, o._bytes) === 0; }
+    static from(k) { return new KeyObject("secret", Buffer.from(k._bytes || [])); }
+  }
+  const semAssimetrica = (o) => () => { throw Object.assign(new Error("Odete: " + o + " (chaves RSA/EC) ainda não existe no iPad; use HMAC (HS256) ou a crypto.subtle"), { code: "ERR_FEATURE_UNAVAILABLE_ON_PLATFORM" }); };
+  const createHmac = (algo, key, _o) => {
+    const n = conferir(algo); const k = bytesDe(key); const chunks = []; let feito = false;
+    const h = { update(d, e) { chunks.push(bytesDe(d, e)); return h; }, digest(e) { if (feito) throw Object.assign(new Error("Digest already called"), { code: "ERR_CRYPTO_HASH_FINALIZED" }); feito = true; const b = globalThis.__comoBuffer(H.hmacBytes(n, k, Buffer.concat(chunks))); return e && e !== "buffer" ? b.toString(e) : b; } };
+    return h;
+  };
+  const randomFillSync = (buf, off = 0, size) => {
+    const u = buf instanceof ArrayBuffer ? new Uint8Array(buf) : new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
+    const fim = size === undefined ? u.length : off + size;
+    if (off < 0 || fim > u.length) throw Object.assign(new RangeError('The value of "offset" is out of range'), { code: "ERR_OUT_OF_RANGE" });
+    H.randomFill(u.subarray(off, fim));
+    return buf;
+  };
+  const randomInt = (a, b, cb) => {
+    if (typeof b === "function" || b === undefined) { cb = b; b = a; a = 0; }
+    const faixa = b - a;
+    if (!(faixa > 0)) throw Object.assign(new RangeError(`The value of "max" is out of range. It must be greater than the value of "min" (${a}). Received ${b}`), { code: "ERR_OUT_OF_RANGE" });
+    // Rejeição para não enviesar: descarta o que cai na sobra do último bloco.
+    const limite = Math.floor(0x1000000000000 / faixa) * faixa;
+    let x;
+    do { const r = H.randomFill(new Uint8Array(6)); x = r[0] * 0x10000000000 + r[1] * 0x100000000 + r[2] * 0x1000000 + r[3] * 0x10000 + r[4] * 0x100 + r[5]; } while (x >= limite);
+    const v = a + (x % faixa);
+    if (cb) { queueMicrotask(() => cb(null, v)); return; }
+    return v;
+  };
+  const pbkdf2Sync = (senha, sal, iter, tam, digest = "sha1") => globalThis.__comoBuffer(H.pbkdf2Bytes(bytesDe(senha), bytesDe(sal), iter, tam, conferir(digest)));
+  const timingSafeEqual = (a, b) => {
+    if (a.byteLength !== b.byteLength) throw Object.assign(new RangeError("Input buffers must have the same byte length"), { code: "ERR_CRYPTO_TIMING_SAFE_EQUAL_LENGTH" });
+    const x = bytesDe(a), y = bytesDe(b); let d = 0; for (let i = 0; i < x.length; i++) d |= x[i] ^ y[i]; return d === 0;
+  };
+  module.exports = {
+    randomBytes: (n, cb) => { const b = Buffer.alloc(n); H.randomFill(b); if (cb) { queueMicrotask(() => cb(null, b)); return; } return b; },
+    pseudoRandomBytes: (n) => { const b = Buffer.alloc(n); H.randomFill(b); return b; },
+    randomFillSync, randomFill: (buf, off, size, cb) => { if (typeof off === "function") { cb = off; off = 0; size = undefined; } else if (typeof size === "function") { cb = size; size = undefined; } try { randomFillSync(buf, off, size); queueMicrotask(() => cb(null, buf)); } catch (e) { queueMicrotask(() => cb(e)); } },
+    randomUUID: () => globalThis.crypto.randomUUID(), randomInt, getRandomValues: (a) => globalThis.crypto.getRandomValues(a),
+    createHash: (algo) => hashObj(conferir(algo)), createHmac, hash: (algo, d, e = "hex") => hashObj(conferir(algo)).update(d).digest(e),
+    timingSafeEqual, webcrypto: globalThis.crypto, subtle: globalThis.crypto.subtle,
+    getHashes: () => ALGOS.slice(), getCiphers: () => [], getCurves: () => [], constants: {},
+    pbkdf2Sync, pbkdf2: (s, sal, it, tam, dg, cb) => { if (typeof dg === "function") { cb = dg; dg = "sha1"; } queueMicrotask(() => { let r; try { r = pbkdf2Sync(s, sal, it, tam, dg); } catch (e) { cb(e); return; } cb(null, r); }); },
+    KeyObject, createSecretKey: (k, e) => new KeyObject("secret", Buffer.from(bytesDe(k, e))),
+    createPublicKey: semAssimetrica("createPublicKey"), createPrivateKey: semAssimetrica("createPrivateKey"), generateKeyPairSync: semAssimetrica("generateKeyPairSync"), generateKeyPair: semAssimetrica("generateKeyPair"),
+    createSign: semAssimetrica("createSign"), createVerify: semAssimetrica("createVerify"), sign: semAssimetrica("sign"), verify: semAssimetrica("verify"), publicEncrypt: semAssimetrica("publicEncrypt"), privateDecrypt: semAssimetrica("privateDecrypt"),
+    createCipheriv: () => { throw new Error("Odete: cipher ainda não existe no iPad"); }, createDecipheriv: () => { throw new Error("Odete: decipher ainda não existe no iPad"); },
+    scryptSync: () => { throw new Error("Odete: scrypt ainda não existe no iPad"); }, scrypt: () => { throw new Error("Odete: scrypt ainda não existe no iPad"); },
+  };
 });
-__nodeDefine("readline", (module, exports, require) => { const EE = require("events"); module.exports = { createInterface: () => { const rl = new EE(); rl.question = (q, cb) => { globalThis.__odete.write(1, q); cb(""); }; rl.close = () => rl.emit("close"); rl.prompt = () => {}; rl.setPrompt = () => {}; rl.on = rl.on.bind(rl); rl[Symbol.asyncIterator] = async function* () {}; return rl; }, clearLine: () => true, cursorTo: () => true, moveCursor: () => true, emitKeypressEvents() {}, promises: { createInterface: () => ({ question: async (q) => { globalThis.__odete.write(1, q); return ""; }, close() {} }) } }; });
+__nodeDefine("readline", (module, exports, require) => {
+  const EE = require("events");
+  // Linhas de um stream (o stdin que veio pelo pipe, um arquivo): 'line', 'close', o
+  // iterador assíncrono e `question`, que pega a próxima linha. Sem entrada, `question`
+  // responde vazio (o terminal ainda não manda o teclado para o processo).
+  class Interface extends EE {
+    constructor(opts = {}, output) {
+      super();
+      if (opts && typeof opts.on === "function" && typeof opts.read === "function") opts = { input: opts, output };
+      this.input = opts.input; this.output = opts.output; this.terminal = !!opts.terminal; this.line = ""; this.closed = false;
+      this._prompt = opts.prompt ?? "> "; this._linhas = []; this._esperando = []; this._resto = "";
+      // Sem pipe o stdin do terminal não traz nada (o teclado ainda não chega ao processo):
+      // `question` responde vazio na hora e o laço de linhas termina, como antes.
+      this._acabou = !this.input || (this.input.fd === 0 && this.input.isTTY === true);
+      if (this.input && !this._acabou) {
+        const entrar = (c) => { this._resto += typeof c === "string" ? c : c.toString("utf8"); const partes = this._resto.split(/\r?\n/); this._resto = partes.pop(); for (const l of partes) this._entregar(l); };
+        this.input.on("data", entrar);
+        this.input.on("end", () => { if (this._resto) { this._entregar(this._resto); this._resto = ""; } this._acabou = true; for (const w of this._esperando.splice(0)) w(null); this.close(); });
+      } else queueMicrotask(() => {});
+    }
+    _entregar(l) { const w = this._esperando.shift(); if (w) w(l); else if (this.listenerCount("line")) this.emit("line", l); else this._linhas.push(l); }
+    on(ev, fn) { super.on(ev, fn); if (ev === "line") { const l = this._linhas.splice(0); for (const x of l) this.emit("line", x); } return this; }
+    question(q, o, cb) { if (typeof o === "function") cb = o; if (q) globalThis.__odete.writeRaw(1, String(q)); const pega = (l) => cb(l ?? ""); if (this._linhas.length) queueMicrotask(() => pega(this._linhas.shift())); else if (this._acabou) queueMicrotask(() => pega("")); else this._esperando.push(pega); }
+    close() { if (this.closed) return; this.closed = true; this.emit("close"); }
+    pause() { return this; } resume() { return this; } setPrompt(p) { this._prompt = p; } getPrompt() { return this._prompt; } prompt() { if (this._prompt) globalThis.__odete.writeRaw(1, this._prompt); } write() {} getCursorPos() { return { rows: 0, cols: 0 }; }
+    async *[Symbol.asyncIterator]() {
+      const fila = this._linhas; let fim = false, acordar = null;
+      this.on("line", (l) => { fila.push(l); if (acordar) { acordar(); acordar = null; } });
+      this.once("close", () => { fim = true; if (acordar) acordar(); });
+      while (true) { if (fila.length) yield fila.shift(); else if (fim || this.closed || this._acabou) return; else await new Promise((r) => { acordar = r; }); }
+    }
+  }
+  const createInterface = (o, out) => new Interface(o, out);
+  const promises = { Interface, createInterface: (o) => { const rl = createInterface(o); rl.question = ((q) => (pergunta) => new Promise((res) => Interface.prototype.question.call(rl, pergunta, res)))(); return rl; } };
+  module.exports = { Interface, createInterface, clearLine: (s, d, cb) => { if (cb) queueMicrotask(cb); return true; }, clearScreenDown: (s, cb) => { if (cb) queueMicrotask(cb); return true; }, cursorTo: (s, x, y, cb) => { const f = [y, cb].find((v) => typeof v === "function"); if (f) queueMicrotask(f); return true; }, moveCursor: (s, x, y, cb) => { if (cb) queueMicrotask(cb); return true; }, emitKeypressEvents() {}, promises };
+});
+__nodeDefine("readline/promises", (module, exports, require) => { module.exports = require("readline").promises; });
 __nodeDefine("tty", (module) => { module.exports = { isatty: () => false, WriteStream: class {}, ReadStream: class {} }; });
 __nodeDefine("worker_threads", (module) => { module.exports = { isMainThread: true, parentPort: null, workerData: null, threadId: 0, Worker: class { constructor() { throw new Error("Odete: worker_threads ainda não existe no iPad"); } } }; });
 __nodeDefine("perf_hooks", (module) => { module.exports = { performance: globalThis.performance, PerformanceObserver: class { observe() {} disconnect() {} }, monitorEventLoopDelay: () => ({ enable() {}, disable() {}, mean: 0, percentile: () => 0 }) }; });
 __nodeDefine("timers", (module) => { module.exports = { setTimeout, setInterval, setImmediate, clearTimeout, clearInterval, clearImmediate }; });
 __nodeDefine("timers/promises", (module) => { module.exports = { setTimeout: (ms, v) => new Promise((r) => setTimeout(() => r(v), ms)), setImmediate: (v) => new Promise((r) => setImmediate(() => r(v))), setInterval: async function* (ms, v) { while (true) { await new Promise((r) => setTimeout(r, ms)); yield v; } }, scheduler: { wait: (ms) => new Promise((r) => setTimeout(r, ms)), yield: () => new Promise((r) => setImmediate(r)) } }; });
-__nodeDefine("module", (module, exports, require) => { module.exports = { createRequire: (from) => globalThis.__odete_makeRequire(typeof from === "string" ? from.replace(/^file:\/\//, "") : from.pathname), builtinModules: ["fs", "path", "events", "buffer", "util", "stream", "os", "url", "querystring", "http", "https", "crypto", "zlib", "assert", "child_process", "net", "dns", "tls", "readline", "tty", "module", "process", "timers", "worker_threads", "perf_hooks", "string_decoder"], isBuiltin: (n) => globalThis.__nodeHas(n), Module: { _extensions: {}, _cache: {}, builtinModules: [] }, register() {}, syncBuiltinESMExports() {}, findSourceMap: () => undefined }; });
+__nodeDefine("module", (module, exports, require) => { module.exports = { createRequire: (from) => globalThis.__odete_makeRequire(typeof from === "string" ? from.replace(/^file:\/\//, "") : from.pathname), builtinModules: ["fs", "path", "events", "buffer", "util", "stream", "os", "url", "querystring", "http", "https", "http2", "crypto", "zlib", "assert", "child_process", "net", "dns", "tls", "readline", "tty", "module", "process", "timers", "worker_threads", "perf_hooks", "string_decoder"], isBuiltin: (n) => globalThis.__nodeHas(n), Module: { _extensions: {}, _cache: {}, builtinModules: [] }, register() {}, syncBuiltinESMExports() {}, findSourceMap: () => undefined }; });
 __nodeDefine("async_hooks", (module) => { class AsyncLocalStorage { constructor() { this._s = undefined; } run(store, fn, ...a) { const prev = this._s; this._s = store; try { return fn(...a); } finally { this._s = prev; } } getStore() { return this._s; } enterWith(s) { this._s = s; } exit(fn, ...a) { return this.run(undefined, fn, ...a); } disable() {} } module.exports = { AsyncLocalStorage, AsyncResource: class { constructor() {} runInAsyncScope(fn, t, ...a) { return fn.apply(t, a); } emitDestroy() {} bind(fn) { return fn; } static bind(fn) { return fn; } }, createHook: () => ({ enable() {}, disable() {} }), executionAsyncId: () => 1, triggerAsyncId: () => 0 }; });
 __nodeDefine("constants", (module, exports, require) => { module.exports = { ...require("fs").constants, ...require("os").constants.signals }; });
 __nodeDefine("v8", (module) => { module.exports = { getHeapStatistics: () => ({ total_heap_size: 0, used_heap_size: 0, heap_size_limit: 4e9 }), serialize: (v) => Buffer.from(JSON.stringify(v)), deserialize: (b) => JSON.parse(Buffer.from(b).toString()), setFlagsFromString() {} }; });

@@ -1065,6 +1065,34 @@
         }
       }
     },
+    "%1$@ não é uma pasta": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ is not a folder"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ ist kein Ordner"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ n'est pas un dossier"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ no es una carpeta"
+          }
+        }
+      }
+    },
     "%1$@ pacote(s) com script de instalação não executado: %2$@": {
       "localizations": {
         "en": {
@@ -1401,6 +1429,34 @@
         }
       }
     },
+    "%1$@ é uma pasta": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ is a folder"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ ist ein Ordner"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ est un dossier"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ es una carpeta"
+          }
+        }
+      }
+    },
     "%1$@%%": {
       "localizations": {
         "en": {
@@ -1481,6 +1537,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "%1$@: %2$@ pide %3$@, pero ya hay %4$@ en el mismo lugar"
+          }
+        }
+      }
+    },
+    "%1$@: %2$@: fora da pasta do projeto": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@: %2$@: outside the project folder"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@: %2$@: außerhalb des Projektordners"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ : %2$@ : en dehors du dossier du projet"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@: %2$@: fuera de la carpeta del proyecto"
           }
         }
       }
@@ -1705,6 +1789,62 @@
           "stringUnit": {
             "state": "translated",
             "value": "%1$@: el servidor no arranca sin %2$@ en node_modules; revisa los errores de arriba y ejecuta npm install"
+          }
+        }
+      }
+    },
+    "%1$@: opção desconhecida: %2$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@: unknown option: %2$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@: unbekannte Option: %2$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ : option inconnue : %2$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@: opción desconocida: %2$@"
+          }
+        }
+      }
+    },
+    "%1$@: opção desconhecida: -%2$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@: unknown option: -%2$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@: unbekannte Option: -%2$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ : option inconnue : -%2$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@: opción desconocida: -%2$@"
           }
         }
       }
@@ -26685,6 +26825,34 @@
         }
       }
     },
+    "cd: não há pasta anterior": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "cd: no previous folder"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "cd: kein vorheriger Ordner"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "cd : pas de dossier précédent"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "cd: no hay carpeta anterior"
+          }
+        }
+      }
+    },
     "chamada fora do subconjunto": {
       "localizations": {
         "en": {
@@ -27269,6 +27437,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "cp: %1$@: %2$@"
+          }
+        }
+      }
+    },
+    "cp: %1$@: é uma pasta (use -r)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "cp: %1$@: is a folder (use -r)"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "cp: %1$@: ist ein Ordner (nutze -r)"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "cp : %1$@ : c'est un dossier (utilise -r)"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "cp: %1$@: es una carpeta (usa -r)"
           }
         }
       }
@@ -28589,6 +28785,62 @@
         }
       }
     },
+    "find: opção desconhecida: %1$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "find: unknown option: %1$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "find: unbekannte Option: %1$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "find : option inconnue : %1$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "find: opción desconocida: %1$@"
+          }
+        }
+      }
+    },
+    "fora da pasta do projeto": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "outside the project folder"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "außerhalb des Projektordners"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "en dehors du dossier du projet"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "fuera de la carpeta del proyecto"
+          }
+        }
+      }
+    },
     "fora do projeto, não carregado: %1$@": {
       "localizations": {
         "en": {
@@ -28977,6 +29229,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "grep: patrón"
+          }
+        }
+      }
+    },
+    "grep: padrão inválido: %1$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "grep: invalid pattern: %1$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "grep: ungültiges Muster: %1$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "grep : motif invalide : %1$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "grep: patrón no válido: %1$@"
           }
         }
       }
@@ -30717,6 +30997,34 @@
         }
       }
     },
+    "node: %1$@: não existe": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "node: %1$@: does not exist"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "node: %1$@: existiert nicht"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "node : %1$@ : n'existe pas"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "node: %1$@: no existe"
+          }
+        }
+      }
+    },
     "node: não achei %1$@": {
       "localizations": {
         "en": {
@@ -30797,34 +31105,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "nombre de la carpeta"
-          }
-        }
-      }
-    },
-    "not a link": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "not a link"
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "not a link"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "not a link"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "not a link"
           }
         }
       }
@@ -31049,6 +31329,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "no encontré %1$@"
+          }
+        }
+      }
+    },
+    "não apago a raiz do projeto": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "I won't delete the project root"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ich lösche den Projektstamm nicht"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "je ne supprime pas la racine du projet"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "no borro la raíz del proyecto"
           }
         }
       }
@@ -31945,6 +32253,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "odete.js.%1$@"
+          }
+        }
+      }
+    },
+    "odete: %1$@: fora da pasta do projeto": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "odete: %1$@: outside the project folder"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "odete: %1$@: außerhalb des Projektordners"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "odete : %1$@ : en dehors du dossier du projet"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "odete: %1$@: fuera de la carpeta del proyecto"
           }
         }
       }

@@ -45,7 +45,8 @@ struct ParserTests {
             Palavra(pedacos: [.texto("echo")]),
             Palavra(pedacos: [.variavel("?")]),
             Palavra(pedacos: [.variavel("?"), .texto("x")]),
-            Palavra(pedacos: [.texto("c="), .variavel("?")]),
+            // Texto entre aspas fica marcado como citado: não vira padrão de glob.
+            Palavra(pedacos: [.citado("c="), .variavel("?")]),
         ])
         #expect(try palavras(#"echo '$?' \$? "\$?" a$ "$""#).map { $0.expandida { _ in "X" } }
             == ["echo", "$?", "$?", "$?", "a$", "$"])

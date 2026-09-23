@@ -80,7 +80,8 @@ extension Builtins {
                 }
                 ctx.io.out(tr("jobs encerrados")); return 0
             }
-            for a in args {
+            // `kill -9 %1`, `kill -TERM %1`: o sinal não muda nada aqui, o job para igual.
+            for a in args where !a.hasPrefix("-") {
                 let id = Int(a.replacingOccurrences(of: "%", with: "")); if let j = ctx.shell.jobs
                     .first(where: { $0.id == id })
                 {

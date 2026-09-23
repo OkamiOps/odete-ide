@@ -3,14 +3,18 @@ import Foundation
 @testable import OdeteRuntime
 import Testing
 
-/// O codificador, o decodificador e o base64 em JS que existiam antes das funções nativas,
-/// copiados do bootstrap.js de então: o nativo tem de dar exatamente o mesmo resultado.
+/// O codificador, o decodificador e o base64 de referência em JS: o nativo tem de dar
+/// exatamente o mesmo resultado. O base64 é o do bootstrap.js de antes das funções nativas;
+/// o UTF-8 é o do Node (TextEncoder/Buffer): substituto solto vira U+FFFD na ida, e na volta
+/// cada byte fora de uma sequência válida (Tabela 3-7 do Unicode) vira um U+FFFD — o
+/// decodificador antigo engolia os bytes seguintes a um 0xFF.
 private let jsAntigo = """
 function antigoEncode(str) {
   const out = [];
   for (let i = 0; i < str.length; i++) {
     let c = str.charCodeAt(i);
     if (c >= 0xd800 && c < 0xdc00 && i + 1 < str.length) { const d = str.charCodeAt(i + 1); if (d >= 0xdc00 && d < 0xe000) { c = 0x10000 + ((c - 0xd800) << 10) + (d - 0xdc00); i++; } }
+    if (c >= 0xd800 && c < 0xe000) c = 0xfffd;
     if (c < 0x80) out.push(c);
     else if (c < 0x800) out.push(0xc0 | (c >> 6), 0x80 | (c & 63));
     else if (c < 0x10000) out.push(0xe0 | (c >> 12), 0x80 | ((c >> 6) & 63), 0x80 | (c & 63));
@@ -19,17 +23,23 @@ function antigoEncode(str) {
   return new Uint8Array(out);
 }
 function antigoDecode(b) {
+  // Faixas válidas do segundo byte por líder (Tabela 3-7); os demais de continuação são 80–BF.
+  const segundo = (c) => c === 0xe0 ? [0xa0, 0xbf] : c === 0xed ? [0x80, 0x9f] : c === 0xf0 ? [0x90, 0xbf] : c === 0xf4 ? [0x80, 0x8f] : [0x80, 0xbf];
   let s = "", i = 0;
   const n = b.length;
   while (i < n) {
-    const c = b[i++];
-    if (c < 0x80) { s += String.fromCharCode(c); continue; }
-    if (c < 0xc2) { s += "\\ufffd"; continue; }
-    if (c < 0xe0) { if (i >= n) { s += "\\ufffd"; break; } s += String.fromCharCode(((c & 31) << 6) | (b[i++] & 63)); continue; }
-    if (c < 0xf0) { if (i + 1 >= n) { s += "\\ufffd"; break; } s += String.fromCharCode(((c & 15) << 12) | ((b[i++] & 63) << 6) | (b[i++] & 63)); continue; }
-    if (i + 2 >= n) { s += "\\ufffd"; break; }
-    const cp = ((c & 7) << 18) | ((b[i++] & 63) << 12) | ((b[i++] & 63) << 6) | (b[i++] & 63);
-    s += cp > 0x10ffff ? "\\ufffd" : String.fromCodePoint(cp);
+    const c = b[i];
+    const tam = c < 0x80 ? 1 : c >= 0xc2 && c <= 0xdf ? 2 : c >= 0xe0 && c <= 0xef ? 3 : c >= 0xf0 && c <= 0xf4 ? 4 : 0;
+    if (tam === 1) { s += String.fromCharCode(c); i++; continue; }
+    if (tam === 0) { s += "\\ufffd"; i++; continue; }
+    let k = 1, cp = c & (tam === 2 ? 0x1f : tam === 3 ? 0x0f : 0x07);
+    for (; k < tam && i + k < n; k++) {
+      const [lo, hi] = k === 1 ? segundo(c) : [0x80, 0xbf];
+      if (b[i + k] < lo || b[i + k] > hi) break;
+      cp = (cp << 6) | (b[i + k] & 63);
+    }
+    if (k < tam) { s += "\\ufffd"; i += k; continue; } // parte máxima inválida: um U+FFFD só
+    s += String.fromCodePoint(cp); i += tam;
   }
   return s;
 }
@@ -70,7 +80,7 @@ struct PonteDeBytesTests {
         return (code, String(linha.dropFirst(7)), c)
     }
 
-    @Test func utf8IgualAoJSAntigo() async throws {
+    @Test func utf8IgualAoNode() async throws {
         let (code, falhas, c) = try await verifica("""
         const casos = ["", "a", "abc", "olá, ação, coração", "日本語のテキスト", "한국어", "🎉👍🏽 família 👨‍👩‍👧",
           "\\u0000\\u0001\\u007f\\u0080\\u07ff\\u0800\\uffff", "\\ud800", "a\\udc00b", "\\ud83d", "x\\ud83d\\ude00y",

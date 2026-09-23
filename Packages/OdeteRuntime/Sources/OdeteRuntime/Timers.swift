@@ -45,6 +45,11 @@ final class AgendaDeTimers {
         timers.count
     }
 
+    /// O timer ainda está agendado (não disparou por último nem foi cancelado)?
+    func existe(_ id: Int) -> Bool {
+        timers[id] != nil
+    }
+
     /// Agenda um timer. `ms <= 0` (setImmediate, setTimeout de 0) roda na próxima volta da fila,
     /// na ordem de criação; um intervalo nunca repete em menos de 1 ms.
     func agendar(ms: Double, repete: Bool) -> Int {

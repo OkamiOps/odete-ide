@@ -9,7 +9,7 @@ enum ModuleLoader {
 
     static func install(_ rt: JSRuntime) {
         let h = rt.host
-        let cache = CacheDeModulos()
+        let cache = rt.cacheDeModulos
         let resolve: @convention(block) (String, String) -> Any = { spec, from in
             if let r = resolveModule(spec, from: from, cache: cache) {
                 return r
@@ -18,30 +18,147 @@ enum ModuleLoader {
         }
         h.setObject(resolve, forKeyedSubscript: "resolve" as NSString)
 
-        let load: @convention(block) (String) -> Any = { [unowned rt] path in
-            guard let data = FileManager.default.contents(atPath: path) else { return ["error": "ENOENT"] }
-            var src = String(decoding: data, as: UTF8.self)
-            let ext = (path as NSString).pathExtension.lowercased()
-            let needsTransform = ["ts", "tsx", "jsx", "mts", "cts"].contains(ext) || looksLikeESM(src, ext: ext)
-            if needsTransform {
-                guard let t = rt.transform else {
-                    return [
-                        "error": "ESM",
-                        "message": tr(
-                            "%1$@: módulos ES e TypeScript precisam do transformador (esbuild), que chega no marco 3",
-                            "\(path)"
-                        ),
-                    ]
-                }
-                do { src = try t(src, path) } catch { return [
-                    "error": "TRANSFORM",
-                    "message": error.localizedDescription,
-                ] }
-                src = embrulharModuloES(src)
+        // `loadModule(caminho, ehEntrada)`: o fonte pronto para o embrulho CJS do loader.js.
+        let load: @convention(block) (String, Bool) -> Any = { [unowned rt] path, ehEntrada in
+            if let e = rt.bloqueado(path) {
+                return e
             }
-            return src
+            guard let data = FileManager.default.contents(atPath: path) else { return ["error": "ENOENT"] }
+            do {
+                return try fonte(String(decoding: data, as: UTF8.self), caminho: path, ehEntrada: ehEntrada, rt: rt)
+            } catch let e as ErroDeCarga {
+                return ["error": e.codigo, "message": e.mensagem]
+            } catch {
+                return ["error": "TRANSFORM", "message": error.localizedDescription]
+            }
         }
         h.setObject(load, forKeyedSubscript: "loadModule" as NSString)
+    }
+
+    struct ErroDeCarga: Error {
+        var codigo: String
+        var mensagem: String
+    }
+
+    /// O fonte de um módulo como o loader.js o avalia.
+    ///
+    /// - ES/TS passa pelo esbuild (com cache em disco — ver `CacheDeTransformacao`).
+    /// - O módulo de entrada com `async`/`await` passa pelo transformador de entrada, que
+    ///   rebaixa o async para a Promise do runtime (só assim o `main()` que rejeita sem
+    ///   `catch` é visto) e, se houver top-level await, embrulha o corpo numa função async.
+    /// - CJS cru só troca `import(` por `__odete_import(` (ver `ReescritaDeImport`).
+    static func fonte(_ original: String, caminho path: String, ehEntrada: Bool, rt: JSRuntime) throws -> String {
+        let ext = (path as NSString).pathExtension.lowercased()
+        let esm = ["ts", "tsx", "jsx", "mts", "cts"].contains(ext) || looksLikeESM(original, ext: ext)
+            || (ext == "js" && pacoteEhModulo(path, rt: rt))
+        if ehEntrada, let te = rt.transformEntrada, esm || usaAsync(original) {
+            let cjs = try CacheDeTransformacao.transformar(
+                original, caminho: path, tipo: "entrada", versao: rt.versaoDoTransformador
+            ) { src, arquivo in
+                interopDeModuloES(try transformarEntrada(src, arquivo, te))
+            }
+            return esm ? embrulharModuloES(cjs) : cjs
+        }
+        if esm {
+            guard let t = rt.transform else {
+                throw ErroDeCarga(codigo: "ESM", mensagem: tr(
+                    "%1$@: módulos ES e TypeScript precisam do transformador (esbuild), que chega no marco 3",
+                    "\(path)"
+                ))
+            }
+            let cjs = try CacheDeTransformacao.transformar(
+                original, caminho: path, tipo: "cjs", versao: rt.versaoDoTransformador
+            ) { src, arquivo in
+                interopDeModuloES(try t(src, arquivo))
+            }
+            return embrulharModuloES(cjs)
+        }
+        return ReescritaDeImport.reescrever(original) ?? original
+    }
+
+    /// O `"type": "module"` do package.json mais próximo: um `.js` ali é módulo ES, como no
+    /// Node, mesmo minificado numa linha só (o `marked.esm.js`, que o teste por texto não via).
+    static func pacoteEhModulo(_ arquivo: String, rt: JSRuntime) -> Bool {
+        var dir = (arquivo as NSString).deletingLastPathComponent
+        while true {
+            let pj = (dir as NSString).appendingPathComponent("package.json")
+            if tipo(pj) == .arquivo {
+                return rt.cacheDeModulos.packageJSON(pj)["type"] as? String == "module"
+            }
+            let pai = (dir as NSString).deletingLastPathComponent
+            if pai == dir || pai.isEmpty {
+                return false
+            }
+            dir = pai
+        }
+    }
+
+    /// O `import x from "pacote-esm"` num `.mjs` vira, no CJS do esbuild,
+    /// `__toESM(require("pacote-esm"), 1)` — o "modo Node", em que `default` é o
+    /// `module.exports` inteiro, como quando o Node importa CommonJS. Só que aqui o pacote ES
+    /// também virou CJS, e o `default` dele sumia (chalk, mime, yargs, node-fetch: "x.default
+    /// is not a function"). O módulo ES convertido leva a marca `odete.esm` (ver
+    /// `embrulharModuloES`), e o `__toESM` passa a respeitá-la.
+    static func interopDeModuloES(_ cjs: String) -> String {
+        guard cjs.contains("isNodeMode || !mod || !mod.__esModule") else { return cjs }
+        return cjs.replacingOccurrences(
+            of: "isNodeMode || !mod || !mod.__esModule",
+            with: #"isNodeMode && !(mod && mod[Symbol.for("odete.esm")]) || !mod || !mod.__esModule"#
+        )
+    }
+
+    /// Há `async` ou `await` como palavra? Filtro barato: sem isso o módulo de entrada não
+    /// precisa do esbuild.
+    static func usaAsync(_ src: String) -> Bool {
+        src.range(of: #"\b(async|await)\b"#, options: .regularExpression) != nil
+    }
+
+    /// O transformador de entrada, com o caminho do top-level await: o formato CJS não o
+    /// aceita, então o módulo sai primeiro como ESM (só sem tipos), os imports sobem e o
+    /// resto vai para dentro de uma função async. Módulo de entrada com `export` fica como
+    /// está — exportar de dentro de uma função não existe.
+    static func transformarEntrada(_ src: String, _ arquivo: String, _ te: TransformadorDeEntrada) throws -> String {
+        do {
+            return try te.paraCJS(src, arquivo)
+        } catch {
+            let msg = "\(error.localizedDescription)"
+            guard msg.contains("Top-level await") else { throw error }
+            let esm = try te.paraESM(src, arquivo)
+            guard let embrulhado = embrulharTopLevelAwait(esm) else { throw error }
+            return try te.paraCJS(embrulhado, arquivo)
+        }
+    }
+
+    /// Separa as declarações `import` do topo (o esbuild as imprime na coluna 0, uma por
+    /// linha ou em várias até o `;`) e põe o resto numa função async que é chamada na hora.
+    /// Nil quando há `export` no topo.
+    static func embrulharTopLevelAwait(_ esm: String) -> String? {
+        var imports: [Substring] = []
+        var corpo: [Substring] = []
+        var dentroDeImport = false
+        for linha in esm.split(separator: "\n", omittingEmptySubsequences: false) {
+            if dentroDeImport {
+                imports.append(linha)
+                if linha.hasSuffix(";") {
+                    dentroDeImport = false
+                }
+                continue
+            }
+            if linha.hasPrefix("export ") || linha.hasPrefix("export{") {
+                return nil
+            }
+            if linha.hasPrefix("import ") || linha.hasPrefix("import{") || linha.hasPrefix("import\"")
+                || linha.hasPrefix("import*")
+            {
+                imports.append(linha)
+                dentroDeImport = !linha.hasSuffix(";")
+                continue
+            }
+            corpo.append(linha)
+        }
+        return imports.joined(separator: "\n")
+            + "\n(async () => {\n" + corpo.joined(separator: "\n")
+            + "\n})().catch((e) => globalThis.__odete_reportUncaught(e));\n"
     }
 
     /// Um módulo ES convertido para CJS roda numa função própria dentro do embrulho CJS.
@@ -56,8 +173,11 @@ enum ModuleLoader {
     /// vira comentário, senão ficaria no meio do código.
     static func embrulharModuloES(_ cjs: String) -> String {
         let corpo = cjs.hasPrefix("#!") ? "//" + cjs.dropFirst(2) : cjs
-        return "return (() => {" + corpo + "\n})();"
+        return "(() => {" + corpo + "\n})(); " + marcaDeModuloES
     }
+
+    /// Marca o `module.exports` de um módulo ES convertido (ver `interopDeModuloES`).
+    static let marcaDeModuloES = #"try { if (module.exports && typeof module.exports === "object" || typeof module.exports === "function") Object.defineProperty(module.exports, Symbol.for("odete.esm"), { value: true }); } catch {}"#
 
     static func looksLikeESM(_ src: String, ext: String) -> Bool {
         if ext == "mjs" {
@@ -71,16 +191,28 @@ enum ModuleLoader {
                 of: #"\n\s*(import\s+[\w{*]|export\s+(default|const|function|class|let|var|\{|\*))"#,
                 options: .regularExpression
             ) != nil
+            // Minificado: `…;export{a as b}` no fim de uma linha longa.
+            || src.range(of: #"[;}]export\s*\{[\w$, ]+\}\s*;?\s*(//.*)?$"#, options: .regularExpression) != nil
     }
 
+    /// O caminho sai sempre normalizado (sem `./` nem `../` no meio). Antes cada ciclo de
+    /// `require` relativo acumulava `././././` no nome, o cache do loader.js via um módulo
+    /// novo a cada volta, e zod 4, yargs 17 e readable-stream 4 não carregavam.
     static func resolveModule(_ spec: String, from: String, cache: CacheDeModulos? = nil) -> String? {
-        let fromDir = (from as NSString).deletingLastPathComponent
         if spec.hasPrefix("node:") {
             return "node:" + String(spec.dropFirst(5))
         }
-        if spec.hasPrefix("./") || spec.hasPrefix("../") || spec.hasPrefix("/") {
+        return resolverSemNormalizar(spec, from: from, cache: cache).map(Confinamento.normalizar)
+    }
+
+    private static func resolverSemNormalizar(_ spec: String, from: String, cache: CacheDeModulos?) -> String? {
+        let fromDir = (from as NSString).deletingLastPathComponent
+        if spec == "." || spec == ".." || spec.hasPrefix("./") || spec.hasPrefix("../") || spec.hasPrefix("/") {
             let base = spec.hasPrefix("/") ? spec : (fromDir as NSString).appendingPathComponent(spec)
-            return resolveFileOrDir(base, cache: cache)
+            return resolveFileOrDir(Confinamento.normalizar(base), cache: cache)
+        }
+        if spec.hasPrefix("#") {
+            return resolverImports(spec, fromDir: fromDir, cache: cache)
         }
         // pacote
         let chave = spec + "\u{0}" + fromDir
@@ -101,6 +233,60 @@ enum ModuleLoader {
             dir = parent
         }
         return nil
+    }
+
+    /// `#interno` pelo campo `imports` do package.json mais próximo (o chalk 5 importa
+    /// `#ansi-styles` assim). O alvo é um caminho do pacote (`./…`) ou outro pacote.
+    static func resolverImports(_ spec: String, fromDir: String, cache: CacheDeModulos?) -> String? {
+        var dir = fromDir
+        while true {
+            let pj = (dir as NSString).appendingPathComponent("package.json")
+            if tipo(pj) == .arquivo {
+                // O package.json mais próximo decide sozinho, como no Node.
+                guard let imports = packageJSON(pj, cache: cache)["imports"] as? [String: Any],
+                      let alvo = casarSubpath(imports, key: spec).flatMap(pickCondition) else { return nil }
+                if alvo.hasPrefix("./") || alvo.hasPrefix("../") {
+                    return resolveFileOrDir(Confinamento.normalizar((dir as NSString).appendingPathComponent(alvo)), cache: cache)
+                }
+                return resolveModule(alvo, from: pj, cache: cache)
+            }
+            let pai = (dir as NSString).deletingLastPathComponent
+            if pai == dir || pai.isEmpty {
+                return nil
+            }
+            dir = pai
+        }
+    }
+
+    /// Chave exata ou padrão com `*` num mapa de subpaths (`exports`, `imports`). Devolve o
+    /// valor com o `*` já trocado nas strings.
+    static func casarSubpath(_ map: [String: Any], key: String) -> Any? {
+        if let v = map[key] {
+            return v
+        }
+        // O padrão mais específico (prefixo mais longo) ganha, como no Node.
+        let padroes = map.keys.filter { $0.contains("*") }.sorted { $0.count > $1.count }
+        for pattern in padroes {
+            let parts = pattern.split(separator: "*", omittingEmptySubsequences: false).map(String.init)
+            guard parts.count == 2, key.hasPrefix(parts[0]), key.hasSuffix(parts[1]),
+                  key.count >= pattern.count - 1, let v = map[pattern] else { continue }
+            let star = String(key.dropFirst(parts[0].count).dropLast(parts[1].count))
+            return trocarEstrela(v, star)
+        }
+        return nil
+    }
+
+    private static func trocarEstrela(_ v: Any, _ star: String) -> Any {
+        if let s = v as? String {
+            return s.replacingOccurrences(of: "*", with: star)
+        }
+        if let a = v as? [Any] {
+            return a.map { trocarEstrela($0, star) }
+        }
+        if let m = v as? [String: Any] {
+            return m.mapValues { trocarEstrela($0, star) }
+        }
+        return v
     }
 
     static func resolveFileOrDir(_ base: String, cache: CacheDeModulos? = nil) -> String? {

@@ -1,6 +1,7 @@
 import Foundation
 import OdeteCore
 import OdeteI18n
+import OdeteRuntime
 
 struct Simple: ShellCommand {
     let name: String
@@ -14,16 +15,38 @@ struct Simple: ShellCommand {
 enum Builtins {
     static func flags(_ args: [String]) -> (flags: Set<Character>, rest: [String]) {
         var f: Set<Character> = [], r: [String] = []
+        var acabaram = false
         for a in args {
-            if a.hasPrefix("-"), a.count > 1,
-               !a.hasPrefix("--")
-            {
+            if !acabaram, a == "--" {
+                acabaram = true; continue
+            }
+            if !acabaram, a.hasPrefix("-"), a.count > 1, !a.hasPrefix("--") {
                 a.dropFirst().forEach { f.insert($0) }
             } else {
                 r.append(a)
             }
         }
         return (f, r)
+    }
+
+    /// As opções de um comando, recusando as que ele não conhece. Antes `grep -v` e `find
+    /// -type f` eram aceitos e ignorados: saía o contrário do pedido, sem aviso.
+    static func opcoes(
+        _ comando: String,
+        _ args: [String],
+        aceitas: String,
+        _ ctx: CommandContext
+    ) -> (flags: Set<Character>, rest: [String])? {
+        let (f, rest) = flags(args)
+        if let x = f.first(where: { !aceitas.contains($0) }) {
+            ctx.io.err(tr("%1$@: opção desconhecida: -%2$@", comando, String(x)))
+            return nil
+        }
+        if let longa = args.first(where: { $0.hasPrefix("--") && $0 != "--" }) {
+            ctx.io.err(tr("%1$@: opção desconhecida: %2$@", comando, longa))
+            return nil
+        }
+        return (f, rest)
     }
 
     /// Lista recursiva (síncrona, para usar dentro de comandos async).
@@ -43,22 +66,36 @@ enum Builtins {
         return out
     }
 
-    static func readInput(_ args: [String], _ ctx: CommandContext) -> [(String, String)]? {
+    static func readInput(_ args: [String], _ ctx: CommandContext, comando: String = "cat") -> [(String, String)]? {
         if args.isEmpty {
             return [("", ctx.io.stdin ?? "")]
         }
         var out: [(String, String)] = []
         for a in args {
-            guard let s = try? String(contentsOf: ctx.resolve(a), encoding: .utf8)
+            if a == "-" {
+                out.append(("", ctx.io.stdin ?? "")); continue
+            }
+            guard let u = ctx.noProjeto(a) else { ctx.avisarFora(comando, a); return nil }
+            guard let s = try? String(contentsOf: u, encoding: .utf8)
             else { ctx.io.err(tr("%1$@: não existe", "\(a)")); return nil }
             out.append((a, s))
         }
         return out
     }
 
+    /// As linhas de um texto como o `grep`/`wc` as veem: o `\n` final não abre uma linha
+    /// a mais, mas linha vazia no meio conta.
+    static func linhas(_ s: String) -> [Substring] {
+        var l = s.split(separator: "\n", omittingEmptySubsequences: false)
+        if s.hasSuffix("\n") {
+            l.removeLast()
+        }
+        return s.isEmpty ? [] : l
+    }
+
     /// Arquivos e texto. O resto — ambiente, jobs, utilidades — está em
     /// `BuiltinsAmbiente.swift`: juntos não cabiam num arquivo que se lê de uma vez.
-    static let all: [ShellCommand] = arquivos + ambiente
+    static let all: [ShellCommand] = arquivos + texto + ambiente
 
     static let arquivos: [ShellCommand] = [
         Simple(name: "help", help: "lista os comandos") { _, ctx in
@@ -73,17 +110,24 @@ enum Builtins {
         },
         Simple(name: "pwd", help: "pasta atual") { _, ctx in ctx.io.out(ctx.display(ctx.cwd)); return 0 },
         Simple(name: "cd", help: "muda de pasta") { args, ctx in
-            let target = args.first.map { ctx.resolve($0) } ?? ctx.root
-            if ctx.shell.setCwd(target) {
+            // `cd -` volta para a pasta de antes, e mostra qual é, como no sh.
+            if args.first == "-" {
+                guard let antes = ctx.shell.cwdAnterior else { ctx.io.err(tr("cd: não há pasta anterior")); return 1 }
+                guard ctx.shell.setCwd(antes) else { ctx.io.err(tr("cd: %1$@: não é uma pasta do projeto", "-")); return 1 }
+                ctx.io.out(ctx.display(antes))
+                return 0
+            }
+            let alvo = args.first.map { ctx.caminhoCru($0) } ?? ctx.root
+            if ctx.shell.setCwd(alvo) {
                 return 0
             }
             ctx.io.err(tr("cd: %1$@: não é uma pasta do projeto", "\(args.first ?? "")")); return 1
         },
         Simple(name: "ls", help: "lista arquivos") { args, ctx in
-            let (f, rest) = flags(args)
+            guard let (f, rest) = opcoes("ls", args, aceitas: "laA1hF", ctx) else { return 2 }
             let targets = rest.isEmpty ? ["."] : rest
             for t in targets {
-                let u = ctx.resolve(t)
+                guard let u = ctx.noProjeto(t) else { ctx.avisarFora("ls", t); return 1 }
                 var isDir: ObjCBool = false
                 guard FileManager.default.fileExists(atPath: u.path, isDirectory: &isDir)
                 else { ctx.io.err(tr("ls: %1$@: não existe", "\(t)")); return 1 }
@@ -91,7 +135,7 @@ enum Builtins {
                     ctx.io.out(t); continue
                 }
                 guard var items = try? FileManager.default.contentsOfDirectory(atPath: u.path) else { continue }
-                items = items.filter { f.contains("a") || !$0.hasPrefix(".") }
+                items = items.filter { f.contains("a") || f.contains("A") || !$0.hasPrefix(".") }
                     .sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
                 if targets.count > 1 {
                     ctx.io.out("\(t):")
@@ -117,81 +161,19 @@ enum Builtins {
                         isDirectory: &d
                     ); return i + (d.boolValue ? "/" : "") }
                     if !line.isEmpty {
-                        ctx.io.out(line.joined(separator: "  "))
+                        ctx.io.out(line.joined(separator: f.contains("1") ? "\n" : "  "))
                     }
                 }
             }
             return 0
         },
-        Simple(name: "cat", help: "mostra arquivos") { args, ctx in
-            guard let inputs = readInput(args, ctx) else { return 1 }
-            for (_, s) in inputs {
-                ctx.io.out(s.hasSuffix("\n") ? String(s.dropLast()) : s)
-            }
-            return 0
-        },
-        Simple(name: "head", help: "primeiras linhas (-n)") { args, ctx in
-            var n = 10; var rest: [String] = []
-            var i = 0
-            while i < args
-                .count
-            {
-                if args[i] == "-n",
-                   i + 1 < args.count
-                {
-                    n = Int(args[i + 1]) ?? 10; i += 2
-                } else if args[i].hasPrefix("-"),
-                          let v = Int(args[i].dropFirst())
-                {
-                    n = v; i += 1
-                } else {
-                    rest.append(args[i]); i += 1
-                }
-            }
-            guard let inputs = readInput(rest, ctx) else { return 1 }
-            for (_, s) in inputs {
-                ctx.io
-                    .out(s.split(separator: "\n", omittingEmptySubsequences: false).prefix(n).joined(separator: "\n"))
-            }
-            return 0
-        },
-        Simple(name: "tail", help: "últimas linhas (-n)") { args, ctx in
-            var n = 10; var rest: [String] = []
-            var i = 0
-            while i < args
-                .count
-            {
-                if args[i] == "-n",
-                   i + 1 < args.count
-                {
-                    n = Int(args[i + 1]) ?? 10; i += 2
-                } else if args[i].hasPrefix("-"),
-                          let v = Int(args[i].dropFirst())
-                {
-                    n = v; i += 1
-                } else {
-                    rest.append(args[i]); i += 1
-                }
-            }
-            guard let inputs = readInput(rest, ctx) else { return 1 }
-            for (_, s) in inputs {
-                let lines = s.split(separator: "\n", omittingEmptySubsequences: false); ctx.io
-                    .out(lines.suffix(n).joined(separator: "\n"))
-            }
-            return 0
-        },
-        Simple(name: "echo", help: "imprime") { args, ctx in
-            let (f, rest) = flags(args.prefix(1).map(\.self) + [])
-            let text = (f.contains("n") ? Array(args.dropFirst()) : args).joined(separator: " ")
-            _ = rest
-            ctx.io.out(text); return 0
-        },
         Simple(name: "mkdir", help: "cria pasta (-p)") { args, ctx in
-            let (f, rest) = flags(args)
+            guard let (f, rest) = opcoes("mkdir", args, aceitas: "pv", ctx) else { return 2 }
             for r in rest {
+                guard let u = ctx.noProjeto(r) else { ctx.avisarFora("mkdir", r); return 1 }
                 do
                 { try FileManager.default.createDirectory(
-                    at: ctx.resolve(r),
+                    at: u,
                     withIntermediateDirectories: f.contains("p")
                 ) } catch { ctx.io.err(tr("mkdir: %1$@: %2$@", "\(r)", "\(error.localizedDescription)")); return 1 }
             }
@@ -199,13 +181,9 @@ enum Builtins {
         },
         Simple(name: "touch", help: "cria arquivo vazio") { args, ctx in
             for a in args {
-                let u = ctx.resolve(a); if !FileManager.default
-                    .fileExists(atPath: u.path)
-                {
-                    FileManager.default.createFile(
-                        atPath: u.path,
-                        contents: Data()
-                    )
+                guard let u = ctx.noProjeto(a) else { ctx.avisarFora("touch", a); return 1 }
+                if !FileManager.default.fileExists(atPath: u.path) {
+                    FileManager.default.createFile(atPath: u.path, contents: Data())
                 } else {
                     try? FileManager.default.setAttributes([.modificationDate: Date()], ofItemAtPath: u.path)
                 }
@@ -213,25 +191,29 @@ enum Builtins {
             return 0
         },
         Simple(name: "rm", help: "apaga (-r, -f)") { args, ctx in
-            let (f, rest) = flags(args)
+            guard let (f, rest) = opcoes("rm", args, aceitas: "rRfdiv", ctx) else { return 2 }
+            let recursivo = f.contains("r") || f.contains("R")
             for r in rest {
-                let u = ctx.resolve(r)
-                var isDir: ObjCBool = false
-                guard FileManager.default.fileExists(atPath: u.path, isDirectory: &isDir)
-                else {
+                // O link é apagado, não seguido; e nada fora do projeto — `rm -rf ../Outro`
+                // apagava outro projeto inteiro.
+                // `rm link/` (com a barra) é a pasta do outro lado do link, como no sh.
+                guard let u = ctx.noProjeto(r, seguirUltimo: r.hasSuffix("/")) else { ctx.avisarFora("rm", r); return 1 }
+                let conf = Confinamento(raiz: ctx.root)
+                if conf.raizes.contains(Confinamento.real(u.path, seguirUltimo: false)) {
+                    ctx.io.err(tr("rm: não vou apagar a raiz do projeto")); return 1
+                }
+                var st = stat()
+                guard lstat(u.path, &st) == 0 else {
                     if !f.contains("f") {
                         ctx.io.err(tr("rm: %1$@: não existe", "\(r)")); return 1
                     }; continue
                 }
-                if isDir.boolValue, !f.contains("r") {
+                if (st.st_mode & S_IFMT) == S_IFDIR, !recursivo {
                     ctx.io.err(tr("rm: %1$@: é uma pasta (use -r)", "\(r)")); return 1
                 }
-                if u.standardizedFileURL.path == ctx.root.standardizedFileURL
-                    .path
-                {
-                    ctx.io.err(tr("rm: não vou apagar a raiz do projeto")); return 1
+                if (st.st_mode & S_IFMT) != S_IFLNK {
+                    HistoricoDeArquivos.guardar(u, raiz: ctx.root, origem: .terminal)
                 }
-                HistoricoDeArquivos.guardar(u, raiz: ctx.root, origem: .terminal)
                 do { try FileManager.default.removeItem(at: u) } catch {
                     ctx.io.err(tr("rm: %1$@: %2$@", "\(r)", "\(error.localizedDescription)")); return 1
                 }
@@ -239,145 +221,112 @@ enum Builtins {
             return 0
         },
         Simple(name: "cp", help: "copia (-r)") { args, ctx in
-            let (_, rest) = flags(args)
+            guard let (f, rest) = opcoes("cp", args, aceitas: "rRfpaiv", ctx) else { return 2 }
             guard rest.count >= 2 else { ctx.io.err(tr("cp: origem destino")); return 1 }
-            var dest = ctx.resolve(rest.last!)
-            var isDir: ObjCBool = false
-            let destIsDir = FileManager.default.fileExists(atPath: dest.path, isDirectory: &isDir) && isDir.boolValue
+            guard let dest = ctx.noProjeto(rest.last!) else { ctx.avisarFora("cp", rest.last!); return 1 }
+            let destIsDir = Shell.ehPasta(dest)
+            let recursivo = f.contains("r") || f.contains("R") || f.contains("a")
             for src in rest.dropLast() {
-                let s = ctx.resolve(src)
+                guard let s = ctx.noProjeto(src) else { ctx.avisarFora("cp", src); return 1 }
                 let d = destIsDir ? dest.appending(path: s.lastPathComponent) : dest
-                do {
-                    if FileManager.default
-                        .fileExists(atPath: d.path)
-                    {
-                        HistoricoDeArquivos.guardar(d, raiz: ctx.root, origem: .terminal)
-                        try FileManager.default.removeItem(at: d)
-                    }; try FileManager.default
-                        .copyItem(
-                            at: s,
-                            to: d
-                        )
-                } catch { ctx.io.err(tr("cp: %1$@: %2$@", "\(src)", "\(error.localizedDescription)")); return 1 }
+                if Shell.ehPasta(s), !recursivo {
+                    ctx.io.err(tr("cp: %1$@: é uma pasta (use -r)", src)); return 1
+                }
+                // Pasta sobre pasta mescla, como o cp; antes o destino era apagado inteiro.
+                if let e = Self.copiar(s, para: d) {
+                    ctx.io.err(tr("cp: %1$@: %2$@", "\(src)", e)); return 1
+                }
             }
-            dest = dest.standardizedFileURL
             return 0
         },
         Simple(name: "mv", help: "move ou renomeia") { args, ctx in
-            guard args.count >= 2 else { ctx.io.err(tr("mv: origem destino")); return 1 }
-            let dest = ctx.resolve(args.last!)
-            var isDir: ObjCBool = false
-            let destIsDir = FileManager.default.fileExists(atPath: dest.path, isDirectory: &isDir) && isDir.boolValue
-            for src in args.dropLast() {
-                let s = ctx.resolve(src)
+            guard let (_, rest) = opcoes("mv", args, aceitas: "fiv", ctx) else { return 2 }
+            guard rest.count >= 2 else { ctx.io.err(tr("mv: origem destino")); return 1 }
+            guard let dest = ctx.noProjeto(rest.last!, seguirUltimo: false) else { ctx.avisarFora("mv", rest.last!); return 1 }
+            let destIsDir = Shell.ehPasta(dest)
+            for src in rest.dropLast() {
+                guard let s = ctx.noProjeto(src, seguirUltimo: false) else { ctx.avisarFora("mv", src); return 1 }
                 let d = destIsDir ? dest.appending(path: s.lastPathComponent) : dest
-                do {
-                    if FileManager.default
-                        .fileExists(atPath: d.path)
-                    {
-                        HistoricoDeArquivos.guardar(d, raiz: ctx.root, origem: .terminal)
-                        try FileManager.default.removeItem(at: d)
-                    }; try FileManager.default
-                        .moveItem(
-                            at: s,
-                            to: d
-                        )
-                } catch { ctx.io.err(tr("mv: %1$@: %2$@", "\(src)", "\(error.localizedDescription)")); return 1 }
-            }
-            return 0
-        },
-        Simple(name: "grep", help: "busca texto (-i, -n, -r)") { args, ctx in
-            let (f, rest) = flags(args)
-            guard let pattern = rest.first else { ctx.io.err(tr("grep: padrão")); return 2 }
-            let opts: String.CompareOptions = f.contains("i") ? [.caseInsensitive] : []
-            var found = false
-            func scan(_ label: String, _ text: String) {
-                for (i, line) in text.split(separator: "\n", omittingEmptySubsequences: false).enumerated()
-                    where line.range(
-                        of: pattern,
-                        options: opts
-                    ) != nil
-                {
-                    found = true
-                    ctx.io.out((label.isEmpty ? "" : label + ":") + (f.contains("n") ? "\(i + 1):" : "") + line)
-                }
-            }
-            let files = Array(rest.dropFirst())
-            if files.isEmpty {
-                scan("", ctx.io.stdin ?? ""); return found ? 0 : 1
-            }
-            for file in files {
-                let u = ctx.resolve(file)
-                var isDir: ObjCBool = false
-                if FileManager.default.fileExists(atPath: u.path, isDirectory: &isDir), isDir.boolValue {
-                    guard f.contains("r")
-                    else { ctx.io.err(tr("grep: %1$@: é uma pasta (use -r)", "\(file)")); continue }
-                    for item in walk(u, skipNoise: true) {
-                        if let s = try? String(contentsOf: item, encoding: .utf8) {
-                            scan(ctx.display(item), s)
-                        }
+                // `rename(2)`: arquivo sobre arquivo substitui; pasta sobre pasta cheia é
+                // recusado. Antes o destino era apagado antes — pasta inteira inclusive.
+                HistoricoDeArquivos.guardar(d, raiz: ctx.root, origem: .terminal)
+                if Darwin.rename(s.path, d.path) != 0 {
+                    let e = errno
+                    if e == EXDEV, (try? FileManager.default.moveItem(at: s, to: d)) != nil {
+                        continue
                     }
-                } else if let s = try? String(contentsOf: u, encoding: .utf8) {
-                    scan(files.count > 1 ? file : "", s)
-                } else {
-                    ctx.io.err(tr("grep: %1$@: não existe", "\(file)"))
+                    ctx.io.err(tr("mv: %1$@: %2$@", "\(src)", String(cString: strerror(e)))); return 1
                 }
-            }
-            return found ? 0 : 1
-        },
-        Simple(name: "wc", help: "conta linhas, palavras e bytes") { args, ctx in
-            let (f, rest) = flags(args)
-            guard let inputs = readInput(rest, ctx) else { return 1 }
-            for (label, s) in inputs {
-                let l = s.split(separator: "\n").count, w = s.split(whereSeparator: { $0.isWhitespace }).count,
-                    b = s.utf8.count
-                let parts = f.isEmpty ? [l, w, b] : [
-                    f.contains("l") ? l : nil,
-                    f.contains("w") ? w : nil,
-                    f.contains("c") ? b : nil,
-                ].compactMap(\.self)
-                ctx.io.out(parts.map { String($0).leftPad(7) }.joined() + (label.isEmpty ? "" : " " + label))
             }
             return 0
         },
-        Simple(name: "find", help: "lista arquivos recursivamente (-name)") { args, ctx in
-            var start = "."; var name: String?
+        Simple(name: "find", help: "lista arquivos recursivamente (-name, -type)") { args, ctx in
+            var start = "."; var name: String?; var iname: String?; var tipo: Character?
             var i = 0
-            while i < args
-                .count
-            {
-                if args[i] == "-name",
-                   i + 1 < args.count
-                {
-                    name = args[i + 1]; i += 2
-                } else if !args[i].hasPrefix("-") {
-                    start = args[i]; i += 1
+            while i < args.count {
+                let a = args[i]
+                if a == "-name" || a == "-iname", i + 1 < args.count {
+                    if a == "-name" {
+                        name = args[i + 1]
+                    } else {
+                        iname = args[i + 1]
+                    }
+                    i += 2
+                } else if a == "-type", i + 1 < args.count, let t = args[i + 1].first, "fd".contains(t), args[i + 1].count == 1 {
+                    tipo = t; i += 2
+                } else if !a.hasPrefix("-") {
+                    start = a; i += 1
                 } else {
-                    i += 1
+                    ctx.io.err(tr("find: opção desconhecida: %1$@", a)); return 2
                 }
             }
-            let base = ctx.resolve(start)
+            guard let base = ctx.noProjeto(start) else { ctx.avisarFora("find", start); return 1 }
             guard FileManager.default.fileExists(atPath: base.path)
             else { ctx.io.err(tr("find: %1$@: não existe", "\(start)")); return 1 }
-            let re = name
-                .map {
-                    NSRegularExpression.escapedPattern(for: $0).replacingOccurrences(of: "\\*", with: ".*")
-                        .replacingOccurrences(
-                            of: "\\?",
-                            with: "."
-                        )
-                }
-            for item in walk(base, skipNoise: true) {
-                if let re,
-                   item.lastPathComponent.range(of: "^" + re + "$", options: .regularExpression) == nil
-                {
+            for item in [base] + walk(base, skipNoise: true) {
+                if let name, fnmatch(name, item.lastPathComponent, 0) != 0 {
                     continue
                 }
-                ctx.io.out(ctx.display(item))
+                if let iname, fnmatch(iname.lowercased(), item.lastPathComponent.lowercased(), 0) != 0 {
+                    continue
+                }
+                if let tipo, Shell.ehPasta(item) != (tipo == "d") {
+                    continue
+                }
+                ctx.io.out(start == "." && item == base ? "." : ctx.display(item))
             }
             return 0
         },
     ]
+
+    /// Copia arquivo ou pasta (mesclando com o que já existe). Devolve a mensagem de erro.
+    static func copiar(_ s: URL, para d: URL) -> String? {
+        let fm = FileManager.default
+        if Shell.ehPasta(s) {
+            if !fm.fileExists(atPath: d.path) {
+                do { try fm.createDirectory(at: d, withIntermediateDirectories: false) } catch {
+                    return error.localizedDescription
+                }
+            } else if !Shell.ehPasta(d) {
+                return tr("%1$@ não é uma pasta", d.lastPathComponent)
+            }
+            for nome in (try? fm.contentsOfDirectory(atPath: s.path)) ?? [] {
+                if let e = copiar(s.appending(path: nome), para: d.appending(path: nome)) {
+                    return e
+                }
+            }
+            return nil
+        }
+        if Shell.ehPasta(d) {
+            return tr("%1$@ é uma pasta", d.lastPathComponent)
+        }
+        if fm.fileExists(atPath: d.path) {
+            HistoricoDeArquivos.guardar(d, origem: .terminal)
+            try? fm.removeItem(at: d)
+        }
+        do { try fm.copyItem(at: s, to: d) } catch { return error.localizedDescription }
+        return nil
+    }
 }
 
 extension String {

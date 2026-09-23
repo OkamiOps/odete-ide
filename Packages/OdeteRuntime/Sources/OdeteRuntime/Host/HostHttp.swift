@@ -373,6 +373,7 @@ enum HostHttp {
             guard let server, let rt else { return }
             switch state {
             case .ready:
+                rt.portas.withLock { $0[id] = Int(server.actualPort) }
                 rt.call("__odete_httpListening", [id, Int(server.actualPort)])
             case let .failed(erro):
                 let ocupada = if case .posix(.EADDRINUSE) = erro {
@@ -384,6 +385,7 @@ enum HostHttp {
                 // servidor a menos, e nada fica preso a ele.
                 server.stop()
                 box.servers.removeValue(forKey: id)
+                rt.portas.withLock { $0[id] = nil }
                 if ocupada, porta != 0, restantes > 0 {
                     abrir(
                         rt: rt,
@@ -400,6 +402,9 @@ enum HostHttp {
             }
         }
         box.servers[id] = server
+        // A porta aparece já (antes do `.ready`), como antes: o terminal decide se o
+        // processo vira job olhando para ela.
+        rt.portas.withLock { $0[id] = Int(server.actualPort) }
         server.start()
     }
 
@@ -427,6 +432,7 @@ enum HostHttp {
                 s.stop()
                 rt.keepAlive = max(rt.keepAlive - 1, 0)
             }
+            rt.portas.withLock { $0[id] = nil }
             rt.checkIdle()
         }
         h.setObject(close, forKeyedSubscript: "httpClose" as NSString)

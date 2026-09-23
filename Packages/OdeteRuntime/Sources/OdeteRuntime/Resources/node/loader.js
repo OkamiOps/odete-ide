@@ -32,39 +32,103 @@
   globalThis.__odete_fetchFail = (id, msg) => { const p = pendingFetch.get(id); if (!p) return; pendingFetch.delete(id); p.reject(Object.assign(new TypeError("fetch failed: " + msg), { cause: new Error(msg) })); };
 
   // ---- require de arquivos ----
+  // O caminho chega normalizado do Swift (sem `./` acumulado) e o módulo é achado pelo
+  // caminho real (links resolvidos): o mesmo arquivo por dois caminhos carrega uma vez só.
+  // `__filename` fica o caminho pedido, não o real — num projeto do iCloud `node_modules` é
+  // um link para `node_modules.nosync`, e muita ferramenta procura "/node_modules/" no nome.
   const fileCache = Object.create(null);
+  const porReal = new Map();
+  const reais = new Map();
+  const real = (p) => { let r = reais.get(p); if (r === undefined) { r = H.caminhoReal(p); reais.set(p, r); } return r; };
+  // O módulo já carregado para `file`, pelo nome ou pelo caminho real. Um que saiu do
+  // `require.cache` (recarga à mão) não conta.
+  function jaCarregado(file) {
+    const m = fileCache[file];
+    if (m) return m;
+    const r = porReal.get(real(file));
+    if (r && fileCache[r.filename] === r) { fileCache[file] = r; return r; }
+    return null;
+  }
   function makeRequire(fromFile) {
     const fromDir = path.dirname(fromFile);
     function require(spec) {
+      if (typeof spec !== "string") throw Object.assign(new TypeError('The "id" argument must be of type string. Received ' + typeof spec), { code: "ERR_INVALID_ARG_TYPE" });
       if (globalThis.__nodeHas(spec) && !spec.startsWith("./") && !spec.startsWith("../") && !spec.startsWith("/")) return globalThis.__nodeRequire(spec);
       const r = H.resolve(spec, fromFile);
-      if (r && typeof r === "object") { const e = new Error(r.message); e.code = r.error; e.requireStack = [fromFile]; throw e; }
+      if (r && typeof r === "object") { const e = new Error(r.message || `Cannot find module '${spec}'`); e.code = r.error; e.requireStack = [fromFile]; throw e; }
       if (r.startsWith("node:")) return globalThis.__nodeRequire(r);
       return loadFile(r);
     }
-    require.resolve = (spec, o) => { if (globalThis.__nodeHas(spec)) return spec; const r = H.resolve(spec, fromFile); if (r && typeof r === "object") { const e = new Error(r.message); e.code = r.error; throw e; } return r; };
-    require.resolve.paths = () => [path.join(fromDir, "node_modules")];
+    require.resolve = (spec, o) => { if (globalThis.__nodeHas(spec) && !spec.startsWith(".") && !spec.startsWith("/")) return spec; const r = H.resolve(spec, fromFile); if (r && typeof r === "object") { const e = new Error(r.message); e.code = r.error; throw e; } return r; };
+    require.resolve.paths = (spec) => { if (globalThis.__nodeHas(spec)) return null; const out = []; let d = fromDir; while (true) { if (path.basename(d) !== "node_modules") out.push(path.join(d, "node_modules")); const pai = path.dirname(d); if (pai === d) break; d = pai; } return out; };
     require.cache = fileCache;
-    require.main = mainModule;
-    require.extensions = {};
+    Object.defineProperty(require, "main", { get: () => mainModule, enumerable: true });
+    require.extensions = { ".js": () => {}, ".json": () => {}, ".node": () => {}, ".cjs": () => {}, ".mjs": () => {}, ".ts": () => {} };
     return require;
   }
   globalThis.__odete_makeRequire = makeRequire;
-  let mainModule = null;
+
+  // `import()` em código que o esbuild não transformou (CJS cru, `new Function`): o Swift
+  // troca `import(` por `__odete_import(` e aqui ele vira require + namespace de módulo.
+  // Aceita `file://` com query (`?t=123`, que os carregadores de config põem para fugir de
+  // cache) e builtins.
+  function namespace(m) {
+    if (m && m.__esModule) return "default" in m ? m : Object.assign(Object.create(null), m, { default: m });
+    const ns = Object.create(null);
+    if (m !== null && (typeof m === "object" || typeof m === "function")) for (const k of Object.keys(m)) if (k !== "default") ns[k] = m[k];
+    ns.default = m;
+    Object.defineProperty(ns, Symbol.toStringTag, { value: "Module" });
+    return ns;
+  }
+  function makeImport(fromFile) {
+    const req = makeRequire(fromFile);
+    return function __odete_import(spec) {
+      return new Promise((res) => res()).then(() => {
+        let s = spec && typeof spec === "object" && spec.href ? spec.href : String(spec);
+        if (s.startsWith("file:")) s = decodeURIComponent(s.replace(/^file:\/\/(localhost)?/, "").replace(/[?#].*$/, ""));
+        return namespace(req(s));
+      });
+    };
+  }
+  globalThis.__odete_import = makeImport(path.join(H.cwd, "[eval]"));
+  // `new Function("return import(x)")` (o bin do prettier carrega o CLI assim).
+  if (H.modoProcesso) {
+    const FunctionNativa = Function;
+    const reescrever = (args) => { if (args.length) { const corpo = String(args[args.length - 1]); if (corpo.includes("import")) { const r = H.reescreverImport(corpo); if (r !== null) { args = Array.from(args); args[args.length - 1] = r; } } } return args; };
+    const P = new Proxy(FunctionNativa, {
+      construct(t, args, nt) { return Reflect.construct(t, reescrever(args), nt === P ? t : nt); },
+      apply(t, self, args) { return Reflect.apply(t, self, reescrever(args)); },
+    });
+    globalThis.Function = P;
+  }
+
+  let mainModule = undefined;
   globalThis.require = makeRequire(path.join(H.cwd, "__global__.js"));
-  function loadFile(file) {
-    if (fileCache[file]) return fileCache[file].exports;
-    const module = { id: file, filename: file, path: path.dirname(file), exports: {}, loaded: false, children: [], paths: [], parent: null };
+  function loadFile(file, ehEntrada = false) {
+    const ja = jaCarregado(file);
+    if (ja) return ja.exports;
+    const module = { id: ehEntrada ? "." : file, filename: file, path: path.dirname(file), exports: {}, loaded: false, children: [], paths: [], parent: null, isPreloading: false };
+    module.require = (s) => module._req(s);
     fileCache[file] = module;
-    if (file.endsWith(".json")) { module.exports = JSON.parse(fs.readFileSync(file, "utf8")); module.loaded = true; return module.exports; }
-    if (file.endsWith(".node")) { throw Object.assign(new Error(`Odete: ${path.basename(file)} é um binário nativo e não roda no iPad`), { code: "ERR_DLOPEN_FAILED" }); }
-    const src = H.loadModule(file);
+    porReal.set(real(file), module);
+    if (ehEntrada) { mainModule = module; process.mainModule = module; }
+    if (file.endsWith(".json")) { try { module.exports = JSON.parse(fs.readFileSync(file, "utf8")); } catch (e) { delete fileCache[file]; e.message = file + ": " + e.message; throw e; } module.loaded = true; return module.exports; }
+    if (file.endsWith(".node")) { delete fileCache[file]; throw Object.assign(new Error(`Odete: ${path.basename(file)} é um binário nativo e não roda no iPad`), { code: "ERR_DLOPEN_FAILED" }); }
+    const src = H.loadModule(file, ehEntrada);
     if (src && typeof src === "object") { delete fileCache[file]; const e = new Error(src.message || src.error); e.code = src.error; throw e; }
-    const wrapper = `(function (exports, require, module, __filename, __dirname) {${src.startsWith("#!") ? "//" + src : src}\n})`;
+    const wrapper = `(function (exports, require, module, __filename, __dirname, __odete_import) {${src.startsWith("#!") ? "//" + src : src}\n})`;
     let fn;
-    try { fn = (0, eval)(wrapper + "\n//# sourceURL=" + file); } catch (e) { delete fileCache[file]; e.message = file + ": " + e.message; throw e; }
+    try { fn = H.compilar(wrapper, file); } catch (e) { delete fileCache[file]; e.message = file + ": " + e.message; throw e; }
     const req = makeRequire(file);
-    try { fn.call(module.exports, module.exports, req, module, file, path.dirname(file)); } catch (e) { delete fileCache[file]; throw e; }
+    module._req = req;
+    let imp = null;
+    const importar = (spec) => (imp || (imp = makeImport(file)))(spec);
+    try { fn.call(module.exports, module.exports, req, module, file, path.dirname(file), importar); } catch (e) { delete fileCache[file]; throw e; }
+    // `export { x as "module.exports" }`: o jeito do Node (22.12+) de um módulo ES dizer o
+    // que o `require` dele devolve. O yargs 18 faz isso — sem isto `require("yargs/yargs")`
+    // vinha o namespace e "não é uma função".
+    const ex = module.exports;
+    if (ex && ex.__esModule && Object.prototype.hasOwnProperty.call(ex, "module.exports")) module.exports = ex["module.exports"];
     module.loaded = true;
     return module.exports;
   }
@@ -77,17 +141,13 @@
     const abs = path.isAbsolute(file) ? file : path.join(process.cwd(), file);
     const resolved = H.resolve(abs, abs);
     if (resolved && typeof resolved === "object") { H.write(2, `Error: Cannot find module '${file}'`); H.exit(1); return; }
-    mainModule = { filename: resolved };
     process.argv[1] = resolved;
-    loadFile(resolved);
+    loadFile(resolved, true);
   });
   globalThis.__odete_runCode = (code, filename) => runGuard(() => {
     const module = { id: "[eval]", filename, exports: {}, loaded: false };
-    const fn = (0, eval)(`(function (exports, require, module, __filename, __dirname) {${code}\n})\n//# sourceURL=${filename}`);
-    fn.call(module.exports, module.exports, makeRequire(filename), module, filename, path.dirname(filename));
+    const src = (H.modoProcesso && code.includes("import") && H.reescreverImport(code)) || code;
+    const fn = H.compilar(`(function (exports, require, module, __filename, __dirname, __odete_import) {${src}\n})`, filename);
+    fn.call(module.exports, module.exports, makeRequire(filename), module, filename, path.dirname(filename), makeImport(filename));
   });
-
-  // rejeições não tratadas
-  const unhandled = new Set();
-  globalThis.__odete_unhandled = (reason) => { queueMicrotask(() => { if (process.listenerCount("unhandledRejection")) process.emit("unhandledRejection", reason); else globalThis.__odete_reportUncaught(reason); }); };
 })();

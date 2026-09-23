@@ -14,6 +14,7 @@ import Security
 enum HostBytes {
     static func install(_ rt: JSRuntime) {
         guard let ctx = rt.context.jsGlobalContextRef, let host = rt.host.jsValueRef else { return }
+        registrar(rt)
         let def = { (nome: String, fn: JSObjectCallAsFunctionCallback) in define(ctx, host, nome, fn) }
         def("readBytes") { c, _, _, n, a, e in HostBytes.lerArquivo(Argumentos(c, n, a), e) }
         def("writeBytes") { c, _, _, n, a, e in HostBytes.escreverArquivo(Argumentos(c, n, a), e) }
@@ -29,6 +30,12 @@ enum HostBytes {
         def("gzipBytes") { c, _, _, n, a, e in HostBytes.gzipBytes(Argumentos(c, n, a), e) }
         def("hashBytes") { c, _, _, n, a, e in HostBytes.hashBytes(Argumentos(c, n, a), e) }
         def("randomFill") { c, _, _, n, a, e in HostBytes.randomFill(Argumentos(c, n, a), e) }
+        def("hmacBytes") { c, _, _, n, a, e in HostBytes.hmacBytes(Argumentos(c, n, a), e) }
+        def("pbkdf2Bytes") { c, _, _, n, a, e in HostBytes.pbkdf2Bytes(Argumentos(c, n, a), e) }
+        def("writeRaw") { c, _, _, n, a, e in HostBytes.escreverSaida(Argumentos(c, n, a), e) }
+        def("compilar") { c, _, _, n, a, e in HostBytes.compilar(Argumentos(c, n, a), e) }
+        def("lerFd") { c, _, _, n, a, e in HostBytes.lerDescritor(Argumentos(c, n, a), e) }
+        def("escreverFd") { c, _, _, n, a, e in HostBytes.escreverDescritor(Argumentos(c, n, a), e) }
     }
 
     private static func define(
@@ -362,12 +369,40 @@ enum HostBytes {
         return saida.withUnsafeBytes { uint8Array(a.ctx, copiando: $0) }
     }
 
-    /// `hashBytes(algoritmo, bytes)` → `Uint8Array` com o digest.
+    /// `hashBytes(algoritmo, bytes)` → `Uint8Array` com o digest. Algoritmo que não existe
+    /// lança, como no Node ("Digest method not supported"); antes caía no SHA-256 calado.
     static func hashBytes(_ a: Argumentos, _ exc: UnsafeMutablePointer<JSValueRef?>?) -> JSValueRef? {
         let algo = comUTF16(a.ctx, a[0]) { u, n in u.map { String(utf16CodeUnits: $0, count: n) } ?? "" } ?? ""
         guard let b = bytes(a.ctx, a[1]) else { return lanca(a, exc, "hashBytes: typed array esperado") }
-        let digest = Hash.bytes(algo: algo, data: b)
+        guard let digest = Hash.digest(algo: algo, data: b) else { return lanca(a, exc, "Digest method not supported") }
         return digest.withUnsafeBytes { uint8Array(a.ctx, copiando: $0) }
+    }
+
+    /// `hmacBytes(algoritmo, chave, bytes)` → `Uint8Array`.
+    static func hmacBytes(_ a: Argumentos, _ exc: UnsafeMutablePointer<JSValueRef?>?) -> JSValueRef? {
+        let algo = comUTF16(a.ctx, a[0]) { u, n in u.map { String(utf16CodeUnits: $0, count: n) } ?? "" } ?? ""
+        guard let k = bytes(a.ctx, a[1]) else { return lanca(a, exc, "hmacBytes: chave em typed array") }
+        let chave = Data(k)
+        guard let b = bytes(a.ctx, a[2]) else { return lanca(a, exc, "hmacBytes: typed array esperado") }
+        guard let mac = Hash.hmac(algo: algo, chave: chave, data: b) else {
+            return lanca(a, exc, "Invalid digest: \(algo)")
+        }
+        return mac.withUnsafeBytes { uint8Array(a.ctx, copiando: $0) }
+    }
+
+    /// `pbkdf2Bytes(senha, sal, iterações, tamanho, algoritmo)` → `Uint8Array`.
+    static func pbkdf2Bytes(_ a: Argumentos, _ exc: UnsafeMutablePointer<JSValueRef?>?) -> JSValueRef? {
+        guard let s = bytes(a.ctx, a[0]) else { return lanca(a, exc, "pbkdf2: senha em typed array") }
+        let senha = Data(s)
+        guard let sl = bytes(a.ctx, a[1]) else { return lanca(a, exc, "pbkdf2: sal em typed array") }
+        let sal = Data(sl)
+        let iteracoes = Int(JSValueToNumber(a.ctx, a[2], nil))
+        let tamanho = Int(JSValueToNumber(a.ctx, a[3], nil))
+        let algo = comUTF16(a.ctx, a[4]) { u, n in u.map { String(utf16CodeUnits: $0, count: n) } ?? "" } ?? ""
+        guard let chave = Hash.pbkdf2(senha: senha, sal: sal, iteracoes: iteracoes, tamanho: tamanho, algo: algo) else {
+            return lanca(a, exc, "Invalid digest: \(algo)")
+        }
+        return chave.withUnsafeBytes { uint8Array(a.ctx, copiando: $0) }
     }
 
     /// `randomFill(bytes)` → o próprio array, preenchido por `SecRandomCopyBytes`.
@@ -377,6 +412,31 @@ enum HostBytes {
             _ = SecRandomCopyBytes(kSecRandomDefault, b.count, UnsafeMutableRawPointer(mutating: p))
         }
         return a[0]
+    }
+
+    // MARK: - módulos
+
+    /// `compilar(fonte, arquivo)` → o valor do script avaliado com `arquivo` como origem.
+    ///
+    /// O loader avaliava cada módulo com `eval` e um `//# sourceURL=`, que o JSC ignora: todo
+    /// quadro de pilha de código de módulo saía como "fn@", sem arquivo nem linha — o
+    /// `err.stack`, o erro fatal e o `getFileName()` dos CallSites (o depd, dentro do express,
+    /// procura o chamador por ele). `JSEvaluateScript` com a URL de origem dá arquivo e linha.
+    /// Erro de sintaxe volta como exceção para o JS, sem passar pelo `exceptionHandler`.
+    static func compilar(_ a: Argumentos, _ exc: UnsafeMutablePointer<JSValueRef?>?) -> JSValueRef? {
+        guard let fonte = a[0], let js = JSValueToStringCopy(a.ctx, fonte, nil) else {
+            return lanca(a, exc, "compilar: fonte esperada")
+        }
+        defer { JSStringRelease(js) }
+        let origem = a[1].flatMap { JSValueToStringCopy(a.ctx, $0, nil) }
+        defer { origem.map(JSStringRelease) }
+        var erro: JSValueRef?
+        let r = JSEvaluateScript(a.ctx, js, nil, origem, 1, &erro)
+        if let erro {
+            exc?.pointee = erro
+            return JSValueMakeUndefined(a.ctx)
+        }
+        return r
     }
 
     // MARK: - blocos ObjC (http, fetch)

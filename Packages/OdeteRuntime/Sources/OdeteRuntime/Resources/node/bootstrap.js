@@ -19,11 +19,23 @@
 
   // --- timers ---
   const timers = new Map();
+  // O Timeout do Node: `unref()` solta o processo (o Swift deixa de contar o timer como
+  // trabalho pendente) e `ref()` volta a segurar. Antes os dois eram de enfeite, e um
+  // `setInterval(...).unref()` (node-cache, clientes de banco) prendia o `node` para sempre.
+  class Timeout {
+    constructor(id, ms, repete) { this.id = id; this._ms = ms; this._repete = repete; this._ref = true; }
+    ref() { if (!this._ref) { this._ref = true; H.refTimer(this.id, true); } return this; }
+    unref() { if (this._ref) { this._ref = false; H.refTimer(this.id, false); } return this; }
+    hasRef() { return this._ref; }
+    refresh() { const t = timers.get(this.id); if (!t) return this; timers.delete(this.id); H.clearTimer(this.id); this.id = H.setTimer(this._ms, this._repete); timers.set(this.id, t); if (!this._ref) H.refTimer(this.id, false); return this; }
+    close() { clear(this); return this; }
+    [Symbol.toPrimitive]() { return this.id; }
+  }
   function makeTimer(fn, ms, args, repeats) {
+    if (typeof fn !== "function") throw Object.assign(new TypeError('The "callback" argument must be of type function. Received ' + (fn === null ? "null" : typeof fn)), { code: "ERR_INVALID_ARG_TYPE" });
     const id = H.setTimer(ms, repeats);
     timers.set(id, { fn, args, repeats });
-    const t = { id, ref() { return t; }, unref() { return t; }, hasRef() { return true; }, refresh() { return t; }, [Symbol.toPrimitive]() { return id; } };
-    return t;
+    return new Timeout(id, ms, repeats);
   }
   globalThis.__odete_fireTimer = (id) => {
     const t = timers.get(id);
@@ -45,23 +57,223 @@
   globalThis.setImmediate = (fn, ...args) => makeTimer(fn, 0, args, false);
   const clear = (t) => { if (t == null) return; const id = typeof t === "object" ? t.id : t; if (timers.delete(id)) H.clearTimer(id); };
   globalThis.clearTimeout = clear; globalThis.clearInterval = clear; globalThis.clearImmediate = clear;
-  globalThis.queueMicrotask = globalThis.queueMicrotask || ((fn) => Promise.resolve().then(fn));
+  // `util.promisify(setTimeout)` dá a versão com promise, como no Node (antes: TypeError).
+  const P_CUSTOM = Symbol.for("nodejs.util.promisify.custom");
+  globalThis.setTimeout[P_CUSTOM] = (ms, v) => new Promise((r) => setTimeout(r, ms, v));
+  globalThis.setImmediate[P_CUSTOM] = (v) => new Promise((r) => setImmediate(r, v));
 
+  // --- microtarefas e nextTick ---
+  // A fila de microtarefas é a das promises nativas (o `then` original, sem o rastreio de
+  // rejeição). Erro dentro de uma microtarefa ou de um `nextTick` é exceção não tratada,
+  // como no Node; antes virava uma promise rejeitada que ninguém via, e o processo seguia.
+  const thenNativo = Promise.prototype.then, resolvida = Promise.resolve();
+  const microtarefa = (fn) => { thenNativo.call(resolvida, fn); };
+  globalThis.queueMicrotask = (fn) => {
+    if (typeof fn !== "function") throw new TypeError('The "callback" argument must be of type function');
+    microtarefa(() => { try { fn(); } catch (e) { reportUncaught(e); } });
+  };
+  // No Node a fila do nextTick roda antes das promises. O JSC só roda as promises quando a
+  // chamada vinda do Swift volta; `__odete_entrar` esvazia os ticks antes disso. Tick criado
+  // dentro de uma promise roda na próxima microtarefa, também como no Node.
+  const ticks = [];
+  let tickAgendado = false;
+  function drenarTicks() {
+    tickAgendado = false;
+    while (ticks.length) { const t = ticks.shift(); try { t.fn(...t.args); } catch (e) { reportUncaught(e); } }
+  }
+  globalThis.__odete_nextTick = (fn, ...args) => {
+    if (typeof fn !== "function") throw Object.assign(new TypeError('The "callback" argument must be of type function. Received ' + typeof fn), { code: "ERR_INVALID_ARG_TYPE" });
+    ticks.push({ fn, args });
+    if (!tickAgendado) { tickAgendado = true; microtarefa(drenarTicks); }
+  };
+  // Toda tarefa do laço (main, timer, requisição, fetch) entra por aqui num processo.
+  globalThis.__odete_entrar = (nome, ...args) => {
+    try { const f = globalThis[nome]; if (typeof f === "function") f(...args); }
+    finally { if (ticks.length) drenarTicks(); }
+  };
+
+  let saindo = false;
   function reportUncaught(e) {
+    if (e && e.__odeteExit) return;
     const p = globalThis.process;
-    if (p && p.listenerCount && p.listenerCount("uncaughtException") > 0) { p.emit("uncaughtException", e); return; }
+    if (p && p.listenerCount && p.listenerCount("uncaughtException") > 0) {
+      try { p.emit("uncaughtException", e, "uncaughtException"); } catch (e2) { fatal(e2); }
+      return;
+    }
+    fatal(e);
+  }
+  // Erro fatal: imprime, avisa `exit` com 1 (como o Node) e sai.
+  function fatal(e) {
+    if (e && e.__odeteExit) return;
     H.write(2, globalThis.__formatError(e));
+    const p = globalThis.process;
+    if (!saindo && p && typeof p.emit === "function") { saindo = true; try { p.exitCode = 1; p.emit("exit", 1); } catch {} }
     H.exit(1);
   }
   globalThis.__odete_reportUncaught = reportUncaught;
+  globalThis.__odete_marcarSaida = () => { const ja = saindo; saindo = true; return ja; };
+
+  // --- pilha no formato do V8 ---
+  // A pilha do JSC é só "fn@arquivo:linha:coluna", sem a linha "Error: mensagem", e o JSC não
+  // tem `Error.prepareStackTrace`. O depd (dentro do express) pede os quadros como CallSites
+  // e morria com "callSite.getFileName is not a function"; quem imprime `err.stack` perdia a
+  // mensagem. Os construtores de erro viram Proxies que trocam `stack` por um getter
+  // preguiçoso no formato do V8 — com a mensagem, e passando por `prepareStackTrace` quando
+  // alguém o definiu. Erro criado pelo próprio JSC (um TypeError de `null.x`) continua com a
+  // pilha dele em `.stack`, mas sai no formato do V8 em `console.error` e no erro fatal.
+  const ErroNativo = Error;
+  const capturarNativo = ErroNativo.captureStackTrace;
+  const DAQUI = "odete://node/bootstrap.js";
+  let limiteVisivel = 10;
+  class CallSite {
+    constructor(fn, arquivo, linha, coluna) { this._fn = fn; this._arquivo = arquivo; this._linha = linha; this._coluna = coluna; }
+    getThis() { return undefined; } getTypeName() { return null; } getFunction() { return undefined; }
+    getFunctionName() { return this._fn || null; } getMethodName() { return null; }
+    getFileName() { return this._arquivo && this._arquivo !== "native" ? this._arquivo : undefined; }
+    getLineNumber() { return this._linha; } getColumnNumber() { return this._coluna; }
+    getEvalOrigin() { return undefined; } getScriptNameOrSourceURL() { return this.getFileName(); } getScriptHash() { return ""; }
+    getEnclosingLineNumber() { return this._linha; } getEnclosingColumnNumber() { return this._coluna; } getPosition() { return 0; } getPromiseIndex() { return null; }
+    isToplevel() { return !this._fn; } isEval() { return false; } isNative() { return this._arquivo === "native"; } isConstructor() { return false; } isAsync() { return false; } isPromiseAll() { return false; }
+    toString() { const onde = this._arquivo === "native" ? "native" : this._arquivo ? `${this._arquivo}:${this._linha}:${this._coluna}` : "<anonymous>"; return this._fn ? `${this._fn} (${onde})` : onde; }
+  }
+  function quadros(bruta) {
+    const out = [];
+    for (const l of String(bruta || "").split("\n")) {
+      if (!l || l === "@") continue;
+      const a = l.indexOf("@");
+      let fn = a >= 0 ? l.slice(0, a) : "";
+      const onde = a >= 0 ? l.slice(a + 1) : l;
+      if (fn === "global code" || fn === "module code" || fn === "eval code") fn = "";
+      if (onde === "[native code]") { out.push(new CallSite(fn, "native", null, null)); continue; }
+      const m = /^(.*):(\d+):(\d+)$/.exec(onde);
+      out.push(m ? new CallSite(fn, m[1], +m[2], +m[3]) : new CallSite(fn, onde, null, null));
+    }
+    // Os quadros do próprio Proxy (e o Reflect.construct nativo em volta) não são do usuário.
+    while (out.length && (out[0]._arquivo === DAQUI || out[0]._arquivo === "native")) out.shift();
+    return out;
+  }
+  function cabecalho(e) {
+    let nome, msg;
+    try { nome = e.name === undefined ? "Error" : String(e.name); } catch { nome = "Error"; }
+    try { msg = e.message === undefined ? "" : String(e.message); } catch { msg = ""; }
+    return !nome ? msg : !msg ? nome : nome + ": " + msg;
+  }
+  function pilhaDe(e, bruta) {
+    const lista = quadros(bruta).slice(0, Math.max(0, Number(limiteVisivel) || 0));
+    const prep = ErroNativo.prepareStackTrace;
+    if (typeof prep === "function") return prep(e, lista);
+    return cabecalho(e) + lista.map((q) => "\n    at " + q).join("");
+  }
+  function instalarPilha(e, bruta) {
+    if (e === null || (typeof e !== "object" && typeof e !== "function")) return;
+    let valor, pronto = false;
+    try {
+      Object.defineProperty(e, "stack", {
+        configurable: true, enumerable: false,
+        get() { if (!pronto) { pronto = true; valor = pilhaDe(this, bruta); } return valor; },
+        set(v) { pronto = true; valor = v; },
+      });
+    } catch {}
+  }
+  // A pilha no formato do V8 de qualquer erro: a nossa, ou a do JSC convertida.
+  function pilhaV8(e) {
+    const d = Object.getOwnPropertyDescriptor(e, "stack");
+    if (d && d.get) { const s = e.stack; return typeof s === "string" ? s : cabecalho(e); }
+    const s = e.stack;
+    if (typeof s !== "string" || !s) return cabecalho(e);
+    return /^\s+at /m.test(s) ? s : pilhaDe(e, s);
+  }
+  if (H.modoProcesso) {
+    const capturar = function captureStackTrace(obj, fn) {
+      capturarNativo(obj, typeof fn === "function" ? fn : capturar);
+      instalarPilha(obj, obj.stack);
+    };
+    ErroNativo.captureStackTrace = capturar;
+    ErroNativo.stackTraceLimit = 30;
+    const embrulhar = (Nativo) => {
+      const P = new Proxy(Nativo, {
+        construct(t, args, nt) { const e = Reflect.construct(t, args, nt === P ? t : nt); instalarPilha(e, e.stack); return e; },
+        apply(t, self, args) { const e = Reflect.construct(t, args); instalarPilha(e, e.stack); return e; },
+        get(t, k, r) { return t === ErroNativo && k === "stackTraceLimit" ? limiteVisivel : Reflect.get(t, k, r); },
+        set(t, k, v) { if (t === ErroNativo && k === "stackTraceLimit") { limiteVisivel = v; ErroNativo.stackTraceLimit = typeof v === "number" ? Math.max(v + 5, 20) : 30; return true; } return Reflect.set(t, k, v); },
+      });
+      try { Object.defineProperty(Nativo.prototype, "constructor", { value: P, writable: true, configurable: true, enumerable: false }); } catch {}
+      return P;
+    };
+    for (const n of ["Error", "TypeError", "RangeError", "SyntaxError", "ReferenceError", "EvalError", "URIError", "AggregateError"]) {
+      if (typeof globalThis[n] === "function") globalThis[n] = embrulhar(globalThis[n]);
+    }
+  }
+  globalThis.__odete_CallSite = CallSite;
+  globalThis.__odete_quadros = quadros;
   globalThis.__formatError = (e) => {
-    if (!(e instanceof Error)) return "Uncaught " + String(e);
-    const head = (e.name || "Error") + ": " + e.message;
-    // Quadro sem nome nem arquivo ("@", de código avaliado) não diz nada: fica de fora.
-    const stack = e.stack ? String(e.stack).split("\n").filter((l) => l && l !== "@").map((l) => "    at " + l).join("\n") : "";
-    return head + (stack ? "\n" + stack : "");
+    if (e && e.__odeteExit) return "";
+    if (!(e instanceof ErroNativo)) {
+      if (e !== null && typeof e === "object" && typeof e.stack === "string" && typeof e.message === "string") return pilhaV8(e);
+      let t; try { t = typeof e === "string" ? e : globalThis.__nodeRequire("util").inspect(e); } catch { t = String(e); }
+      return "Uncaught " + t;
+    }
+    let s = pilhaV8(e);
+    // A causa vem embaixo, como no Node.
+    if (e.cause instanceof ErroNativo) s += "\n  [cause]: " + pilhaV8(e.cause).split("\n").join("\n  ");
+    return s;
   };
 
+  // --- promises: rejeição que ninguém trata ---
+  // O JSContext não avisa rejeição não tratada, e ela sumia com saída 0. A Promise global de
+  // um processo passa a ser uma subclasse que anota toda rejeição e quem chamou `then` nela;
+  // ao fim de cada tarefa do laço (`__odete_depoisDaTarefa`, já com as microtarefas rodadas) o
+  // que foi rejeitado sem handler vira `unhandledRejection` ou erro fatal com saída 1, como
+  // no Node. `await` numa destas passa pelo `then` (o construtor não é o nativo), então conta
+  // como tratada. A promise nativa de uma função `async` não passa por aqui — por isso o
+  // módulo de entrada tem o async rebaixado pelo esbuild (ver `TransformadorDeEntrada`).
+  if (H.modoProcesso) {
+    const Nativa = globalThis.Promise; // (a classe abaixo sombreia o nome neste bloco)
+    const tratadas = new WeakSet();
+    let pendentes = [];
+    const anotar = (p, motivo) => { if (!tratadas.has(p)) pendentes.push([p, motivo]); };
+    class Promise extends Nativa {
+      constructor(executor) {
+        if (typeof executor !== "function") { super(executor); return; }
+        let self = null, antes = null;
+        super((resolver, rejeitar) => {
+          let feito = false;
+          const res = (v) => { if (feito) return; feito = true; resolver(v); };
+          const rej = (r) => { if (feito) return; feito = true; if (self) anotar(self, r); else antes = { r }; rejeitar(r); };
+          try { executor(res, rej); } catch (e) { rej(e); }
+        });
+        self = this;
+        if (antes) anotar(this, antes.r);
+      }
+      then(f, r) { tratadas.add(this); return super.then(f, r); }
+    }
+    Object.defineProperty(Promise, Symbol.hasInstance, { value: (x) => x instanceof Nativa });
+    globalThis.Promise = Promise;
+    globalThis.__odete_PromiseNativa = Nativa;
+    globalThis.__odete_depoisDaTarefa = () => {
+      while (pendentes.length) {
+        const lista = pendentes;
+        pendentes = [];
+        for (const [p, motivo] of lista) {
+          if (tratadas.has(p)) continue;
+          tratadas.add(p);
+          const proc = globalThis.process;
+          if (proc && proc.listenerCount && proc.listenerCount("unhandledRejection") > 0) {
+            try { proc.emit("unhandledRejection", motivo, p); } catch (e) { reportUncaught(e); }
+            continue;
+          }
+          let erro = motivo;
+          if (!(motivo instanceof ErroNativo)) {
+            let t; try { t = typeof motivo === "string" ? motivo : globalThis.__nodeRequire("util").inspect(motivo); } catch { t = String(motivo); }
+            erro = new Error('This error originated either by throwing inside of an async function without a catch block, or by rejecting a promise which was not handled with .catch(). The promise rejected with the reason "' + t + '".');
+            erro.name = "UnhandledPromiseRejection"; erro.code = "ERR_UNHANDLED_REJECTION";
+          }
+          reportUncaught(erro);
+          return;
+        }
+      }
+    };
+  }
   // --- console ---
   const inspect = (v, depth) => globalThis.__nodeRequire("util").inspect(v, { depth: depth ?? 2, colors: false });
   const fmt = (args) => globalThis.__nodeRequire("util").format(...args);
@@ -97,6 +309,7 @@
     for (let i = 0; i < str.length; i++) {
       let c = str.charCodeAt(i);
       if (c >= 0xd800 && c < 0xdc00 && i + 1 < str.length) { const d = str.charCodeAt(i + 1); if (d >= 0xdc00 && d < 0xe000) { c = 0x10000 + ((c - 0xd800) << 10) + (d - 0xdc00); i++; } }
+      if (c >= 0xd800 && c < 0xe000) c = 0xfffd; // substituto solto, como no Node
       if (c < 0x80) out.push(c);
       else if (c < 0x800) out.push(0xc0 | (c >> 6), 0x80 | (c & 63));
       else if (c < 0x10000) out.push(0xe0 | (c >> 12), 0x80 | ((c >> 6) & 63), 0x80 | (c & 63));
@@ -112,6 +325,7 @@
     while (i < n) {
       let c = str.charCodeAt(i), u = 1;
       if (c >= 0xd800 && c < 0xdc00 && i + 1 < n) { const d = str.charCodeAt(i + 1); if (d >= 0xdc00 && d < 0xe000) { c = 0x10000 + ((c - 0xd800) << 10) + (d - 0xdc00); u = 2; } }
+      if (c >= 0xd800 && c < 0xe000) c = 0xfffd;
       if (c < 0x80) { if (w + 1 > cap) break; dst[w++] = c; }
       else if (c < 0x800) { if (w + 2 > cap) break; dst[w++] = 0xc0 | (c >> 6); dst[w++] = 0x80 | (c & 63); }
       else if (c < 0x10000) { if (w + 3 > cap) break; dst[w++] = 0xe0 | (c >> 12); dst[w++] = 0x80 | ((c >> 6) & 63); dst[w++] = 0x80 | (c & 63); }
@@ -128,21 +342,28 @@
     if (v && v.buffer instanceof ArrayBuffer) return new Uint8Array(v.buffer);
     return new Uint8Array(0);
   }
+  // O decodificador do WHATWG (o do TextDecoder e do Buffer do Node): byte que não forma
+  // sequência válida vira U+FFFD e o seguinte é lido de novo. O nativo (Codificacao.swift)
+  // segue as mesmas regras.
   function utf8Decode(bytes) {
     const b = toU8(bytes);
     if (b.length >= NATIVO) return H.utf8Decode(b);
-    let s = "", i = 0;
-    const n = b.length;
-    while (i < n) {
-      const c = b[i++];
-      if (c < 0x80) { s += String.fromCharCode(c); continue; }
-      if (c < 0xc2) { s += "\ufffd"; continue; }
-      if (c < 0xe0) { if (i >= n) { s += "\ufffd"; break; } s += String.fromCharCode(((c & 31) << 6) | (b[i++] & 63)); continue; }
-      if (c < 0xf0) { if (i + 1 >= n) { s += "\ufffd"; break; } s += String.fromCharCode(((c & 15) << 12) | ((b[i++] & 63) << 6) | (b[i++] & 63)); continue; }
-      if (i + 2 >= n) { s += "\ufffd"; break; }
-      const cp = ((c & 7) << 18) | ((b[i++] & 63) << 12) | ((b[i++] & 63) << 6) | (b[i++] & 63);
-      s += cp > 0x10ffff ? "\ufffd" : String.fromCodePoint(cp);
+    let s = "", cp = 0, faltam = 0, vistos = 0, menor = 0x80, maior = 0xbf;
+    for (let i = 0; i < b.length; i++) {
+      const c = b[i];
+      if (faltam === 0) {
+        if (c <= 0x7f) s += String.fromCharCode(c);
+        else if (c >= 0xc2 && c <= 0xdf) { faltam = 1; cp = c & 0x1f; }
+        else if (c >= 0xe0 && c <= 0xef) { if (c === 0xe0) menor = 0xa0; if (c === 0xed) maior = 0x9f; faltam = 2; cp = c & 0xf; }
+        else if (c >= 0xf0 && c <= 0xf4) { if (c === 0xf0) menor = 0x90; if (c === 0xf4) maior = 0x8f; faltam = 3; cp = c & 0x7; }
+        else s += "\ufffd";
+        continue;
+      }
+      if (c < menor || c > maior) { cp = faltam = vistos = 0; menor = 0x80; maior = 0xbf; s += "\ufffd"; i--; continue; }
+      menor = 0x80; maior = 0xbf; cp = (cp << 6) | (c & 0x3f);
+      if (++vistos === faltam) { s += String.fromCodePoint(cp); cp = faltam = vistos = 0; }
     }
+    if (faltam) s += "\ufffd";
     return s;
   }
   // latin1: um byte por caractere. `Uint8Array.from(str, …)` anda por ponto de código, então um
@@ -278,10 +499,90 @@
   globalThis.crypto = globalThis.crypto || {};
   globalThis.crypto.getRandomValues = (arr) => { H.randomFill(new Uint8Array(arr.buffer, arr.byteOffset, arr.byteLength)); return arr; };
   globalThis.crypto.randomUUID = () => { const b = H.randomBytes(16); b[6] = (b[6] & 15) | 64; b[8] = (b[8] & 63) | 128; const h = b.map((x) => x.toString(16).padStart(2, "0")).join(""); return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`; };
-  globalThis.crypto.subtle = { async digest(algo, data) { const name = String(algo && algo.name || algo).replace("-", "").toLowerCase(); const u8 = data instanceof ArrayBuffer ? new Uint8Array(data) : new Uint8Array(data.buffer, data.byteOffset, data.byteLength); return H.hashBytes(name, u8).buffer; } };
+  // WebCrypto: digest e HMAC (o que o jose usa para HS256/384/512). Chave é um CryptoKey com
+  // os bytes guardados; o resto do subtle lança dizendo o que falta, em vez de undefined.
+  const nomeHash = (a) => String((a && a.name) || a || "").toUpperCase().replace(/^SHA(\d)/, "SHA-$1");
+  const paraU8 = (d) => (d instanceof ArrayBuffer ? new Uint8Array(d) : ArrayBuffer.isView(d) ? new Uint8Array(d.buffer, d.byteOffset, d.byteLength) : new Uint8Array(0));
+  const copia = (u8) => { const c = new Uint8Array(u8.length); c.set(u8); return c.buffer; };
+  class CryptoKey {
+    constructor(tipo, algoritmo, extraivel, usos, bytes) { this.type = tipo; this.algorithm = algoritmo; this.extractable = extraivel; this.usages = usos; Object.defineProperty(this, "_bytes", { value: bytes }); }
+    get [Symbol.toStringTag]() { return "CryptoKey"; }
+  }
+  globalThis.CryptoKey = CryptoKey;
+  const naoTem = (o) => Promise.reject(Object.assign(new Error("Odete: crypto.subtle." + o + " ainda não existe no iPad (só digest e HMAC)"), { name: "NotSupportedError" }));
+  globalThis.crypto.subtle = {
+    async digest(algo, data) { return copia(H.hashBytes(nomeHash(algo).replace("-", "").toLowerCase(), paraU8(data))); },
+    async importKey(formato, dados, algo, extraivel, usos) {
+      const nome = String((algo && algo.name) || algo).toUpperCase();
+      if (nome !== "HMAC" || (formato !== "raw" && formato !== "jwk")) return naoTem("importKey(" + formato + ", " + nome + ")");
+      const bytes = formato === "jwk" ? Uint8Array.from(globalThis.__b64.decUrl(dados.k)) : Uint8Array.from(paraU8(dados));
+      const hash = { name: nomeHash(algo.hash) };
+      return new CryptoKey("secret", { name: "HMAC", hash, length: bytes.length * 8 }, !!extraivel, usos || [], bytes);
+    },
+    async exportKey(formato, chave) {
+      if (formato === "raw") return copia(chave._bytes);
+      if (formato === "jwk") return { kty: "oct", k: globalThis.__b64.encUrl(chave._bytes), alg: "HS" + chave.algorithm.hash.name.replace("SHA-", ""), ext: chave.extractable, key_ops: chave.usages };
+      return naoTem("exportKey(" + formato + ")");
+    },
+    async generateKey(algo, extraivel, usos) {
+      if (String((algo && algo.name) || algo).toUpperCase() !== "HMAC") return naoTem("generateKey");
+      const tam = algo.length || ({ "SHA-1": 512, "SHA-256": 512, "SHA-384": 1024, "SHA-512": 1024 }[nomeHash(algo.hash)] || 512);
+      const bytes = H.randomFill(new Uint8Array(tam / 8));
+      return new CryptoKey("secret", { name: "HMAC", hash: { name: nomeHash(algo.hash) }, length: tam }, !!extraivel, usos || [], bytes);
+    },
+    async sign(algo, chave, dados) {
+      if (String((algo && algo.name) || algo).toUpperCase() !== "HMAC") return naoTem("sign");
+      return copia(H.hmacBytes(chave.algorithm.hash.name.replace("-", "").toLowerCase(), chave._bytes, paraU8(dados)));
+    },
+    async verify(algo, chave, assinatura, dados) {
+      if (String((algo && algo.name) || algo).toUpperCase() !== "HMAC") return naoTem("verify");
+      const mac = H.hmacBytes(chave.algorithm.hash.name.replace("-", "").toLowerCase(), chave._bytes, paraU8(dados));
+      const a = paraU8(assinatura);
+      if (a.length !== mac.length) return false;
+      let d = 0; for (let i = 0; i < a.length; i++) d |= a[i] ^ mac[i];
+      return d === 0;
+    },
+    encrypt: () => naoTem("encrypt"), decrypt: () => naoTem("decrypt"), deriveBits: () => naoTem("deriveBits"), deriveKey: () => naoTem("deriveKey"), wrapKey: () => naoTem("wrapKey"), unwrapKey: () => naoTem("unwrapKey"),
+  };
 
   globalThis.performance = globalThis.performance || { now: () => H.perfNow(), timeOrigin: H.now(), mark() {}, measure() {} };
-  globalThis.structuredClone = globalThis.structuredClone || ((v) => JSON.parse(JSON.stringify(v)));
+  // O structuredClone do HTML: Date, RegExp, Map, Set, typed arrays, ArrayBuffer, erros e
+  // referências circulares; `undefined` fica. O de antes era JSON — Date virava string, Map
+  // virava {} e `undefined` sumia.
+  const TIPADOS = [Uint8Array, Int8Array, Uint8ClampedArray, Int16Array, Uint16Array, Int32Array, Uint32Array, Float32Array, Float64Array, BigInt64Array, BigUint64Array];
+  function naoClonavel(v) { return Object.assign(new Error((typeof v === "function" ? (v.name || "function") + "() {...}" : String(v)) + " could not be cloned."), { name: "DataCloneError", code: 25 }); }
+  function clonar(v, vistos) {
+    if (typeof v === "function" || typeof v === "symbol") throw naoClonavel(v);
+    if (v === null || typeof v !== "object") return v;
+    if (vistos.has(v)) return vistos.get(v);
+    let c;
+    if (v instanceof Date) c = new Date(v.getTime());
+    else if (v instanceof RegExp) c = new RegExp(v.source, v.flags);
+    else if (v instanceof ArrayBuffer) c = v.slice(0);
+    else if (ArrayBuffer.isView(v)) {
+      const buf = clonar(v.buffer, vistos);
+      if (v instanceof DataView) c = new DataView(buf, v.byteOffset, v.byteLength);
+      else { const T = TIPADOS.find((C) => v instanceof C) || Uint8Array; c = new T(buf, v.byteOffset, v.length); }
+    } else if (v instanceof Boolean || v instanceof Number || v instanceof String) c = Object(v.valueOf());
+    else if (v instanceof Map) { c = new Map(); vistos.set(v, c); for (const [k, x] of v) c.set(clonar(k, vistos), clonar(x, vistos)); return c; }
+    else if (v instanceof Set) { c = new Set(); vistos.set(v, c); for (const x of v) c.add(clonar(x, vistos)); return c; }
+    else if (v instanceof Error) {
+      const Ctor = { TypeError, RangeError, SyntaxError, ReferenceError, EvalError, URIError }[v.name] || Error;
+      c = new Ctor(v.message); vistos.set(v, c);
+      if (v.stack !== undefined) try { c.stack = v.stack; } catch {}
+      if ("cause" in v) c.cause = clonar(v.cause, vistos);
+      return c;
+    } else if (Array.isArray(v)) { c = new Array(v.length); vistos.set(v, c); for (let i = 0; i < v.length; i++) if (i in v) c[i] = clonar(v[i], vistos); return c; }
+    else {
+      if (typeof Blob === "function" && v instanceof Blob) return v;
+      c = {}; vistos.set(v, c);
+      for (const k of Object.keys(v)) c[k] = clonar(v[k], vistos);
+      return c;
+    }
+    vistos.set(v, c);
+    return c;
+  }
+  globalThis.structuredClone = (v) => clonar(v, new Map());
   globalThis.global = globalThis;
   globalThis.self = globalThis;
 

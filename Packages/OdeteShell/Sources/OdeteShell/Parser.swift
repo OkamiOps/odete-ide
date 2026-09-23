@@ -15,15 +15,24 @@ public struct CommandLine: Equatable, Sendable {
         public var stdoutFile: String?
         public var append: Bool
         public var stderrToStdout: Bool
+        /// `2> arquivo` (`2>> arquivo` com `stderrAppend`). Antes o nome era jogado fora.
+        public var stderrFile: String?
+        public var stderrAppend: Bool
+        /// `>&2`: o stdout vai para o stderr.
+        public var stdoutToStderr: Bool
         public init(
             argv: [String],
             stdinFile: String? = nil,
             stdoutFile: String? = nil,
             append: Bool = false,
-            stderrToStdout: Bool = false
+            stderrToStdout: Bool = false,
+            stderrFile: String? = nil,
+            stderrAppend: Bool = false,
+            stdoutToStderr: Bool = false
         ) {
             self.argv = argv; self.stdinFile = stdinFile; self.stdoutFile = stdoutFile; self.append = append; self
                 .stderrToStdout = stderrToStdout
+            self.stderrFile = stderrFile; self.stderrAppend = stderrAppend; self.stdoutToStderr = stdoutToStderr
         }
     }
 
@@ -67,6 +76,8 @@ public enum ParseError: LocalizedError, Equatable {
 struct Palavra: Equatable, Sendable {
     enum Pedaco: Equatable, Sendable {
         case texto(String)
+        /// Texto entre aspas ou escapado com `\`: nunca vira padrão de glob.
+        case citado(String)
         case variavel(String)
     }
 
@@ -77,11 +88,40 @@ struct Palavra: Equatable, Sendable {
         var s = ""
         for p in pedacos {
             switch p {
-            case let .texto(t): s += t
+            case let .texto(t), let .citado(t): s += t
             case let .variavel(nome): s += valor(nome)
             }
         }
         return s
+    }
+
+    /// O padrão de glob (para `fnmatch`), se a palavra tem `*`, `?` ou `[` fora de aspas; o
+    /// que veio entre aspas ou de variável entra escapado. Nil quando não há o que expandir.
+    func padraoDeGlob(_ valor: (String) -> String) -> String? {
+        var temCuringa = false
+        var s = ""
+        func escapar(_ t: String) -> String {
+            var r = ""
+            for c in t {
+                if c == "*" || c == "?" || c == "[" || c == "]" || c == "\\" {
+                    r.append("\\")
+                }
+                r.append(c)
+            }
+            return r
+        }
+        for p in pedacos {
+            switch p {
+            case let .texto(t):
+                if t.contains(where: { $0 == "*" || $0 == "?" || $0 == "[" }) {
+                    temCuringa = true
+                }
+                s += t
+            case let .citado(t): s += escapar(t)
+            case let .variavel(nome): s += escapar(valor(nome))
+            }
+        }
+        return temCuringa ? s : nil
     }
 }
 
@@ -93,14 +133,33 @@ struct LinhaCrua: Sendable {
         var stdoutFile: Palavra?
         var append = false
         var stderrToStdout = false
+        var stderrFile: Palavra?
+        var stderrAppend = false
+        var stdoutToStderr = false
 
-        func expandido(_ valor: (String) -> String) -> CommandLine.Simple {
-            CommandLine.Simple(
-                argv: argv.map { $0.expandida(valor) },
+        /// `glob` recebe o padrão e devolve os caminhos que casam (vazio: fica o texto, como
+        /// no sh).
+        func expandido(_ valor: (String) -> String, glob: ((String) -> [String])? = nil) -> CommandLine.Simple {
+            var args: [String] = []
+            for p in argv {
+                if let glob, let padrao = p.padraoDeGlob(valor) {
+                    let achados = glob(padrao)
+                    if !achados.isEmpty {
+                        args.append(contentsOf: achados)
+                        continue
+                    }
+                }
+                args.append(p.expandida(valor))
+            }
+            return CommandLine.Simple(
+                argv: args,
                 stdinFile: stdinFile?.expandida(valor),
                 stdoutFile: stdoutFile?.expandida(valor),
                 append: append,
-                stderrToStdout: stderrToStdout
+                stderrToStdout: stderrToStdout,
+                stderrFile: stderrFile?.expandida(valor),
+                stderrAppend: stderrAppend,
+                stdoutToStderr: stdoutToStderr
             )
         }
     }
@@ -109,8 +168,8 @@ struct LinhaCrua: Sendable {
         var commands: [Simples]
         var background: Bool
 
-        func expandido(_ valor: (String) -> String) -> CommandLine.Pipeline {
-            CommandLine.Pipeline(commands: commands.map { $0.expandido(valor) }, background: background)
+        func expandido(_ valor: (String) -> String, glob: ((String) -> [String])? = nil) -> CommandLine.Pipeline {
+            CommandLine.Pipeline(commands: commands.map { $0.expandido(valor, glob: glob) }, background: background)
         }
     }
 
@@ -126,19 +185,31 @@ public enum Parser {
     static func tokenize(_ line: String) throws -> [Token] {
         var out: [Token] = []
         var palavra = Palavra()
-        var cur = "" // texto literal que ainda não foi para `palavra`
+        var cur = "" // texto que ainda não foi para `palavra`
+        var curCitado = false // `cur` veio de aspas/escape?
         var hasWord = false
         var i = line.startIndex
         func fecharTexto() {
             if !cur.isEmpty {
-                palavra.pedacos.append(.texto(cur)); cur = ""
+                palavra.pedacos.append(curCitado ? .citado(cur) : .texto(cur)); cur = ""
             }
+        }
+        func literal(_ t: some StringProtocol, citado: Bool) {
+            if citado != curCitado {
+                fecharTexto()
+                curCitado = citado
+            }
+            cur += t
         }
         func flush() {
             if hasWord {
                 fecharTexto()
                 out.append(.word(palavra)); palavra = Palavra(); hasWord = false
             }
+        }
+        func proximo(_ k: Int) -> Character? {
+            guard let j = line.index(i, offsetBy: k, limitedBy: line.endIndex), j < line.endIndex else { return nil }
+            return line[j]
         }
         /// O nome da variável cujo `$` está em `from`, deixando `from` no último caractere
         /// dela; nil quando o `$` é só um cifrão.
@@ -170,33 +241,62 @@ public enum Parser {
             from = line.index(before: k)
             return name
         }
-        func dolar(_ from: inout String.Index) throws {
+        func dolar(_ from: inout String.Index, citado: Bool) throws {
             if let nome = try variavel(&from) {
                 fecharTexto(); palavra.pedacos.append(.variavel(nome))
             } else {
-                cur.append("$")
+                literal("$", citado: citado)
             }
         }
+        /// Um redirecionamento que começa em `i` (`>`, `>>`, `>&2`, `2>`, `1>&2`, `&>`…).
+        /// Devolve o operador e deixa `i` no último caractere dele.
+        func redirecionamento() -> String? {
+            var op = ""
+            var k = 0
+            if let c = proximo(0), c == "1" || c == "2" || c == "&" {
+                guard proximo(1) == ">" else { return nil }
+                op = String(c); k = 1
+            }
+            guard proximo(k) == ">" else { return nil }
+            op += ">"; k += 1
+            if proximo(k) == ">" {
+                op += ">"; k += 1
+            } else if op != "&>", proximo(k) == "&", let d = proximo(k + 1), d == "1" || d == "2" {
+                op += "&" + String(d); k += 2
+            }
+            i = line.index(i, offsetBy: k - 1)
+            return op
+        }
+        /// O que a barra escapa dentro de aspas duplas.
+        let escapaveis: Set<Character> = ["$", "`", "\"", "\\", "\n"]
         while i < line.endIndex {
             let c = line[i]
             switch c {
             case "'":
                 guard let close = line[line.index(after: i)...].firstIndex(of: "'")
                 else { throw ParseError.unterminatedQuote }
-                cur += line[line.index(after: i) ..< close]; hasWord = true; i = close
+                literal(line[line.index(after: i) ..< close], citado: true); hasWord = true; i = close
             case "\"":
                 var j = line.index(after: i)
                 var closed = false
                 while j < line.endIndex {
                     let d = line[j]
-                    if d == "\\", line.index(after: j) < line.endIndex {
-                        j = line.index(after: j); cur.append(line[j])
+                    let depois = line.index(after: j)
+                    if d == "\\", depois < line.endIndex {
+                        // Nas aspas duplas a barra só escapa `$`, crase, aspas, a própria barra e
+                        // a quebra de linha; antes dos outros ela fica, como no sh: "a\nb" é a,
+                        // barra, n, b. Antes o shell comia a barra e o "a\nb" virava "anb".
+                        if escapaveis.contains(line[depois]) {
+                            j = depois; literal(String(line[depois]), citado: true)
+                        } else {
+                            literal("\\", citado: true)
+                        }
                     } else if d == "$" {
-                        try dolar(&j)
+                        try dolar(&j, citado: true)
                     } else if d == "\"" {
                         closed = true; break
                     } else {
-                        cur.append(d)
+                        literal(String(d), citado: true)
                     }
                     j = line.index(after: j)
                 }
@@ -205,37 +305,33 @@ public enum Parser {
             case "\\":
                 let n = line.index(after: i)
                 if n < line.endIndex {
-                    cur.append(line[n]); hasWord = true; i = n
+                    literal(String(line[n]), citado: true); hasWord = true; i = n
                 }
-            case "$": try dolar(&i); hasWord = true
+            case "$": try dolar(&i, citado: false); hasWord = true
             case "`": throw ParseError.semSubstituicao
             case " ", "\t": flush()
             case "#" where !hasWord: i = line.endIndex; continue
             case "|", "&", ";", ">", "<":
                 flush()
+                if c == ">" || (c == "&" && proximo(1) == ">"), let op = redirecionamento() {
+                    out.append(.op(op))
+                    break
+                }
                 let n = line.index(after: i)
                 if c == "<", n < line.endIndex, line[n] == "<" {
                     throw ParseError.semHeredoc
                 }
-                if n < line.endIndex, line[n] == c,
-                   c == "|" || c == "&" || c == ">"
-                {
+                if n < line.endIndex, line[n] == c, c == "|" || c == "&" {
                     out.append(.op(String(c) + String(c))); i = n
-                } else if c == "2", false {}
-                else {
+                } else {
                     out.append(.op(String(c)))
                 }
             default:
-                // 2> e 2>&1
-                if c == "2", !hasWord, line.index(after: i) < line.endIndex, line[line.index(after: i)] == ">" {
-                    let rest = line[line.index(after: i)...]
-                    if rest.hasPrefix(">&1") {
-                        out.append(.op("2>&1")); i = line.index(i, offsetBy: 3)
-                    } else {
-                        out.append(.op("2>")); i = line.index(after: i)
-                    }
+                // 2> 2>> 2>&1 1> 1>&2 no começo de uma palavra
+                if c == "1" || c == "2", !hasWord, proximo(1) == ">", let op = redirecionamento() {
+                    out.append(.op(op))
                 } else {
-                    cur.append(c); hasWord = true
+                    literal(String(c), citado: false); hasWord = true
                 }
             }
             i = line.index(after: i)
@@ -289,13 +385,16 @@ public enum Parser {
                 case "&&": try endPipeline(background: false); link = .andThen
                 case ";": try endPipeline(background: false); link = .always
                 case "&": try endPipeline(background: true); link = .always
-                case ">", ">>", "2>":
+                case ">", ">>", "1>", "1>>", "2>", "2>>", "&>", "&>>":
                     guard i + 1 < tokens.count,
                           case let .word(f) = tokens[i + 1] else { throw ParseError.unexpected(o) }
-                    if o == "2>" {
-                        cur.stderrToStdout = false
+                    if o.hasPrefix("2") {
+                        cur.stderrFile = f; cur.stderrAppend = o == "2>>"
                     } else {
-                        cur.stdoutFile = f; cur.append = o == ">>"
+                        cur.stdoutFile = f; cur.append = o.hasSuffix(">>")
+                        if o.hasPrefix("&") {
+                            cur.stderrToStdout = true
+                        }
                     }
                     i += 1
                 case "<":
@@ -303,6 +402,8 @@ public enum Parser {
                           case let .word(f) = tokens[i + 1] else { throw ParseError.unexpected(o) }
                     cur.stdinFile = f; i += 1
                 case "2>&1": cur.stderrToStdout = true
+                case ">&2", "1>&2": cur.stdoutToStderr = true
+                case ">&1", "1>&1", "2>&2": break
                 default: throw ParseError.unexpected(o)
                 }
             }

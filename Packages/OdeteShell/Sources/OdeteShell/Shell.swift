@@ -5,6 +5,7 @@ import OdeteGit
 import OdeteI18n
 import OdeteNpm
 import OdeteRuntime
+import Synchronization
 
 /// Serviços que o app injeta: git (autor, credenciais), npm (registro) e a saída.
 public struct ShellServices: Sendable {
@@ -42,14 +43,16 @@ public final class Job: @unchecked Sendable, Identifiable {
     public private(set) var ports: [Int] = []
     let stop: @Sendable () -> Void
     public private(set) var finished = false
+    /// O cancelamento do job: `kill %N` o dispara, e o `node` de dentro morre junto.
+    let cancelamento: Cancelamento
     /// Quem tira o job da lista quando ele acaba. O `stop` só desliga a coisa; sem isto
     /// o job continuava listado para sempre e o app dizia que o servidor estava no ar
     /// depois de o socket já ter morrido.
     var onFinish: (@Sendable (Job) -> Void)?
     private let trava = NSLock()
 
-    init(id: Int, command: String, stop: @escaping @Sendable () -> Void) {
-        self.id = id; self.command = command; self.stop = stop
+    init(id: Int, command: String, cancelamento: Cancelamento = Cancelamento(), stop: @escaping @Sendable () -> Void) {
+        self.id = id; self.command = command; self.stop = stop; self.cancelamento = cancelamento
     }
 
     func setPorts(_ p: [Int]) {
@@ -74,6 +77,7 @@ public final class Job: @unchecked Sendable, Identifiable {
         }
         finished = true
         trava.unlock()
+        cancelamento.cancelar()
         stop()
         onFinish?(self)
     }
@@ -92,7 +96,12 @@ public final class Shell: @unchecked Sendable {
     /// Esbuild compartilhado do projeto (carregado sob demanda).
     private var esbuild: Esbuild?
     public var devServer: DevServer?
-    private var cancelFlag = false
+    /// Os cancelamentos das linhas em primeiro plano agora (a do terminal e as de dentro
+    /// dela, como o script de um `npm run`). O Ctrl+C dispara estes e só estes: os jobs em
+    /// segundo plano têm o seu, que só o `kill` dispara.
+    private let emPrimeiroPlano = Mutex<[ObjectIdentifier: Cancelamento]>([:])
+    /// A pasta de antes do último `cd` (o `cd -`).
+    public private(set) var cwdAnterior: URL?
     public var onJobsChanged: (@Sendable () -> Void)?
     /// Código de saída do último pipeline que terminou em primeiro plano neste terminal:
     /// o `$?`. Fica de uma linha para a outra, como no sh.
@@ -105,6 +114,10 @@ public final class Shell: @unchecked Sendable {
     /// no do terminal — num job em segundo plano ela terminaria quando bem entendesse, no
     /// meio de outra linha.
     @TaskLocal static var dentroDeUmComando = false
+
+    /// O cancelamento de quem está rodando esta linha: a de fora (terminal) ou um job. A linha
+    /// de dentro de um comando cria o seu como filho deste.
+    @TaskLocal static var cancelamentoAtual: Cancelamento?
 
     public init(root: URL, services: ShellServices = ShellServices()) {
         self.root = root
@@ -141,8 +154,10 @@ public final class Shell: @unchecked Sendable {
 
     // MARK: execução
 
+    /// Ctrl+C: para o que roda em primeiro plano neste terminal — não os jobs.
     public func cancel() {
-        cancelFlag = true
+        let todos = emPrimeiroPlano.withLock { Array($0.values) }
+        todos.forEach { $0.cancelar() }
     }
 
     /// Executa uma linha inteira. `sink` recebe a saída para a tela.
@@ -150,9 +165,23 @@ public final class Shell: @unchecked Sendable {
     public func run(_ line: String, sink: @escaping @Sendable (StreamKind, String) -> Void) async -> Int32 {
         let trimmed = line.trimmingCharacters(in: .whitespaces)
         guard !trimmed.isEmpty else { return 0 }
-        remember(trimmed)
-        cancelFlag = false
         let deDentro = Self.dentroDeUmComando
+        if !deDentro {
+            remember(trimmed)
+        }
+        // A linha do terminal tem cancelamento próprio, que o Ctrl+C alcança; a de dentro de
+        // um comando (ou de um job) herda o de quem a chamou.
+        let pai = deDentro ? Self.cancelamentoAtual : nil
+        let cancelamento = Cancelamento(pai: pai)
+        let chave = ObjectIdentifier(cancelamento)
+        if pai == nil {
+            emPrimeiroPlano.withLock { $0[chave] = cancelamento }
+        }
+        defer {
+            if pai == nil {
+                emPrimeiroPlano.withLock { _ = $0.removeValue(forKey: chave) }
+            }
+        }
         // O `$?` que esta linha enxerga: o da linha anterior, ou 0 no script de um comando.
         var status: Int32 = deDentro ? 0 : ultimoCodigo
         func anotar(_ codigo: Int32) {
@@ -168,24 +197,39 @@ public final class Shell: @unchecked Sendable {
             return 2
         }
         var last: Int32 = 0
+        // Um montador de linhas para a linha toda: `echo -n x; echo y` sai "xy".
+        let montador = MontadorDeLinhas(sink)
+        defer { montador.fechar() }
         await Self.$dentroDeUmComando.withValue(true) {
-            for (link, crua) in linha.items {
-                switch link {
-                case .andThen where last != 0: continue
-                case .orElse where last == 0: continue
-                default: break
+            await Self.$cancelamentoAtual.withValue(cancelamento) {
+                for (link, crua) in linha.items {
+                    if cancelamento.cancelado {
+                        last = 130
+                        break
+                    }
+                    switch link {
+                    case .andThen where last != 0: continue
+                    case .orElse where last == 0: continue
+                    default: break
+                    }
+                    // Expandido agora, e não antes da linha: em `cmd; echo $?` o `$?` é o do `cmd`,
+                    // e em `export X=1; echo $X` o `X` já é o novo. Os curingas (`*.ts`) também.
+                    let pipeline = crua.expandido({ [self] in valor(de: $0, status: status) }, glob: { [self] in
+                        expandirGlob($0)
+                    })
+                    if pipeline.background {
+                        let text = pipeline.commands.map { $0.argv.joined(separator: " ") }.joined(separator: " | ")
+                        startJob(text) { [self] in
+                            let m = MontadorDeLinhas(sink)
+                            defer { m.fechar() }
+                            return await runPipeline(pipeline, sink: sink, montador: m)
+                        }
+                        last = 0 // como no sh: `cmd &` sai com 0 na hora
+                    } else {
+                        last = await runPipeline(pipeline, sink: sink, montador: montador)
+                    }
+                    anotar(last)
                 }
-                // Expandido agora, e não antes da linha: em `cmd; echo $?` o `$?` é o do `cmd`,
-                // e em `export X=1; echo $X` o `X` já é o novo.
-                let pipeline = crua.expandido { [self] in valor(de: $0, status: status) }
-                if pipeline.background {
-                    let text = pipeline.commands.map { $0.argv.joined(separator: " ") }.joined(separator: " | ")
-                    startJob(text) { [self] in await runPipeline(pipeline, sink: sink) }
-                    last = 0 // como no sh: `cmd &` sai com 0 na hora
-                } else {
-                    last = await runPipeline(pipeline, sink: sink)
-                }
-                anotar(last)
             }
         }
         return last
@@ -204,53 +248,126 @@ public final class Shell: @unchecked Sendable {
         }
     }
 
-    func runPipeline(_ p: CommandLine.Pipeline, sink: @escaping @Sendable (StreamKind, String) -> Void) async -> Int32 {
-        var input: String?
+    func runPipeline(
+        _ p: CommandLine.Pipeline,
+        sink: @escaping @Sendable (StreamKind, String) -> Void,
+        montador: MontadorDeLinhas? = nil
+    ) async -> Int32 {
+        let montador = montador ?? MontadorDeLinhas(sink)
+        var input: Data?
         var code: Int32 = 0
         for (i, simple) in p.commands.enumerated() {
             let isLast = i == p.commands.count - 1
             var stdin = input
             if let f = simple.stdinFile {
-                let u = resolvePath(f)
-                guard let s = try? String(contentsOf: u, encoding: .utf8) else { sink(
-                    .err,
-                    tr("odete: %1$@: não existe", "\(f)")
-                ); return 1 }
-                stdin = s
+                if f == "/dev/null" {
+                    stdin = Data()
+                } else {
+                    guard let u = arquivoDeRedirecionamento(f, sink: sink) else { return 1 }
+                    guard let d = FileManager.default.contents(atPath: u.path) else {
+                        sink(.err, tr("odete: %1$@: não existe", "\(f)")); return 1
+                    }
+                    stdin = d
+                }
             }
             let capturing = !isLast || simple.stdoutFile != nil
-            let io = CommandIO(stdin: stdin, capturing: capturing, sink: sink)
+            let io = CommandIO(stdinBytes: stdin, capturing: capturing, sink: sink, montador: montador)
             io.stderrToStdout = simple.stderrToStdout
+            io.stdoutToStderr = simple.stdoutToStderr
+            io.capturandoErro = simple.stderrFile != nil
+            // Confere os destinos antes de rodar: um `> ../fora.txt` não roda o comando.
+            var saida: URL?, erro: URL?
+            if let f = simple.stdoutFile, f != "/dev/null" {
+                guard let u = arquivoDeRedirecionamento(f, sink: sink) else { return 1 }
+                saida = u
+            }
+            if let f = simple.stderrFile, f != "/dev/null" {
+                guard let u = arquivoDeRedirecionamento(f, sink: sink) else { return 1 }
+                erro = u
+            }
             code = await runSimple(simple.argv, io: io)
-            if let f = simple.stdoutFile {
-                let u = resolvePath(f)
-                do {
-                    if simple.append,
-                       let fh = FileHandle(forWritingAtPath: u.path)
-                    {
-                        try fh.seekToEnd(); try fh.write(contentsOf: Data(io.captured.utf8)); try fh.close()
-                    } else {
-                        HistoricoDeArquivos.guardar(u, raiz: root, origem: .terminal)
-                        try io.captured.write(to: u, atomically: true, encoding: .utf8)
-                    }
-                } catch { sink(.err, tr("odete: não consegui escrever %1$@", "\(f)")); return 1 }
+            if let erro, !escrever(io.stderrCapturado, em: erro, anexar: simple.stderrAppend) {
+                sink(.err, tr("odete: não consegui escrever %1$@", simple.stderrFile ?? "")); return 1
+            }
+            if simple.stdoutFile != nil {
+                if let saida, !escrever(io.capturedData, em: saida, anexar: simple.append) {
+                    sink(.err, tr("odete: não consegui escrever %1$@", simple.stdoutFile ?? "")); return 1
+                }
                 input = nil
             } else {
-                input = capturing ? String(io.captured.dropLast(io.captured.hasSuffix("\n") ? 1 : 0)) : nil
+                input = capturing ? io.capturedData : nil
             }
         }
         return code
     }
 
-    func runSimple(_ argv: [String], io: CommandIO) async -> Int32 {
-        guard let name = argv.first else { return 0 }
+    /// O arquivo de um `>`, `2>` ou `<`, dentro do projeto; fora, avisa e devolve nil.
+    func arquivoDeRedirecionamento(_ f: String, sink: @Sendable (StreamKind, String) -> Void) -> URL? {
+        let u = caminhoCru(f)
+        guard Confinamento(raiz: root).permite(u.path) else {
+            sink(.err, tr("odete: %1$@: fora da pasta do projeto", f))
+            return nil
+        }
+        return u
+    }
+
+    /// Bytes no arquivo, do jeito que vieram (binário inclusive).
+    func escrever(_ dados: Data, em u: URL, anexar: Bool) -> Bool {
+        if !anexar {
+            HistoricoDeArquivos.guardar(u, raiz: root, origem: .terminal)
+        }
+        let flags = O_WRONLY | O_CREAT | O_CLOEXEC | (anexar ? O_APPEND : O_TRUNC)
+        let fd = open(u.path, flags, 0o644)
+        guard fd >= 0 else { return false }
+        defer { close(fd) }
+        var feito = 0
+        return dados.withUnsafeBytes { b -> Bool in
+            while feito < b.count, let base = b.baseAddress {
+                let r = write(fd, base + feito, b.count - feito)
+                if r < 0 {
+                    if errno == EINTR {
+                        continue
+                    }
+                    return false
+                }
+                feito += r
+            }
+            return true
+        }
+    }
+
+    /// `A=1` sozinho define a variável do shell; `A=1 cmd` só para o `cmd`, como no sh.
+    /// Antes os dois davam "comando não encontrado: A=1" — inclusive nos scripts do npm.
+    static func atribuicao(_ palavra: String) -> (String, String)? {
+        guard let i = palavra.firstIndex(of: "="), i != palavra.startIndex else { return nil }
+        let nome = palavra[..<i]
+        guard let primeiro = nome.first, primeiro == "_" || primeiro.isLetter,
+              nome.allSatisfy({ $0 == "_" || $0.isLetter || $0.isNumber }) else { return nil }
+        return (String(nome), String(palavra[palavra.index(after: i)...]))
+    }
+
+    func runSimple(_ argvCompleto: [String], io: CommandIO) async -> Int32 {
+        var argv = argvCompleto
+        var extras: [String: String] = [:]
+        while let primeiro = argv.first, let (k, v) = Self.atribuicao(primeiro) {
+            extras[k] = v
+            argv.removeFirst()
+        }
+        guard let name = argv.first else {
+            for (k, v) in extras {
+                env[k] = v
+            }
+            return 0
+        }
+        let cancelamento = Self.cancelamentoAtual ?? Cancelamento()
         let ctx = CommandContext(
             cwd: cwd,
             root: root,
-            env: env,
+            env: env.merging(extras) { _, novo in novo },
             io: io,
             shell: self,
-            isCancelled: { [weak self] in self?.cancelFlag ?? true }
+            isCancelled: { cancelamento.cancelado || Task.isCancelled },
+            cancelamento: cancelamento
         )
         if let c = command(named: name) {
             return await c.run(Array(argv.dropFirst()), ctx)
@@ -274,18 +391,94 @@ public final class Shell: @unchecked Sendable {
         return 127
     }
 
+    // MARK: glob
+
+    /// Os caminhos que casam com o padrão, relativos como foram escritos, em ordem. Arquivo
+    /// oculto só casa com padrão que começa por ponto; nada fora do projeto entra.
+    func expandirGlob(_ padrao: String) -> [String] {
+        var base: URL
+        var prefixo: String
+        var resto = padrao
+        if resto.hasPrefix("/") {
+            base = root; prefixo = "/"; resto.removeFirst()
+        } else if resto.hasPrefix("~/") {
+            base = root; prefixo = "~/"; resto.removeFirst(2)
+        } else {
+            base = cwd; prefixo = ""
+        }
+        let partes = resto.split(separator: "/", omittingEmptySubsequences: true).map(String.init)
+        guard !partes.isEmpty else { return [] }
+        var candidatos: [(URL, String)] = [(base, prefixo)]
+        let conf = Confinamento(raiz: root)
+        for (n, parte) in partes.enumerated() {
+            let ultima = n == partes.count - 1
+            var proximos: [(URL, String)] = []
+            let temCuringa = parte.contains(where: { $0 == "*" || $0 == "?" || $0 == "[" })
+            for (dir, texto) in candidatos {
+                if !temCuringa {
+                    let literal = Self.semEscapes(parte)
+                    let u = dir.appending(path: literal)
+                    if ultima ? FileManager.default.fileExists(atPath: u.path) : Self.ehPasta(u) {
+                        proximos.append((u, texto + literal + (ultima ? "" : "/")))
+                    }
+                    continue
+                }
+                guard let nomes = try? FileManager.default.contentsOfDirectory(atPath: dir.path) else { continue }
+                for nome in nomes.sorted() {
+                    if nome.hasPrefix("."), !parte.hasPrefix(".") {
+                        continue
+                    }
+                    guard fnmatch(parte, nome, 0) == 0 else { continue }
+                    let u = dir.appending(path: nome)
+                    if !ultima, !Self.ehPasta(u) {
+                        continue
+                    }
+                    proximos.append((u, texto + nome + (ultima ? "" : "/")))
+                }
+            }
+            candidatos = proximos
+            if candidatos.isEmpty {
+                return []
+            }
+        }
+        return candidatos.filter { conf.permite($0.0.path, seguirUltimo: false) }.map(\.1)
+    }
+
+    static func semEscapes(_ s: String) -> String {
+        var r = ""
+        var escapando = false
+        for c in s {
+            if c == "\\", !escapando {
+                escapando = true; continue
+            }
+            escapando = false
+            r.append(c)
+        }
+        return r
+    }
+
+    static func ehPasta(_ u: URL) -> Bool {
+        var d: ObjCBool = false
+        return FileManager.default.fileExists(atPath: u.path, isDirectory: &d) && d.boolValue
+    }
+
     // MARK: jobs
 
     func startJob(_ text: String, _ body: @escaping @Sendable () async -> Int32) {
         let id = nextJob
         nextJob += 1
         let box = TaskBox()
-        let job = Job(id: id, command: text) { box.cancel() }
+        // Cancelamento próprio, sem pai: o Ctrl+C da linha em primeiro plano não chega aqui,
+        // só o `kill`.
+        let cancelamento = Cancelamento()
+        let job = Job(id: id, command: text, cancelamento: cancelamento) { box.cancel() }
         job.onFinish = { [weak self] j in self?.removeJob(j) }
         lock.lock(); jobs.append(job); lock.unlock()
         onJobsChanged?()
         box.task = Task { [weak self] in
-            _ = await body()
+            _ = await Self.$cancelamentoAtual.withValue(cancelamento) {
+                await body()
+            }
             job.finish()
             self?.removeJob(job)
         }
@@ -300,7 +493,7 @@ public final class Shell: @unchecked Sendable {
     func registerJob(_ text: String, ports: [Int], stop: @escaping @Sendable () -> Void) -> Job {
         let id = nextJob
         nextJob += 1
-        let job = Job(id: id, command: text, stop: stop)
+        let job = Job(id: id, command: text, cancelamento: Cancelamento(), stop: stop)
         job.onFinish = { [weak self] j in self?.removeJob(j) }
         job.setPorts(ports)
         lock.lock(); jobs.append(job); lock.unlock()
@@ -322,26 +515,40 @@ public final class Shell: @unchecked Sendable {
 
     // MARK: utilidades
 
-    public func resolvePath(_ path: String) -> URL {
+    /// O caminho do jeito do shell (`/` e `~` são a raiz do projeto), sem conferir.
+    func caminhoCru(_ path: String) -> URL {
         if path.hasPrefix("/") {
-            return root.appending(path: String(path.dropFirst()))
+            return root.appending(path: String(path.dropFirst())).standardizedFileURL
         }
         if path == "~" {
             return root
         }
         if path.hasPrefix("~/") {
-            return root.appending(path: String(path.dropFirst(2)))
+            return root.appending(path: String(path.dropFirst(2))).standardizedFileURL
         }
         return cwd.appending(path: path).standardizedFileURL
     }
 
+    /// O caminho resolvido; se sair do projeto (por `..` ou por link), um lugar onde nada
+    /// existe nem pode ser criado (`CommandContext.foraDoProjeto`).
+    public func resolvePath(_ path: String) -> URL {
+        let u = caminhoCru(path)
+        return Confinamento(raiz: root).permite(u.path) ? u : CommandContext.foraDoProjeto
+    }
+
+    /// Muda de pasta, só dentro do projeto. Antes o prefixo era comparado sem a `/`: `cd
+    /// ../proj2` passava porque "/x/proj2" começa com "/x/proj".
     func setCwd(_ url: URL) -> Bool {
-        var isDir: ObjCBool = false
         let std = url.standardizedFileURL
-        guard FileManager.default.fileExists(atPath: std.path, isDirectory: &isDir), isDir.boolValue,
-              std.path.hasPrefix(root.standardizedFileURL.path) else { return false }
+        guard Self.ehPasta(std), Confinamento(raiz: root).permite(std.path) else { return false }
+        if std.path != cwd.path {
+            cwdAnterior = cwd
+        }
         cwd = std
         env["PWD"] = std.path
+        if let a = cwdAnterior {
+            env["OLDPWD"] = a.path
+        }
         return true
     }
 

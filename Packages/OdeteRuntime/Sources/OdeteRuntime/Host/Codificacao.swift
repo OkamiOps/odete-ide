@@ -2,54 +2,74 @@ import Foundation
 
 /// O codificador/decodificador UTF-8 do bootstrap.js, igual unidade por unidade.
 enum Utf8 {
-    /// Decodifica como o JS antigo: sem validar bytes de continuação, U+FFFD para líder solto
-    /// (0x80–0xC1) e para sequência cortada no fim (que encerra), pontos acima de U+10FFFF viram
-    /// U+FFFD. `saida` precisa de `n` unidades (nunca sai mais que uma por byte). Devolve quantas.
+    /// Decodifica como o `TextDecoder` e o `Buffer.toString()` do Node (o algoritmo do padrão
+    /// Encoding do WHATWG): cada byte que não forma sequência válida vira um U+FFFD e o
+    /// byte seguinte é lido de novo. O decodificador antigo não conferia os bytes de
+    /// continuação: um 0xFF (ou um "é" em latin1) engolia os três bytes seguintes, texto
+    /// válido incluso. `saida` precisa de `n` unidades (nunca sai mais que uma por byte).
+    /// Devolve quantas.
     static func decodifica(_ b: UnsafePointer<UInt8>, _ n: Int, em saida: UnsafeMutablePointer<UInt16>) -> Int {
-        var i = 0, k = 0
-        @inline(__always) func cont(_ j: Int) -> UInt32 {
-            UInt32(b[j]) & 63
-        }
+        var k = 0
+        var cp: UInt32 = 0, faltam = 0, vistos = 0
+        var menor: UInt8 = 0x80, maior: UInt8 = 0xBF
+        var i = 0
         while i < n {
-            let c = UInt32(b[i])
-            i += 1
-            if c < 0x80 {
-                saida[k] = UInt16(c); k += 1; continue
-            }
-            if c < 0xC2 {
-                saida[k] = 0xFFFD; k += 1; continue
-            }
-            if c < 0xE0 {
-                if i >= n {
-                    saida[k] = 0xFFFD; k += 1; break
+            let c = b[i]
+            if faltam == 0 {
+                i += 1
+                switch c {
+                case 0x00 ... 0x7F:
+                    saida[k] = UInt16(c); k += 1
+                case 0xC2 ... 0xDF:
+                    faltam = 1; cp = UInt32(c & 0x1F)
+                case 0xE0 ... 0xEF:
+                    if c == 0xE0 {
+                        menor = 0xA0
+                    }
+                    if c == 0xED {
+                        maior = 0x9F
+                    }
+                    faltam = 2; cp = UInt32(c & 0x0F)
+                case 0xF0 ... 0xF4:
+                    if c == 0xF0 {
+                        menor = 0x90
+                    }
+                    if c == 0xF4 {
+                        maior = 0x8F
+                    }
+                    faltam = 3; cp = UInt32(c & 0x07)
+                default:
+                    saida[k] = 0xFFFD; k += 1
                 }
-                saida[k] = UInt16(((c & 31) << 6) | cont(i)); i += 1; k += 1; continue
+                continue
             }
-            if c < 0xF0 {
-                if i + 1 >= n {
-                    saida[k] = 0xFFFD; k += 1; break
-                }
-                saida[k] = UInt16(((c & 15) << 12) | (cont(i) << 6) | cont(i + 1)); i += 2; k += 1; continue
-            }
-            if i + 2 >= n {
-                saida[k] = 0xFFFD; k += 1; break
-            }
-            let cp = ((c & 7) << 18) | (cont(i) << 12) | (cont(i + 1) << 6) | cont(i + 2)
-            i += 3
-            if cp > 0x10FFFF {
+            if c < menor || c > maior {
+                // Sequência interrompida: um U+FFFD e o mesmo byte de novo, como início.
+                cp = 0; faltam = 0; vistos = 0; menor = 0x80; maior = 0xBF
                 saida[k] = 0xFFFD; k += 1
-            } else if cp >= 0x10000 {
-                let v = cp - 0x10000
-                saida[k] = UInt16(0xD800 + (v >> 10)); saida[k + 1] = UInt16(0xDC00 + (v & 0x3FF)); k += 2
-            } else {
-                saida[k] = UInt16(cp); k += 1
+                continue
             }
+            i += 1
+            menor = 0x80; maior = 0xBF
+            cp = (cp << 6) | UInt32(c & 0x3F)
+            vistos += 1
+            if vistos == faltam {
+                if cp >= 0x10000 {
+                    let v = cp - 0x10000
+                    saida[k] = UInt16(0xD800 + (v >> 10)); saida[k + 1] = UInt16(0xDC00 + (v & 0x3FF)); k += 2
+                } else {
+                    saida[k] = UInt16(cp); k += 1
+                }
+                cp = 0; faltam = 0; vistos = 0
+            }
+        }
+        if faltam > 0 {
+            saida[k] = 0xFFFD; k += 1
         }
         return k
     }
 
-    /// Bytes que `codifica` produz. Substituto solto vira 3 bytes (o JS antigo não o trocava por
-    /// U+FFFD, e o decodificador devolve o mesmo substituto: a ida e volta é exata).
+    /// Bytes que `codifica` produz. Substituto solto vira 3 bytes (os do U+FFFD).
     static func tamanho(_ u: UnsafePointer<UInt16>, _ n: Int) -> Int {
         var i = 0, t = 0
         while i < n {
@@ -91,6 +111,11 @@ enum Utf8 {
                 if e >= 0xDC00, e < 0xE000 {
                     c = 0x10000 + ((c - 0xD800) << 10) + (e - 0xDC00); unidades = 2
                 }
+            }
+            // Substituto solto vira U+FFFD, como no TextEncoder e no Buffer do Node (mesmos
+            // três bytes, então `tamanho` não muda).
+            if c >= 0xD800, c < 0xE000 {
+                c = 0xFFFD
             }
             if c < 0x800 {
                 if k + 2 > capacidade {

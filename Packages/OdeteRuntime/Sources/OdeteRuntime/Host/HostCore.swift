@@ -6,10 +6,12 @@ import Security
 enum HostCore {
     static func install(_ rt: JSRuntime) {
         let h = rt.host
-        let write: @convention(block) (Int, String) -> Void = { [unowned rt] fd, text in rt.emit(
-            fd == 2 ? .err : .out,
-            text
-        ) }
+        let write: @convention(block) (Int, String) -> Void = { [unowned rt] fd, text in
+            if rt.lancarSeInterrompido() {
+                return
+            }
+            rt.emit(fd == 2 ? .err : .out, text)
+        }
         h.setObject(write, forKeyedSubscript: "write" as NSString)
 
         let setTimer: @convention(block) (Double, Bool) -> Int = { [unowned rt] ms, rep in rt.addTimer(
@@ -77,9 +79,26 @@ enum HostCore {
 
         let log: @convention(block) (String) -> Void = { [unowned rt] s in rt.emit(.err, "[odete] \(s)") }
         h.setObject(log, forKeyedSubscript: "debug" as NSString)
+
+        let refTimer: @convention(block) (Int, Bool) -> Void = { [unowned rt] id, ref in rt.refTimer(id, ref) }
+        h.setObject(refTimer, forKeyedSubscript: "refTimer" as NSString)
+
+        // O stdin inteiro (o que veio pelo pipe), ou null quando não há nada ligado.
+        let stdin: @convention(block) () -> Any = { [unowned rt] in
+            guard let d = rt.entrada else { return NSNull() }
+            return rt.bytes(d)
+        }
+        h.setObject(stdin, forKeyedSubscript: "stdin" as NSString)
+
+        // `import(` fora do esbuild (CJS carregado cru, `new Function`): ver ReescritaDeImport.
+        let reescreverImport: @convention(block) (String) -> Any = { src in
+            ReescritaDeImport.reescrever(src) ?? NSNull()
+        }
+        h.setObject(reescreverImport, forKeyedSubscript: "reescreverImport" as NSString)
     }
 }
 
+import CommonCrypto
 import Compression
 import CryptoKit
 
@@ -143,18 +162,94 @@ enum CRC32 {
 
 enum Hash {
     static func hex(algo: String, data: Data) -> String {
-        hexString(bytes(algo: algo, data: data))
+        hexString(digest(algo: algo, data: data) ?? [])
     }
 
-    /// O digest cru; algoritmo desconhecido cai no sha256, como sempre caiu.
-    static func bytes(algo: String, data: some DataProtocol) -> [UInt8] {
-        switch algo.lowercased() {
+    /// O nome como o Node aceita: `SHA256`, `sha-256`, `RSA-SHA256` viram `sha256`.
+    static func normalizar(_ algo: String) -> String {
+        var a = algo.lowercased()
+        if a.hasPrefix("rsa-") {
+            a.removeFirst(4)
+        }
+        if a.hasPrefix("sha3-") {
+            return a
+        }
+        return a.replacingOccurrences(of: "-", with: "")
+    }
+
+    /// O digest cru; nil para algoritmo que não existe aqui (antes caía no SHA-256 calado,
+    /// e um `createHash("sha3-256")` devolvia outro hash sem aviso).
+    static func digest(algo: String, data: some DataProtocol) -> [UInt8]? {
+        switch normalizar(algo) {
         case "sha1": Array(Insecure.SHA1.hash(data: data))
+        case "sha256": Array(SHA256.hash(data: data))
         case "sha384": Array(SHA384.hash(data: data))
         case "sha512": Array(SHA512.hash(data: data))
         case "md5": Array(Insecure.MD5.hash(data: data))
-        default: Array(SHA256.hash(data: data))
+        case "sha3-256": sha3(SHA3_256(), data)
+        case "sha3-384": sha3(SHA3_384(), data)
+        case "sha3-512": sha3(SHA3_512(), data)
+        default: nil
         }
+    }
+
+    private static func sha3(_ h: SHA3_256, _ data: some DataProtocol) -> [UInt8] {
+        var h = h
+        for r in data.regions {
+            r.withUnsafeBytes { h.update(bufferPointer: $0) }
+        }
+        return Array(h.finalize())
+    }
+
+    private static func sha3(_ h: SHA3_384, _ data: some DataProtocol) -> [UInt8] {
+        var h = h
+        for r in data.regions {
+            r.withUnsafeBytes { h.update(bufferPointer: $0) }
+        }
+        return Array(h.finalize())
+    }
+
+    private static func sha3(_ h: SHA3_512, _ data: some DataProtocol) -> [UInt8] {
+        var h = h
+        for r in data.regions {
+            r.withUnsafeBytes { h.update(bufferPointer: $0) }
+        }
+        return Array(h.finalize())
+    }
+
+    static func hmac(algo: String, chave: Data, data: some DataProtocol) -> [UInt8]? {
+        let k = SymmetricKey(data: chave)
+        switch normalizar(algo) {
+        case "sha1": return Array(HMAC<Insecure.SHA1>.authenticationCode(for: Array(data), using: k))
+        case "sha256": return Array(HMAC<SHA256>.authenticationCode(for: Array(data), using: k))
+        case "sha384": return Array(HMAC<SHA384>.authenticationCode(for: Array(data), using: k))
+        case "sha512": return Array(HMAC<SHA512>.authenticationCode(for: Array(data), using: k))
+        case "md5": return Array(HMAC<Insecure.MD5>.authenticationCode(for: Array(data), using: k))
+        default: return nil
+        }
+    }
+
+    static func pbkdf2(senha: Data, sal: Data, iteracoes: Int, tamanho: Int, algo: String) -> [UInt8]? {
+        let prf: CCPseudoRandomAlgorithm
+        switch normalizar(algo) {
+        case "sha1": prf = CCPseudoRandomAlgorithm(kCCPRFHmacAlgSHA1)
+        case "sha256": prf = CCPseudoRandomAlgorithm(kCCPRFHmacAlgSHA256)
+        case "sha384": prf = CCPseudoRandomAlgorithm(kCCPRFHmacAlgSHA384)
+        case "sha512": prf = CCPseudoRandomAlgorithm(kCCPRFHmacAlgSHA512)
+        default: return nil
+        }
+        var saida = [UInt8](repeating: 0, count: max(tamanho, 0))
+        let r = senha.withUnsafeBytes { s in
+            sal.withUnsafeBytes { sl in
+                CCKeyDerivationPBKDF(
+                    CCPBKDFAlgorithm(kCCPBKDF2),
+                    s.baseAddress?.assumingMemoryBound(to: CChar.self), s.count,
+                    sl.baseAddress?.assumingMemoryBound(to: UInt8.self), sl.count,
+                    prf, UInt32(max(iteracoes, 1)), &saida, saida.count
+                )
+            }
+        }
+        return r == kCCSuccess ? saida : nil
     }
 }
 

@@ -36,7 +36,9 @@ __nodeDefine("util", (module, exports, require) => {
     return out;
   }
   function format(f, ...args) {
-    if (typeof f !== "string") return [f, ...args].map((a) => inspect(a)).join(" ");
+    // `console.log()` é uma linha vazia, não "undefined".
+    if (arguments.length === 0) return "";
+    if (typeof f !== "string") return [f, ...args].map((a) => (typeof a === "string" ? a : inspect(a))).join(" ");
     let i = 0;
     let s = f.replace(/%[sdifjoOc%]/g, (m) => {
       if (m === "%%") return "%";
@@ -61,7 +63,9 @@ __nodeDefine("util", (module, exports, require) => {
     TextEncoder: globalThis.TextEncoder, TextDecoder: globalThis.TextDecoder,
     styleText: (_, t) => t, stripVTControlCharacters: (s) => s.replace(/\x1b\[[0-9;]*m/g, ""),
     parseArgs({ args = __nodeRequire("process").argv.slice(2), options = {}, allowPositionals = true } = {}) { const values = {}, positionals = []; for (let i = 0; i < args.length; i++) { const a = args[i]; if (a.startsWith("--")) { const [k, v] = a.slice(2).split("="); const o = options[k] || {}; if (o.type === "boolean" || (v === undefined && (!args[i + 1] || args[i + 1].startsWith("-")))) values[k] = true; else values[k] = v !== undefined ? v : args[++i]; } else if (a.startsWith("-") && a.length > 1) { for (const ch of a.slice(1)) { const k = Object.keys(options).find((n) => options[n].short === ch) || ch; values[k] = true; } } else positionals.push(a); } return { values, positionals }; },
-    debuglog: () => () => {}, debug: () => () => {},
+    debuglog: () => Object.assign(() => {}, { enabled: false }), debug: () => Object.assign(() => {}, { enabled: false }),
+    // O parser do `.env` do Node (process.loadEnvFile, --env-file): KEY=valor, aspas, # comentário.
+    parseEnv(texto) { const out = {}; for (const linha of String(texto).split(/\r?\n/)) { const m = /^\s*(?:export\s+)?([\w.-]+)\s*=\s*(.*)?\s*$/.exec(linha); if (!m) continue; let v = (m[2] || "").trim(); const q = v[0]; if ((q === '"' || q === "'" || q === "`") && v.endsWith(q) && v.length > 1) { v = v.slice(1, -1); if (q === '"') v = v.replace(/\\n/g, "\n"); } else { const h = v.indexOf(" #"); if (h >= 0) v = v.slice(0, h).trim(); } out[m[1]] = v; } return out; },
     getSystemErrorName: (n) => "E" + n, toUSVString: (s) => String(s), aborted: (signal) => new Promise((r) => signal.addEventListener("abort", r)),
   };
   module.exports.inspect.custom = custom;

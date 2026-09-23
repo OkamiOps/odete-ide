@@ -31,7 +31,8 @@ struct CenterPane: View {
                         tabs: ws.tabs,
                         active: ws.active,
                         onSelect: { ws.openFile($0) },
-                        onClose: { ws.closeTab($0) }
+                        onClose: { ws.closeTab($0) },
+                        menu: menuDaAba(ws)
                     )
                 } else {
                     Spacer(minLength: 0)
@@ -106,6 +107,7 @@ struct CenterPane: View {
                             ws.historyPath = path
                         }
                         Button(tr("Blame"), systemImage: "person.text.rectangle") { ws.blamePath = path }
+                        Button(tr("Histórico local"), systemImage: "clock") { ws.historicoLocal.abrir(path) }
                         Button(tr("Copiar caminho"), systemImage: "doc.on.doc") { UIPasteboard.general.string = path }
                     }
                     Section {

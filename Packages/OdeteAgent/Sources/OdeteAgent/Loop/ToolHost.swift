@@ -99,6 +99,7 @@ open class FileToolHost: ToolHost, @unchecked Sendable {
             at: url(path).deletingLastPathComponent(),
             withIntermediateDirectories: true
         )
+        HistoricoDeArquivos.guardar(url(path), raiz: root, origem: .agente)
         try text.write(to: url(path), atomically: true, encoding: .utf8)
     }
 

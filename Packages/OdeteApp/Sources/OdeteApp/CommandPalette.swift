@@ -301,7 +301,7 @@ struct CommandPalette: View {
                 symbol: "paintpalette",
                 shortcut: nil
             )
-        }
+        } + ComandosDoHistorico.itens
     }
 
     var symbols: [PaletteItem] {
@@ -511,6 +511,7 @@ struct CommandPalette: View {
                 }
             case ">hub": app.closeWorkspace()
             default:
+                ComandosDoHistorico.executar(item.id, ws: ws)
                 if item.id.hasPrefix(">editor."),
                    let acao = AcaoDoEditor(rawValue: String(item.id.dropFirst(8)))
                 {

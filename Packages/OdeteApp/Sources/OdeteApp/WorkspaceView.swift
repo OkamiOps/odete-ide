@@ -54,6 +54,7 @@ struct WorkspaceView: View {
         })) {
             Button(tr("OK")) { ws.error = nil }
         } message: { Text(ws.error ?? "") }
+        .folhasDoHistoricoLocal()
     }
 
     func portraitLayout(width: CGFloat) -> some View {

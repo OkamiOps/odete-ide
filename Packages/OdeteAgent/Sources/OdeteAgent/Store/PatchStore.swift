@@ -1,4 +1,5 @@
 import Foundation
+import OdeteCore
 import Synchronization
 
 public struct Patch: Codable, Sendable, Hashable, Identifiable {
@@ -210,6 +211,7 @@ public final class PatchStore: @unchecked Sendable {
     private func write(_ path: String, _ text: String) {
         let u = root.appending(path: path)
         try? FileManager.default.createDirectory(at: u.deletingLastPathComponent(), withIntermediateDirectories: true)
+        HistoricoDeArquivos.guardar(u, raiz: root, origem: .agente)
         try? text.write(to: u, atomically: true, encoding: .utf8)
     }
 
@@ -255,6 +257,7 @@ public final class PatchStore: @unchecked Sendable {
     }
 
     private func restore(_ p: Patch) {
+        HistoricoDeArquivos.guardar(root.appending(path: p.path), raiz: root, origem: .patchRejeitado)
         if p.orig.isEmpty, !FileManager.default.fileExists(atPath: root.appending(path: p.path).path) {
             return
         }

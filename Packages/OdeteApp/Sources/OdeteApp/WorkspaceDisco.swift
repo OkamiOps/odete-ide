@@ -32,6 +32,7 @@ extension WorkspaceModel {
         git.agendarMarcas()
         guard !t.isDirty else { return }
         if let disco = try? ops.read(t.path), disco != buffers[t.path] {
+            guardarBuffer(t.path, antesDe: disco, origem: .externo)
             buffers[t.path] = disco
             reloadTick += 1
             analyze(t.path)

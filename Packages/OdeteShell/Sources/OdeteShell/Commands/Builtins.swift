@@ -231,6 +231,7 @@ enum Builtins {
                 {
                     ctx.io.err(tr("rm: não vou apagar a raiz do projeto")); return 1
                 }
+                HistoricoDeArquivos.guardar(u, raiz: ctx.root, origem: .terminal)
                 do { try FileManager.default.removeItem(at: u) } catch {
                     ctx.io.err(tr("rm: %1$@: %2$@", "\(r)", "\(error.localizedDescription)")); return 1
                 }
@@ -250,6 +251,7 @@ enum Builtins {
                     if FileManager.default
                         .fileExists(atPath: d.path)
                     {
+                        HistoricoDeArquivos.guardar(d, raiz: ctx.root, origem: .terminal)
                         try FileManager.default.removeItem(at: d)
                     }; try FileManager.default
                         .copyItem(
@@ -273,6 +275,7 @@ enum Builtins {
                     if FileManager.default
                         .fileExists(atPath: d.path)
                     {
+                        HistoricoDeArquivos.guardar(d, raiz: ctx.root, origem: .terminal)
                         try FileManager.default.removeItem(at: d)
                     }; try FileManager.default
                         .moveItem(

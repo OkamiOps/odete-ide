@@ -4,9 +4,14 @@ import OdeteCore
 /// Operações sobre caminhos relativos à raiz do projeto.
 public struct FileOps: Sendable {
     public let root: URL
+    /// Para onde vai o conteúdo que uma gravação ou um apagar ia perder. `nil` desliga
+    /// (os testes que não falam de histórico não precisam dele).
+    public let historico: HistoricoLocal?
 
-    public init(root: URL) {
+    public init(root: URL, historico: HistoricoLocal? = .compartilhado) {
         self.root = root
+        self.historico = historico
+        historico?.conhecer(root)
     }
 
     public func url(_ rel: String) throws -> URL {
@@ -38,10 +43,40 @@ public struct FileOps: Sendable {
         data.prefix(8192).contains(0)
     }
 
-    public func write(_ rel: String, _ text: String) throws {
+    /// Grava o texto, guardando antes no histórico local o que estava no arquivo.
+    ///
+    /// `origem` diz quem está gravando. O padrão é o editor, cujo salvamento se agrupa por
+    /// minuto de edição; quem grava por outro motivo passa o seu, e aí a versão de antes é
+    /// sempre guardada.
+    public func write(_ rel: String, _ text: String, origem: OrigemDaVersao = .voce) throws {
         let u = try url(rel)
-        try FileManager.default.createDirectory(at: u.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try text.write(to: u, atomically: true, encoding: .utf8)
+        // Arquivo que é link simbólico: `write(atomically:)` grava um temporário e o
+        // renomeia por cima do caminho, e o link virava um arquivo comum — o destino ficava
+        // com o conteúdo velho e o link sumia. Grava-se no destino, e o link continua link.
+        let destino = Self.destinoReal(u)
+        historico?.guardar([u], raiz: root, origem: origem)
+        try FileManager.default.createDirectory(
+            at: destino.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        let dados = Data(text.utf8)
+        try dados.write(to: destino, options: .atomic)
+        historico?.anotarEscrita(u, raiz: root, dados: dados)
+    }
+
+    /// Onde o arquivo está de fato: segue o link (e o link do link) até um caminho que não
+    /// é link. Link quebrado devolve o destino que não existe, que é onde gravar o cria.
+    public static func destinoReal(_ u: URL) -> URL {
+        var atual = u
+        // Um link que aponta para si mesmo, direto ou em roda, não pode prender a gravação.
+        for _ in 0 ..< 32 {
+            guard let alvo = try? FileManager.default.destinationOfSymbolicLink(atPath: atual.path) else {
+                return atual
+            }
+            atual = (alvo.hasPrefix("/") ? URL(filePath: alvo) : atual.deletingLastPathComponent().appending(path: alvo))
+                .standardizedFileURL
+        }
+        return atual
     }
 
     public func createFile(_ rel: String, contents: String = "") throws {
@@ -78,6 +113,7 @@ public struct FileOps: Sendable {
         let to = try url(dest)
         try FileManager.default.createDirectory(at: to.deletingLastPathComponent(), withIntermediateDirectories: true)
         try FileManager.default.moveItem(at: url(rel), to: to)
+        try historico?.mover(de: url(rel), para: to, raiz: root)
     }
 
     /// Manda para a lixeira e devolve onde foi parar, para dar para desfazer.
@@ -88,6 +124,7 @@ public struct FileOps: Sendable {
     public func delete(_ rel: String) throws -> URL? {
         guard exists(rel) else { throw FileError.notFound(rel) }
         let alvo = try url(rel)
+        historico?.guardar([alvo], raiz: root, origem: .apagar)
         var lixo: NSURL?
         do {
             try FileManager.default.trashItem(at: alvo, resultingItemURL: &lixo)

@@ -99,6 +99,7 @@ public final class WorkspaceModel {
     /// Folhas de histórico/blame por arquivo (nil = fechadas).
     public var historyPath: String?
     public var blamePath: String?
+    public let historicoLocal = HistoricoLocalEstado()
     @ObservationIgnored var analysisTasks: [String: Task<Void, Never>] = [:]
     @ObservationIgnored var lintEngine: Esbuild?
 
@@ -208,6 +209,7 @@ public final class WorkspaceModel {
     /// Recarrega o buffer de um arquivo que outra coisa (agente, shell) escreveu no disco.
     public func reloadBuffer(_ path: String) {
         guard buffers[path] != nil, let novo = try? ops.read(path) else { return }
+        guardarBuffer(path, antesDe: novo, origem: .recarregar)
         buffers[path] = novo
         markDirty(path, false)
         analyze(path)
@@ -266,6 +268,7 @@ public final class WorkspaceModel {
         for t in tabs where !t.isDirty {
             if ops.exists(t.path) {
                 if let disk = try? ops.read(t.path), disk != buffers[t.path] {
+                    guardarBuffer(t.path, antesDe: disk, origem: .externo)
                     buffers[t.path] = disk
                     analyze(t.path)
                 }

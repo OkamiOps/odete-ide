@@ -1009,6 +1009,34 @@
         }
       }
     },
+    "%1$@ voltou para o projeto": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ is back in the project"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ ist wieder im Projekt"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ est de retour dans le projet"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ volvió al proyecto"
+          }
+        }
+      }
+    },
     "%1$@ · linha %2$@": {
       "localizations": {
         "en": {
@@ -1929,6 +1957,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "La cuota de la nube privada de Apple se acabó. Se renueva el %1$@."
+          }
+        }
+      }
+    },
+    "A diferença para o arquivo de agora aparece aqui.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The difference from the current file appears here."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Unterschied zur aktuellen Datei erscheint hier."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La différence avec le fichier actuel s’affiche ici."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La diferencia con el archivo actual aparece aquí."
           }
         }
       }
@@ -3193,6 +3249,314 @@
         }
       }
     },
+    "Antes de apagar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Before deleting"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vor dem Löschen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avant la suppression"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Antes de borrar"
+          }
+        }
+      }
+    },
+    "Antes de desfazer o agente": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Before undoing the agent"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vor dem Rückgängigmachen des Agenten"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avant d’annuler l’agent"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Antes de deshacer el agente"
+          }
+        }
+      }
+    },
+    "Antes de mudar por fora": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Before an outside change"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vor einer Änderung von außen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avant une modification externe"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Antes de un cambio externo"
+          }
+        }
+      }
+    },
+    "Antes de recarregar do disco": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Before reloading from disk"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vor dem Neuladen von der Festplatte"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avant le rechargement depuis le disque"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Antes de recargar desde el disco"
+          }
+        }
+      }
+    },
+    "Antes de restaurar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Before restoring"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vor dem Wiederherstellen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avant la restauration"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Antes de restaurar"
+          }
+        }
+      }
+    },
+    "Antes de salvar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Before saving"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vor dem Speichern"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avant l’enregistrement"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Antes de guardar"
+          }
+        }
+      }
+    },
+    "Antes de trocar tudo": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Before Replace all"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vor „Alles ersetzen“"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avant « Tout remplacer »"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Antes de Reemplazar todo"
+          }
+        }
+      }
+    },
+    "Antes de um arquivo ser salvo por cima, mudado pelo agente, pelo git ou pelo terminal, ou apagado, a Odete guarda como ele estava: até 50 versões por arquivo, por 30 dias. Fica só neste aparelho, fora do projeto — não vai para o iCloud nem para o git. Para ver, toque e segure a aba ou o arquivo na árvore.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Before a file is saved over, changed by the agent, git or the terminal, or deleted, Odete keeps how it was: up to 50 versions per file, for 30 days. It stays on this device only, outside the project — it doesn’t go to iCloud or git. To see them, touch and hold the tab or the file in the tree."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bevor eine Datei überschrieben, vom Agenten, von git oder vom Terminal geändert oder gelöscht wird, speichert Odete ihren vorherigen Stand: bis zu 50 Versionen pro Datei, 30 Tage lang. Das bleibt nur auf diesem Gerät, außerhalb des Projekts — nicht in iCloud und nicht in git. Zum Ansehen halte den Tab oder die Datei im Baum gedrückt."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avant qu’un fichier soit écrasé, modifié par l’agent, par git ou par le terminal, ou supprimé, Odete garde son état précédent : jusqu’à 50 versions par fichier, pendant 30 jours. Tout reste sur cet appareil, hors du projet — rien ne va dans iCloud ni dans git. Pour les voir, touche et maintiens l’onglet ou le fichier dans l’arborescence."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Antes de que un archivo se sobrescriba, lo cambie el agente, git o la terminal, o se borre, Odete guarda cómo estaba: hasta 50 versiones por archivo, durante 30 días. Se queda solo en este dispositivo, fuera del proyecto: no va a iCloud ni a git. Para verlas, mantén pulsada la pestaña o el archivo en el árbol."
+          }
+        }
+      }
+    },
+    "Antes do agente": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Before the agent"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vor dem Agenten"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avant l’agent"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Antes del agente"
+          }
+        }
+      }
+    },
+    "Antes do git": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Before git"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vor git"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avant git"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Antes de git"
+          }
+        }
+      }
+    },
+    "Antes do terminal": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Before the terminal"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vor dem Terminal"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Avant le terminal"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Antes de la terminal"
+          }
+        }
+      }
+    },
     "Apagados, por terem nascido no turno: %1$@": {
       "localizations": {
         "en": {
@@ -3385,6 +3749,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Eliminar proyecto"
+          }
+        }
+      }
+    },
+    "Apagar todas as versões guardadas de todos os projetos?": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete all kept versions from every project?"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alle gespeicherten Versionen aller Projekte löschen?"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprimer toutes les versions gardées de tous les projets ?"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Borrar todas las versiones guardadas de todos los proyectos?"
           }
         }
       }
@@ -3777,6 +4169,62 @@
           "stringUnit": {
             "state": "translated",
             "value": "Archivos (%1$@)"
+          }
+        }
+      }
+    },
+    "Arquivos apagados": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deleted Files"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gelöschte Dateien"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fichiers supprimés"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Archivos borrados"
+          }
+        }
+      }
+    },
+    "Arquivos apagados aqui": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deleted Files Here"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hier gelöschte Dateien"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fichiers supprimés ici"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Archivos borrados aquí"
           }
         }
       }
@@ -6105,6 +6553,34 @@
         }
       }
     },
+    "Conteúdo": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Content"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inhalt"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Contenu"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Contenido"
+          }
+        }
+      }
+    },
     "Continua de onde parou.": {
       "localizations": {
         "en": {
@@ -6157,6 +6633,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Conversaciones"
+          }
+        }
+      }
+    },
+    "Copiado.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copied."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kopiert."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copié."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copiado."
           }
         }
       }
@@ -7505,6 +8009,34 @@
         }
       }
     },
+    "Diferença": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Difference"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unterschied"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Différence"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diferencia"
+          }
+        }
+      }
+    },
     "Diff": {
       "localizations": {
         "en": {
@@ -8569,6 +9101,34 @@
         }
       }
     },
+    "Espaço usado": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Space used"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Belegter Speicher"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Espace utilisé"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Espacio usado"
+          }
+        }
+      }
+    },
     "Espaços e tabs": {
       "localizations": {
         "en": {
@@ -8677,6 +9237,62 @@
           "stringUnit": {
             "state": "translated",
             "value": "Esta conversación"
+          }
+        }
+      }
+    },
+    "Esta versão não está mais guardada.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This version is no longer kept."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diese Version ist nicht mehr gespeichert."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cette version n’est plus gardée."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esta versión ya no está guardada."
+          }
+        }
+      }
+    },
+    "Esta versão tem o mesmo conteúdo que o arquivo tem hoje.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This version has the same content the file has now."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diese Version hat denselben Inhalt wie die Datei jetzt."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cette version a le même contenu que le fichier maintenant."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esta versión tiene el mismo contenido que el archivo ahora."
           }
         }
       }
@@ -10109,6 +10725,90 @@
         }
       }
     },
+    "Histórico local": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Local History"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lokaler Verlauf"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Historique local"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Historial local"
+          }
+        }
+      }
+    },
+    "Histórico local do arquivo": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Local History of File"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lokaler Verlauf der Datei"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Historique local du fichier"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Historial local del archivo"
+          }
+        }
+      }
+    },
+    "Hoje": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Today"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Heute"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aujourd’hui"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hoy"
+          }
+        }
+      }
+    },
     "IDE no colo · versão %1$@ (%2$@)": {
       "localizations": {
         "en": {
@@ -10245,6 +10945,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Idioma del dispositivo"
+          }
+        }
+      }
+    },
+    "Igual ao arquivo de agora": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Same as the current file"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wie die aktuelle Datei"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Identique au fichier actuel"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Igual al archivo actual"
           }
         }
       }
@@ -10921,6 +11649,34 @@
         }
       }
     },
+    "Limite": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Limit"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Grenze"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Limite"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Límite"
+          }
+        }
+      }
+    },
     "Limite de uso batido. Espere um pouco ou use outra conta.": {
       "localizations": {
         "en": {
@@ -11085,6 +11841,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Limpiar filtro"
+          }
+        }
+      }
+    },
+    "Limpar histórico": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear History"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verlauf löschen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Effacer l’historique"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Borrar historial"
           }
         }
       }
@@ -11733,6 +12517,34 @@
         }
       }
     },
+    "Mostra as versões guardadas": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shows the kept versions"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Zeigt die gespeicherten Versionen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Affiche les versions gardées"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Muestra las versiones guardadas"
+          }
+        }
+      }
+    },
     "Mostrar espaços": {
       "localizations": {
         "en": {
@@ -12209,6 +13021,34 @@
         }
       }
     },
+    "Nenhum arquivo apagado": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No deleted files"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keine gelöschten Dateien"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucun fichier supprimé"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ningún archivo borrado"
+          }
+        }
+      }
+    },
     "Nenhum arquivo de teste encontrado (*.test.ts, *.spec.js, …)%1$@": {
       "localizations": {
         "en": {
@@ -12457,6 +13297,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ninguna conversación"
+          }
+        }
+      }
+    },
+    "Nenhuma versão guardada ainda. Ela aparece quando o arquivo é salvo por cima, mudado pelo agente, pelo git ou pelo terminal, ou apagado.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No versions kept yet. One appears when the file is saved over, changed by the agent, git or the terminal, or deleted."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Noch keine Version gespeichert. Eine erscheint, wenn die Datei überschrieben, vom Agenten, von git oder vom Terminal geändert oder gelöscht wird."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Aucune version gardée pour l’instant. Elle apparaît quand le fichier est écrasé, modifié par l’agent, par git ou par le terminal, ou supprimé."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Todavía no hay versiones guardadas. Aparece una cuando el archivo se sobrescribe, lo cambia el agente, git o la terminal, o se borra."
           }
         }
       }
@@ -13101,6 +13969,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "No se pudo leer la base de datos"
+          }
+        }
+      }
+    },
+    "Não dá para mostrar o conteúdo, mas dá para restaurar.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The content can’t be shown, but it can be restored."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Inhalt kann nicht angezeigt, aber wiederhergestellt werden."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossible d’afficher le contenu, mais tu peux le restaurer."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se puede mostrar el contenido, pero se puede restaurar."
           }
         }
       }
@@ -14277,6 +15173,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Dónde va cada área"
+          }
+        }
+      }
+    },
+    "Ontem": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yesterday"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gestern"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hier"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ayer"
           }
         }
       }
@@ -15849,6 +16773,34 @@
         }
       }
     },
+    "Quando um arquivo com versões guardadas some do projeto, ele aparece aqui para voltar.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "When a file with kept versions disappears from the project, it shows up here so you can bring it back."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wenn eine Datei mit gespeicherten Versionen aus dem Projekt verschwindet, erscheint sie hier, damit du sie zurückholen kannst."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quand un fichier avec des versions gardées disparaît du projet, il apparaît ici pour que tu puisses le récupérer."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cuando un archivo con versiones guardadas desaparece del proyecto, aparece aquí para que puedas recuperarlo."
+          }
+        }
+      }
+    },
     "Quebrar linhas": {
       "localizations": {
         "en": {
@@ -16573,6 +17525,62 @@
           "stringUnit": {
             "state": "translated",
             "value": "Responde en %1$@."
+          }
+        }
+      }
+    },
+    "Restaurado. O que estava no arquivo ficou guardado no histórico.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restored. What was in the file is kept in the history."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wiederhergestellt. Der vorherige Inhalt bleibt im Verlauf."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restauré. Ce qui était dans le fichier est gardé dans l’historique."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restaurado. Lo que había en el archivo quedó guardado en el historial."
+          }
+        }
+      }
+    },
+    "Restaurar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restore"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wiederherstellen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restaurer"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restaurar"
           }
         }
       }
@@ -21001,6 +22009,34 @@
         }
       }
     },
+    "apagado %1$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "deleted %1$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "gelöscht %1$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "supprimé %1$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "borrado %1$@"
+          }
+        }
+      }
+    },
     "aplicar": {
       "localizations": {
         "en": {
@@ -24137,6 +25173,34 @@
         }
       }
     },
+    "igual ao atual": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "same as current"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "wie aktuell"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "identique à l’actuel"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "igual al actual"
+          }
+        }
+      }
+    },
     "index.html estático": {
       "localizations": {
         "en": {
@@ -27049,6 +28113,34 @@
         }
       }
     },
+    "restaurar do histórico local": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "restore from local history"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "aus dem lokalen Verlauf wiederherstellen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "restaurer depuis l’historique local"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "restaurar desde el historial local"
+          }
+        }
+      }
+    },
     "rm: %1$@: %2$@": {
       "localizations": {
         "en": {
@@ -28337,6 +29429,34 @@
         }
       }
     },
+    "versões guardadas neste aparelho": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "versions kept on this device"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "auf diesem Gerät gespeicherte Versionen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "versions gardées sur cet appareil"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "versiones guardadas en este dispositivo"
+          }
+        }
+      }
+    },
     "vite build: %1$@": {
       "localizations": {
         "en": {
@@ -28921,6 +30041,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "índice %1$@ fuera del array"
+          }
+        }
+      }
+    },
+    "última versão %1$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "last version %1$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "letzte Version %1$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "dernière version %1$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "última versión %1$@"
           }
         }
       }

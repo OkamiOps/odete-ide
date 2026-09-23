@@ -229,6 +229,7 @@ public final class Shell: @unchecked Sendable {
                     {
                         try fh.seekToEnd(); try fh.write(contentsOf: Data(io.captured.utf8)); try fh.close()
                     } else {
+                        HistoricoDeArquivos.guardar(u, raiz: root, origem: .terminal)
                         try io.captured.write(to: u, atomically: true, encoding: .utf8)
                     }
                 } catch { sink(.err, tr("odete: não consegui escrever %1$@", "\(f)")); return 1 }

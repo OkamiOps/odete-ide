@@ -1,5 +1,6 @@
 import Clibgit2
 import Foundation
+import OdeteCore
 import OdeteI18n
 
 public extension Repository {
@@ -89,6 +90,7 @@ public extension Repository {
 
     /// Marca um conflito como resolvido com o conteúdo dado.
     func resolveConflict(path: String, contents: String) throws {
+        HistoricoDeArquivos.guardar(workdir.appending(path: path), raiz: workdir, origem: .git)
         try contents.write(to: workdir.appending(path: path), atomically: true, encoding: .utf8)
         try withIndex { idx in
             git_index_conflict_remove(idx, path)
@@ -146,6 +148,7 @@ public extension Repository {
     }
 
     func abortMerge() throws {
+        HistoricoDeArquivos.guardar(((try? status()) ?? []).map { workdir.appending(path: $0.path) }, raiz: workdir, origem: .git)
         var head: OpaquePointer?
         try check(git_revparse_single(&head, repo, "HEAD"), "HEAD")
         defer { git_object_free(head) }

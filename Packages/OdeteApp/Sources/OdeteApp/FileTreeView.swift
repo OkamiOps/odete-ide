@@ -446,6 +446,7 @@ struct FileRow: View {
                 Button(tr("Histórico"), systemImage: "clock.arrow.circlepath") { ws.historyPath = node.path }
                 Button(tr("Blame"), systemImage: "person.text.rectangle") { ws.blamePath = node.path }
             }
+            BotaoDoHistoricoLocal(caminho: node.path, pasta: node.isDirectory)
             Divider()
             Button(tr("Apagar"), systemImage: "trash", role: .destructive) { deleting = node.path }
             if let a = ws.ultimaAcao, a.podeDesfazer {

@@ -105,7 +105,8 @@ struct PhoneShell: View {
                     tabs: ws.tabs,
                     active: ws.active,
                     onSelect: { ws.openFile($0) },
-                    onClose: { ws.closeTab($0) }
+                    onClose: { ws.closeTab($0) },
+                    menu: menuDaAba(ws)
                 )
                 if let path = ws.active, ws.naoEhTexto.contains(path) {
                     // O mesmo desvio do layout largo: imagem, PDF e banco vão para o

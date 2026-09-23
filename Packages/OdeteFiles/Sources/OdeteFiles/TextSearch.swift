@@ -102,6 +102,7 @@ public extension TextSearch {
                 novo = texto.replacingOccurrences(of: query, with: replacement, options: opcoes)
             }
             guard novo != texto else { continue }
+            HistoricoDeArquivos.guardar(u, raiz: root, origem: .trocarTudo)
             try novo.write(to: u, atomically: true, encoding: .utf8)
             arquivos += 1
             trocas += noArquivo

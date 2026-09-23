@@ -9,17 +9,21 @@ public struct EditorTabs: View {
     public var active: String?
     public var onSelect: (String) -> Void
     public var onClose: (String) -> Void
+    /// Menu de toque longo de cada aba, montado por quem conhece o app. Sem ele, não há.
+    public var menu: (@MainActor (String) -> AnyView)?
 
     public init(
         tabs: [EditorTab],
         active: String?,
         onSelect: @escaping (String) -> Void,
-        onClose: @escaping (String) -> Void
+        onClose: @escaping (String) -> Void,
+        menu: (@MainActor (String) -> AnyView)? = nil
     ) {
         self.tabs = tabs
         self.active = active
         self.onSelect = onSelect
         self.onClose = onClose
+        self.menu = menu
     }
 
     public var body: some View {
@@ -31,7 +35,8 @@ public struct EditorTabs: View {
                             tab: tab,
                             on: tab.path == active,
                             onSelect: { onSelect(tab.path) },
-                            onClose: { onClose(tab.path) }
+                            onClose: { onClose(tab.path) },
+                            menu: menu.map { m in { m(tab.path) } }
                         )
                         .equatable()
                         .id(tab.path)
@@ -65,6 +70,9 @@ struct TabItem: View, Equatable {
     var on: Bool
     var onSelect: () -> Void
     var onClose: () -> Void
+    /// Fica fora da comparação, como os outros fechamentos: o menu é montado na hora do
+    /// toque longo, com o estado de então.
+    var menu: (@MainActor () -> AnyView)?
     @State private var hover = false
 
     nonisolated static func == (a: TabItem, b: TabItem) -> Bool {
@@ -110,7 +118,22 @@ struct TabItem: View, Equatable {
             in: Capsule()
         )
         .onHover { hover = $0 }
+        .modifier(MenuDaAba(menu: menu))
         .accessibilityElement(children: .contain)
         .accessibilityAddTraits(on ? .isSelected : [])
+    }
+}
+
+/// Pendura o menu de toque longo só quando há um: `contextMenu` vazio ainda faz a aba
+/// reagir ao toque longo, sem nada para mostrar.
+private struct MenuDaAba: ViewModifier {
+    var menu: (@MainActor () -> AnyView)?
+
+    func body(content: Content) -> some View {
+        if let menu {
+            content.contextMenu { menu() }
+        } else {
+            content
+        }
     }
 }

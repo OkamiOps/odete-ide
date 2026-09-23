@@ -599,6 +599,7 @@ struct SettingsContent: View {
                 )
             }
         }
+        HistoricoLocalAjustes()
     }
 
     // MARK: sobre

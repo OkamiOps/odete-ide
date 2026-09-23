@@ -1,4 +1,5 @@
 import Foundation
+import OdeteCore
 
 /// Leitura e escrita mínima do package.json preservando os outros campos.
 public struct PackageJSON: @unchecked Sendable {
@@ -55,6 +56,7 @@ public struct PackageJSON: @unchecked Sendable {
             withJSONObject: ordered,
             options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
         )
+        HistoricoDeArquivos.guardar(url, origem: .terminal)
         try data.write(to: url, options: .atomic)
     }
 }

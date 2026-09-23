@@ -1,5 +1,6 @@
 import Clibgit2
 import Foundation
+import OdeteCore
 import OdeteI18n
 
 /// Texto de patch unificado para um hunk, opcionalmente invertido.
@@ -53,6 +54,7 @@ public extension Repository {
 
     /// Descarta um hunk do workdir.
     func discardHunk(_ hunk: Hunk, in file: FileDiff) throws {
+        HistoricoDeArquivos.guardar(workdir.appending(path: file.path), raiz: workdir, origem: .git)
         try apply(PatchText.make(file: file, hunk: hunk, reverse: true), location: GIT_APPLY_LOCATION_WORKDIR)
     }
 }

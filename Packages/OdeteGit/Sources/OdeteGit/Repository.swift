@@ -237,6 +237,7 @@ public actor Repository {
 
     /// Descarta alterações do workdir (volta ao índice). Untracked é apagado.
     public func discard(_ paths: [String]) throws {
+        HistoricoDeArquivos.guardar(paths.map { workdir.appending(path: $0) }, raiz: workdir, origem: .git)
         let st = try status()
         var tracked: [String] = []
         for p in paths {

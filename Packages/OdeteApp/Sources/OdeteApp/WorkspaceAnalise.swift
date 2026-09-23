@@ -21,7 +21,7 @@ public extension WorkspaceModel {
             access(keyPath: \.outlines)
             return guardadoOutlines
         }
-        set { gravarSeMudou(\.outlines, &guardadoOutlines, newValue) }
+        set { gravarSeMudou(\.outlines, \.guardadoOutlines, newValue) }
     }
 
     /// Caminhos de import que apontam para arquivos do projeto, por arquivo aberto.
@@ -30,7 +30,7 @@ public extension WorkspaceModel {
             access(keyPath: \.links)
             return guardadoLinks
         }
-        set { gravarSeMudou(\.links, &guardadoLinks, newValue) }
+        set { gravarSeMudou(\.links, \.guardadoLinks, newValue) }
     }
 
     /// Linhas que o patch pendente do agente mexeu, por arquivo aberto.
@@ -39,7 +39,7 @@ public extension WorkspaceModel {
             access(keyPath: \.patchChanges)
             return guardadoPatchChanges
         }
-        set { gravarSeMudou(\.patchChanges, &guardadoPatchChanges, newValue) }
+        set { gravarSeMudou(\.patchChanges, \.guardadoPatchChanges, newValue) }
     }
 
     var lint: [String: [LintIssue]] {
@@ -47,7 +47,7 @@ public extension WorkspaceModel {
             access(keyPath: \.lint)
             return guardadoLint
         }
-        set { gravarSeMudou(\.lint, &guardadoLint, newValue) }
+        set { gravarSeMudou(\.lint, \.guardadoLint, newValue) }
     }
 
     var syntax: [String: [Diagnostic]] {
@@ -55,7 +55,7 @@ public extension WorkspaceModel {
             access(keyPath: \.syntax)
             return guardadoSyntax
         }
-        set { gravarSeMudou(\.syntax, &guardadoSyntax, newValue) }
+        set { gravarSeMudou(\.syntax, \.guardadoSyntax, newValue) }
     }
 
     var gutter: [String: [GutterMark]] {
@@ -63,7 +63,7 @@ public extension WorkspaceModel {
             access(keyPath: \.gutter)
             return guardadoGutter
         }
-        set { gravarSeMudou(\.gutter, &guardadoGutter, newValue) }
+        set { gravarSeMudou(\.gutter, \.guardadoGutter, newValue) }
     }
 
     var gutterFiles: [String: FileDiff] {
@@ -71,7 +71,7 @@ public extension WorkspaceModel {
             access(keyPath: \.gutterFiles)
             return guardadoGutterFiles
         }
-        set { gravarSeMudou(\.gutterFiles, &guardadoGutterFiles, newValue) }
+        set { gravarSeMudou(\.gutterFiles, \.guardadoGutterFiles, newValue) }
     }
 
     /// Problemas de todas as fontes: build, Swift, lint do editor e erros do preview.
@@ -87,9 +87,21 @@ extension WorkspaceModel {
     /// Atribuir a propriedade inteira já compara (o `@Observable` faz isso para tipos
     /// `Equatable`); é a escrita por índice que não compara, e é ela que a análise usa.
     /// A comparação custa o tamanho do dicionário, que é o de poucos arquivos abertos.
-    func gravarSeMudou<T: Equatable>(_ chave: KeyPath<WorkspaceModel, T>, _ guardado: inout T, _ novo: T) {
-        guard guardado != novo else { return }
-        withMutation(keyPath: chave) { guardado = novo }
+    ///
+    /// O guardado chega como caminho, não como `inout`, e só é escrito dentro do closure do
+    /// `withMutation` — o mesmo que o `@Observable` faz. Um `inout` deixava o acesso de
+    /// escrita aberto durante todo o `withMutation`; o `willSet` faz o SwiftUI refazer o
+    /// corpo ali mesmo (a escrita acontece dentro de um ciclo de atualização), o corpo lê o
+    /// getter, o getter lê o guardado, e a leitura batia no acesso aberto: "Fatal access
+    /// conflict detected", também em Release. Era o crash de aprovar um patch com o editor
+    /// aberto. Ver `EscritaDaAnaliseTests`.
+    func gravarSeMudou<T: Equatable>(
+        _ chave: KeyPath<WorkspaceModel, T>,
+        _ guardado: ReferenceWritableKeyPath<WorkspaceModel, T>,
+        _ novo: T
+    ) {
+        guard self[keyPath: guardado] != novo else { return }
+        withMutation(keyPath: chave) { self[keyPath: guardado] = novo }
     }
 
     // MARK: problemas

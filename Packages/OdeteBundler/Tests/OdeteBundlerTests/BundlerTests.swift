@@ -111,6 +111,53 @@ func tmpProject() throws -> URL {
         #expect(code == 0 && out.withLock { $0 } == "ts ok 5", Comment(rawValue: out.withLock { $0 }))
     }
 
+    /// O app abre sem carregar o esbuild: o primeiro `node x.ts` (ou `npx vitest`) do terminal
+    /// chega antes de qualquer `ready()`. Antes morria com "função não encontrada: __transformCJS".
+    @Test func requireDeTypeScriptSemReadyAntes() async throws {
+        let root = try tmpProject()
+        let es = Esbuild(root: root)
+        let out = Mutex<String>("")
+        let p = JSProcess(cwd: root, output: { _, t in out.withLock { $0 += t } })
+        p.setTransform(es.cjsTransform)
+        try "import { soma } from './src/soma'; console.log('ts ok', soma(2, 3));".write(
+            to: root.appending(path: "run.ts"),
+            atomically: true,
+            encoding: .utf8
+        )
+        let code = await p.run(file: root.appending(path: "run.ts"))
+        #expect(code == 0 && out.withLock { $0 } == "ts ok 5", Comment(rawValue: out.withLock { $0 }))
+        // Já carregado, o mesmo caminho responde direto (e de uma fila qualquer, como o runtime).
+        let cjs = try await withCheckedThrowingContinuation { (cont: CheckedContinuation<String, Error>) in
+            DispatchQueue.global().async {
+                cont.resume(with: Result {
+                    try es.transformCJSSync("export const b: number = 1;", file: root.appending(path: "b.ts").path)
+                })
+            }
+        }
+        #expect(cjs.contains("exports") && !cjs.contains(": number"))
+    }
+
+    /// `import()` num módulo transformado passa pelo `require` do runtime. Nativo, ele
+    /// rejeitava com "No module loader provided" — e a CLI do vitest, que carrega tudo assim,
+    /// saía com 0 sem escrever nada.
+    @Test func importDinamicoViraRequire() async throws {
+        let root = try tmpProject()
+        let es = Esbuild(root: root)
+        let out = Mutex<String>("")
+        let p = JSProcess(cwd: root, output: { _, t in out.withLock { $0 += t } })
+        p.setTransform(es.cjsTransform)
+        try """
+        const nome = "./src/soma";
+        import("./src/soma").then(async (m) => {
+          const n = await import(nome);
+          console.log("dinamico", m.soma(2, 3), n.soma(1, 1));
+        }, (e) => { console.log("falhou", String(e)); process.exitCode = 1; });
+        export {};
+        """.write(to: root.appending(path: "din.ts"), atomically: true, encoding: .utf8)
+        let code = await p.run(file: root.appending(path: "din.ts"))
+        #expect(code == 0 && out.withLock { $0 } == "dinamico 5 2", Comment(rawValue: out.withLock { $0 }))
+    }
+
     @Test func devServerServesHtmlBundleAndCss() async throws {
         let root = try tmpProject()
         let dev = DevServer(root: root)

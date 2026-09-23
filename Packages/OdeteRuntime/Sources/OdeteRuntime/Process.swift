@@ -28,6 +28,10 @@ public final class JSProcess: @unchecked Sendable {
         e["PWD"] = cwd.path
         e["NODE_ENV"] = e["NODE_ENV"] ?? "development"
         e["ODETE"] = "1"
+        // O terminal da Odete mostra texto puro: escapes ANSI viram lixo na tela. O stdout
+        // diz que é TTY (há CLIs que só escrevem progresso num TTY), então quem decide cor
+        // pelo TTY — o `tsc`, por exemplo — precisa do aviso de https://no-color.org.
+        e["NO_COLOR"] = e["NO_COLOR"] ?? "1"
         let rt = JSRuntime(cwd: cwd, env: e, argv: argv)
         rt.output = output
         ModuleLoader.install(rt)

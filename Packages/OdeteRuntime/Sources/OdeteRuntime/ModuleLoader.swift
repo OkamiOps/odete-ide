@@ -37,10 +37,26 @@ enum ModuleLoader {
                     "error": "TRANSFORM",
                     "message": error.localizedDescription,
                 ] }
+                src = embrulharModuloES(src)
             }
             return src
         }
         h.setObject(load, forKeyedSubscript: "loadModule" as NSString)
+    }
+
+    /// Um módulo ES convertido para CJS roda numa função própria dentro do embrulho CJS.
+    ///
+    /// O loader.js põe todo módulo em `function (exports, require, module, __filename,
+    /// __dirname)`. Um módulo ES não tem essas variáveis, e é comum ele mesmo declará-las:
+    /// `const __dirname = path.dirname(fileURLToPath(import.meta.url))` ou
+    /// `const require = createRequire(import.meta.url)` — o vite, por exemplo. No mesmo
+    /// escopo dos parâmetros isso é SyntaxError ("Cannot declare a const variable twice");
+    /// numa função de dentro é só sombra. A seta mantém `this` e enxerga os parâmetros de
+    /// fora, e fica na mesma linha para não deslocar a pilha. O `#!` que o esbuild preserva
+    /// vira comentário, senão ficaria no meio do código.
+    static func embrulharModuloES(_ cjs: String) -> String {
+        let corpo = cjs.hasPrefix("#!") ? "//" + cjs.dropFirst(2) : cjs
+        return "return (() => {" + corpo + "\n})();"
     }
 
     static func looksLikeESM(_ src: String, ext: String) -> Bool {
@@ -95,6 +111,9 @@ enum ModuleLoader {
         for e in extensions where tipo(base + e) == .arquivo {
             return base + e
         }
+        if t == nil, let ts = fonteTypeScript(de: base) {
+            return ts
+        }
         if t == .pasta {
             let pkg = (base as NSString).appendingPathComponent("package.json")
             if let main = packageJSON(pkg, cache: cache)["main"] as? String,
@@ -104,6 +123,20 @@ enum ModuleLoader {
             }
             for e in extensions where tipo((base as NSString).appendingPathComponent("index" + e)) == .arquivo {
                 return (base as NSString).appendingPathComponent("index" + e)
+            }
+        }
+        return nil
+    }
+
+    /// `./math.js` que no disco é `./math.ts`: o jeito que o TypeScript manda escrever imports
+    /// com `moduleResolution: node16/nodenext`, e que o vite, o vitest e o tsx aceitam. Só vale
+    /// quando o `.js` não existe — um `.js` de verdade sempre ganha.
+    static func fonteTypeScript(de base: String) -> String? {
+        let trocas = [".js": [".ts", ".tsx"], ".jsx": [".tsx"], ".mjs": [".mts"], ".cjs": [".cts"]]
+        for (ext, alternativas) in trocas where base.hasSuffix(ext) {
+            let semExt = String(base.dropLast(ext.count))
+            for alt in alternativas where tipo(semExt + alt) == .arquivo {
+                return semExt + alt
             }
         }
         return nil

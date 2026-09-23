@@ -8,7 +8,9 @@ __nodeDefine("util", (module, exports, require) => {
     if (typeof v === "number" || typeof v === "boolean" || typeof v === "bigint") return String(v) + (typeof v === "bigint" ? "n" : "");
     if (typeof v === "symbol") return v.toString();
     if (typeof v === "function") return `[${v.constructor && v.constructor.name === "AsyncFunction" ? "AsyncFunction" : "Function"}${v.name ? ": " + v.name : " (anonymous)"}]`;
-    if (v instanceof Error) return v.stack || `${v.name}: ${v.message}`;
+    // A pilha do JSC não começa por "Nome: mensagem" como a do V8: só a pilha, e a mensagem
+    // sumia de todo console.error(e) (o "Startup Error" do vitest saía sem dizer qual erro).
+    if (v instanceof Error) return globalThis.__formatError(v);
     if (v instanceof Date) return isNaN(v) ? "Invalid Date" : v.toISOString();
     if (v instanceof RegExp) return v.toString();
     if (v instanceof Promise) return "Promise { <pending> }";

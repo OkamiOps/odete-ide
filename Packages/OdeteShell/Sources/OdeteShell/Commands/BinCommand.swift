@@ -13,7 +13,7 @@ struct BinCommand: ShellCommand {
     /// `node_modules`, e precisam responder pelo nome puro: `npm run dev` com
     /// `"dev": "vite"` executa `vite`, não `npx vite`.
     static let substituidos: Set<String> = [
-        "vite", "astro", "next", "nest", "serve", "http-server", "tsx", "ts-node",
+        "vite", "astro", "next", "nest", "serve", "http-server", "tsx", "ts-node", "vitest",
     ]
 
     static func binPath(_ name: String, root: URL) -> URL? {
@@ -61,6 +61,16 @@ struct BinCommand: ShellCommand {
         case "serve", "http-server": return await serveStatic(ctx, dir: rest.first { !$0.hasPrefix("-") } ?? ".")
         case "tsx", "ts-node":
             return await NodeCommand().run(rest, ctx)
+        case "vitest":
+            return await vitest(rest, ctx)
+        case "tsc" where Self.typescriptNativo(root: ctx.root) != nil, "tsgo":
+            let versao = Self.typescriptNativo(root: ctx.root) ?? "7"
+            io.err(tr(
+                "%1$@: o TypeScript %2$@ é o compilador nativo (Go) e não roda no iPad. Para checar tipos aqui, instale o compilador em JavaScript: npm i -D typescript@6",
+                bin,
+                versao
+            ))
+            return 1
         default:
             guard let file = Self.binPath(bin, root: ctx.root)
             else { io.err(tr("npx: %1$@ não está em node_modules/.bin (rode npm install)", "\(bin)")); return 127 }
@@ -78,6 +88,130 @@ struct BinCommand: ShellCommand {
                 esbuild: ctx.shell.esbuildEngine()
             )
         }
+    }
+
+    /// A versão do `typescript` instalado quando ele é o 7 ou mais novo: o compilador nativo
+    /// (Go). O pacote traz só um lançador que executa o binário da plataforma — que o
+    /// instalador nem baixa, porque não roda no iPad. O último `tsc` em JavaScript é o 6.
+    static func typescriptNativo(root: URL) -> String? {
+        guard let v = versaoInstalada("typescript", root: root),
+              let maior = Int(v.prefix { $0.isNumber }), maior >= 7 else { return nil }
+        return v
+    }
+
+    /// `vitest`, `vitest run [filtros]`: o executor embutido (`ExecutorDeTestes`).
+    ///
+    /// O vitest de verdade não sobe aqui em nenhuma configuração — o vite 8 dele precisa do
+    /// binário nativo do rolldown, e todo pool (forks, threads, vmThreads) roda os arquivos
+    /// em worker_threads ou processos filhos. Antes ele morria calado e o comando saía com
+    /// 0, como se tudo tivesse passado. Sem modo watch: roda uma vez e sai.
+    func vitest(_ args: [String], _ ctx: CommandContext) async -> Int32 {
+        let io = ctx.io
+        let versao = Self.versaoInstalada("vitest", root: ctx.root) ?? "5"
+        var filtros: [String] = []
+        var padrao: String?
+        var tempoLimite: Int?
+        var detalhado = false
+        var semTestesOk = false
+        var raiz = ctx.root
+        // Opções que levam valor separado (`--pool threads`): o valor não é filtro.
+        let comValor: Set = [
+            "--pool", "--reporter", "--maxWorkers", "--minWorkers", "--config", "-c", "--environment",
+            "--project", "--outputFile", "--shard", "--mode", "--retry", "--bail", "--hookTimeout", "--exclude",
+        ]
+        var i = 0
+        let valor = { (j: Int) -> String? in j + 1 < args.count ? args[j + 1] : nil }
+        while i < args.count {
+            let a = args[i]
+            switch a {
+            case "-v", "--version":
+                io.out("vitest/\(versao) (Odete)"); return 0
+            case "run", "watch", "dev":
+                break
+            case "bench", "init", "list", "related", "typecheck":
+                io.err(tr("vitest %1$@ não existe no executor embutido da Odete; use vitest run", a)); return 1
+            case "-t", "--testNamePattern":
+                padrao = valor(i); i += 1
+            case "--testTimeout":
+                tempoLimite = valor(i).flatMap { Int($0) }; i += 1
+            case "--dir", "--root", "-r":
+                if let d = valor(i) {
+                    raiz = ctx.resolve(d)
+                }
+                i += 1
+            case "--passWithNoTests":
+                semTestesOk = true
+            case "--reporter=verbose":
+                detalhado = true
+            default:
+                if a.hasPrefix("--testNamePattern=") {
+                    padrao = String(a.dropFirst("--testNamePattern=".count))
+                } else if a.hasPrefix("--testTimeout=") {
+                    tempoLimite = Int(a.dropFirst("--testTimeout=".count))
+                } else if a == "--reporter", valor(i) == "verbose" {
+                    detalhado = true; i += 1
+                } else if comValor.contains(a) {
+                    i += 1
+                } else if !a.hasPrefix("-") {
+                    filtros.append(a)
+                }
+            }
+            i += 1
+        }
+        io.out(tr(
+            "vitest: o vitest de verdade não roda no iPad (precisa de worker_threads e do binário nativo do vite); usando o executor embutido da Odete"
+        ))
+        if let ignorado = Self.configDoVitestIgnorada(raiz) {
+            io.err(tr("aviso: %1$@ usa %2$@, que o executor embutido não aplica", ignorado.arquivo, ignorado.opcao))
+        }
+        let arquivos = ExecutorDeTestes.arquivos(em: raiz, filtros: filtros)
+        guard !arquivos.isEmpty else {
+            io.err(tr(
+                "Nenhum arquivo de teste encontrado (*.test.ts, *.spec.js, …)%1$@",
+                filtros.isEmpty ? "" : ": " + filtros.joined(separator: " ")
+            ))
+            return semTestesOk ? 0 : 1
+        }
+        let opcoes = ExecutorDeTestes.Opcoes(
+            raiz: raiz.path,
+            versao: versao,
+            arquivos: arquivos.map(\.path),
+            padrao: padrao,
+            tempoLimite: tempoLimite,
+            detalhado: detalhado
+        )
+        return await NodeCommand.runProcess(
+            NodeCommand.Alvo(code: nil, file: ExecutorDeTestes.script, argv: [opcoes.json], label: "vitest run"),
+            ctx: ctx,
+            esbuild: ctx.shell.esbuildEngine()
+        )
+    }
+
+    /// O que a config do vitest pede e o executor embutido não faz: `setupFiles` e ambiente
+    /// de navegador (jsdom, happy-dom). Sem executar a config — ela importa o vite —, só
+    /// lendo o texto. Melhor avisar do que ver o teste falhar sem saber por quê.
+    static func configDoVitestIgnorada(_ raiz: URL) -> (arquivo: String, opcao: String)? {
+        let nomes = ["vitest.config", "vite.config"].flatMap { base in
+            ["ts", "mts", "js", "mjs", "cts", "cjs"].map { "\(base).\($0)" }
+        }
+        for nome in nomes {
+            guard let texto = try? String(contentsOf: raiz.appending(path: nome), encoding: .utf8) else { continue }
+            if texto.contains("setupFiles") {
+                return (nome, "setupFiles")
+            }
+            if let m = texto.firstMatch(of: /environment\s*:\s*["'](jsdom|happy-dom|edge-runtime)["']/) {
+                return (nome, "environment: \(m.1)")
+            }
+        }
+        return nil
+    }
+
+    /// `version` do package.json de um pacote instalado no projeto.
+    static func versaoInstalada(_ pacote: String, root: URL) -> String? {
+        let pkg = root.appending(path: "node_modules/\(pacote)/package.json")
+        guard let d = try? Data(contentsOf: pkg),
+              let j = try? JSONSerialization.jsonObject(with: d) as? [String: Any] else { return nil }
+        return j["version"] as? String
     }
 
     func portArg(_ args: [String]) -> Int? {

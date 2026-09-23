@@ -57,7 +57,8 @@
   globalThis.__formatError = (e) => {
     if (!(e instanceof Error)) return "Uncaught " + String(e);
     const head = (e.name || "Error") + ": " + e.message;
-    const stack = e.stack ? String(e.stack).split("\n").filter(Boolean).map((l) => "    at " + l).join("\n") : "";
+    // Quadro sem nome nem arquivo ("@", de código avaliado) não diz nada: fica de fora.
+    const stack = e.stack ? String(e.stack).split("\n").filter((l) => l && l !== "@").map((l) => "    at " + l).join("\n") : "";
     return head + (stack ? "\n" + stack : "");
   };
 

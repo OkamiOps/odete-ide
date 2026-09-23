@@ -1,6 +1,7 @@
 import Foundation
 import OdeteI18n
 import OdeteRuntime
+import Synchronization
 
 /// `node arquivo.js [args]`, `node -e "código"`, `node -v`.
 struct NodeCommand: ShellCommand {
@@ -64,53 +65,59 @@ struct NodeCommand: ShellCommand {
             kind == .out ? io.out(text) : io.err(text)
         }
         p.setTransform(esbuild.cjsTransform)
+        let fim = Termino()
         let task = Task { () -> Int32 in
-            if let code {
-                return await p.run(code: code)
+            let c = if let code {
+                await p.run(code: code)
+            } else {
+                await p.run(file: file!)
             }
-            return await p.run(file: file!)
+            fim.marcar(c)
+            return c
         }
-        // espera até 1,5 s: se o processo abriu porta, vira job
-        for _ in 0 ..< 15 {
-            try? await Task.sleep(for: .milliseconds(100))
+        // Olha o processo a cada 20 ms: acabou, devolve na hora; nos primeiros 1,5 s, se
+        // abriu porta, vira job. Antes o laço dormia os 1,5 s inteiros mesmo com o processo
+        // já terminado — todo `node`/`npx` levava no mínimo 1,5 s — e depois esperava num
+        // grupo de tasks que só volta quando o processo acaba, então Ctrl+C não chegava.
+        // Passada a janela do job, 200 ms: um processo longo sem porta (watcher, script
+        // demorado) não acorda o iPad 50 vezes por segundo, e o Ctrl+C responde como antes.
+        let inicio = ContinuousClock.now
+        while true {
+            if let c = fim.codigo {
+                return c
+            }
             if ctx.isCancelled() {
                 p.kill(); return await task.value
             }
-            let ports = p.ports
-            if !ports.isEmpty {
-                let job = ctx.shell.registerJob(label, ports: ports) { p.kill() }
-                io.out(tr(
-                    "servidor em http://127.0.0.1:%1$@ (job %2$@; kill %%%3$@ para parar)",
-                    "\(ports[0])",
-                    "\(job.id)",
-                    "\(job.id)"
-                ))
-                Task { _ = await task.value; ctx.shell.removeJob(job) }
-                return 0
+            let naJanela = ContinuousClock.now - inicio < .milliseconds(1500)
+            if naJanela {
+                let ports = p.ports
+                if !ports.isEmpty {
+                    let job = ctx.shell.registerJob(label, ports: ports) { p.kill() }
+                    io.out(tr(
+                        "servidor em http://127.0.0.1:%1$@ (job %2$@; kill %%%3$@ para parar)",
+                        "\(ports[0])",
+                        "\(job.id)",
+                        "\(job.id)"
+                    ))
+                    Task { _ = await task.value; ctx.shell.removeJob(job) }
+                    return 0
+                }
             }
-            if task.isCancelled {
-                break
-            }
+            try? await Task.sleep(for: .milliseconds(naJanela ? 20 : 200))
         }
-        // ainda rodando sem porta: espera terminar, checando cancelamento
-        while true {
-            if ctx.isCancelled() {
-                p.kill(); break
-            }
-            if let v = await withTimeout(task, ms: 200) {
-                return v
-            }
-        }
-        return await task.value
     }
 
-    static func withTimeout(_ task: Task<Int32, Never>, ms: Int) async -> Int32? {
-        await withTaskGroup(of: Int32?.self) { g in
-            g.addTask { await task.value }
-            g.addTask { try? await Task.sleep(for: .milliseconds(ms)); return nil }
-            let first = await g.next() ?? nil
-            g.cancelAll()
-            return first
+    /// O código de saída, visível sem esperar pela task do processo.
+    final class Termino: Sendable {
+        private let valor = Mutex<Int32?>(nil)
+
+        func marcar(_ c: Int32) {
+            valor.withLock { $0 = c }
+        }
+
+        var codigo: Int32? {
+            valor.withLock { $0 }
         }
     }
 }

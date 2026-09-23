@@ -59,6 +59,15 @@ struct NpmCommand: ShellCommand {
                 for n in rep.native {
                     io.err(tr("aviso: %1$@ tem código nativo e não roda no iPad", "\(n)"))
                 }
+                // `npm i -D typescript` hoje traz o 7, que é só um lançador do binário em Go.
+                if rep.installed.contains(where: { $0.name == "typescript" }),
+                   let v = BinCommand.typescriptNativo(root: ctx.root)
+                {
+                    io.err(tr(
+                        "aviso: typescript@%1$@ é o compilador nativo (Go); o tsc dele não roda no iPad. Para checar tipos aqui: npm i -D typescript@6",
+                        v
+                    ))
+                }
                 // Pacote de outra plataforma não é problema: é o rollup e o esbuild
                 // trazendo um binário por sistema. Uma linha vermelha para cada um fazia
                 // uma instalação certa parecer que tinha dado errado dez vezes.

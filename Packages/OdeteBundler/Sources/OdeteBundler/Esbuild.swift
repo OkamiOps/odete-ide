@@ -52,6 +52,8 @@ public final class Esbuild: @unchecked Sendable {
     public let engine: JSEngine
     public let root: URL
     private let inicializacao = Mutex<Task<String, Error>?>(nil)
+    /// A carga já terminou bem: `transformCJSSync` não precisa mais esperar por ela.
+    private let carregado = Mutex(false)
     private let saida: SaidaDoMotor
     private let paradas = Mutex<[Task<Void, Never>]>([])
     private let ultimoLint = Mutex<[String: (texto: String, diagnosticos: [Diagnostic])]>([:])
@@ -244,8 +246,37 @@ public final class Esbuild: @unchecked Sendable {
     /// Bloqueia a fila de quem chama, nunca a deste motor: quem chama é o runtime de um
     /// `node x.ts`, que tem fila própria. Chamar daqui de dentro travaria para sempre.
     public func transformCJSSync(_ code: String, file: String) throws -> String {
+        try carregarSync()
         let json = try engine.callSync("__transformCJS", [code, file])
         return try (JSONSerialization.jsonObject(with: Data(json.utf8), options: [.fragmentsAllowed]) as? String) ?? ""
+    }
+
+    /// `ready()` bloqueante, para o `require` de outro runtime.
+    ///
+    /// `__transformCJS` só existe depois que o bundler.js foi avaliado. Desde que o app abre
+    /// sem carregar o esbuild, o primeiro `node x.ts` (ou `npx vitest`) do terminal podia
+    /// chegar antes de qualquer lint e morria com "função não encontrada: __transformCJS".
+    /// Bloquear aqui é seguro pelo mesmo motivo de `transformCJSSync`: quem espera é a fila
+    /// do outro runtime, e a carga roda na fila deste motor. Depois da primeira vez não
+    /// custa nada além de ler a trava.
+    private func carregarSync() throws {
+        if carregado.withLock({ $0 }) {
+            return
+        }
+        let caixa = CaixaDeCarga()
+        Task.detached { [self] in
+            do {
+                _ = try await ready()
+            } catch {
+                caixa.erro = error
+            }
+            caixa.pronto.signal()
+        }
+        caixa.pronto.wait()
+        if let e = caixa.erro {
+            throw e
+        }
+        carregado.withLock { $0 = true }
     }
 
     /// Build avulso (o `vite build`, por exemplo).
@@ -309,6 +340,13 @@ public final class Esbuild: @unchecked Sendable {
     public var cjsTransform: @Sendable (String, String) throws -> String {
         { [self] code, file in try transformCJSSync(code, file: file) }
     }
+}
+
+/// O resultado da carga esperada por `carregarSync`. O semáforo ordena a escrita do erro
+/// (na task) antes da leitura (em quem espera).
+private final class CaixaDeCarga: @unchecked Sendable {
+    let pronto = DispatchSemaphore(value: 0)
+    var erro: Error?
 }
 
 /// Para onde vai o que o JS do motor escreve. Classe à parte porque o motor é criado

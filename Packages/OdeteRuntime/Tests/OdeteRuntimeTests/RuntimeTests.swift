@@ -178,6 +178,66 @@ struct RuntimeTests {
         #expect(code2 == 0 && cap2.stdout == "via transform")
     }
 
+    /// Módulo ES que declara as variáveis do embrulho CJS, como o vite faz: antes era
+    /// SyntaxError ("Cannot declare a const variable twice: '__dirname'"). (`require`,
+    /// `module` e `exports` o próprio esbuild renomeia quando gera CJS; `__dirname` e
+    /// `__filename` ele deixa.)
+    @Test func moduloESDeclaraDirname() async throws {
+        let dir = try tmp()
+        try """
+        #!/usr/bin/env node
+        import path from "node:path";
+        const __filename = new URL(import.meta.url).pathname;
+        const __dirname = path.dirname(__filename);
+        console.log(__dirname === process.cwd(), path.basename(__filename), this === exports);
+        """.write(to: dir.appending(path: "m.mjs"), atomically: true, encoding: .utf8)
+        let cap = Capture()
+        let p = JSProcess(cwd: dir, output: cap.handler)
+        // Finge o esbuild: troca o import por require e import.meta.url pela URL do arquivo,
+        // e deixa o `#!` no topo, como o esbuild deixa.
+        p.setTransform { src, file in
+            src.replacingOccurrences(
+                of: #"import path from "node:path";"#,
+                with: #"const path = require("node:path");"#
+            )
+            .replacingOccurrences(of: "import.meta.url", with: "\"file://\(file)\"")
+        }
+        let code = await p.run(file: dir.appending(path: "m.mjs"))
+        #expect(code == 0 && cap.stdout == "true m.mjs true", Comment(rawValue: cap.stdout + cap.stderr))
+    }
+
+    /// `import "./a.js"` com `a.ts` no disco (o estilo do TypeScript com nodenext); um `.js`
+    /// que existe de verdade continua ganhando.
+    @Test func importComJsAchaOFonteTypeScript() async throws {
+        let dir = try tmp()
+        try "exports.v = 'do ts';".write(to: dir.appending(path: "a.ts"), atomically: true, encoding: .utf8)
+        try "exports.v = 'do tsx';".write(to: dir.appending(path: "c.tsx"), atomically: true, encoding: .utf8)
+        try "exports.v = 'do js';".write(to: dir.appending(path: "b.js"), atomically: true, encoding: .utf8)
+        try "exports.v = 'do ts errado';".write(to: dir.appending(path: "b.ts"), atomically: true, encoding: .utf8)
+        let cap = Capture()
+        let p = JSProcess(cwd: dir, output: cap.handler)
+        p.setTransform { src, _ in src }
+        let code = await p.run(code: """
+        console.log(require("./a.js").v, require("./b.js").v, require("./c.js").v);
+        try { require("./nada.js"); } catch (e) { console.log(e.code); }
+        """)
+        #expect(
+            code == 0 && cap.stdout == "do ts do js do tsx\nMODULE_NOT_FOUND",
+            Comment(rawValue: cap.stdout + cap.stderr)
+        )
+    }
+
+    /// `console.error(e)` mostra o nome e a mensagem, não só a pilha do JSC.
+    @Test func consoleDeErroMostraAMensagem() async throws {
+        let (code, c) = try await run("""
+        function f() { throw new TypeError("sem binário nativo"); }
+        try { f(); } catch (e) { console.error(e); console.log(require("util").inspect({ e: 1 })); }
+        """)
+        #expect(code == 0)
+        #expect(c.stderr.hasPrefix("TypeError: sem binário nativo\n    at f"), Comment(rawValue: c.stderr))
+        #expect(c.stdout == "{ e: 1 }")
+    }
+
     @Test func exitCodesAndErrors() async throws {
         let (a, _) = try await run("process.exitCode = 3; setTimeout(() => {}, 5);")
         #expect(a == 3)

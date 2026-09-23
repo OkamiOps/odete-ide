@@ -319,11 +319,16 @@ const __odeteChama = (id) => async (...args) => {
   };
 
   // transforma TS/ESM → CJS para o require do runtime
+  //
+  // `import()` vira `Promise.resolve().then(() => require(…))`: o JSContext do runtime não
+  // tem carregador de módulos, e o `import()` nativo rejeita com "No module loader
+  // provided". Deixado como estava, a CLI do vitest (que carrega tudo por `import()`)
+  // rejeitava, a rejeição não aparecia em lugar nenhum e o processo saía com 0, mudo.
   globalThis.__transformCJS = async (code, file) => {
     await ready;
     const ext = path.extname(file).toLowerCase();
     const loader = { ".ts": "ts", ".tsx": "tsx", ".jsx": "jsx", ".mts": "ts", ".cts": "ts" }[ext] || "js";
-    const r = await globalThis.esbuild.transform(code, { loader, format: "cjs", target: "es2022", sourcefile: file, platform: "node", supported: { "dynamic-import": true }, define: { "import.meta.url": JSON.stringify("file://" + file), "import.meta.dirname": JSON.stringify(path.dirname(file)), "import.meta.filename": JSON.stringify(file) } });
+    const r = await globalThis.esbuild.transform(code, { loader, format: "cjs", target: "es2022", sourcefile: file, platform: "node", supported: { "dynamic-import": false }, define: { "import.meta.url": JSON.stringify("file://" + file), "import.meta.dirname": JSON.stringify(path.dirname(file)), "import.meta.filename": JSON.stringify(file) } });
     return r.code;
   };
 

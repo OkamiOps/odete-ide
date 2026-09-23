@@ -85,6 +85,62 @@
         }
       }
     },
+    "  %1$@: faltam pacotes em node_modules (%2$@); rodando npm install": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "  %1$@: packages missing from node_modules (%2$@); running npm install"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "  %1$@: in node_modules fehlen Pakete (%2$@); npm install läuft"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "  %1$@ : il manque des paquets dans node_modules (%2$@) ; lancement de npm install"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "  %1$@: faltan paquetes en node_modules (%2$@); ejecutando npm install"
+          }
+        }
+      }
+    },
+    "  %1$@: terminando de preparar o pacote de dependências…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "  %1$@: finishing the dependency bundle…"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "  %1$@: das Abhängigkeitspaket wird fertig vorbereitet…"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "  %1$@ : fin de la préparation du paquet de dépendances…"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "  %1$@: terminando de preparar el paquete de dependencias…"
+          }
+        }
+      }
+    },
     "  [nativo, não roda]": {
       "localizations": {
         "en": {
@@ -417,6 +473,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "%1$@ (solo %2$@)"
+          }
+        }
+      }
+    },
+    "%1$@ (só no lock)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ (only in the lock)"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ (nur im Lock)"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ (seulement dans le lock)"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ (solo en el lock)"
           }
         }
       }
@@ -981,6 +1065,34 @@
         }
       }
     },
+    "%1$@ pacote(s) com script de instalação não executado: %2$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ package(s) with an install script that wasn’t run: %2$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ Paket(e) mit nicht ausgeführtem Installationsskript: %2$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ paquet(s) avec un script d’installation non exécuté : %2$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ paquete(s) con script de instalación sin ejecutar: %2$@"
+          }
+        }
+      }
+    },
     "%1$@ pacote(s) de outros sistemas ignorado(s): ": {
       "localizations": {
         "en": {
@@ -1061,6 +1173,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "%1$@ patches pendientes"
+          }
+        }
+      }
+    },
+    "%1$@ pede %2$@@%3$@ como peer, mas a versão instalada é %4$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ wants %2$@@%3$@ as a peer, but the installed version is %4$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ verlangt %2$@@%3$@ als Peer, installiert ist aber %4$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ demande %2$@@%3$@ comme peer, mais la version installée est %4$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ pide %2$@@%3$@ como peer, pero la versión instalada es %4$@"
           }
         }
       }
@@ -1317,6 +1457,34 @@
         }
       }
     },
+    "%1$@: %2$@ pede %3$@, mas já há %4$@ no mesmo lugar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@: %2$@ wants %3$@, but %4$@ is already in the same place"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@: %2$@ verlangt %3$@, aber an derselben Stelle liegt schon %4$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ : %2$@ demande %3$@, mais %4$@ est déjà au même endroit"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@: %2$@ pide %3$@, pero ya hay %4$@ en el mismo lugar"
+          }
+        }
+      }
+    },
     "%1$@: de %2$@ para %3$@ tokens": {
       "localizations": {
         "en": {
@@ -1341,6 +1509,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "%1$@: de %2$@ a %3$@ tokens"
+          }
+        }
+      }
+    },
+    "%1$@: dependência por git (%2$@) precisa do git, que não roda no iPad; só GitHub é baixado direto": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@: a git dependency (%2$@) needs git, which doesn’t run on iPad; only GitHub is downloaded directly"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@: eine Git-Abhängigkeit (%2$@) braucht git, das auf dem iPad nicht läuft; nur GitHub wird direkt geladen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ : une dépendance git (%2$@) a besoin de git, qui ne tourne pas sur iPad ; seul GitHub est téléchargé directement"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@: una dependencia por git (%2$@) necesita git, que no funciona en el iPad; solo GitHub se descarga directamente"
           }
         }
       }
@@ -1401,6 +1597,34 @@
         }
       }
     },
+    "%1$@: não há package.json em %2$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@: there’s no package.json in %2$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@: in %2$@ gibt es keine package.json"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ : pas de package.json dans %2$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@: no hay package.json en %2$@"
+          }
+        }
+      }
+    },
     "%1$@: o TypeScript %2$@ é o compilador nativo (Go) e não roda no iPad. Para checar tipos aqui, instale o compilador em JavaScript: npm i -D typescript@6": {
       "localizations": {
         "en": {
@@ -1425,6 +1649,118 @@
           "stringUnit": {
             "state": "translated",
             "value": "%1$@: TypeScript %2$@ es el compilador nativo (Go) y no funciona en el iPad. Para comprobar tipos aquí, instala el compilador en JavaScript: npm i -D typescript@6"
+          }
+        }
+      }
+    },
+    "%1$@: o pacote em %2$@ não tem package.json": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@: the package at %2$@ has no package.json"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@: das Paket unter %2$@ hat keine package.json"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ : le paquet à %2$@ n’a pas de package.json"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@: el paquete en %2$@ no tiene package.json"
+          }
+        }
+      }
+    },
+    "%1$@: o servidor não sobe sem %2$@ em node_modules; confira os erros acima e rode npm install": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@: the server won’t start without %2$@ in node_modules; check the errors above and run npm install"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@: ohne %2$@ in node_modules startet der Server nicht; sieh dir die Fehler oben an und führ npm install aus"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ : le serveur ne démarre pas sans %2$@ dans node_modules ; regarde les erreurs ci-dessus et lance npm install"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@: el servidor no arranca sin %2$@ en node_modules; revisa los errores de arriba y ejecuta npm install"
+          }
+        }
+      }
+    },
+    "%1$@: sem conexão, não deu para instalar as dependências, e sem elas o Preview não abre. Conecte-se à internet e rode npm run dev de novo.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@: no connection, so the dependencies couldn’t be installed, and the Preview won’t open without them. Connect to the internet and run npm run dev again."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@: keine Verbindung, die Abhängigkeiten konnten nicht installiert werden, und ohne sie öffnet sich das Preview nicht. Verbinde dich mit dem Internet und führ npm run dev noch einmal aus."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ : pas de connexion, impossible d’installer les dépendances, et sans elles le preview ne s’ouvre pas. Connecte-toi à Internet et relance npm run dev."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@: sin conexión no se pudieron instalar las dependencias, y sin ellas el preview no abre. Conéctate a internet y vuelve a ejecutar npm run dev."
+          }
+        }
+      }
+    },
+    "%1$@: workspace:%2$@ pedido, mas não há workspace com esse nome": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@: workspace:%2$@ requested, but there’s no workspace with that name"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@: workspace:%2$@ angefordert, aber es gibt keinen Workspace mit diesem Namen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ : workspace:%2$@ demandé, mais aucun workspace ne porte ce nom"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@: se pidió workspace:%2$@, pero no hay ningún workspace con ese nombre"
           }
         }
       }
@@ -25789,34 +26125,6 @@
         }
       }
     },
-    "aviso: %1$@ não instalados; o preview vai buscar no esm.sh": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "warning: %1$@ not installed; the preview will fetch them from esm.sh"
-          }
-        },
-        "de": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Warnung: %1$@ nicht installiert; das Preview holt sie von esm.sh"
-          }
-        },
-        "fr": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "avertissement : %1$@ non installés ; le preview ira les chercher sur esm.sh"
-          }
-        },
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "advertencia: %1$@ no instalados; el preview los va a buscar en esm.sh"
-          }
-        }
-      }
-    },
     "aviso: %1$@ tem código nativo e não roda no iPad": {
       "localizations": {
         "en": {
@@ -30549,6 +30857,34 @@
         }
       }
     },
+    "npm ci precisa de um package-lock.json; rode npm install para criar um": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "npm ci needs a package-lock.json; run npm install to create one"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "npm ci braucht eine package-lock.json; führ npm install aus, um eine zu erstellen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "npm ci a besoin d’un package-lock.json ; lance npm install pour en créer un"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "npm ci necesita un package-lock.json; ejecuta npm install para crear uno"
+          }
+        }
+      }
+    },
     "npm: comando não suportado: %1$@": {
       "localizations": {
         "en": {
@@ -30657,6 +30993,62 @@
           "stringUnit": {
             "state": "translated",
             "value": "npx: %1$@ no está en node_modules/.bin (ejecuta npm install)"
+          }
+        }
+      }
+    },
+    "npx: instalando %1$@…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "npx: installing %1$@…"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "npx: %1$@ wird installiert…"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "npx: installation de %1$@…"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "npx: instalando %1$@…"
+          }
+        }
+      }
+    },
+    "não achei %1$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "couldn’t find %1$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ nicht gefunden"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ introuvable"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "no encontré %1$@"
           }
         }
       }
@@ -31781,6 +32173,34 @@
         }
       }
     },
+    "package.json e package-lock.json não batem (%1$@); rode npm install para atualizar o lock": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "package.json and package-lock.json don’t match (%1$@); run npm install to update the lock"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "package.json und package-lock.json passen nicht zusammen (%1$@); führ npm install aus, um das Lock zu aktualisieren"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "package.json et package-lock.json ne correspondent pas (%1$@) ; lance npm install pour mettre à jour le lock"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "package.json y package-lock.json no coinciden (%1$@); ejecuta npm install para actualizar el lock"
+          }
+        }
+      }
+    },
     "package.json já existe": {
       "localizations": {
         "en": {
@@ -32085,6 +32505,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "puerto %1$@ ocupado, y los %2$@ siguientes también"
+          }
+        }
+      }
+    },
+    "preparando o dev server em segundo plano (esbuild e pacote de dependências)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "preparing the dev server in the background (esbuild and dependency bundle)"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "der Dev-Server wird im Hintergrund vorbereitet (esbuild und Abhängigkeitspaket)"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "préparation du serveur de dev en arrière-plan (esbuild et paquet de dépendances)"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "preparando el dev server en segundo plano (esbuild y paquete de dependencias)"
           }
         }
       }
@@ -33009,6 +33457,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "sin commit"
+          }
+        }
+      }
+    },
+    "sem conexão com o registro do npm: confira a internet e rode de novo": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "no connection to the npm registry: check your internet and run it again"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "keine Verbindung zur npm-Registry: prüf deine Internetverbindung und versuch es noch einmal"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "pas de connexion au registre npm : vérifie ta connexion et relance"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "sin conexión con el registro de npm: revisa tu internet y vuelve a ejecutarlo"
           }
         }
       }

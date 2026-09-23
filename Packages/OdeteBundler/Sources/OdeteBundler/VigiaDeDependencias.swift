@@ -294,8 +294,19 @@ final class VigiaDeDependencias: @unchecked Sendable {
             let pacotes = raiz + "/" + nome
             return caminho == pacotes || caminho.hasPrefix(pacotes + "/")
         }
-        return dePacotes || caminho == raiz + "/package.json" || caminho == raiz + "/package-lock.json"
+        return dePacotes || caminho == raiz + "/package.json" || Self.travas.contains { caminho == raiz + "/" + $0 }
     }
+
+    /// Os locks de cada gerenciador. `git pull` que só muda um deles também é mudança de
+    /// ambiente: vem junto com um `npm install` que troca os pacotes.
+    static let travas = [
+        "package-lock.json",
+        "npm-shrinkwrap.json",
+        "yarn.lock",
+        "pnpm-lock.yaml",
+        "bun.lock",
+        "bun.lockb",
+    ]
 
     private func avisarAmbienteQuandoSossegar(_ caminhos: [String]) {
         ambientePendente.formUnion(caminhos)

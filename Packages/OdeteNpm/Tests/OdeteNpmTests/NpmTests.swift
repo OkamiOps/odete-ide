@@ -102,12 +102,19 @@ final class FakeRegistry: RegistryClient, @unchecked Sendable {
         os: [String] = [],
         cpu: [String] = [],
         install: Bool = false,
-        latest: Bool = true
+        latest: Bool = true,
+        peer: [String: String] = [:],
+        peersOpcionais: Set<String> = [],
+        deprecated: String? = nil,
+        links: [String: String] = [:]
     ) {
         let url = "fake://\(name)/\(version).tgz"
         var pkgJSON: [String: Any] = ["name": name, "version": version, "dependencies": deps]
         if !bin.isEmpty {
             pkgJSON["bin"] = bin
+        }
+        if !peer.isEmpty {
+            pkgJSON["peerDependencies"] = peer
         }
         var entries = [Tar.Entry(
             path: "package/package.json",
@@ -125,6 +132,9 @@ final class FakeRegistry: RegistryClient, @unchecked Sendable {
                 link: nil
             ))
         }
+        for (p, destino) in links.sorted(by: { $0.key < $1.key }) {
+            entries.append(Tar.Entry(path: "package/" + p, data: Data(), isDir: false, mode: 0o777, link: destino))
+        }
         tarballs[url] = GzipCodec.compress(Tar.write(entries))!
         let pv = PackumentVersion(
             version: Version(version)!,
@@ -137,10 +147,13 @@ final class FakeRegistry: RegistryClient, @unchecked Sendable {
             os: os,
             cpu: cpu,
             hasInstallScript: install,
-            deprecated: nil
+            deprecated: deprecated
         )
+        var pvComPeers = pv
+        pvComPeers.peerDependencies = peer
+        pvComPeers.peersOpcionais = peersOpcionais
         var p = packuments[name] ?? Packument(name: name, distTags: [:], versions: [:])
-        p.versions[pv.version] = pv
+        p.versions[pv.version] = pvComPeers
         if latest {
             p.distTags["latest"] = version
         }
@@ -211,7 +224,9 @@ struct InstallerTests {
         let inst = Installer(project: dir, registry: reg)
         let rep = try await inst.install(add: [Installer.Spec("b"), Installer.Spec("nativo")], dev: false)
         #expect(rep.added.sorted() == ["b@2.0.0", "nativo@1.0.0"])
-        #expect(rep.native == ["nativo@1.0.0"])
+        // Script de instalação sozinho não é código nativo (ver `CompatibilidadeTests`).
+        #expect(rep.native.isEmpty)
+        #expect(rep.scripts == ["nativo@1.0.0"])
         let pkg = PackageJSON(url: dir.appending(path: "package.json"))
         #expect(pkg.dependencies == ["b": "^2.0.0", "nativo": "^1.0.0"])
         _ = try await inst.uninstall(["nativo"])
@@ -241,7 +256,8 @@ struct InstallerTests {
             try texto.write(to: u, atomically: true, encoding: .utf8)
         }
         let guardados = [
-            "node_modules/.odete-deps/x.json", "node_modules/.odete-deps/x.js", "node_modules/.vite/deps/_metadata.json",
+            "node_modules/.odete-deps/x.json", "node_modules/.odete-deps/x.js",
+            "node_modules/.vite/deps/_metadata.json",
             "node_modules/c/node_modules/.cache/y.json",
         ]
         for g in guardados {
@@ -289,11 +305,17 @@ struct InstallerTests {
         #expect(GzipCodec.decompress(gz) == Data("olá".utf8))
     }
 
-    @Test func esmFallback() throws {
-        let map = EsmFallback.importMap(packages: ["react": "^19.2.0"])
-        #expect(map.contains("\"react\" : \"https://esm.sh/react@19.2.0?dev\""))
-        let dir = try project(["react": "^19"])
-        #expect(EsmFallback.missing(project: dir) == ["react": "^19"])
+    /// O que o `npm run dev` confere antes de subir o servidor: pasta que falta e versão
+    /// instalada que não atende mais a faixa (o `git pull` que sobe o React).
+    @Test func dependenciasQueFaltam() async throws {
+        let reg = registry()
+        let dir = try project(["a": "^1.0.0", "c": "^3.0.0"])
+        #expect(Faltando.dependencias(projeto: dir) == ["a", "c"])
+        _ = try await Installer(project: dir, registry: reg).install()
+        #expect(Faltando.dependencias(projeto: dir).isEmpty)
+        try JSONSerialization.data(withJSONObject: ["name": "proj", "dependencies": ["a": "^1.0.0", "c": "^4.0.0"]])
+            .write(to: dir.appending(path: "package.json"))
+        #expect(Faltando.dependencias(projeto: dir) == ["c"])
     }
 }
 

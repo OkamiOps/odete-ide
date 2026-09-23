@@ -25,6 +25,8 @@ globalThis.__devCria = function () {
   // (o iCloud não sincroniza o que termina em .nosync) e `node_modules` é um atalho para
   // ela: as duas são tratadas igual — fora do grafo vigiado, e mexer nelas refaz tudo.
   const PASTAS_DE_PACOTES = ["node_modules", "node_modules.nosync"];
+  // Os locks de cada gerenciador: mudar qualquer um é mudar os pacotes.
+  const TRAVAS = ["package-lock.json", "npm-shrinkwrap.json", "yarn.lock", "pnpm-lock.yaml", "bun.lock", "bun.lockb"];
   const ehDePacote = (f) => PASTAS_DE_PACOTES.some((n) => f.indexOf("/" + n + "/") >= 0);
   const state = {
     id: 0, root: "", server: null, port: 0, diagnostics: [], preset: "plain", base: "/", sockets: new Set(),
@@ -208,7 +210,12 @@ globalThis.__devCria = function () {
         arquivos.set(f, m);
       }
     }
-    for (const n of ["package.json", ".env", ".env.local", ".env.development", ".env.development.local"]) {
+    // Os locks entram também: um `git pull` que só muda o package-lock.json, seguido de
+    // `npm install`, trocava os pacotes sem mudar o package.json nem a lista de pastas de
+    // node_modules — e o servidor seguia servindo o pacote velho. O
+    // `node_modules/.package-lock.json` é o lock escondido que todo install regrava.
+    for (const n of ["package.json", ".env", ".env.local", ".env.development", ".env.development.local", ...TRAVAS,
+      path.join("node_modules", ".package-lock.json")]) {
       const f = path.join(state.root, n);
       if (!arquivos.has(f)) arquivos.set(f, null);
     }
@@ -242,7 +249,8 @@ globalThis.__devCria = function () {
   // ---- mudanças ----
   const ehAmbiente = (f) =>
     PASTAS_DE_PACOTES.some((n) => f === path.join(state.root, n) || f.startsWith(path.join(state.root, n) + "/")) ||
-    (path.dirname(f) === state.root && (/^package(-lock)?\.json$/.test(path.basename(f)) || path.basename(f).startsWith(".env")));
+    (path.dirname(f) === state.root &&
+      (path.basename(f) === "package.json" || TRAVAS.includes(path.basename(f)) || path.basename(f).startsWith(".env")));
 
   const tronco = (f) => path.join(path.dirname(f), path.basename(f, path.extname(f)));
 
@@ -335,33 +343,30 @@ globalThis.__devCria = function () {
     return `console.error(${JSON.stringify(msg)}); document.body.innerHTML = '<pre style="white-space:pre-wrap;padding:16px;color:#e25d5d;background:#111;font:13px ui-monospace,monospace;margin:0;min-height:100vh">' + ${JSON.stringify(msg.replace(/</g, "&lt;"))} + '</pre>';`;
   }
 
-  // Pacotes do package.json que não têm pasta em node_modules vão para o esm.sh.
-  // Sem isto o navegador recebe `import "react"` cru e responde
-  // "Module name, 'react' does not resolve to a valid URL".
+  // Pacotes do package.json sem pasta em node_modules.
+  //
+  // Iam para o esm.sh, por um import map. Com node_modules pela metade isso misturava as
+  // duas origens: o `react-dom` do esm.sh trazia o React de lá, o app usava o daqui, e com
+  // duas cópias do React todo hook quebrava ("Invalid hook call" e o Preview preto). Sem
+  // rede o esm.sh também não responde, então nem o caso offline ele salvava. Agora o
+  // `npm run dev` instala o que falta antes de subir o servidor; se ainda faltar (a
+  // instalação falhou, o servidor subiu por outro caminho), a página diz o que falta em
+  // vez de ficar preta com um "does not resolve to a valid URL" no console.
   function importMap() {
     try {
       const arq = path.join(state.root, "package.json");
       if (!fs.existsSync(arq)) return "";
       const pkg = JSON.parse(fs.readFileSync(arq, "utf8"));
-      const deps = Object.assign({}, pkg.dependencies || {}, pkg.devDependencies || {});
-      const faltando = {};
-      for (const nome of Object.keys(deps)) {
-        if (fs.existsSync(path.join(state.root, "node_modules", nome, "package.json"))) continue;
-        faltando[nome] = String(deps[nome]).replace(/^[\^~=v\s]+/, "") || "latest";
-      }
-      const nomes = Object.keys(faltando);
+      const nomes = Object.keys(pkg.dependencies || {})
+        .filter((nome) => !fs.existsSync(path.join(state.root, "node_modules", nome, "package.json")));
       if (!nomes.length) return "";
-      // Tudo que depende de react precisa apontar para a mesma cópia, senão o esm.sh
-      // entrega duas e os hooks quebram.
-      const react = faltando.react ? `react@${faltando.react}` : "";
-      const imports = {};
-      for (const nome of nomes) {
-        const base = `https://esm.sh/${nome}@${faltando[nome]}`;
-        const extra = react && nome !== "react" ? `&deps=${react}` : "";
-        imports[nome] = `${base}?dev${extra}`;
-        imports[nome + "/"] = `${base}/`;
-      }
-      return `<script type="importmap">${JSON.stringify({ imports })}</script>`;
+      const msg = "Faltam pacotes em node_modules: " + nomes.join(", ") +
+        ". Rode npm install no terminal (o npm run dev já instala antes de subir).";
+      return "<script>console.error(" + JSON.stringify("[odete] " + msg) + ");" +
+        "addEventListener(\"DOMContentLoaded\",function(){var d=document.createElement(\"div\");d.textContent=" +
+        JSON.stringify(msg) + ";d.style.cssText=\"position:fixed;left:0;right:0;top:0;z-index:2147483647;" +
+        "padding:12px 16px;background:#3a1d1d;color:#ffb4b4;font:13px ui-monospace,monospace;white-space:pre-wrap\";" +
+        "document.body.appendChild(d);});</script>";
     } catch (e) {
       return "";
     }

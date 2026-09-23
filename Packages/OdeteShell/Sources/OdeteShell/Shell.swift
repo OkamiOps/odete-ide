@@ -133,7 +133,8 @@ public final class Shell: @unchecked Sendable {
             return c
         }
         if n == "pnpm" || n == "yarn" || n == "bun" {
-            return NpmCommand()
+            // Com o nome: `yarn` sozinho instala e `yarn dev` roda o script.
+            return NpmCommand(chamadoComo: n)
         }
         return nil
     }

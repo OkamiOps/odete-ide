@@ -72,7 +72,14 @@ struct PreviewPane: View {
             }
         }
         .background(theme.bg)
-        .onAppear { pickInitialURL() }
+        .onAppear {
+            pickInitialURL()
+            // Projeto com build (Vite, Next, Astro): o motor fica pronto antes do toque em
+            // "npm run dev". Página estática não precisa de esbuild.
+            if ws.stack.kind == .spa || ws.stack.kind == .ssr {
+                ws.run.aquecerParaOPreview()
+            }
+        }
         .onChange(of: ws.run.previewURL) { _, new in
             if let new {
                 ws.preview.go(new)
@@ -84,6 +91,12 @@ struct PreviewPane: View {
             }
         }
         .onChange(of: ws.run.servers.count) { _, _ in soltarServidorMorto() }
+        // A pilha é detectada depois de o painel aparecer, na leitura da árvore.
+        .onChange(of: ws.stack.kind) { _, novo in
+            if novo == .spa || novo == .ssr {
+                ws.run.aquecerParaOPreview()
+            }
+        }
         .onChange(of: ws.preview.url) { _, new in urlText = new?.absoluteString ?? "" }
         // Link para fora do projeto: o painel não navega para lá, o Safari abre.
         .onChange(of: ws.preview.pedidoExterno) { _, u in

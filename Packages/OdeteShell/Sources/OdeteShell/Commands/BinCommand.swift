@@ -25,9 +25,65 @@ struct BinCommand: ShellCommand {
         return link
     }
 
+    /// O binário no `node_modules/.bin` mais próximo, subindo de `desde` até a raiz — é o
+    /// PATH que o npm monta para scripts e para o npx.
+    static func binPath(_ name: String, desde: URL, raiz: URL) -> URL? {
+        for pasta in pastasAcima(desde, raiz: raiz) {
+            if let achado = binPath(name, root: pasta) {
+                return achado
+            }
+        }
+        return nil
+    }
+
+    /// `desde` e cada pasta acima dela, até a raiz do projeto (inclusive).
+    static func pastasAcima(_ desde: URL, raiz: URL) -> [URL] {
+        let base = raiz.standardizedFileURL.path
+        var atual = desde.standardizedFileURL
+        var out: [URL] = []
+        while atual.path.hasPrefix(base) {
+            out.append(atual)
+            if atual.path == base {
+                break
+            }
+            atual = atual.deletingLastPathComponent().standardizedFileURL
+        }
+        return out.isEmpty ? [raiz] : out
+    }
+
+    /// A pasta do package.json mais próximo, subindo da pasta atual até a raiz — como o
+    /// npm acha o projeto. Sem nenhum, a raiz.
+    static func pastaDoPacote(_ ctx: CommandContext) -> URL {
+        pastasAcima(ctx.cwd, raiz: ctx.root).first {
+            FileManager.default.fileExists(atPath: $0.appending(path: "package.json").path)
+        } ?? ctx.root
+    }
+
     func run(_ args: [String], _ ctx: CommandContext) async -> Int32 {
         let io = ctx.io
-        guard let bin = args.first else { io.err(tr("npx <binário>")); return 1 }
+        // `npx -y create-vite app`, `npx --package=x y`: as opções do npx vêm antes do
+        // binário e não são o binário. Sem terminal interativo não há o que perguntar, então
+        // o `-y` e a falta dele dão no mesmo: o que não está no projeto é baixado.
+        var args = args
+        var pacote: String?
+        while let a = args.first, a.hasPrefix("-") {
+            args.removeFirst()
+            switch a {
+            case "-y", "--yes", "--no", "--no-install", "-q", "--quiet": break
+            case "-p", "--package":
+                if !args.isEmpty {
+                    pacote = args.removeFirst()
+                }
+            default:
+                if a.hasPrefix("--package=") {
+                    pacote = String(a.dropFirst("--package=".count))
+                }
+            }
+        }
+        guard let pedido = args.first else { io.err(tr("npx <binário>")); return 1 }
+        // `npx create-vite@latest`: o binário é o nome sem a versão (e sem o escopo).
+        let spec = Installer.Spec(pedido)
+        let bin = pacote == nil ? (spec.name.split(separator: "/").last.map(String.init) ?? spec.name) : pedido
         let rest = Array(args.dropFirst())
         switch bin {
         case "vite":
@@ -36,7 +92,7 @@ struct BinCommand: ShellCommand {
             }
             if rest.first == "preview" {
                 // Serve o que o build gravou, onde o build gravou, sob o mesmo `base`.
-                let config = ViteBuild.configDoVite(ctx.root)
+                let config = ViteBuild.configDoVite(Self.pastaDoPacote(ctx))
                 let args = Array(rest.dropFirst())
                 let base = ViteBuild.normalizaBase(opcao("--base", args) ?? config.base ?? "/")
                 return await serveStatic(
@@ -72,8 +128,8 @@ struct BinCommand: ShellCommand {
             return await NodeCommand().run(rest, ctx)
         case "vitest":
             return await vitest(rest, ctx)
-        case "tsc" where Self.typescriptNativo(root: ctx.root) != nil, "tsgo":
-            let versao = Self.typescriptNativo(root: ctx.root) ?? "7"
+        case "tsc" where Self.typescriptNativo(root: Self.pastaDoPacote(ctx)) != nil, "tsgo":
+            let versao = Self.typescriptNativo(root: Self.pastaDoPacote(ctx)) ?? "7"
             io.err(tr(
                 "%1$@: o TypeScript %2$@ é o compilador nativo (Go) e não roda no iPad. Para checar tipos aqui, instale o compilador em JavaScript: npm i -D typescript@6",
                 bin,
@@ -81,7 +137,12 @@ struct BinCommand: ShellCommand {
             ))
             return 1
         default:
-            guard let file = Self.binPath(bin, root: ctx.root)
+            var achado = Self.binPath(bin, desde: ctx.cwd, raiz: ctx.root)
+            if achado == nil {
+                // Como o npx: o que não está no projeto é baixado para um cache e roda de lá.
+                achado = await baixarParaONpx(pacote ?? pedido, bin: bin, ctx)
+            }
+            guard let file = achado
             else { io.err(tr("npx: %1$@ não está em node_modules/.bin (rode npm install)", "\(bin)")); return 127 }
             if file.pathExtension == "node" || (try? Data(contentsOf: file))?.prefix(4) == Data([
                 0xCF,
@@ -116,13 +177,13 @@ struct BinCommand: ShellCommand {
     /// 0, como se tudo tivesse passado. Sem modo watch: roda uma vez e sai.
     func vitest(_ args: [String], _ ctx: CommandContext) async -> Int32 {
         let io = ctx.io
-        let versao = Self.versaoInstalada("vitest", root: ctx.root) ?? "5"
+        let versao = Self.versaoInstalada("vitest", root: Self.pastaDoPacote(ctx)) ?? "5"
         var filtros: [String] = []
         var padrao: String?
         var tempoLimite: Int?
         var detalhado = false
         var semTestesOk = false
-        var raiz = ctx.root
+        var raiz = Self.pastaDoPacote(ctx)
         // Opções que levam valor separado (`--pool threads`): o valor não é filtro.
         let comValor: Set = [
             "--pool", "--reporter", "--maxWorkers", "--minWorkers", "--config", "-c", "--environment",
@@ -215,6 +276,88 @@ struct BinCommand: ShellCommand {
         return nil
     }
 
+    /// Instala `spec` num cache só do npx (um projeto por pacote pedido) e devolve o
+    /// binário. É o `npx -y create-vite@latest app`: nada disso entra no projeto.
+    func baixarParaONpx(_ spec: String, bin: String, _ ctx: CommandContext) async -> URL? {
+        let io = ctx.io
+        let chave = spec.unicodeScalars.map { CharacterSet.alphanumerics.contains($0) ? String($0) : "_" }.joined()
+        let cache = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+            .appending(path: "odete-npx/\(chave)", directoryHint: .isDirectory)
+        do {
+            try FileManager.default.createDirectory(at: cache, withIntermediateDirectories: true)
+            let pj = cache.appending(path: "package.json")
+            if !FileManager.default.fileExists(atPath: pj.path) {
+                try #"{"name":"odete-npx","private":true}"#.write(to: pj, atomically: true, encoding: .utf8)
+            }
+            io.out(tr("npx: instalando %1$@…", spec))
+            let installer = Installer(project: cache, registry: ctx.shell.services.registry) { _ in }
+            let rep = try await installer.install(add: [Installer.Spec(spec)])
+            for (n, e) in rep.failed.sorted(by: { $0.key < $1.key }) {
+                io.err(tr("falhou: %1$@: %2$@", "\(n)", "\(e)"))
+            }
+            if let achado = Self.binPath(bin, root: cache) {
+                return achado
+            }
+            // Pacote com um binário só, de nome diferente do pacote.
+            let nome = PackageJSON(url: pj).dependencies.keys.first ?? ""
+            let bins = PackageJSON(url: cache.appending(path: "node_modules/\(nome)/package.json")).bin
+            if bins.count == 1, let unico = bins.keys.first {
+                return Self.binPath(unico, root: cache)
+            }
+            return nil
+        } catch {
+            io.err("npx: \(error.localizedDescription)")
+            return nil
+        }
+    }
+
+    /// Roda o `npm install` quando falta dependência do package.json em node_modules, com
+    /// a saída no terminal. Devolve `false` se ainda faltar alguma depois — aí o servidor
+    /// não sobe: a página sairia preta. Sem rede, o erro diz isso.
+    static func instalarOQueFalta(_ ctx: CommandContext, raiz: URL, label: String) async -> Bool {
+        let io = ctx.io
+        let faltam = Faltando.dependencias(projeto: raiz)
+        guard !faltam.isEmpty else { return true }
+        let nomes = faltam.prefix(4).joined(separator: ", ")
+            + (faltam.count > 4 ? tr(" e mais %1$@", "\(faltam.count - 4)") : "")
+        io.out(tr("  %1$@: faltam pacotes em node_modules (%2$@); rodando npm install", label, nomes))
+        let installer = Installer(project: raiz, registry: ctx.shell.services.registry) { io.out($0) }
+        NpmCommand.ensureGitignore(installer, io: io)
+        let semRede = tr(
+            "%1$@: sem conexão, não deu para instalar as dependências, e sem elas o Preview não abre. Conecte-se à internet e rode npm run dev de novo.",
+            label
+        )
+        let rep: Installer.Report
+        do {
+            rep = try await installer.install()
+        } catch {
+            io.err("npm: \(error.localizedDescription)")
+            if Installer.ehErroDeRede(error) {
+                io.err(semRede)
+            }
+            return false
+        }
+        NpmCommand.relatar(rep, ctx: ctx, raiz: raiz)
+        // Pacote só de outro sistema (`"os": ["linux"]`) nunca vai estar lá, e não é por
+        // ele que o servidor deixa de subir.
+        let aindaFaltam = Faltando.dependencias(projeto: raiz).filter { nome in
+            !rep.plataforma.contains { $0.hasPrefix(nome + " ") }
+        }
+        guard aindaFaltam.isEmpty else {
+            if rep.semRede {
+                io.err(semRede)
+            } else {
+                io.err(tr(
+                    "%1$@: o servidor não sobe sem %2$@ em node_modules; confira os erros acima e rode npm install",
+                    label,
+                    aindaFaltam.joined(separator: ", ")
+                ))
+            }
+            return false
+        }
+        return true
+    }
+
     /// `version` do package.json de um pacote instalado no projeto.
     static func versaoInstalada(_ pacote: String, root: URL) -> String? {
         let pkg = root.appending(path: "node_modules/\(pacote)/package.json")
@@ -248,9 +391,22 @@ struct BinCommand: ShellCommand {
             ctx.shell.services.onServer(jaTem.porta, jaTem.comando)
             return 0
         }
+        let raiz = Self.pastaDoPacote(ctx)
+        // Projeto recém-criado (ou recém-clonado) sem node_modules: instala antes. Antes o
+        // servidor subia assim mesmo e mandava os pacotes para o esm.sh — misturado com o
+        // que houvesse em node_modules, eram duas cópias do React e o Preview preto.
+        if await !Self.instalarOQueFalta(ctx, raiz: raiz, label: label) {
+            return 1
+        }
+        // Um `npm install` recém-terminado pode estar aquecendo o pacote de dependências
+        // neste motor: esperar sai mais barato que fazer o mesmo pacote duas vezes.
+        if Aquecimento.emAndamento(raiz: raiz) {
+            io.out(tr("  %1$@: terminando de preparar o pacote de dependências…", label))
+            _ = await Aquecimento.esperar(raiz: raiz)
+        }
         // No esbuild do projeto, o mesmo que o lint e o `node x.ts` usam: subir o servidor
         // não compila um segundo motor, e parar o servidor não derruba o dos outros.
-        let dev = DevServer(esbuild: ctx.shell.esbuildEngine(), root: ctx.root) { kind, text in
+        let dev = DevServer(esbuild: ctx.shell.esbuildEngine(), root: raiz) { kind, text in
             kind == .out ? io.out(text) : io.err(text)
         }
         dev.onDiagnostics = ctx.shell.services.onDiagnostics
@@ -259,18 +415,6 @@ struct BinCommand: ShellCommand {
             try await dev.start(port: port, preset: preset)
         } catch { io.err("\(label): \(error.localizedDescription)"); return 1 }
         ctx.shell.devServer = dev
-        let missing = EsmFallback.missing(project: ctx.root)
-        if !missing
-            .isEmpty
-        {
-            io
-                .err(
-                    tr(
-                        "aviso: %1$@ não instalados; o preview vai buscar no esm.sh",
-                        "\(missing.keys.sorted().joined(separator: ", "))"
-                    )
-                )
-        }
         let job = ctx.shell.registerJob(label, ports: [dev.port]) { dev.stop(); ctx.shell.devServer = nil }
         io.out(tr("  ➜  Local:   http://127.0.0.1:%1$@/   (job %2$@)", "\(dev.port)", "\(job.id)"))
         return 0
@@ -285,7 +429,11 @@ struct BinCommand: ShellCommand {
             saida: opcao("--outDir", args)
         )
         do {
-            let r = try await ViteBuild.rodar(raiz: ctx.root, esbuild: ctx.shell.esbuildEngine(), opcoes: opcoes)
+            let r = try await ViteBuild.rodar(
+                raiz: Self.pastaDoPacote(ctx),
+                esbuild: ctx.shell.esbuildEngine(),
+                opcoes: opcoes
+            )
             for d in r.diagnosticos {
                 (d.kind == .error ? io.err : io.out)("\(d.file ?? ""):\(d.line ?? 0): \(d.text)")
             }

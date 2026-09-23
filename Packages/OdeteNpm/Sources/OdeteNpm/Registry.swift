@@ -14,6 +14,52 @@ public struct PackumentVersion: Sendable, Hashable {
     public var cpu: [String]
     public var hasInstallScript: Bool
     public var deprecated: String?
+    /// Peers marcados como opcionais em `peerDependenciesMeta`: o npm não instala esses.
+    public var peersOpcionais: Set<String> = []
+    /// O que o lock do npm guarda da versão e a Odete só repassa (`engines`, `funding`,
+    /// `deprecated`, `license`, `libc`).
+    public var extras: JSONOrdenado = .objeto([])
+
+    public init(
+        version: Version,
+        dependencies: [String: String],
+        optionalDependencies: [String: String],
+        peerDependencies: [String: String],
+        bin: [String: String],
+        tarball: String,
+        integrity: String?,
+        os: [String],
+        cpu: [String],
+        hasInstallScript: Bool,
+        deprecated: String?,
+        peersOpcionais: Set<String> = [],
+        extras: JSONOrdenado = .objeto([])
+    ) {
+        self.version = version; self.dependencies = dependencies; self.optionalDependencies = optionalDependencies
+        self.peerDependencies = peerDependencies; self.bin = bin; self.tarball = tarball; self.integrity = integrity
+        self.os = os; self.cpu = cpu; self.hasInstallScript = hasInstallScript; self.deprecated = deprecated
+        self.peersOpcionais = peersOpcionais; self.extras = extras
+    }
+}
+
+extension JSONOrdenado {
+    /// O que o `JSONSerialization` devolveu, em JSON ordenado (a ordem do dicionário não
+    /// existe mais; quem grava o lock ordena de novo).
+    static func de(_ v: Any) -> JSONOrdenado? {
+        switch v {
+        case let s as String: return .texto(s)
+        case let n as NSNumber:
+            if CFGetTypeID(n) == CFBooleanGetTypeID() {
+                return .booleano(n.boolValue)
+            }
+            return .numero(n.stringValue)
+        case let l as [Any]: return .lista(l.compactMap { de($0) })
+        case let m as [String: Any]:
+            return .objeto(m.keys.sorted().compactMap { k in de(m[k] as Any).map { (k, $0) } })
+        case is NSNull: return .nulo
+        default: return nil
+        }
+    }
 }
 
 public struct Packument: Sendable, Hashable {
@@ -37,10 +83,19 @@ public struct Packument: Sendable, Hashable {
             }
             var bin: [String: String] = [:]
             if let b = m["bin"] as? [String: String] {
-                bin = b
+                bin = Self.normalizarBin(b)
             } else if let b = m["bin"] as? String {
                 let short = name.split(separator: "/").last.map(String.init) ?? name
-                bin = [short: b]
+                bin = Self.normalizarBin([short: b])
+            }
+            let meta = (m["peerDependenciesMeta"] as? [String: Any]) ?? [:]
+            var extras: [(String, JSONOrdenado)] = []
+            for k in ["deprecated", "engines", "funding", "libc", "license", "bundleDependencies"] {
+                if let v = m[k] ?? (k == "bundleDependencies" ? m["bundledDependencies"] : nil),
+                   let j = JSONOrdenado.de(v)
+                {
+                    extras.append((k, k == "funding" ? j.fundingComoONpm : j))
+                }
             }
             out[ver] = PackumentVersion(
                 version: ver,
@@ -53,15 +108,55 @@ public struct Packument: Sendable, Hashable {
                 os: (m["os"] as? [String]) ?? [],
                 cpu: (m["cpu"] as? [String]) ?? [],
                 hasInstallScript: (m["hasInstallScript"] as? Bool) ?? false,
-                deprecated: m["deprecated"] as? String
+                deprecated: m["deprecated"] as? String,
+                peersOpcionais: Set(meta.compactMap { k, v in
+                    ((v as? [String: Any])?["optional"] as? Bool) == true ? k : nil
+                }),
+                extras: .objeto(extras)
             )
         }
         return Packument(name: name, distTags: (j["dist-tags"] as? [String: String]) ?? [:], versions: out)
     }
 
+    /// O `bin` como o `npm-normalize-package-bin` deixa: nome sem pasta, caminho sem `./`
+    /// e sem `..` que saia do pacote. É o que o lock do npm grava, e o atalho de `.bin`
+    /// com `./` no meio funcionava do mesmo jeito — só o lock ficava diferente.
+    public static func normalizarBin(_ bin: [String: String]) -> [String: String] {
+        func limpo(_ s: String) -> String {
+            var partes: [Substring] = []
+            for p in s.replacingOccurrences(of: "\\", with: "/").split(separator: "/") {
+                if p == "." {
+                    continue
+                }
+                if p == ".." {
+                    _ = partes.popLast()
+                } else {
+                    partes.append(p)
+                }
+            }
+            return partes.joined(separator: "/")
+        }
+        var out: [String: String] = [:]
+        for (k, v) in bin {
+            let nome = limpo(k.replacingOccurrences(of: ":", with: "/")).split(separator: "/").last
+                .map(String.init) ?? ""
+            let alvo = limpo(v)
+            if !nome.isEmpty, !alvo.isEmpty {
+                out[nome] = alvo
+            }
+        }
+        return out
+    }
+
     /// Escolhe a versão para uma faixa (ou tag).
     public func pick(_ spec: String) -> PackumentVersion? {
-        Self.escolher(spec, distTags: distTags, versoes: versions.keys).flatMap { versions[$0] }
+        Self.escolher(spec, distTags: distTags, versoes: versions.keys, depreciadas: depreciadas)
+            .flatMap { versions[$0] }
+    }
+
+    /// Versões marcadas como `deprecated` no registro.
+    var depreciadas: Set<Version> {
+        Set(versions.values.filter { $0.deprecated != nil }.map(\.version))
     }
 
     /// A regra de `pick` só com o que ela precisa: as tags e a lista de versões.
@@ -69,20 +164,29 @@ public struct Packument: Sendable, Hashable {
     /// Separada para a resolução poder guardar só isso de um packument depois de
     /// escolher — os dados de cada versão (dependências, tarball, binários) são a parte
     /// pesada, e de milhares de versões só uma ou duas acabam usadas.
+    ///
+    /// A ordem é a do `npm-pick-manifest`: a tag pedida; senão o `latest`, se a faixa
+    /// aceitar ele e ele não estiver depreciado (um `6.0.0-next` ou um `5.9.0` publicado
+    /// com outra tag não passa na frente do que o autor marcou como atual); senão a maior
+    /// que serve, fugindo das depreciadas quando há outra.
     static func escolher(
         _ spec: String,
         distTags: [String: String],
-        versoes: some Collection<Version>
+        versoes: some Collection<Version>,
+        depreciadas: Set<Version> = []
     ) -> Version? {
         let s = spec.trimmingCharacters(in: .whitespaces)
         if let tagged = distTags[s.isEmpty ? "latest" : s], let v = Version(tagged), versoes.contains(v) {
             return v
         }
         let range = SemverRange(s)
-        if range.isAny, let latest = distTags["latest"], let v = Version(latest), versoes.contains(v) {
+        if let latest = distTags["latest"], let v = Version(latest), versoes.contains(v),
+           range.isAny || range.satisfies(v), !depreciadas.contains(v)
+        {
             return v
         }
-        return range.maxSatisfying(Array(versoes))
+        let servem = versoes.filter { range.satisfies($0) }
+        return servem.filter { !depreciadas.contains($0) }.max() ?? servem.max()
     }
 }
 
@@ -104,6 +208,16 @@ public enum NpmError: LocalizedError, Sendable {
 public protocol RegistryClient: Sendable {
     func packument(_ name: String) async throws -> Packument
     func tarball(_ url: String, integrity: String?) async throws -> Data
+    /// O documento completo de uma versão (`/<nome>/<versão>`), com o que o packument
+    /// abreviado não traz — `license`, `libc`. Só para o que não é baixado (binário de
+    /// plataforma): do resto, o package.json no disco diz o mesmo.
+    func manifestoCompleto(_ name: String, _ version: String) async throws -> Data?
+}
+
+public extension RegistryClient {
+    func manifestoCompleto(_: String, _: String) async throws -> Data? {
+        nil
+    }
 }
 
 /// registry.npmjs.org com cache em disco.
@@ -132,6 +246,13 @@ public struct HTTPRegistry: RegistryClient {
         let enc = name.hasPrefix("@") ? name.replacingOccurrences(of: "/", with: "%2F") : name
         let b = base.absoluteString.hasSuffix("/") ? String(base.absoluteString.dropLast()) : base.absoluteString
         return URL(string: b + "/" + enc)!
+    }
+
+    public func manifestoCompleto(_ name: String, _ version: String) async throws -> Data? {
+        let u = packumentURL(name).appending(path: version)
+        let (data, resp) = try await session.data(from: u)
+        guard (200 ..< 300).contains((resp as? HTTPURLResponse)?.statusCode ?? 0) else { return nil }
+        return data
     }
 
     public func packument(_ name: String) async throws -> Packument {

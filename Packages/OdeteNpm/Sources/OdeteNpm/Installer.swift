@@ -8,9 +8,13 @@ public struct Installer: Sendable {
         public var name: String
         public var range: String
         public init(_ s: String) {
-            if s.hasPrefix("@"),
-               let at = s.dropFirst()
-               .firstIndex(of: "@")
+            // URL, GitHub, pasta: o texto inteiro é o pedido (o `@` de `git@github.com`
+            // não separa nome de versão), e o nome sai do package.json do pacote.
+            if Pedido.de(s).faixaDoRegistro == nil {
+                name = s; range = "latest"
+            } else if s.hasPrefix("@"),
+                      let at = s.dropFirst()
+                      .firstIndex(of: "@")
             {
                 name = String(s[..<at]); range = String(s[s.index(after: at)...])
             } else if let at = s.firstIndex(of: "@"),
@@ -37,6 +41,13 @@ public struct Installer: Sendable {
         public var plataforma: [String] = []
         public var failed: [String: String] = [:]
         public var added: [String] = []
+        /// Pacotes com `preinstall`/`install`/`postinstall` que não foram rodados (e não
+        /// têm código nativo) — como o npm 12 faz sem aprovação. O `core-js` só imprime
+        /// um recado; chamar isso de "nativo que não roda no iPad" assustava à toa.
+        public var scripts: [String] = []
+        /// Alguma falha foi de rede (sem internet, registro fora do ar): quem chamou pode
+        /// dizer isso em vez de listar um erro por pacote.
+        public var semRede = false
         /// Coisas que não impedem a instalação mas mudam o resultado, como um atalho de
         /// `.bin` que não deu para criar — é ele que faz `vite` responder pelo nome.
         public var avisos: [String] = []
@@ -68,19 +79,48 @@ public struct Installer: Sendable {
     // MARK: API
 
     /// `npm install [specs]` (`add` vazio = instalar tudo do package.json).
-    public func install(add: [Spec] = [], dev: Bool = false, force: Bool = false) async throws -> Report {
+    ///
+    /// `exato` é o `--save-exact`: grava a versão sem o `^`.
+    public func install(
+        add: [Spec] = [],
+        dev: Bool = false,
+        force: Bool = false,
+        exato: Bool = false
+    ) async throws -> Report {
         var pkg = PackageJSON(url: project.appending(path: "package.json"))
         var report = Report()
         var pinned: [String: String] = [:]
         var jaBuscados: [String: Packument] = [:]
         for spec in add {
-            let p = try await registry.packument(spec.name)
-            guard let v = p.pick(spec.range) else { throw NpmError.noVersion(spec.name, spec.range) }
-            let range = spec.range == "latest" || spec.range.isEmpty ? "^\(v.version)" : spec.range
-            pkg.set(spec.name, range: range, dev: dev)
-            pinned[spec.name] = v.version.description
+            // `npm i github:dono/repo`, `npm i ./pasta`, `npm i https://…/x.tgz`: o nome
+            // vem do package.json do pacote, e o que se grava é o pedido como veio.
+            if spec.range == "latest", Pedido.de(spec.name).faixaDoRegistro == nil {
+                var pedido = spec.name
+                let nome = try await nomeDoPacote(pedido)
+                // Pasta e `.tgz` locais vão para o package.json como o npm grava: `file:`
+                // e o caminho a partir do projeto (`npm i ./libs/ui` → `file:libs/ui`).
+                switch Pedido.de(pedido) {
+                case let .pasta(c), let .arquivo(c): pedido = "file:" + caminhoDoProjeto(c, a: "")
+                default: break
+                }
+                pkg.set(nome, range: pedido, dev: dev)
+                report.added.append("\(nome)@\(pedido)")
+                continue
+            }
+            guard case let .registro(nomeReal, faixa) = Pedido.de(spec.range) else {
+                pkg.set(spec.name, range: spec.range, dev: dev)
+                report.added.append("\(spec.name)@\(spec.range)")
+                continue
+            }
+            // `npm i meu-ms@npm:ms@2`: a pasta é `meu-ms`, o pacote é `ms`.
+            let real = nomeReal.isEmpty ? spec.name : nomeReal
+            let p = try await registry.packument(real)
+            guard let v = p.pick(faixa) else { throw NpmError.noVersion(real, faixa) }
+            let salvo = Self.faixaParaSalvar(pedido: faixa, versao: v.version, exato: exato)
+            pkg.set(spec.name, range: real == spec.name ? salvo : "npm:\(real)@\(salvo)", dev: dev)
+            pinned[spec.name] = real == spec.name ? v.version.description : "npm:\(real)@\(v.version)"
             report.added.append("\(spec.name)@\(v.version)")
-            jaBuscados[spec.name] = p
+            jaBuscados[real] = p
         }
         if !add.isEmpty {
             try pkg.save()
@@ -89,20 +129,10 @@ public struct Installer: Sendable {
         let tree = try await resolve(pkg: pkg, lock: lock, pinned: pinned, jaBuscados: jaBuscados, report: &report)
         try PastaDeModulos.preparar(project, nuvem: nuvem)
         try await materialize(tree, report: &report)
-        var newLock = Lockfile(name: pkg.name)
-        for (key, node) in tree {
-            newLock.packages[key] = node.entry
-        }
-        var root: [String: Any] = ["name": pkg.name]
-        if !pkg.dependencies.isEmpty {
-            root["dependencies"] = pkg.dependencies
-        }
-        if !pkg.devDependencies.isEmpty {
-            root["devDependencies"] = pkg.devDependencies
-        }
-        try newLock.save(to: lockURL, root: root)
-        try writeBins(tree, &report)
-        try pruneExtraneous(tree)
+        let completa = await completarMetadados(tree)
+        try gravarLocks(completa, pkg: pkg, lock: lock)
+        try writeBins(completa, &report)
+        try pruneExtraneous(completa)
         return report
     }
 
@@ -119,9 +149,15 @@ public struct Installer: Sendable {
     public func list() -> [(name: String, version: String, dev: Bool, native: Bool)] {
         guard let lock = Lockfile.load(lockURL) else { return [] }
         return lock.packages.compactMap { k, e in
+            guard k.hasPrefix("node_modules/") else { return nil }
             let rel = k.dropFirst("node_modules/".count)
             guard !rel.contains("/node_modules/"), !e.soDePlataforma else { return nil }
-            return (String(rel), e.version, e.dev, e.native)
+            // No lock mas não no disco: o que só um binário de plataforma puxava.
+            guard e.link || FileManager.default.fileExists(atPath: project.appending(path: k)
+                .appending(path: "package.json").path) else { return nil }
+            // Atalho para pasta do projeto: a versão está na entrada da pasta.
+            let versao = e.link ? (e.resolved.flatMap { lock.packages[$0]?.version } ?? e.version) : e.version
+            return (String(rel), versao, e.dev, e.native)
         }.sorted { $0.name < $1.name }
     }
 
@@ -141,7 +177,10 @@ extension Installer {
         var name: String
         var version: String
         var nativo = false
+        /// Tem script de instalação que não foi rodado (e não é nativo).
+        var scripts = false
         var erro: String?
+        var semRede = false
     }
 
     /// Profundidade de aninhamento: `node_modules/a` e `node_modules/@s/a` são 1,
@@ -165,7 +204,13 @@ extension Installer {
     /// nível — quase tudo fica no primeiro, então quase nada se perde de paralelismo.
     func materialize(_ tree: [String: Node], report: inout Report) async throws {
         var todo: [(String, Node)] = []
-        for (key, node) in tree where !node.entry.soDePlataforma {
+        for (key, node) in tree where !Resolvedor.ficaDeFora(node) {
+            // A pasta de um workspace ou de um `file:` é do projeto: não se baixa nada.
+            guard key.hasPrefix("node_modules/") || key.contains("/node_modules/") else { continue }
+            if node.entry.link {
+                try criarAtalho(key, node)
+                continue
+            }
             let marker = project.appending(path: key).appending(path: "package.json")
             if let d = try? Data(contentsOf: marker),
                let j = try? JSONSerialization.jsonObject(with: d) as? [String: Any],
@@ -217,13 +262,18 @@ extension Installer {
         for f in feitos {
             if let erro = f.erro {
                 report.failed[f.name] = erro
+                report.semRede = report.semRede || f.semRede
                 continue
             }
-            if f.nativo {
+            // O esbuild instala o binário no `postinstall`: é nativo, e a Odete cobre por dentro.
+            if f.nativo || (f.scripts && Self.cobertoPorDentro(f.name)) {
                 report.anotarNativo(f.name, f.version)
+            } else if f.scripts {
+                report.scripts.append("\(f.name)@\(f.version)")
             }
             report.installed.append((f.name, f.version))
         }
+        report.scripts = Array(Set(report.scripts)).sorted()
         report.native = Array(Set(report.native)).sorted()
         report.nativosCobertos = Array(Set(report.nativosCobertos)).sorted()
     }
@@ -237,9 +287,10 @@ extension Installer {
         }
         let data: Data
         do {
-            data = try await registry.tarball(url, integrity: node.entry.integrity)
+            data = try await dadosDoTarball(url, integrity: node.entry.integrity)
         } catch {
             feito.erro = error.localizedDescription
+            feito.semRede = Self.ehErroDeRede(error)
             return feito
         }
         let segurado = data.count + Tar.tamanhoDoPedaco
@@ -258,12 +309,56 @@ extension Installer {
                     try? FileManager.default.removeItem(at: dir)
                     throw error
                 }
-                return nativo || FileManager.default.fileExists(atPath: dir.appending(path: "binding.gyp").path)
+                return nativo || Self.temCodigoNativo(dir)
             }
+            feito.scripts = !feito.nativo && node.entry.temScripts
         } catch {
             feito.erro = error.localizedDescription
         }
         return feito
+    }
+
+    /// Addon nativo no disco: `binding.gyp` (o node-gyp compilaria no install) ou um
+    /// `.node` já compilado, na raiz do pacote ou onde os pré-compilados costumam ficar.
+    /// Não desce no pacote inteiro: o `next` tem milhares de arquivos.
+    static func temCodigoNativo(_ dir: URL) -> Bool {
+        let fm = FileManager.default
+        if fm.fileExists(atPath: dir.appending(path: "binding.gyp").path) {
+            return true
+        }
+        for sub in ["", "build/Release", "prebuilds", "bin"] {
+            let pasta = sub.isEmpty ? dir : dir.appending(path: sub)
+            let itens = (try? fm.contentsOfDirectory(atPath: pasta.path)) ?? []
+            if itens.contains(where: { $0.hasSuffix(".node") }) {
+                return true
+            }
+            // `prebuilds/darwin-arm64/x.node`
+            if sub == "prebuilds" {
+                for plataforma in itens {
+                    let dentro = (try? fm.contentsOfDirectory(atPath: pasta.appending(path: plataforma).path)) ?? []
+                    if dentro.contains(where: { $0.hasSuffix(".node") }) {
+                        return true
+                    }
+                }
+            }
+        }
+        return false
+    }
+
+    /// `node_modules/<nome>` apontando para a pasta do workspace ou do `file:`, com o
+    /// caminho relativo que o npm usa (`../packages/web`).
+    func criarAtalho(_ key: String, _ node: Node) throws {
+        guard let alvo = node.entry.resolved else { return }
+        let fm = FileManager.default
+        let link = project.appending(path: key)
+        let pasta = key.split(separator: "/").dropLast().map(String.init)
+        let destino = (Array(repeating: "..", count: pasta.count) + [alvo]).joined(separator: "/")
+        try fm.createDirectory(at: link.deletingLastPathComponent(), withIntermediateDirectories: true)
+        if (try? fm.destinationOfSymbolicLink(atPath: link.path)) == destino {
+            return
+        }
+        try? fm.removeItem(at: link)
+        try fm.createSymbolicLink(atPath: link.path, withDestinationPath: destino)
     }
 
     /// Apaga a versão anterior do pacote, menos o `node_modules` de dentro dela.
@@ -296,10 +391,12 @@ extension Installer {
 extension Installer {
     func writeBins(_ tree: [String: Node], _ report: inout Report) throws {
         let fm = FileManager.default
-        for (key, node) in tree where !node.entry.soDePlataforma {
+        for (key, node) in tree where !Resolvedor.ficaDeFora(node) && key.hasPrefix("node_modules/") {
             let parentNM = key.hasSuffix("/" + node.name) ? String(key.dropLast(node.name.count + 1)) : "node_modules"
             let binDirURL = project.appending(path: parentNM).appending(path: ".bin")
-            for (bname, bpath) in node.entry.bin {
+            // Atalho de workspace ou `file:`: os binários são os da pasta.
+            let bins = node.entry.link ? (node.entry.resolved.flatMap { tree[$0]?.entry.bin } ?? [:]) : node.entry.bin
+            for (bname, bpath) in bins {
                 try fm.createDirectory(at: binDirURL, withIntermediateDirectories: true)
                 let link = binDirURL.appending(path: bname)
                 try? fm.removeItem(at: link)
@@ -326,7 +423,16 @@ extension Installer {
     /// que tem outro nome.
     func pruneExtraneous(_ tree: [String: Node]) throws {
         let fm = FileManager.default
-        let keep = Set(tree.filter { !$0.value.entry.soDePlataforma }.keys)
+        let keep = Set(tree.filter { !Resolvedor.ficaDeFora($0.value) }.keys)
+        // Atalho para pasta do projeto: não se desce nele — o node_modules lá dentro é do
+        // workspace, e as chaves dele no lock não começam por aqui.
+        let atalhos = Set(tree.filter(\.value.entry.link).keys)
+        // Dependências que vêm dentro do tarball (`bundleDependencies`): não estão na
+        // árvore, e apagá-las deixaria o pacote sem elas.
+        var embutidas: [String: Set<String>] = [:]
+        for (k, n) in tree where !n.entry.embutidas.isEmpty {
+            embutidas[k + "/node_modules"] = n.entry.embutidas
+        }
         func walk(_ chave: String, _ pasta: URL) {
             // Pelo caminho, não pela URL: `contentsOfDirectory(at:)` não atravessa link.
             guard let items = try? fm.contentsOfDirectory(atPath: pasta.path) else { return }
@@ -343,18 +449,24 @@ extension Installer {
                 if name.hasPrefix("@") {
                     for scoped in (try? fm.contentsOfDirectory(atPath: item.path)) ?? [] {
                         let k = "\(chave)/\(name)/\(scoped)"
+                        if embutidas[chave]?.contains("\(name)/\(scoped)") == true {
+                            continue
+                        }
                         if !keep.contains(k) {
                             try? fm.removeItem(at: item.appending(path: scoped))
-                        } else {
+                        } else if !atalhos.contains(k) {
                             walk("\(k)/node_modules", item.appending(path: scoped).appending(path: "node_modules"))
                         }
                     }
                     continue
                 }
                 let k = "\(chave)/\(name)"
+                if embutidas[chave]?.contains(name) == true {
+                    continue
+                }
                 if !keep.contains(k) {
                     try? fm.removeItem(at: item)
-                } else {
+                } else if !atalhos.contains(k) {
                     walk("\(k)/node_modules", item.appending(path: "node_modules"))
                 }
             }
@@ -364,6 +476,15 @@ extension Installer {
 }
 
 extension Installer {
+    /// Erro de rede, e não do pacote: sem internet, sem DNS, registro que não responde.
+    public static func ehErroDeRede(_ error: Error) -> Bool {
+        guard let u = error as? URLError else { return false }
+        return [
+            .notConnectedToInternet, .networkConnectionLost, .cannotFindHost, .cannotConnectToHost,
+            .dnsLookupFailed, .timedOut, .dataNotAllowed, .internationalRoamingOff,
+        ].contains(u.code)
+    }
+
     /// Ferramentas de build cujo equivalente já roda dentro da Odete. Um `sharp` ou um
     /// `better-sqlite3` continuam sendo aviso de verdade: aí falta mesmo.
     static func cobertoPorDentro(_ nome: String) -> Bool {

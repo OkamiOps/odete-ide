@@ -76,20 +76,40 @@ public struct SemverRange: Sendable, Hashable {
             if let (v, _) = parsePartial(lo) {
                 out.append(Comparator(op: ">=", v: v))
             }
-            if let (v, wild) = parsePartial(hi) {
+            // O fim parcial conta inteiro: `1.2 - 2.3` vai até antes de 2.4.0, e `1 - 2`
+            // até antes de 3.0.0. `wild` é quantos campos faltam: 1 é o patch, 2 é o minor.
+            // Os dois casos estavam trocados, e `1.2 - 2.3` aceitava 2.9.
+            if let (v, wild) = parsePartial(hi), wild < 3 {
                 if wild == 0 {
                     out.append(Comparator(op: "<=", v: v))
                 } else if wild == 1 {
-                    out.append(Comparator(op: "<", v: Version(v.major + 1, 0, 0, prerelease: ["0"])))
-                } else {
                     out.append(Comparator(op: "<", v: Version(v.major, v.minor + 1, 0, prerelease: ["0"])))
+                } else {
+                    out.append(Comparator(op: "<", v: Version(v.major + 1, 0, 0, prerelease: ["0"])))
                 }
             }
             return out
         }
         var out: [Comparator] = []
-        for tok in s.split(separator: " ").map(String.init) where !tok.isEmpty {
+        for tok in juntarOperadores(s).split(separator: " ").map(String.init) where !tok.isEmpty {
             out += parseComparator(tok)
+        }
+        return out
+    }
+
+    /// `>= 1.2.3` e `^ 1.2` têm espaço entre o operador e a versão, e o npm aceita. Sem
+    /// juntar, o `>=` sozinho virava "qualquer uma" e o `1.2.3` virava versão exata.
+    static func juntarOperadores(_ s: String) -> String {
+        var out = ""
+        var pendente = false
+        for parte in s.split(separator: " ", omittingEmptySubsequences: true) {
+            let p = String(parte)
+            if pendente {
+                out += p
+            } else {
+                out += (out.isEmpty ? "" : " ") + p
+            }
+            pendente = [">=", "<=", ">", "<", "=", "^", "~", "~>"].contains(p)
         }
         return out
     }
@@ -121,10 +141,10 @@ public struct SemverRange: Sendable, Hashable {
     static func parseComparator(_ tok: String) -> [Comparator] {
         var t = tok
         var op = ""
-        for candidate in [">=", "<=", ">", "<", "=", "^", "~"]
+        for candidate in ["~>", ">=", "<=", ">", "<", "=", "^", "~"]
             where t.hasPrefix(candidate)
         {
-            op = candidate; t = String(t.dropFirst(candidate.count)); break
+            op = candidate == "~>" ? "~" : candidate; t = String(t.dropFirst(candidate.count)); break
         }
         guard let (v, wild) = parsePartial(t) else { return [] }
         switch op {
@@ -170,9 +190,24 @@ public struct SemverRange: Sendable, Hashable {
             return [Comparator(op: "=", v: v)]
         case ">", ">=", "<", "<=":
             if wild == 3 {
-                return []
+                // `<*` não aceita nada; `>=*` e `>*`… tudo (o npm faz igual para `>=*`).
+                return op == "<" ? [Comparator(op: "<", v: Version(0, 0, 0, prerelease: ["0"]))] : []
             }
-            return [Comparator(op: op, v: v)]
+            guard wild > 0 else { return [Comparator(op: op, v: v)] }
+            // Versão parcial com comparador: `>1.2` é `>=1.3.0`, `<=1.2` é `<1.3.0-0`,
+            // `<1.2` é `<1.2.0-0`. Tratar o que falta como zero errava a borda.
+            let seguinte = wild == 1 ? Version(v.major, v.minor + 1, 0) : Version(v.major + 1, 0, 0)
+            switch op {
+            case ">": return [Comparator(op: ">=", v: seguinte)]
+            case "<=": return [Comparator(op: "<", v: Version(
+                    seguinte.major,
+                    seguinte.minor,
+                    0,
+                    prerelease: ["0"]
+                ))]
+            case "<": return [Comparator(op: "<", v: Version(v.major, v.minor, 0, prerelease: ["0"]))]
+            default: return [Comparator(op: ">=", v: v)]
+            }
         default: return []
         }
     }
@@ -212,5 +247,76 @@ public struct SemverRange: Sendable, Hashable {
 
     public func maxSatisfying(_ versions: [Version]) -> Version? {
         versions.filter(satisfies).max()
+    }
+}
+
+extension SemverRange {
+    /// Um conjunto de comparadores visto como intervalo: `[de, ate)`, com as bordas.
+    private struct Intervalo {
+        var de: Version?
+        var deInclui = true
+        var ate: Version?
+        var ateInclui = false
+    }
+
+    private static func intervalo(_ set: [Comparator]) -> Intervalo {
+        var i = Intervalo()
+        func subir(_ v: Version, _ inclui: Bool) {
+            if let de = i.de, de > v || (de == v && !inclui) {
+                return
+            }
+            i.de = v; i.deInclui = inclui
+        }
+        func descer(_ v: Version, _ inclui: Bool) {
+            if let ate = i.ate, ate < v || (ate == v && inclui) {
+                return
+            }
+            i.ate = v; i.ateInclui = inclui
+        }
+        for c in set {
+            switch c.op {
+            case ">=": subir(c.v, true)
+            case ">": subir(c.v, false)
+            case "<": descer(c.v, false)
+            case "<=": descer(c.v, true)
+            case "=": subir(c.v, true); descer(c.v, true)
+            default: break
+            }
+        }
+        return i
+    }
+
+    /// Toda versão de `^v` também serve para esta faixa?
+    ///
+    /// É a conta que o npm faz ao gravar `npm install x@<faixa>` no package.json: se o
+    /// `^<versão escolhida>` cabe na faixa pedida, grava o `^`; senão grava a faixa como
+    /// veio. `npm i dotenv@16` grava `^16.6.1`, e `npm i x@"1.x <1.2.3"` grava a faixa.
+    public func contemCircunflexo(_ v: Version) -> Bool {
+        guard let a = SemverRange("^\(v.description)").sets.first else { return false }
+        let ia = Self.intervalo(a)
+        for set in sets {
+            let i = Self.intervalo(set)
+            let embaixo: Bool = if let de = i.de, let ade = ia.de {
+                de < ade || (de == ade && (i.deInclui || !ia.deInclui))
+            } else {
+                i.de == nil
+            }
+            let emcima: Bool = if let ate = i.ate, let aate = ia.ate {
+                ate > aate || (ate == aate && (i.ateInclui || !ia.ateInclui))
+            } else {
+                i.ate == nil
+            }
+            if embaixo, emcima {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// A menor versão que a faixa aceita, quando dá para dizer (para casar seletor de
+    /// `overrides` como `pacote@^1`).
+    var menorVersao: Version? {
+        guard let set = sets.first else { return nil }
+        return Self.intervalo(set).de ?? Version(0, 0, 0)
     }
 }

@@ -264,5 +264,22 @@ globalThis.__depsCria = function (root, prefixo) {
       return vez;
     },
     estatisticas: () => ({ depsBuilds: est.stats.builds, depsDoDisco: est.stats.doDisco, depsModulos: est.chaves.size }),
+    // Há pacote guardado com esta base (mesmo lock, mesmo .env, mesmo esbuild) e com os
+    // arquivos intactos? O aquecimento pergunta antes de fazer o build do app só para
+    // descobrir as chaves — se já há, o primeiro `npm run dev` já cai no caminho rápido.
+    jaTemPacote() {
+      const dir = pasta();
+      if (!dir) return false;
+      const b = base();
+      let nomes;
+      try { nomes = fs.readdirSync(dir).filter((n) => n.endsWith(".json")); } catch (e) { return false; }
+      for (const n of nomes) {
+        try {
+          const meta = JSON.parse(fs.readFileSync(path.join(dir, n), "utf8"));
+          if (meta.formato === FORMATO && meta.base === b && valeAinda(meta)) return true;
+        } catch (e) { /* índice quebrado: não conta */ }
+      }
+      return false;
+    },
   };
 };

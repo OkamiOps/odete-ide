@@ -223,8 +223,9 @@
         root, vigiados: opts.vigiados || (opts.vigiados = new Set()), pastas: opts.faltando || new Set(),
         dev: opts.dev !== false, novo: opts.dev === false, limiteDeInline: opts.limiteDeInline,
       });
-      // Pacote que está no package.json e ainda não foi instalado: no dev ele vem do esm.sh,
-      // mesmo que tenha nome de módulo do Node (o `buffer` e o `events` do npm).
+      // Pacote que está no package.json e ainda não foi instalado: no dev fica de fora do bundle
+      // (a página avisa o que falta instalar), mesmo que tenha nome de módulo do Node (o
+      // `buffer` e o `events` do npm).
       const declarada = (nome) => {
         if (!declaradas) {
           declaradas = new Set();
@@ -343,7 +344,7 @@
           }
         }
         if (r && typeof r === "object") {
-          // Vai pelo import map (esm.sh) — só JS: um `@import "pacote"` de CSS externo chegava
+          // Fica de fora (a página avisa que falta instalar) — só JS: um `@import "pacote"` de CSS externo chegava
           // ao navegador cru, e a folha sumia calada em vez de dizer que falta instalar.
           if (opts.externalMissing && bare && !tentativa && modoDe(args.kind) !== "style" && args.kind !== "url-token") return { path: spec, external: true };
           // Pacote para rodar no motor (o Tailwind 3, um `@plugin`): o que falta fica para o

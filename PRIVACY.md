@@ -36,7 +36,6 @@ you chose. Odete is not in the middle and keeps no copy.
 | `npm install` | `registry.npmjs.org` and the registry you configured | The package names being resolved |
 | Send a message to the coding agent | The provider you signed in to — Anthropic, OpenAI, xAI, or an OpenAI-compatible endpoint you typed | Your prompt, plus the file contents and command output the agent requested |
 | Send a message to a cloud model | `models.dev/api.json` (a public catalog of models) | Nothing about you: a plain download of the catalog, at most once a day, to learn each model's context window and output limit |
-| Load a preview whose packages are not installed | `esm.sh` | The names and versions of the modules being imported |
 | Open a link in Safari from the preview pane | The site you opened | Whatever that site normally receives |
 
 You choose every one of these. An offline Odete never contacts anything.
@@ -102,7 +101,6 @@ escolheu. O Odete não fica no meio e não guarda cópia.
 | `npm install` | `registry.npmjs.org` e o registro que você configurou | Os nomes dos pacotes sendo resolvidos |
 | Mandar uma mensagem para o agente | O provedor em que você entrou — Anthropic, OpenAI, xAI ou um endpoint compatível com OpenAI que você digitou | Seu texto, mais o conteúdo dos arquivos e a saída dos comandos que o agente pediu |
 | Mandar uma mensagem para um modelo na nuvem | `models.dev/api.json` (catálogo público de modelos) | Nada sobre você: só o download do catálogo, no máximo uma vez por dia, para saber a janela de contexto e o limite de saída de cada modelo |
-| Abrir um preview cujos pacotes não estão instalados | `esm.sh` | Os nomes e versões dos módulos importados |
 | Abrir um link no Safari a partir do preview | O site que você abriu | O que aquele site normalmente recebe |
 
 Cada uma dessas coisas é escolha sua. Um Odete offline não contata nada.
@@ -169,7 +167,6 @@ Dienst, den Sie gewählt haben. Odete sitzt nicht dazwischen und behält keine K
 | `npm install` | `registry.npmjs.org` und die von Ihnen konfigurierte Registry | Die Namen der aufzulösenden Pakete |
 | Eine Nachricht an den Agenten senden | Den Anbieter, bei dem Sie angemeldet sind — Anthropic, OpenAI, xAI oder einen von Ihnen eingegebenen OpenAI-kompatiblen Endpunkt | Ihren Text sowie die Dateiinhalte und Befehlsausgaben, die der Agent angefordert hat |
 | Eine Nachricht an ein Cloud-Modell senden | `models.dev/api.json` (ein öffentlicher Modellkatalog) | Nichts über Sie: nur der Download des Katalogs, höchstens einmal am Tag, um Kontextfenster und Ausgabelimit jedes Modells zu kennen |
-| Eine Vorschau laden, deren Pakete nicht installiert sind | `esm.sh` | Die Namen und Versionen der importierten Module |
 | Aus der Vorschau einen Link in Safari öffnen | Die Website, die Sie geöffnet haben | Was diese Website ohnehin erhält |
 
 Jede dieser Handlungen ist Ihre Entscheidung. Ein Odete ohne Netz kontaktiert nichts.
@@ -239,7 +236,6 @@ le service que vous avez choisi. Odete n'est pas au milieu et n'en garde pas de 
 | `npm install` | `registry.npmjs.org` et le registre que vous avez configuré | Les noms des paquets en cours de résolution |
 | Envoyer un message à l'agent | Le fournisseur auquel vous êtes connecté — Anthropic, OpenAI, xAI, ou un point d'accès compatible OpenAI que vous avez saisi | Votre texte, ainsi que le contenu des fichiers et la sortie des commandes demandés par l'agent |
 | Envoyer un message à un modèle dans le cloud | `models.dev/api.json` (un catalogue public de modèles) | Rien sur vous : seulement le téléchargement du catalogue, au plus une fois par jour, pour connaître la fenêtre de contexte et la limite de sortie de chaque modèle |
-| Charger un aperçu dont les paquets ne sont pas installés | `esm.sh` | Les noms et versions des modules importés |
 | Ouvrir un lien dans Safari depuis l'aperçu | Le site que vous avez ouvert | Ce que ce site reçoit habituellement |
 
 Chacune de ces actions est votre choix. Un Odete hors ligne ne contacte rien.
@@ -309,7 +305,6 @@ elegiste. Odete no está en medio y no guarda copia.
 | `npm install` | `registry.npmjs.org` y el registro que configuraste | Los nombres de los paquetes que se resuelven |
 | Enviar un mensaje al agente | El proveedor en el que iniciaste sesión — Anthropic, OpenAI, xAI, o un endpoint compatible con OpenAI que escribiste | Tu texto, más el contenido de los archivos y la salida de los comandos que pidió el agente |
 | Enviar un mensaje a un modelo en la nube | `models.dev/api.json` (un catálogo público de modelos) | Nada sobre ti: solo la descarga del catálogo, como mucho una vez al día, para conocer la ventana de contexto y el límite de salida de cada modelo |
-| Cargar una vista previa cuyos paquetes no están instalados | `esm.sh` | Los nombres y versiones de los módulos importados |
 | Abrir un enlace en Safari desde la vista previa | El sitio que abriste | Lo que ese sitio recibe normalmente |
 
 Cada una de estas cosas la eliges tú. Un Odete sin conexión no contacta con nada.

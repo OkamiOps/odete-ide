@@ -109,6 +109,26 @@ public final class RunModel {
         diagnostics = []
     }
 
+    private var aquecimento: Task<Void, Never>?
+
+    /// O Preview de um projeto JS apareceu sem servidor: carrega o esbuild e prepara o
+    /// pacote de dependências (`Aquecimento`), para o toque em "npm run dev" já achar o
+    /// motor pronto. Espera a mesma janela de abertura do lint (3 s depois de o workspace
+    /// nascer): abrir o app não pode pagar o esbuild antes de mostrar o projeto. Com o
+    /// pacote já guardado para o lock de agora, só o motor é carregado.
+    public func aquecerParaOPreview() {
+        guard aquecimento == nil, servers.isEmpty,
+              FileManager.default.fileExists(atPath: root.appending(path: "package.json").path) else { return }
+        let espera = max(.zero, .seconds(3) - (ContinuousClock.now - criadoEm))
+        let root = root
+        aquecimento = Task { [weak self] in
+            try? await Task.sleep(for: espera)
+            guard let self, !Task.isCancelled, servers.isEmpty else { return }
+            let motor = (active ?? newSession()).shell.bundler
+            _ = await Aquecimento.aquecer(esbuild: motor, raiz: root, soSeFaltar: true).value
+        }
+    }
+
     private func serverOpened(_ port: Int, _ cmd: String) {
         if !servers.contains(where: { $0.port == port }) {
             servers.append((port, cmd))

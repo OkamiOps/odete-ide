@@ -222,6 +222,10 @@ public enum Tar {
                 out.append(padded(l))
             }
             name = String(name.utf8.prefix(99))!
+            if let link = e.link {
+                out.append(header(name: name, size: 0, type: UInt8(ascii: "2"), mode: e.mode, link: link))
+                continue
+            }
             out.append(header(
                 name: name,
                 size: e.isDir ? 0 : e.data.count,
@@ -284,6 +288,44 @@ public enum Tar {
         gravador.fechar()
         guard ok else { throw NpmError.tarball(tr("gzip inválido")) }
         guard leitor.terminouInteiro else { throw NpmError.tarball(tr("tar inválido")) }
+        gravador.criarLinks()
+    }
+
+    /// O package.json de um `.tgz` (o da pasta de cima, seja ela `package/` ou a
+    /// `repo-<commit>/` do GitHub), sem extrair nada. É o que diz nome, versão e
+    /// dependências de um pacote que veio por URL.
+    public static func manifesto(_ tgz: Data) throws -> Data? {
+        struct Achou: Error {}
+        var leitor = Leitor()
+        var achado: Data?
+        var lendo = false
+        do {
+            let ok = try GzipCodec.descomprimir(tgz, pedaco: tamanhoDoPedaco) { pedaco in
+                try leitor.consumir(pedaco) { evento in
+                    switch evento {
+                    case let .inicioDeArquivo(caminho, _, tamanho):
+                        lendo = Gravador.relativo(caminho) == "package.json"
+                        if lendo {
+                            achado = Data(capacity: tamanho)
+                        }
+                    case let .dados(p):
+                        if lendo {
+                            achado?.append(p.assumingMemoryBound(to: UInt8.self))
+                        }
+                    case .fimDeArquivo:
+                        if lendo {
+                            throw Achou()
+                        }
+                    default:
+                        break
+                    }
+                }
+            }
+            guard ok else { throw NpmError.tarball(tr("gzip inválido")) }
+        } catch is Achou {
+            return achado
+        }
+        return nil
     }
 
     /// Recebe os eventos do leitor e grava no disco, arquivo por arquivo.
@@ -298,9 +340,54 @@ public enum Tar {
         private var aberto: Int32 = -1
         private var executavel = false
         private var caminhoAberto = ""
+        /// Links do pacote, criados só depois de todos os arquivos.
+        private var links: [(caminho: String, destino: String)] = []
 
         init(raiz: URL) {
             self.raiz = raiz
+        }
+
+        /// O destino, lido a partir da pasta do link, continua dentro do pacote? Absoluto
+        /// nunca: `/etc/passwd` dentro de um pacote não é coisa de pacote.
+        static func destinoFicaDentro(_ rel: String, _ destino: String) -> Bool {
+            guard !destino.isEmpty, !destino.hasPrefix("/") else { return false }
+            var pilha = rel.split(separator: "/").dropLast().map(String.init)
+            for parte in destino.split(separator: "/") {
+                switch parte {
+                case ".": continue
+                case "..":
+                    guard !pilha.isEmpty else { return false }
+                    pilha.removeLast()
+                default: pilha.append(String(parte))
+                }
+            }
+            return true
+        }
+
+        /// Cria os links e confere cada um pelo caminho real: uma corrente de links que
+        /// individualmente ficam dentro (`a -> b/..`, `b -> ..`) ainda pode sair. O que
+        /// sai do pacote, ou não leva a lugar nenhum, é apagado.
+        func criarLinks() {
+            let fm = FileManager.default
+            let base = raiz.resolvingSymlinksInPath().standardizedFileURL.path
+            for (rel, destino) in links {
+                let dest = raiz.appending(path: rel)
+                try? fm.createDirectory(at: dest.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try? fm.removeItem(at: dest)
+                try? fm.createSymbolicLink(atPath: dest.path, withDestinationPath: destino)
+            }
+            for (rel, _) in links {
+                let dest = raiz.appending(path: rel)
+                guard let real = realpath(dest.path, nil) else {
+                    try? fm.removeItem(at: dest)
+                    continue
+                }
+                let caminho = String(cString: real)
+                free(real)
+                if caminho != base, !caminho.hasPrefix(base + "/") {
+                    try? fm.removeItem(at: dest)
+                }
+            }
         }
 
         static func relativo(_ caminho: String) -> String? {
@@ -323,11 +410,11 @@ public enum Tar {
                 guard let rel = Self.relativo(caminho) else { return }
                 try criarPasta(raiz.appending(path: rel))
             case let .link(caminho, destino, _):
-                guard let rel = Self.relativo(caminho) else { return }
-                let dest = raiz.appending(path: rel)
-                try criarPasta(dest.deletingLastPathComponent())
-                try? FileManager.default.removeItem(at: dest)
-                try? FileManager.default.createSymbolicLink(atPath: dest.path, withDestinationPath: destino)
+                // O link só nasce no fim (`criarLinks`): criado aqui, um arquivo que viesse
+                // depois com o caminho atravessando esse link seria escrito onde o link
+                // aponta — `lib -> ../../..` seguido de `lib/x.js` escrevia fora do pacote.
+                guard let rel = Self.relativo(caminho), Self.destinoFicaDentro(rel, destino) else { return }
+                links.append((rel, destino))
             case let .inicioDeArquivo(caminho, modo, _):
                 guard let rel = Self.relativo(caminho) else { return }
                 let dest = raiz.appending(path: rel)

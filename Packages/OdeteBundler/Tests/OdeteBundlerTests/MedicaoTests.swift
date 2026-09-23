@@ -122,6 +122,25 @@ struct MedicaoTests {
         print("ODETE_MEDIDA estatisticas \(estatisticas.sorted { $0.key < $1.key })")
     }
 
+    /// O `vite build` do projeto: motor já carregado, do index.html ao dist/ gravado.
+    @Test func medeViteBuild() async throws {
+        let raiz = try FixtureReact.projeto()
+        let es = Esbuild(root: raiz)
+        _ = try await es.ready()
+        var r: ViteBuild.Resultado?
+        let tempo = try await FixtureReact.mede { r = try await ViteBuild.rodar(raiz: raiz, esbuild: es) }
+        let feito = try #require(r)
+        #expect(feito.ok, "\(feito.diagnosticos.map(\.text))")
+        let js = try #require(feito.gravados.first { $0.caminho.hasSuffix(".js") })
+        let texto = try String(contentsOf: raiz.appending(path: js.caminho), encoding: .utf8)
+        #expect(texto.contains("cliques") && !texto.contains("jsxDEV"))
+        print(String(
+            format: "ODETE_MEDIDA viteBuild real=%@ %.2fs/%.2fcpu arquivos=%@",
+            "\(FixtureReact.reactDeVerdade)", tempo.parede, tempo.cpu,
+            feito.gravados.map { "\($0.caminho)=\($0.bytes)" }.joined(separator: ",")
+        ))
+    }
+
     /// O lint de um componente de ~200 linhas: a transformação inteira (o que o lint fazia)
     /// contra o lint de agora, texto novo a cada vez; e o texto repetido, que nem chega ao
     /// esbuild.

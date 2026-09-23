@@ -57,7 +57,9 @@ public final class DevServer: @unchecked Sendable {
         URL(string: "http://127.0.0.1:\(port)/")!
     }
 
-    public func start(port: Int = 5173, preset: Preset = .vite) async throws {
+    /// `base` é o prefixo de onde o site é servido (o `base` do vite.config): o `vite preview`
+    /// de um build com `base: "/repo/"` recebe pedidos em /repo/assets/….
+    public func start(port: Int = 5173, preset: Preset = .vite, base: String = "/") async throws {
         // Um servidor que acabou de parar neste motor ainda pode estar soltando a porta.
         await esbuild.esperarParadas()
         _ = try await esbuild.ready()
@@ -78,7 +80,7 @@ public final class DevServer: @unchecked Sendable {
                 name: arquivo
             )
         }
-        let json = try await esbuild.engine.call("__devStart", [root.path, port, preset.rawValue])
+        let json = try await esbuild.engine.call("__devStart", [root.path, port, preset.rawValue, base])
         let obj = try JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any]
         let novoId = (obj?["id"] as? Int) ?? 0
         self.port = (obj?["port"] as? Int) ?? port

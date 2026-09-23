@@ -32,9 +32,20 @@ public struct Diagnostic: Sendable, Hashable, Codable, Identifiable {
 }
 
 public struct BuildResult: Sendable {
+    /// Um arquivo que o build produziu. Em bytes: a imagem que sai como arquivo não é texto.
+    public struct Arquivo: Sendable {
+        public var path: String
+        public var data: Data
+        public var text: String {
+            String(decoding: data, as: UTF8.self)
+        }
+    }
+
     public var ok: Bool
-    public var files: [(path: String, text: String)]
+    public var files: [Arquivo]
     public var diagnostics: [Diagnostic]
+    /// O `import.meta.env` do build (MODE, BASE_URL, as `VITE_*`…), em texto.
+    public var env: [String: String] = [:]
 }
 
 /// Um JSEngine com o esbuild-wasm carregado.
@@ -284,6 +295,11 @@ public final class Esbuild: @unchecked Sendable {
     /// Sem sourcemap por padrão: o bundler.js caía em `inline` quando ninguém dizia nada, e
     /// o `vite build` saía com o mapa inteiro embutido no JS de produção — o dobro do
     /// tamanho para quem abre o site.
+    ///
+    /// O resto é o que o `vite build` pede (`ViteBuild`): `mode` e `base` para o
+    /// `import.meta.env`, nomes com hash (`entryNames`, `assetNames`, com `publicPath`),
+    /// o tamanho até onde um arquivo importado vai embutido no JS (`limiteDeInline`), módulos
+    /// que só existem em memória (`virtuais`) e a fachada do interop CJS/ESM (`fachadas`).
     public func build(
         entries: [String],
         platform: String = "browser",
@@ -291,33 +307,72 @@ public final class Esbuild: @unchecked Sendable {
         dev: Bool = true,
         minify: Bool = false,
         define: [String: String] = [:],
-        sourcemap: Bool = false
+        sourcemap: Bool = false,
+        mode: String? = nil,
+        base: String = "/",
+        entryNames: String? = nil,
+        assetNames: String? = nil,
+        publicPath: String? = nil,
+        limiteDeInline: Int? = nil,
+        virtuais: [String: String] = [:],
+        fachadas: Bool = true
     ) async throws -> BuildResult {
         _ = try await ready()
-        let json = try await engine.call(
-            "__build",
-            [[
-                "root": root.path,
-                "entries": entries,
-                "platform": platform,
-                "format": format,
-                "dev": dev,
-                "minify": minify,
-                "define": define,
-                "outdir": "dist",
-                "sourcemap": sourcemap ? "inline" : false,
-            ] as [String: Any]]
-        )
+        var opts: [String: Any] = [
+            "root": root.path,
+            "entries": entries,
+            "platform": platform,
+            "format": format,
+            "dev": dev,
+            "minify": minify,
+            "define": define,
+            "outdir": "dist",
+            "sourcemap": sourcemap ? "inline" : false,
+            "base": base,
+            "fachadas": fachadas,
+        ]
+        if let mode {
+            opts["mode"] = mode
+        }
+        if let entryNames {
+            opts["entryNames"] = entryNames
+        }
+        if let assetNames {
+            opts["assetNames"] = assetNames
+        }
+        if let publicPath {
+            opts["publicPath"] = publicPath
+        }
+        if let limiteDeInline {
+            opts["limiteDeInline"] = limiteDeInline
+        }
+        if !virtuais.isEmpty {
+            opts["virtuais"] = virtuais
+        }
+        let json = try await engine.call("__build", [opts])
         return try Self.parseBuild(json)
     }
 
     static func parseBuild(_ json: String) throws -> BuildResult {
         guard let obj = try JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any]
         else { throw RuntimeError(message: tr("build: resposta inválida")) }
-        let files = ((obj["files"] as? [[String: Any]]) ?? []).map { (
-            path: ($0["path"] as? String) ?? "",
-            text: ($0["text"] as? String) ?? ""
-        ) }
+        let files = ((obj["files"] as? [[String: Any]]) ?? []).map { f in
+            let data = if let t = f["text"] as? String {
+                Data(t.utf8)
+            } else {
+                Data(base64Encoded: (f["base64"] as? String) ?? "") ?? Data()
+            }
+            return BuildResult.Arquivo(path: (f["path"] as? String) ?? "", data: data)
+        }
+        // Valores do `import.meta.env` são texto ou booleano (DEV, PROD, SSR).
+        var env: [String: String] = [:]
+        for (k, v) in (obj["env"] as? [String: Any]) ?? [:] {
+            if let b = v as? Bool {
+                env[k] = b ? "true" : "false"
+            } else {
+                env[k] = "\(v)"
+            }
+        }
         func diags(_ key: String, _ kind: Diagnostic.Kind) -> [Diagnostic] {
             ((obj[key] as? [[String: Any]]) ?? []).map { Diagnostic(
                 kind: kind,
@@ -332,7 +387,8 @@ public final class Esbuild: @unchecked Sendable {
         return BuildResult(
             ok: (obj["ok"] as? Bool) ?? false,
             files: files,
-            diagnostics: diags("errors", .error) + diags("warnings", .warning)
+            diagnostics: diags("errors", .error) + diags("warnings", .warning),
+            env: env
         )
     }
 

@@ -27,7 +27,7 @@ globalThis.__devCria = function () {
   const PASTAS_DE_PACOTES = ["node_modules", "node_modules.nosync"];
   const ehDePacote = (f) => PASTAS_DE_PACOTES.some((n) => f.indexOf("/" + n + "/") >= 0);
   const state = {
-    id: 0, root: "", server: null, port: 0, diagnostics: [], preset: "plain", sockets: new Set(),
+    id: 0, root: "", server: null, port: 0, diagnostics: [], preset: "plain", base: "/", sockets: new Set(),
     // Um por entrada servida (`src/main.tsx`): o build mais recente e a assinatura do que saiu.
     entradas: new Map(),
     // Quem consome o quê: "b:<entrada>" (bundle), "next:<arquivo>", "ilhas:<rota>",
@@ -63,7 +63,9 @@ globalThis.__devCria = function () {
   // ele. Os dois jeitos têm contextos separados: um não serve de cache para o outro.
   function opcoesDoBundle(entryRel, pre) {
     const o = { root: state.root, entries: [entryRel], format: "esm", platform: "browser", dev: true, outdir: "__odete", externalMissing: true };
-    if (pre) { o.preempacota = true; o.banner = 'import "/@odete/deps.js";'; }
+    // Sem o pacote de dependências, a fachada do `vite build` mantém o `default` de um
+    // CommonJS igual ao que o app recebia com ele (bundler.js, `fachada`).
+    if (pre) { o.preempacota = true; o.banner = 'import "/@odete/deps.js";'; } else o.fachadas = true;
     return o;
   }
   const contextoDoBundle = (entryRel, pre) => "dev" + state.id + ":" + (pre ? "pre:" : "") + entryRel;
@@ -206,7 +208,7 @@ globalThis.__devCria = function () {
         arquivos.set(f, m);
       }
     }
-    for (const n of ["package.json", ".env", ".env.local", ".env.development"]) {
+    for (const n of ["package.json", ".env", ".env.local", ".env.development", ".env.development.local"]) {
       const f = path.join(state.root, n);
       if (!arquivos.has(f)) arquivos.set(f, null);
     }
@@ -367,6 +369,10 @@ globalThis.__devCria = function () {
 
   function html(file) {
     let src = fs.readFileSync(file, "utf8");
+    // `%VITE_TITULO%` e `%MODE%` no HTML viram o valor, como no Vite (e no `vite build`).
+    // Só o que existe em `import.meta.env`: um `100%` solto fica como está.
+    const env = globalThis.__envDoVite(state.root, "development", "/", true);
+    src = src.replace(/%(\S+?)%/g, (tudo, k) => (Object.prototype.hasOwnProperty.call(env, k) ? String(env[k]) : tudo));
     // <script type="module" src="/src/main.tsx"> → bundle + css
     const entries = [];
     // A folha dos pacotes vem antes da do app, na ordem em que o bundle inteiro as juntaria.
@@ -489,7 +495,7 @@ globalThis.__devCria = function () {
       const d = await state.pre.deps.garante(r.dependencias);
       if (!d.ok) {
         await desligaPreEmpacotamento(null, d);
-        delete opcoes.preempacota; delete opcoes.banner;
+        delete opcoes.preempacota; delete opcoes.banner; opcoes.fachadas = true;
         r = await globalThis.__buildBruto(opcoes);
       }
     }
@@ -784,6 +790,10 @@ globalThis.__devCria = function () {
   async function handle(req, res) {
     let url = new URL(req.url, "http://x");
     let p = decodeURIComponent(url.pathname);
+    // O `vite preview` de um build com `base: "/repo/"`: o index.html pede
+    // /repo/assets/…, e o arquivo está em dist/assets/. Sem o prefixo também serve — o
+    // Preview abre na raiz.
+    if (state.base !== "/" && (p + "/").startsWith(state.base)) p = "/" + p.slice(state.base.length);
     try {
       if (p.startsWith("/@odete/js/")) { const b = await bundle(p.slice(11)); return send(res, 200, MIME[".js"], b.js); }
       if (p.startsWith("/@odete/css/")) { const b = await bundle(p.slice(12)); return send(res, 200, MIME[".css"], b.css); }
@@ -920,9 +930,9 @@ globalThis.__devCria = function () {
     }
   }
 
-  function inicia(id, root, port, preset) {
+  function inicia(id, root, port, preset, base) {
     return new Promise((resolve, reject) => {
-      state.id = id; state.root = root; state.preset = preset || "plain";
+      state.id = id; state.root = root; state.preset = preset || "plain"; state.base = base || "/";
       state.pre.deps = globalThis.__depsCria(root, "dev" + id + ":");
       const srv = http.createServer(handle);
       srv.on("odete:ws", (sock) => { state.sockets.add(sock); sock.on("close", () => state.sockets.delete(sock)); });
@@ -983,12 +993,12 @@ globalThis.__devCria = function () {
     globalThis.__guardaSo(uniao);
   };
 
-  globalThis.__devStart = async (root, port, preset) => {
+  globalThis.__devStart = async (root, port, preset, base) => {
     const id = (globalThis.__devProximoId = (globalThis.__devProximoId || 0) + 1);
     const s = globalThis.__devCria();
     servidores.set(id, s);
     try {
-      const r = await s.inicia(id, root, port, preset);
+      const r = await s.inicia(id, root, port, preset, base);
       return { id, port: r.port };
     } catch (e) {
       servidores.delete(id);

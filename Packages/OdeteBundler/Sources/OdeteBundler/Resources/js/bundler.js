@@ -64,12 +64,28 @@
   //   - um CommonJS que pega o módulo no registro que o pacote de dependências preenche
   //     (`globalThis.__odeteDep`), igual a um `require` — então o `import` do app passa
   //     pela mesma interoperação CJS↔ESM do esbuild que teria se o pacote estivesse junto;
-  //   - um ESM na frente dele (`export *` e `export default`), para que `default` siga o
-  //     `__esModule` como no Vite (e num pacote ESM seja o default de verdade): direto, num
-  //     projeto `"type": "module"` o esbuild usaria a regra do Node e daria o objeto inteiro.
+  //   - a fachada ESM na frente dele (`fachada`, abaixo), para que `default` siga o
+  //     `__esModule` como no Vite (e num pacote ESM seja o default de verdade).
   // Os caminhos virtuais não podem terminar em `.mjs`: a extensão decide o formato mesmo
   // fora do disco. Por isso o sufixo.
   const SUFIXO_DEP = "?odete", SUFIXO_DEP_CJS = "?odete.cjs";
+
+  // ---- a fachada ESM de um pacote CommonJS ----
+  // O `default` de um CommonJS muda conforme quem importa. O esbuild dá o `default` do
+  // Vite (e do Babel) — `exports.default` se o módulo tem `__esModule`, senão o
+  // `module.exports` — a quem importa de um módulo comum; a quem é ESM do Node, a regra
+  // do Node: o `module.exports` inteiro, sempre. E ESM do Node, aqui, é só `.mjs` e
+  // `.mts`: o esbuild do motor não lê arquivo nenhum (tudo passa por este plugin), então
+  // não vê o `"type": "module"` do package.json. Um `src/x.mjs` que importa o
+  // react-transition-group recebia o objeto no lugar do componente.
+  //
+  // A fachada é um módulo virtual — comum, portanto — que reexporta o pacote: quem a
+  // importa recebe o `default` que ela recebeu, pela regra do Vite. O dev server a põe na
+  // frente de todo pacote; o `vite build`, só onde a regra do Node valeria (`fachadas`).
+  const fachada = (alvo) => {
+    const a = JSON.stringify(alvo);
+    return `export * from ${a};\nexport { default } from ${a};\n`;
+  };
   const CODIGO_DE_PACOTE = /\.([mc]?[jt]s|[jt]sx)$/i;
   const TIPOS_DE_IMPORT = new Set(["import-statement", "require-call", "dynamic-import"]);
   const dentroDePacote = (p) => p.indexOf("/node_modules/") >= 0 || p.indexOf("/node_modules.nosync/") >= 0;
@@ -80,6 +96,46 @@
   function vaiParaAsDependencias(abs, kind) {
     if (!TIPOS_DE_IMPORT.has(kind) || !CODIGO_DE_PACOTE.test(abs) || !dentroDePacote(abs)) return false;
     try { return dentroDePacote(fs.realpathSync(abs)); } catch (e) { return false; }
+  }
+
+  // Quem importa é ESM do Node para o esbuild (ver `fachada`).
+  const ehESMDoNode = (p) => /\.m[jt]s$/i.test(p);
+
+  // Código do app: fora de node_modules, ou um pacote ligado (`npm link`), que o dev
+  // server também trata como código do app.
+  function ehCodigoDoApp(p) {
+    if (!dentroDePacote(p)) return true;
+    try { return !dentroDePacote(fs.realpathSync(p)); } catch (e) { return false; }
+  }
+
+  // Se o esbuild vai ler o arquivo como CommonJS, pelo mesmo critério dele: a extensão
+  // manda (`.cjs`/`.cts` é CommonJS, `.mjs`/`.mts` é ESM); fora isso, CommonJS é o que
+  // não tem sintaxe de ESM e usa `module`, `exports` ou `require`. A procura é por
+  // `indexOf`, que é nativo: expressão regular no arquivo inteiro, sem JIT, anda
+  // caractere por caractere. Na dúvida (um `export ` num comentário), ESM — sem fachada,
+  // o import fica como era, e uma fachada num ESM sem `default` quebraria o build.
+  function ehCommonJS(abs) {
+    if (/\.c[jt]s$/i.test(abs)) return true;
+    if (/\.m[jt]s$/i.test(abs)) return false;
+    let t;
+    try { t = fs.readFileSync(abs, "utf8"); } catch (e) { return false; }
+    if (temSintaxeESM(t)) return false;
+    return t.indexOf("exports") >= 0 || t.indexOf("module") >= 0 || t.indexOf("require") >= 0;
+  }
+
+  function temSintaxeESM(t) {
+    const ident = /[\w$.]/;
+    for (const [palavra, depois] of [["export", " \t\r\n{*"], ["import", " \t\r\n{*\"'."]]) {
+      for (let i = t.indexOf(palavra); i >= 0; i = t.indexOf(palavra, i + 1)) {
+        if (i > 0 && ident.test(t[i - 1])) continue;
+        const c = t[i + palavra.length];
+        if (c === undefined || depois.indexOf(c) < 0) continue;
+        // `import.x` só é sintaxe de módulo como `import.meta`.
+        if (c === "." && !t.startsWith(".meta", i + palavra.length)) continue;
+        return true;
+      }
+    }
+    return false;
   }
 
   // O que o bundle do app pediu ao pacote de dependências, a partir do metafile.
@@ -118,6 +174,11 @@
         if (args.path.startsWith("odete-dep-cjs:")) {
           return { path: args.path.slice("odete-dep-cjs:".length), namespace: "odete-dep-cjs" };
         }
+        // O pacote por trás de uma fachada do build: o arquivo de sempre, no namespace de
+        // sempre — o mesmo módulo que outro pacote importa direto, e não uma segunda cópia.
+        if (args.path.startsWith("odete-pacote:")) {
+          return { path: args.path.slice("odete-pacote:".length), namespace: "file" };
+        }
         // Módulos que só existem em memória: a entrada das ilhas e o mapa delas são
         // gerados por rota, e não faz sentido escrever isso no projeto de quem usa.
         // O ponto de entrada chega como caminho absoluto, porque o esbuild junta com a
@@ -140,8 +201,20 @@
         if (args.path.startsWith("virtual:") ) return { path: args.path, namespace: "virtual" };
         const importer = args.importer || path.join(root, "index.js");
         // condição browser: tenta "browser"/"import" antes de "require"
-        const r = H.resolve(args.path, importer);
+        let r = H.resolve(args.path, importer);
         const bare = !args.path.startsWith(".") && !args.path.startsWith("/");
+        // Caminho absoluto que não existe no disco é da raiz do projeto, como no Vite
+        // (`import "/src/util"`, `url(/src/fundo.png)`). E no CSS, se nem lá existe, é um
+        // endereço do site — o `url(/fundo.png)` de um arquivo de public/ —, que fica como
+        // está (com o `base` na frente); antes derrubava o build inteiro por "não achei".
+        if (r && typeof r === "object" && args.path.startsWith("/") && !args.path.startsWith(root + "/")) {
+          const daRaiz = H.resolve(path.join(root, args.path), importer);
+          if (typeof daRaiz === "string") r = daRaiz;
+          else if (args.kind === "url-token") {
+            const pre = opts.base && opts.base !== "./" ? opts.base : "/";
+            return { path: pre + args.path.slice(1), external: true };
+          }
+        }
         if (r && typeof r === "object") {
           if (opts.externalMissing && bare) return { path: args.path, external: true }; // vai pelo import map (esm.sh)
           // A pasta onde o arquivo que falta nasceria: o observador passa a olhar lá, e o
@@ -161,12 +234,49 @@
         if (opts.preempacota && bare && vaiParaAsDependencias(abs, args.kind)) {
           return { path: path.relative(root, abs) + SUFIXO_DEP, namespace: "odete-dep" };
         }
+        // Sem pacote de dependências, a fachada vai só onde a regra do Node valeria: um
+        // `.mjs` do app importando um pacote CommonJS. No resto o esbuild já dá o mesmo
+        // `default` que ela, e o bundle fica como sempre foi. `require` fica de fora: ele
+        // é o `module.exports`, em qualquer regra.
+        if (opts.fachadas && bare && args.kind !== "require-call" && ehESMDoNode(importer) && ehCodigoDoApp(importer) &&
+            vaiParaAsDependencias(abs, args.kind) && ehCommonJS(abs)) {
+          return { path: abs + SUFIXO_DEP, namespace: "odete-fachada" };
+        }
+        // O esbuild só lê o `"sideEffects": false` do package.json quando ele mesmo resolve
+        // o import; aqui quem resolve é o plugin, então o build de produção diz por ele.
+        // Sem isso, importar um ícone de um pacote com barril (`export * from "./icones"`)
+        // levava para o bundle todo módulo cujo topo chama uma função — o Vite (Rollup)
+        // deixa de fora.
+        if (opts.dev === false && CODIGO_DE_PACOTE.test(abs) && dentroDePacote(abs) && semEfeitos(abs)) {
+          return { path: abs, namespace: "file", sideEffects: false };
+        }
         return { path: abs, namespace: "file" };
       };
-      build.onLoad({ filter: /.*/, namespace: "odete-dep" }, (args) => {
-        const cjs = JSON.stringify("odete-dep-cjs:" + args.path.slice(0, -SUFIXO_DEP.length) + SUFIXO_DEP_CJS);
-        return { contents: `export * from ${cjs};\nexport { default } from ${cjs};\n`, loader: "js", resolveDir: root };
-      });
+      // O package.json mais perto do arquivo, como o esbuild: `sideEffects: false` vale; uma
+      // lista de arquivos não é interpretada aqui, e fica como sem a informação.
+      // A resposta fica guardada para cada pasta do caminho: os arquivos de `cjs/` e `esm/`
+      // não voltam a procurar package.json onde não há.
+      const efeitosPorPasta = new Map();
+      const semEfeitos = (abs) => {
+        const vistas = [];
+        let v = false;
+        for (let dir = path.dirname(abs); dir && dir !== path.dirname(dir); dir = path.dirname(dir)) {
+          if (efeitosPorPasta.has(dir)) { v = efeitosPorPasta.get(dir); break; }
+          vistas.push(dir);
+          let pkg;
+          try { pkg = fs.readFileSync(path.join(dir, "package.json"), "utf8"); } catch (e) { continue; }
+          try { v = JSON.parse(pkg).sideEffects === false; } catch (e) { /* package.json quebrado */ }
+          break;
+        }
+        for (const d of vistas) efeitosPorPasta.set(d, v);
+        return v;
+      };
+      build.onLoad({ filter: /.*/, namespace: "odete-dep" }, (args) => ({
+        contents: fachada("odete-dep-cjs:" + args.path.slice(0, -SUFIXO_DEP.length) + SUFIXO_DEP_CJS), loader: "js", resolveDir: root,
+      }));
+      build.onLoad({ filter: /.*/, namespace: "odete-fachada" }, (args) => ({
+        contents: fachada("odete-pacote:" + args.path.slice(0, -SUFIXO_DEP.length)), loader: "js", resolveDir: root,
+      }));
       build.onLoad({ filter: /.*/, namespace: "odete-dep-cjs" }, (args) => {
         const chave = JSON.stringify(args.path.slice(0, -SUFIXO_DEP_CJS.length));
         return { contents: `module.exports = globalThis.__odeteDep(${chave});\n`, loader: "js" };
@@ -249,7 +359,16 @@
           return { contents: fs.readFileSync(args.path), loader: final, resolveDir: path.dirname(args.path) };
         }
         anotaMtime(args.path);
-        if (loader === "dataurl" || loader === "binary" || loader === "file") return { contents: fs.readFileSync(args.path), loader: final, resolveDir: path.dirname(args.path) };
+        if (loader === "dataurl" || loader === "file") {
+          // O `vite build` embute no JS só o arquivo pequeno (o `assetsInlineLimit` do Vite,
+          // 4 KB); o resto sai como arquivo à parte, com hash no nome — a foto de 2 MB não
+          // vai em base64 dentro do bundle que o navegador precisa ler antes de desenhar.
+          const bytes = fs.readFileSync(args.path);
+          const limite = opts.limiteDeInline;
+          const comoArquivo = typeof limite === "number" && bytes.length > limite;
+          return { contents: bytes, loader: comoArquivo ? "file" : "dataurl", resolveDir: path.dirname(args.path) };
+        }
+        if (loader === "binary") return { contents: fs.readFileSync(args.path), loader, resolveDir: path.dirname(args.path) };
         return { contents: fs.readFileSync(args.path, "utf8"), loader, resolveDir: path.dirname(args.path) };
       };
     },
@@ -348,15 +467,42 @@ const __odeteChama = (id) => async (...args) => {
       bundle: true, write: false, format: opts.format || "esm", platform: opts.platform || "browser", target: opts.target || "es2022",
       sourcemap: opts.sourcemap || false, outdir: path.join(root, opts.outdir || "dist"), outbase: root,
       jsx: "automatic", jsxDev: opts.dev !== false, minify: !!opts.minify, splitting: false, metafile: !!opts.metafile, logLevel: "silent", absWorkingDir: root,
-      define: Object.assign({ "process.env.NODE_ENV": JSON.stringify(opts.dev === false ? "production" : "development"), "import.meta.env.DEV": String(opts.dev !== false), "import.meta.env.PROD": String(opts.dev === false), "import.meta.env.MODE": JSON.stringify(opts.dev === false ? "production" : "development"), "import.meta.env.BASE_URL": '"/"', "import.meta.env.SSR": "false", "import.meta.hot": "undefined", "global": "globalThis" }, envDefines(root, opts.dev === false), opts.define || {}),
+      define: Object.assign(definesDoVite(opts), opts.define || {}),
       loader: { ".png": "dataurl", ".jpg": "dataurl", ".svg": "dataurl", ".gif": "dataurl", ".webp": "dataurl", ".woff": "dataurl", ".woff2": "dataurl", ".ttf": "dataurl" },
       plugins: [fsPlugin(root, opts)], nodePaths: [path.join(root, "node_modules")], resolveExtensions: [".tsx", ".ts", ".jsx", ".js", ".mjs", ".cjs", ".json", ".css"], mainFields: opts.platform === "node" ? ["module", "main"] : ["browser", "module", "main"], conditions: opts.platform === "node" ? ["node", "import", "default"] : ["browser", "import", "default"],
     };
     // O bundle do app com dependências pré-empacotadas começa importando o pacote delas:
     // pela regra do ESM, ele roda antes de qualquer linha do app.
     if (opts.banner) o.banner = { js: opts.banner };
+    // Os nomes do `vite build`: `assets/index-<hash>.js`, e o que o bundle referencia
+    // pelo endereço de onde o site é servido (o `base`).
+    if (opts.entryNames) o.entryNames = opts.entryNames;
+    if (opts.assetNames) o.assetNames = opts.assetNames;
+    if (opts.publicPath) o.publicPath = opts.publicPath;
     return o;
   }
+
+  // `import.meta.env` como no Vite: MODE, DEV, PROD, BASE_URL, SSR e as variáveis dos
+  // `.env`. Além de cada chave, o objeto inteiro: sem ele, `import.meta.env.VITE_X ?? "p"`
+  // com VITE_X ausente virava `import.meta.env` de verdade no navegador — `undefined`, e
+  // o `.VITE_X` dele, um TypeError em vez do valor padrão. O esbuild põe o objeto numa
+  // variável só, e só se alguém o usar inteiro.
+  function definesDoVite(opts) {
+    const prod = opts.dev === false;
+    const env = envDoVite(opts.root, opts.mode || (prod ? "production" : "development"), opts.base || "/", !prod);
+    const d = {
+      "process.env.NODE_ENV": JSON.stringify(prod ? "production" : "development"),
+      "import.meta.env": JSON.stringify(env),
+      "import.meta.hot": "undefined",
+      "global": "globalThis",
+    };
+    for (const k of Object.keys(env)) {
+      d["import.meta.env." + k] = JSON.stringify(env[k]);
+      if (!(k in ENV_FIXAS)) d["process.env." + k] = JSON.stringify(env[k]);
+    }
+    return d;
+  }
+  const ENV_FIXAS = { BASE_URL: 1, MODE: 1, DEV: 1, PROD: 1, SSR: 1 };
 
   // O que, nas opções, muda o que sai do esbuild: entra na chave do cache do pacote de
   // dependências. Um `.env` com VITE_X novo, por exemplo, muda os defines e a chave.
@@ -402,10 +548,17 @@ const __odeteChama = (id) => async (...args) => {
     }
   };
 
-  // Para o Swift (`Esbuild.build`): texto, que é o que o `vite build` grava em dist/.
+  // Para o Swift (`Esbuild.build`): o que o `vite build` grava em dist/. JS e CSS vão como
+  // texto; o resto (a imagem que saiu como arquivo) em base64, que texto a estragaria.
+  // `env` é o `import.meta.env` do build, para o `%VITE_X%` do index.html.
   globalThis.__build = async (opts) => {
     const r = await globalThis.__buildBruto(opts);
-    return { ok: r.ok, files: r.saidas.map((f) => ({ path: path.relative(opts.root, f.path), text: f.text })), warnings: r.warnings, errors: r.errors };
+    const files = r.saidas.map((f) => {
+      const p = path.relative(opts.root, f.path);
+      return /\.(js|css|map)$/.test(p) ? { path: p, text: f.text } : { path: p, base64: Buffer.from(f.contents).toString("base64") };
+    });
+    const env = r.ok ? envDoVite(opts.root, opts.mode || (opts.dev === false ? "production" : "development"), opts.base || "/", opts.dev !== false) : {};
+    return { ok: r.ok, files, env, warnings: r.warnings, errors: r.errors };
   };
 
   // ---- contextos incrementais ----
@@ -456,18 +609,64 @@ const __odeteChama = (id) => async (...args) => {
   };
   globalThis.__contextosVivos = () => contextos.size;
 
-  function envDefines(root, prod) {
-    const out = {};
-    for (const f of [".env", prod ? ".env.production" : ".env.development", ".env.local"]) {
-      const p = path.join(root, f);
-      if (!fs.existsSync(p)) continue;
-      for (const line of fs.readFileSync(p, "utf8").split("\n")) {
-        const m = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/.exec(line);
-        if (!m) continue;
-        const v = m[2].trim().replace(/^["']|["']$/g, "");
-        if (m[1].startsWith("VITE_") || m[1].startsWith("PUBLIC_") || m[1].startsWith("NEXT_PUBLIC_")) { out[`import.meta.env.${m[1]}`] = JSON.stringify(v); out[`process.env.${m[1]}`] = JSON.stringify(v); }
+  // O `import.meta.env` de um modo: as fixas e as variáveis públicas dos `.env`.
+  //
+  // Os arquivos na ordem do `loadEnv` do Vite, o de depois ganhando: `.env`, `.env.local`,
+  // `.env.<modo>`, `.env.<modo>.local`. Antes o `.env.local` vinha por último e passava
+  // por cima do `.env.production`, e o `.env.production.local` nem era lido. Públicas são
+  // as com o prefixo do Vite (`VITE_`), e as do Astro e do Next, que usam o mesmo motor.
+  function envDoVite(root, modo, base, dev) {
+    const lidas = {};
+    for (const f of [".env", ".env.local", ".env." + modo, ".env." + modo + ".local"]) {
+      let texto;
+      try { texto = fs.readFileSync(path.join(root, f), "utf8"); } catch (e) { continue; }
+      leEnv(texto, lidas);
+    }
+    const env = { BASE_URL: base, MODE: modo, DEV: dev, PROD: !dev, SSR: false };
+    for (const k of Object.keys(lidas)) {
+      // O nome vira chave de define: `VITE_A-B` quebraria o build inteiro.
+      if (!/^\w+$/.test(k)) continue;
+      if (k.startsWith("VITE_") || k.startsWith("PUBLIC_") || k.startsWith("NEXT_PUBLIC_")) env[k] = expande(lidas, k);
+    }
+    return env;
+  }
+  globalThis.__envDoVite = envDoVite;
+
+  // Um `.env` como o dotenv lê: `export` na frente, aspas (simples, duplas ou crase)
+  // guardando `#` e espaços, `\n` dentro de aspas duplas, e comentário depois do valor sem
+  // aspas — `VITE_API=/api # produção` é `/api`, não a linha inteira.
+  function leEnv(texto, destino) {
+    for (const linha of texto.split("\n")) {
+      const m = /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_.-]*)\s*=\s*(.*?)\s*$/.exec(linha);
+      if (!m) continue;
+      let v = m[2];
+      const q = v[0];
+      const fim = (q === '"' || q === "'" || q === "`") ? v.indexOf(q, 1) : -1;
+      if (fim > 0) {
+        v = v.slice(1, fim);
+        if (q === '"') v = v.replace(/\\n/g, "\n").replace(/\\r/g, "\r");
+        destino[m[1]] = { valor: v, expande: q !== "'" };
+      } else {
+        const c = v.search(/\s#/);
+        if (c >= 0) v = v.slice(0, c);
+        destino[m[1]] = { valor: v.trim(), expande: true };
       }
     }
-    return out;
+  }
+
+  // `${VAR}`, `${VAR:-padrão}` e `$VAR`, com as outras variáveis dos `.env` (o
+  // dotenv-expand do Vite). `\$` é um cifrão. Uma variável que se referencia não trava.
+  function expande(lidas, k, visitadas) {
+    const item = lidas[k];
+    if (!item) return "";
+    if (!item.expande || item.valor.indexOf("$") < 0) return item.valor;
+    const vis = new Set(visitadas || []);
+    vis.add(k);
+    return item.valor.replace(/\\\$|\$\{([A-Za-z_][\w.-]*)(?::?-([^}]*))?\}|\$([A-Za-z_]\w*)/g, (tudo, a, padrao, b) => {
+      if (tudo === "\\$") return "$";
+      const nome = a || b;
+      const v = vis.has(nome) ? "" : expande(lidas, nome, vis);
+      return v === "" && padrao !== undefined ? padrao : v;
+    });
   }
 })();

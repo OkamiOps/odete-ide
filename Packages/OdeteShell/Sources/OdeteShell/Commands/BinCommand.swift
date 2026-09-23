@@ -32,10 +32,19 @@ struct BinCommand: ShellCommand {
         switch bin {
         case "vite":
             if rest.first == "build" {
-                return await build(ctx, entryHTML: true)
+                return await build(ctx, Array(rest.dropFirst()))
             }
             if rest.first == "preview" {
-                return await serveStatic(ctx, dir: "dist")
+                // Serve o que o build gravou, onde o build gravou, sob o mesmo `base`.
+                let config = ViteBuild.configDoVite(ctx.root)
+                let args = Array(rest.dropFirst())
+                let base = ViteBuild.normalizaBase(opcao("--base", args) ?? config.base ?? "/")
+                return await serveStatic(
+                    ctx,
+                    dir: opcao("--outDir", args) ?? config.saida ?? "dist",
+                    port: portArg(args) ?? 4173,
+                    base: base.hasPrefix("/") ? base : "/"
+                )
             }
             return await devServer(ctx, preset: .vite, port: portArg(rest) ?? 5173, label: "vite")
         case "astro":
@@ -267,82 +276,47 @@ struct BinCommand: ShellCommand {
         return 0
     }
 
-    func build(_ ctx: CommandContext, entryHTML: Bool) async -> Int32 {
+    /// `vite build [--mode m] [--base b] [--outDir d]`: `ViteBuild`, no esbuild do projeto.
+    func build(_ ctx: CommandContext, _ args: [String]) async -> Int32 {
         let io = ctx.io
-        let es = ctx.shell.esbuildEngine()
-        let index = ctx.root.appending(path: "index.html")
-        guard let html = try? String(contentsOf: index, encoding: .utf8)
-        else { io.err(tr("vite build: sem index.html")); return 1 }
-        let entries = html.matches(of: /<script\s+type="module"\s+src="([^"]+)"/)
-            .map { String($0.1).replacingOccurrences(
-                of: "^/",
-                with: "",
-                options: .regularExpression
-            ) }
-        guard !entries.isEmpty
-        else { io.err(tr("vite build: nenhum <script type=module src> no index.html")); return 1 }
+        let opcoes = ViteBuild.Opcoes(
+            modo: opcao("--mode", args) ?? opcao("-m", args) ?? "production",
+            base: opcao("--base", args),
+            saida: opcao("--outDir", args)
+        )
         do {
-            let r = try await es.build(entries: entries, dev: false, minify: true)
-            for d in r.diagnostics {
+            let r = try await ViteBuild.rodar(raiz: ctx.root, esbuild: ctx.shell.esbuildEngine(), opcoes: opcoes)
+            for d in r.diagnosticos {
                 (d.kind == .error ? io.err : io.out)("\(d.file ?? ""):\(d.line ?? 0): \(d.text)")
             }
             guard r.ok else { return 1 }
-            let dist = ctx.root.appending(path: "dist")
-            try? FileManager.default.removeItem(at: dist)
-            try FileManager.default.createDirectory(
-                at: dist.appending(path: "assets"),
-                withIntermediateDirectories: true
-            )
-            var out = html
-            for f in r.files {
-                let name = "assets/" + (f.path as NSString).lastPathComponent
-                try f.text.write(to: dist.appending(path: name), atomically: true, encoding: .utf8)
-                io
-                    .out(
-                        "  dist/\(name)  \(Tamanho.arquivo(f.text.utf8.count))"
-                    )
+            for g in r.gravados {
+                io.out("  \(g.caminho)  \(Tamanho.arquivo(g.bytes))")
             }
-            for e in entries {
-                let js = "assets/" + ((e as NSString).deletingPathExtension as NSString).lastPathComponent + ".js"
-                let css = "assets/" + ((e as NSString).deletingPathExtension as NSString).lastPathComponent + ".css"
-                let hasCSS = r.files.contains { $0.path.hasSuffix(".css") }
-                out = out.replacingOccurrences(of: "src=\"/\(e)\"", with: "src=\"/\(js)\"").replacingOccurrences(
-                    of: "src=\"\(e)\"",
-                    with: "src=\"/\(js)\""
-                )
-                if hasCSS {
-                    out = out.replacingOccurrences(
-                        of: "</head>",
-                        with: "<link rel=\"stylesheet\" href=\"/\(css)\"></head>"
-                    )
-                }
-            }
-            try out.write(to: dist.appending(path: "index.html"), atomically: true, encoding: .utf8)
-            if let pub = try? FileManager.default.contentsOfDirectory(
-                at: ctx.root.appending(path: "public"),
-                includingPropertiesForKeys: nil
-            ) {
-                for item in pub {
-                    try? FileManager.default.copyItem(
-                        at: item,
-                        to: dist.appending(path: item.lastPathComponent)
-                    )
-                }
-            }
-            io.out(tr("✓ build em dist/"))
+            io.out(r.saida == "dist" ? tr("✓ build em dist/") : tr("✓ build em %1$@/", r.saida))
             return 0
         } catch { io.err(tr("vite build: %1$@", "\(error.localizedDescription)")); return 1 }
     }
 
-    func serveStatic(_ ctx: CommandContext, dir: String) async -> Int32 {
+    /// O valor de `--nome valor` ou `--nome=valor`.
+    func opcao(_ nome: String, _ args: [String]) -> String? {
+        if let i = args.firstIndex(of: nome), i + 1 < args.count {
+            return args[i + 1]
+        }
+        return args.first { $0.hasPrefix(nome + "=") }.map { String($0.dropFirst(nome.count + 1)) }
+    }
+
+    func serveStatic(_ ctx: CommandContext, dir: String, port: Int = 4173, base: String = "/") async -> Int32 {
         let io = ctx.io
-        let base = ctx.resolve(dir)
+        let pasta = ctx.resolve(dir)
         // `vite preview` serve dist/, mas no motor do projeto: servir estático não justifica
         // compilar outro esbuild só porque a raiz servida é outra.
-        let dev = DevServer(esbuild: ctx.shell.esbuildEngine(), root: base) { k, t in
+        let dev = DevServer(esbuild: ctx.shell.esbuildEngine(), root: pasta) { k, t in
             k == .out ? io.out(t) : io.err(t)
         }
-        do { try await dev.start(port: 4173, preset: .plain) } catch { io.err(error.localizedDescription); return 1 }
+        do { try await dev.start(port: port, preset: .plain, base: base) } catch {
+            io.err(error.localizedDescription); return 1
+        }
         let job = ctx.shell.registerJob("serve \(dir)", ports: [dev.port]) { dev.stop() }
         io.out(tr("  ➜  http://127.0.0.1:%1$@/   (job %2$@)", "\(dev.port)", "\(job.id)"))
         return 0

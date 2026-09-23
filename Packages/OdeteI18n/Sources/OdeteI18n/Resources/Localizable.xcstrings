@@ -24333,6 +24333,34 @@
         }
       }
     },
+    "navegou para %1$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "navigated to %1$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "navigiert zu %1$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "navigation vers %1$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "navegó a %1$@"
+          }
+        }
+      }
+    },
     "nenhum PR aberto": {
       "localizations": {
         "en": {

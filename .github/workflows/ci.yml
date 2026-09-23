@@ -1,8 +1,9 @@
 name: CI
 
-# Precisa do Xcode 27: os pacotes declaram `platforms: [.iOS(.v26)]`, e o provedor da
-# Apple Intelligence usa APIs do SDK novo (`contextSize`, `PrivateCloudComputeLanguageModel`)
-# que o Xcode 26.3 da imagem macos-15 não tem — com ele o build parava no OdeteAgent.
+# Precisa do Xcode 26.6 ou mais novo: os pacotes declaram `platforms: [.iOS(.v26)]` e o
+# provedor da Apple Intelligence usa `contextSize` (SDK do iOS 26.4). O Xcode 26.3 da
+# imagem macos-15 parava o build no OdeteAgent. A nuvem privada (SDK do iOS 27) fica atrás
+# de `#if compiler(>=6.4)` enquanto o GitHub não tiver o Xcode 27.
 on:
   push:
     branches: [main, iOS]
@@ -21,7 +22,7 @@ jobs:
 
       - uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: '27'
+          xcode-version: '26.6'
 
       - name: Ferramentas
         run: brew install xcodegen swiftformat swiftlint

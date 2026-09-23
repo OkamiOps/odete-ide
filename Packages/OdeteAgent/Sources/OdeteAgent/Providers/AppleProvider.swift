@@ -116,7 +116,7 @@ public struct AppleProvider: Provider {
     }
 
     /// A janela vem do próprio modelo a partir do iOS 26.4; antes disso a Apple
-    /// documenta 4096 fichas por sessão.
+    /// documenta 4096 tokens por sessão.
     public static var janela: Int {
         if #available(iOS 26.4, *) {
             return SystemLanguageModel.default.contextSize
@@ -147,8 +147,14 @@ public struct AppleProvider: Provider {
     /// A nuvem privada está disponível? Precisa da permissão da Apple, do iOS 27 em
     /// diante, e de um aparelho que a Apple considere elegível.
     public static var nuvemDisponivel: Bool {
-        guard temPermissaoDaNuvem, #available(iOS 27.0, *) else { return false }
-        return PrivateCloudComputeLanguageModel().isAvailable
+        // `#if compiler`: a nuvem privada é do SDK do iOS 27 (Xcode 27). Compilado com um
+        // Xcode mais velho (o do CI, por enquanto) ela simplesmente não existe.
+        #if compiler(>=6.4)
+            guard temPermissaoDaNuvem, #available(iOS 27.0, *) else { return false }
+            return PrivateCloudComputeLanguageModel().isAvailable
+        #else
+            return false
+        #endif
     }
 
     /// Por que a nuvem não dá, quando não dá.
@@ -161,18 +167,22 @@ public struct AppleProvider: Provider {
         guard temPermissaoDaNuvem else {
             return tr("A Apple ainda não liberou a permissão para a Odete usar a nuvem privada.")
         }
-        switch PrivateCloudComputeLanguageModel().availability {
-        case .available: return nil
-        case let .unavailable(motivo):
-            switch motivo {
-            case .deviceNotEligible:
-                return tr("Este aparelho não é elegível para a nuvem privada da Apple.")
-            case .systemNotReady:
-                return tr("A nuvem privada da Apple ainda não está pronta. Tente daqui a pouco.")
-            @unknown default:
-                return tr("A nuvem privada da Apple não está disponível agora.")
+        #if compiler(>=6.4)
+            switch PrivateCloudComputeLanguageModel().availability {
+            case .available: return nil
+            case let .unavailable(motivo):
+                switch motivo {
+                case .deviceNotEligible:
+                    return tr("Este aparelho não é elegível para a nuvem privada da Apple.")
+                case .systemNotReady:
+                    return tr("A nuvem privada da Apple ainda não está pronta. Tente daqui a pouco.")
+                @unknown default:
+                    return tr("A nuvem privada da Apple não está disponível agora.")
+                }
             }
-        }
+        #else
+            return tr("A nuvem privada da Apple não está disponível agora.")
+        #endif
     }
 
     /// Os dois modelos, sempre — com o motivo quando um deles não dá.
@@ -288,16 +298,18 @@ public struct AppleProvider: Provider {
             ferramentas: ferramentas,
             orcamento: sobra
         )
-        if naNuvem, #available(iOS 27.0, *), nuvemDisponivel {
-            return (
-                LanguageModelSession(
-                    model: PrivateCloudComputeLanguageModel(),
-                    tools: ferramentas,
-                    transcript: transcricao
-                ),
-                prompt
-            )
-        }
+        #if compiler(>=6.4)
+            if naNuvem, #available(iOS 27.0, *), nuvemDisponivel {
+                return (
+                    LanguageModelSession(
+                        model: PrivateCloudComputeLanguageModel(),
+                        tools: ferramentas,
+                        transcript: transcricao
+                    ),
+                    prompt
+                )
+            }
+        #endif
         return (LanguageModelSession(model: .default, tools: ferramentas, transcript: transcricao), prompt)
     }
 
@@ -390,23 +402,27 @@ public struct AppleProvider: Provider {
     /// `erro as QuotaLimitReached`, que é o valor associado e não um erro: o teste nunca
     /// passava, e a cota esgotada chegava na conversa como texto do sistema.
     static func explicarNuvem(_ erro: Error) -> String? {
-        guard #available(iOS 27.0, *), let erro = erro as? PrivateCloudComputeLanguageModel.Error else {
-            return nil
-        }
-        switch erro {
-        case let .quotaLimitReached(cota):
-            if let quando = cota.resetDate {
-                let f = DateFormatter()
-                f.dateStyle = .short
-                f.timeStyle = .short
-                return tr("A cota da nuvem privada da Apple acabou. Ela renova em %1$@.", f.string(from: quando))
+        #if compiler(>=6.4)
+            guard #available(iOS 27.0, *), let erro = erro as? PrivateCloudComputeLanguageModel.Error else {
+                return nil
             }
-            return tr("A cota da nuvem privada da Apple acabou por enquanto.")
-        case .serviceUnavailable, .networkFailure:
-            return tr("A nuvem privada da Apple não respondeu. Tente de novo.")
-        @unknown default:
+            switch erro {
+            case let .quotaLimitReached(cota):
+                if let quando = cota.resetDate {
+                    let f = DateFormatter()
+                    f.dateStyle = .short
+                    f.timeStyle = .short
+                    return tr("A cota da nuvem privada da Apple acabou. Ela renova em %1$@.", f.string(from: quando))
+                }
+                return tr("A cota da nuvem privada da Apple acabou por enquanto.")
+            case .serviceUnavailable, .networkFailure:
+                return tr("A nuvem privada da Apple não respondeu. Tente de novo.")
+            @unknown default:
+                return nil
+            }
+        #else
             return nil
-        }
+        #endif
     }
 }
 

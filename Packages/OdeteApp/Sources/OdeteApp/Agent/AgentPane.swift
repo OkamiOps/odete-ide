@@ -48,6 +48,9 @@ struct AgentPane: View {
                 Rectangle().fill(theme.border).frame(width: 1)
             }
         }
+        // O cartão de erro pede a lista de contas quando o modelo escolhido não pode
+        // responder; quem desenha a lista é este painel.
+        .onChange(of: ag.pedidoDeTrocarModelo) { abreContas() }
         .sheet(isPresented: $history) { HistorySheet(agent: ag) }
         .sheet(isPresented: $showAccounts) {
             NavigationStack {

@@ -280,6 +280,15 @@ struct ChatRow: View {
                         .buttonStyle(.bordered)
                         .controlSize(.small)
                         .tint(theme.danger)
+                } else if !parado, agent.items.last?.id == id, agent.podeTrocarDeModelo {
+                    // O modelo da Apple não está no aparelho: repetir não adianta, trocar sim.
+                    Button(tr("Trocar de modelo"), systemImage: "arrow.left.arrow.right") {
+                        agent.pedidoDeTrocarModelo += 1
+                    }
+                    .font(.caption.weight(.medium))
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .tint(theme.danger)
                 }
             }
             .padding(.horizontal, 12).padding(.vertical, 10)

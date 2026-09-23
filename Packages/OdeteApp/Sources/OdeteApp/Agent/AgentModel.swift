@@ -280,11 +280,41 @@ public final class AgentModel {
 
     /// Só vale oferecer repetir quando o turno morreu num erro e nada está rodando.
     public var podeTentarDeNovo: Bool {
-        !running && perguntaParaRepetir != nil && Self.ehErroQueDaParaRepetir(items.last)
+        !running && perguntaParaRepetir != nil
+            && Self.ehErroQueDaParaRepetir(items.last, modeloIndisponivel: modeloIndisponivel)
+    }
+
+    /// No lugar de "Tentar de novo" quando o modelo escolhido não pode responder.
+    public var podeTrocarDeModelo: Bool {
+        !running && Self.ofereceTrocarDeModelo(items.last, modeloIndisponivel: modeloIndisponivel)
+    }
+
+    /// Sobe para abrir a lista de contas do topo do painel — é lá que se troca de modelo.
+    public var pedidoDeTrocarModelo = 0
+
+    /// Por que o modelo escolhido não pode responder agora, quando é da Apple e não pode.
+    ///
+    /// Lido na hora, e não guardado do erro: quando a pessoa liga o Apple Intelligence e
+    /// o modelo termina de baixar, o cartão volta a oferecer "Tentar de novo" sozinho.
+    public var modeloIndisponivel: String? {
+        guard account?.kind == .apple, !emRoteiro else { return nil }
+        return AppleProvider.impedimento(doModelo: model)
     }
 
     /// Parar foi escolha da pessoa, não falha: ali não se oferece repetir. Desfazer também.
-    nonisolated static func ehErroQueDaParaRepetir(_ ultimo: ChatItem?) -> Bool {
+    ///
+    /// Com o modelo indisponível também não: repetir o mesmo pedido para o mesmo modelo
+    /// só redesenhava o mesmo cartão vermelho.
+    nonisolated static func ehErroQueDaParaRepetir(_ ultimo: ChatItem?, modeloIndisponivel: String? = nil) -> Bool {
+        modeloIndisponivel == nil && ehFalha(ultimo)
+    }
+
+    /// O turno morreu num erro de verdade, e o modelo escolhido não tem como responder.
+    nonisolated static func ofereceTrocarDeModelo(_ ultimo: ChatItem?, modeloIndisponivel: String?) -> Bool {
+        modeloIndisponivel != nil && ehFalha(ultimo)
+    }
+
+    nonisolated static func ehFalha(_ ultimo: ChatItem?) -> Bool {
         if case let .error(id, texto) = ultimo {
             return texto != "parado" && !ehAvisoDoDesfazer(id)
         }

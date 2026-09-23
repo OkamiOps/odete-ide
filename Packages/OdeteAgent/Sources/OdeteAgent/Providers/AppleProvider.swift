@@ -91,22 +91,28 @@ public struct AppleProvider: Provider {
         return false
     }
 
-    /// Explicação em português do porquê de não dar para usar, ou nada quando dá.
+    /// Por que não dá para usar, ou nada quando dá. Aparece no seletor, nos Ajustes e —
+    /// com o que fazer em seguida — no cartão de erro da conversa.
     public static var impedimento: String? {
         switch SystemLanguageModel.default.availability {
         case .available: nil
         case let .unavailable(motivo):
             switch motivo {
             case .deviceNotEligible:
-                "Este aparelho não roda o Apple Intelligence."
+                tr("Este aparelho não roda o Apple Intelligence.")
             case .appleIntelligenceNotEnabled:
-                "Ligue o Apple Intelligence nos Ajustes do iPad."
+                tr("Ligue o Apple Intelligence em Ajustes › Apple Intelligence e Siri.")
             case .modelNotReady:
-                "O modelo ainda está sendo baixado. Tente de novo daqui a pouco."
+                tr("O modelo ainda está sendo baixado. Tente de novo daqui a pouco.")
             @unknown default:
                 tr("O modelo do sistema não está disponível agora.")
             }
         }
+    }
+
+    /// O impedimento do modelo escolhido: o do aparelho ou o da nuvem.
+    public static func impedimento(doModelo id: String) -> String? {
+        id == idNuvem ? impedimentoDaNuvem : impedimento
     }
 
     /// A janela vem do próprio modelo a partir do iOS 26.4; antes disso a Apple
@@ -299,8 +305,11 @@ public struct AppleProvider: Provider {
         AsyncThrowingStream { cont in
             let tarefa = Task {
                 let naNuvem = turn.model == Self.idNuvem
-                if let impedimento = naNuvem ? Self.impedimentoDaNuvem : Self.impedimento {
-                    cont.yield(.error(impedimento))
+                // Quando a disponibilidade já sabe que não dá, o motivo dela vai para a
+                // conversa em vez de um erro de geração: "ligue o Apple Intelligence"
+                // diz o que fazer, "assets unavailable" não.
+                if let impedimento = Self.impedimento(doModelo: turn.model) {
+                    cont.yield(.error(FalhaApple.modeloIndisponivel(motivo: impedimento).frase))
                     cont.finish()
                     return
                 }
@@ -335,29 +344,20 @@ public struct AppleProvider: Provider {
                         }
                     }
                     Self.encerra(cont, pedidos.withLock { $0 })
-                } catch let erro as LanguageModelSession.GenerationError {
-                    // É por aqui que o pedido de ferramenta chega: a ferramenta anota e
-                    // lança, e o framework embrulha isso num erro de geração. Com pedido
-                    // anotado não houve falha nenhuma — o turno só acabou mais cedo.
-                    let anotados = pedidos.withLock { $0 }
-                    guard anotados.isEmpty else {
-                        Self.encerra(cont, anotados)
-                        return
-                    }
-                    cont.yield(.error(Self.explicar(erro)))
-                    cont.finish()
                 } catch {
+                    // É por aqui que o pedido de ferramenta chega: a ferramenta anota e
+                    // lança, e o framework embrulha isso num erro. Com pedido anotado não
+                    // houve falha nenhuma — o turno só acabou mais cedo.
                     let anotados = pedidos.withLock { $0 }
                     guard anotados.isEmpty else {
                         Self.encerra(cont, anotados)
                         return
                     }
-                    if let recado = Self.explicarNuvem(error) {
-                        cont.yield(.error(recado))
-                        cont.finish()
-                        return
-                    }
-                    cont.yield(.error(error.localizedDescription))
+                    // Nunca `localizedDescription`: sem descrição, ele vira "The operation
+                    // couldn't be completed. (… error -1.)" na conversa. A disponibilidade
+                    // é lida de novo porque pode ter mudado desde o começo do turno.
+                    let recado = await Self.explicar(error, motivo: Self.impedimento(doModelo: turn.model))
+                    cont.yield(.error(recado))
                     cont.finish()
                 }
             }
@@ -383,16 +383,18 @@ public struct AppleProvider: Provider {
         )
     }
 
-    /// Junta o histórico num prompt só, cortando o começo até caber na janela.
-    /// O corte tem dois limites, e os dois precisam acompanhar a janela: o número de
-    /// mensagens e o tamanho em caracteres. Só mexer no segundo não adianta — o primeiro
-    /// amarra antes, e o modelo grande recebe a mesma conversinha do pequeno.
     /// A cota da nuvem é por uso e vem com data de renovação: dizer "tente de novo" sem
     /// dizer quando não ajuda ninguém.
+    ///
+    /// O erro é um enum com a cota e a indisponibilidade como casos. Aqui se testava
+    /// `erro as QuotaLimitReached`, que é o valor associado e não um erro: o teste nunca
+    /// passava, e a cota esgotada chegava na conversa como texto do sistema.
     static func explicarNuvem(_ erro: Error) -> String? {
-        guard #available(iOS 27.0, *) else { return nil }
+        guard #available(iOS 27.0, *), let erro = erro as? PrivateCloudComputeLanguageModel.Error else {
+            return nil
+        }
         switch erro {
-        case let cota as PrivateCloudComputeLanguageModel.Error.QuotaLimitReached:
+        case let .quotaLimitReached(cota):
             if let quando = cota.resetDate {
                 let f = DateFormatter()
                 f.dateStyle = .short
@@ -400,23 +402,10 @@ public struct AppleProvider: Provider {
                 return tr("A cota da nuvem privada da Apple acabou. Ela renova em %1$@.", f.string(from: quando))
             }
             return tr("A cota da nuvem privada da Apple acabou por enquanto.")
-        case is PrivateCloudComputeLanguageModel.Error.ServiceUnavailable:
+        case .serviceUnavailable, .networkFailure:
             return tr("A nuvem privada da Apple não respondeu. Tente de novo.")
-        default:
+        @unknown default:
             return nil
-        }
-    }
-
-    static func explicar(_ erro: LanguageModelSession.GenerationError) -> String {
-        switch erro {
-        case .exceededContextWindowSize:
-            tr("A conversa passou da janela de %1$@ fichas do modelo. Comece uma conversa nova.", "\(janela)")
-        case .guardrailViolation:
-            "O filtro de segurança da Apple barrou este pedido."
-        case .unsupportedLanguageOrLocale:
-            "O modelo do sistema não atende este idioma."
-        default:
-            erro.localizedDescription
         }
     }
 }

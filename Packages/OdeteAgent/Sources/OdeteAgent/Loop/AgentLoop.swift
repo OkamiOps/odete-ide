@@ -171,6 +171,10 @@ public final class AgentLoop: @unchecked Sendable {
         messages.append(.user(expanded, images: images))
         emit(.item(.user(id: UUID().uuidString, text: userText, images: images.isEmpty ? nil : images)))
         checkpoints?.take(title: ChatStore.title(of: [.user(id: "", text: userText, images: nil)]))
+        // O fim do turno fica anotado seja qual for a saída — resposta, erro, parada, o freio
+        // de repetição. Sem ele, o desfazer não separa o que o turno fez do que a pessoa
+        // fizer depois.
+        defer { checkpoints?.encerrar() }
         let tools = Tools.forMode(config.mode)
         var round = 0
         var hitCap = false

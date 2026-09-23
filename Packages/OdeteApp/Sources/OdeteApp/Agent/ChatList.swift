@@ -251,14 +251,18 @@ struct ChatRow: View {
         case let .tool(_, name, detail):
             ToolGroup(items: [.tool(id: item.id, name: name, detail: detail)])
         case let .error(id, text):
-            let parado = text == "parado"
+            // Parar e desfazer são avisos, não falhas: cartão neutro, sem "Tentar de novo".
+            let desfeito = AgentModel.ehAvisoDoDesfazer(id)
+            let parado = text == "parado" || desfeito
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .top, spacing: 9) {
-                    Image(systemName: parado ? "stop.circle" : "exclamationmark.triangle.fill")
+                    Image(systemName: desfeito ? "arrow.uturn.backward.circle"
+                        : parado ? "stop.circle" : "exclamationmark.triangle.fill")
                         .font(.system(size: 13))
                         .foregroundStyle(parado ? theme.fgSubtle : theme.danger)
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(text).font(.footnote).foregroundStyle(parado ? theme.fgMuted : theme.fg)
+                        // O resultado do desfazer é para ler inteiro: o que ficou e por quê.
+                        Text(text).font(.footnote).foregroundStyle(parado && !desfeito ? theme.fgMuted : theme.fg)
                             .textSelection(.enabled)
                             .fixedSize(horizontal: false, vertical: true)
                         // O texto cru do provedor é um HTTP com JSON dentro: sozinho não

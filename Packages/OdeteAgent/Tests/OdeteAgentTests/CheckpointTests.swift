@@ -4,13 +4,25 @@ import OdeteI18n
 import Synchronization
 import Testing
 
-/// Host cujo shell faz de verdade o pouco que os testes pedem: `rm` de um arquivo.
+/// Host cujo shell faz de verdade o pouco que os testes pedem: `rm` e `touch` de um
+/// arquivo, e `gerar`, que escreve num caminho que não dá para ler na linha de comando —
+/// como um gerador de código que escreve onde quer.
 final class ShellDeVerdade: FileToolHost, @unchecked Sendable {
     override func runShell(_ command: String) async -> String {
         let partes = command.split(separator: " ").map(String.init)
-        if partes.first == "rm" {
-            for p in partes.dropFirst() where !p.hasPrefix("-") {
-                try? FileManager.default.removeItem(at: root.appending(path: p))
+        let fm = FileManager.default
+        for p in partes.dropFirst() where !p.hasPrefix("-") {
+            let u = root.appending(path: p)
+            switch partes.first {
+            case "rm":
+                try? fm.removeItem(at: u)
+            case "touch" where !fm.fileExists(atPath: u.path):
+                fm.createFile(atPath: u.path, contents: Data())
+            case "gerar":
+                try? fm.createDirectory(at: u.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try? "gerado\n".write(to: u, atomically: true, encoding: .utf8)
+            default:
+                break
             }
         }
         return "ok"
@@ -69,7 +81,12 @@ final class ShellDeVerdade: FileToolHost, @unchecked Sendable {
         #expect(atual.capturados.contains("grande.txt"))
         #expect(atual.capturados.count + atual.saved.count >= 301)
 
-        #expect(cs.restore(cp.id) == "voltou: turno")
+        cs.encerrar()
+        let volta = try #require(cs.desfazer(cp.id))
+        #expect(volta.voltaram.count == 301)
+        #expect(volta.apagados.isEmpty && volta.mantidos.isEmpty && volta.semCopia.isEmpty)
+        #expect(volta.mensagem.hasPrefix("voltou: turno\nVoltaram ao que eram antes do turno: "))
+        #expect(volta.mensagem.contains("e mais 293"), "a lista longa não foi resumida")
         for (p, texto) in originais {
             #expect(host.read(p) == texto, "\(p) não voltou")
         }
@@ -88,6 +105,7 @@ final class ShellDeVerdade: FileToolHost, @unchecked Sendable {
         #expect(await r.run(call("write_file", ["path": ".odete/plan.md", "content": "# plano"]), mode: .plan)
             .text == "escrito .odete/plan.md")
         #expect(host.exists("novo/fundo/a.ts") && host.exists(".odete/plan.md"))
+        cs.encerrar()
         _ = cs.restore(cp.id)
         #expect(!host.exists("novo/fundo/a.ts"))
         #expect(!host.exists(".odete/plan.md"))
@@ -105,6 +123,7 @@ final class ShellDeVerdade: FileToolHost, @unchecked Sendable {
         let cp = cs.take(title: "rm")
         #expect(await r.run(call("run_shell", ["command": "rm grande.txt src/f299.txt"]), mode: .build).text == "ok")
         #expect(!host.exists("grande.txt") && !host.exists("src/f299.txt"))
+        cs.encerrar()
         _ = cs.restore(cp.id)
         #expect(host.read("grande.txt") == original)
         #expect(host.read("src/f299.txt") == tardio)

@@ -236,6 +236,11 @@ struct Composer: View {
 
     /// Nome curto: na barra cabe o essencial, o resto está no menu.
     var nomeModelo: String {
+        #if DEBUG
+            if agent.emRoteiro {
+                return ProvedorDeRoteiro.rotulo
+            }
+        #endif
         guard agent.account != nil else { return tr("conectar") }
         let cheio = agent.models.first { $0.id == agent.model }?.label ?? agent.model
         let primeiro = cheio.split(separator: "·").first.map {
@@ -408,6 +413,16 @@ struct ModeloPopover: View {
     var body: some View {
         ScrollPane {
             VStack(alignment: .leading, spacing: 14) {
+                #if DEBUG
+                    if let c = ProvedorDeRoteiro.caminhoDoAmbiente() {
+                        // Enquanto o roteiro estiver ligado, é ele quem responde, seja
+                        // qual for o modelo escolhido abaixo.
+                        VStack(alignment: .leading, spacing: 8) {
+                            SectionTitle(ProvedorDeRoteiro.rotulo)
+                            CardNote(c)
+                        }
+                    }
+                #endif
                 if let acc = agent.account {
                     VStack(alignment: .leading, spacing: 8) {
                         SectionTitle(tr("Modelo"), detail: acc.kind.label) {

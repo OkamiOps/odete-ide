@@ -97,11 +97,14 @@ public struct ToolRunner: Sendable {
                 }
             }
             // O shell escreve por conta própria: antes de ele rodar, guarda o que dá para
-            // saber que ele vai tocar. Comando que só lê não mexe em nada.
+            // saber que ele vai tocar, e anota quando ele rodou — o que mudar nessa janela é
+            // do turno. Comando que só lê não mexe em nada.
             if let checkpoints, !Tools.isReadShell(cmd) {
-                for alvo in Tools.alvosDoShell(cmd, pasta: host.pastaDoShell()) {
-                    checkpoints.capturar(alvo)
-                }
+                let alvos = Tools.alvosDoShell(cmd, pasta: host.pastaDoShell())
+                let desde = checkpoints.antesDoShell(alvos)
+                let saida = await host.runShell(cmd)
+                checkpoints.depoisDoShell(desde: desde, alvos: alvos)
+                return .init(text: Self.clip(saida))
             }
             return await .init(text: Self.clip(host.runShell(cmd)))
         case "github":
@@ -180,6 +183,7 @@ public struct ToolRunner: Sendable {
             do { try host.write(path, after) } catch {
                 return .init(text: "erro ao escrever: \(error.localizedDescription)")
             }
+            checkpoints?.anotarEscrita(path)
             return .init(text: "escrito \(path)")
         }
         let before = host.read(path) ?? ""
@@ -190,6 +194,9 @@ public struct ToolRunner: Sendable {
         do { try host.write(path, after) } catch {
             return .init(text: "erro ao escrever: \(error.localizedDescription)")
         }
+        // E o que ficou, logo depois: se o turno não chegar a fechar, é por isto que o
+        // desfazer sabe se o arquivo ainda está como o agente deixou.
+        checkpoints?.anotarEscrita(path)
         let patch = patches.queue(path: path, before: before, after: after)
         host.reveal(path)
         // O tamanho vai junto porque é a consequência: um arquivo que dobrou de linhas

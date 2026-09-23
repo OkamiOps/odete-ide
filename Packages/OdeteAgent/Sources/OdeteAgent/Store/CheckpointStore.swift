@@ -1,6 +1,5 @@
 import Foundation
 import OdeteCore
-import OdeteI18n
 import Synchronization
 
 public struct Checkpoint: Codable, Sendable, Hashable, Identifiable {
@@ -17,6 +16,13 @@ public struct Checkpoint: Codable, Sendable, Hashable, Identifiable {
     public var pastasCriadas: [String] = []
     /// Grandes demais para guardar (mais de `CheckpointStore.tetoPorArquivo`).
     public var grandes: [String] = []
+    /// O que cada caminho escrito pelo turno tinha logo depois da escrita: o resumo do
+    /// conteúdo, ou vazio se ficou apagado. `nil` nos turnos de antes desta versão.
+    ///
+    /// É o que deixa desfazer com segurança um turno que não chegou ao fim — o app fechou
+    /// no meio e o fim do turno nunca foi anotado: só volta o que ainda está como o agente
+    /// deixou.
+    public var depois: [String: String]?
 
     public init(id: String, title: String, at: Date, paths: [String], saved: [String]) {
         self.id = id
@@ -41,6 +47,16 @@ struct Escritas: Codable {
     var criados: [String] = []
     var pastasCriadas: [String] = []
     var grandes: [String] = []
+    /// Opcional para os `escritas.json` de antes continuarem legíveis — ver `Checkpoint.depois`.
+    var depois: [String: String]?
+
+    init(_ cp: Checkpoint) {
+        capturados = cp.capturados
+        criados = cp.criados
+        pastasCriadas = cp.pastasCriadas
+        grandes = cp.grandes
+        depois = cp.depois
+    }
 }
 
 /// Snapshot dos arquivos antes de cada turno, em `.odete/checkpoints/<id>/`.
@@ -55,10 +71,17 @@ struct Escritas: Codable {
 ///   com teto folgado de tamanho. O retrato sozinho parava nos 220 primeiros arquivos
 ///   com menos de 200 kB: o agente editava o 221º, ou um arquivo grande, e o "desfazer
 ///   último turno" voltava tudo menos justamente o que ele tinha mudado.
+///
+/// E um retrato do fim (`encerrar`): como cada arquivo ficou quando o turno terminou, e
+/// quais o turno mexeu. É ele que separa o turno do que a pessoa fez depois. Desfazer
+/// apagava tudo o que não existia no começo do turno — inclusive o arquivo que a pessoa
+/// criou depois — e sobrescrevia com o conteúdo de antes o arquivo que ela editou depois.
+/// Agora só sai o que o turno criou, só volta o que o turno mudou, e o que a pessoa mexeu
+/// depois fica como ela deixou, com o aviso na conversa.
 public final class CheckpointStore: @unchecked Sendable {
     public let root: URL
     public let host: ToolHost
-    private var dir: URL {
+    var dir: URL {
         root.appending(path: ".odete/checkpoints")
     }
 
@@ -79,6 +102,12 @@ public final class CheckpointStore: @unchecked Sendable {
         var conhecidos: Set<String> = []
         /// Os caminhos que existiam no começo do turno.
         var doComeco: Set<String> = []
+        /// Tamanho e hora de cada arquivo no começo do turno. É comparando com isto, no fim,
+        /// que se sabe o que o shell mudou sem ninguém avisar.
+        var inicio: [String: Assinatura] = [:]
+        /// Quando o shell do agente rodou comandos que escrevem, em nanossegundos, já com a
+        /// folga. Mudança fora dessas janelas não é do turno — ver `FimDoTurno.medir`.
+        var janelas: [ClosedRange<Int64>] = []
     }
 
     private let estado = Mutex(Estado())
@@ -115,6 +144,7 @@ public final class CheckpointStore: @unchecked Sendable {
                     cp.criados = escritas.criados
                     cp.pastasCriadas = escritas.pastasCriadas
                     cp.grandes = escritas.grandes
+                    cp.depois = escritas.depois
                 }
                 return cp
             }.sorted { $0.id > $1.id }
@@ -136,6 +166,11 @@ public final class CheckpointStore: @unchecked Sendable {
         let paths = host.allPaths()
         var saved: [String] = []
         let fm = FileManager.default
+        // Um `stat` por arquivo, sem ler conteúdo: é o que diz, no fim, o que mudou.
+        var inicio: [String: Assinatura] = [:]
+        for p in paths {
+            inicio[p] = Assinatura.de(root.appending(path: p))
+        }
         for p in paths.prefix(220) {
             let src = root.appending(path: p)
             guard let size = (try? fm.attributesOfItem(atPath: src.path)[.size]) as? Int,
@@ -146,7 +181,8 @@ public final class CheckpointStore: @unchecked Sendable {
                 saved.append(p)
             }
         }
-        let cp = Checkpoint(id: id, title: title, at: .now, paths: paths, saved: saved)
+        var cp = Checkpoint(id: id, title: title, at: .now, paths: paths, saved: saved)
+        cp.depois = [:]
         let enc = JSONEncoder()
         enc.dateEncodingStrategy = .iso8601
         try? fm.createDirectory(at: dir.appending(path: id), withIntermediateDirectories: true)
@@ -159,6 +195,8 @@ public final class CheckpointStore: @unchecked Sendable {
             st.atual = id
             st.conhecidos = Set(saved)
             st.doComeco = Set(paths)
+            st.inicio = inicio
+            st.janelas = []
             limpar(&st)
         }
         return cp
@@ -182,16 +220,100 @@ public final class CheckpointStore: @unchecked Sendable {
             guard antes != (cp.capturados.count, cp.criados.count, cp.grandes.count) else { return }
             l[i] = cp
             st.lista = l
-            let escritas = Escritas(
-                capturados: cp.capturados,
-                criados: cp.criados,
-                pastasCriadas: cp.pastasCriadas,
-                grandes: cp.grandes
+            gravarEscritas(cp)
+        }
+    }
+
+    private func gravarEscritas(_ cp: Checkpoint) {
+        try? JSONEncoder().encode(Escritas(cp)).write(
+            to: dir.appending(path: "\(cp.id)/escritas.json"),
+            options: .atomic
+        )
+    }
+
+    /// Mexe no checkpoint do turno em andamento, se houver um, e regrava `escritas.json`.
+    private func noTurno(_ mudar: (inout Checkpoint, inout Estado) -> Void) {
+        estado.withLock { st in
+            guard let id = st.atual, var l = st.lista, let i = l.firstIndex(where: { $0.id == id }) else { return }
+            var cp = l[i]
+            mudar(&cp, &st)
+            l[i] = cp
+            st.lista = l
+            gravarEscritas(cp)
+        }
+    }
+
+    /// Anota o que uma ferramenta do agente acabou de deixar em `caminho` — ver
+    /// `Checkpoint.depois`.
+    public func anotarEscrita(_ caminho: String) {
+        let p = Self.limpo(caminho)
+        guard !p.isEmpty else { return }
+        noTurno { cp, _ in
+            var d = cp.depois ?? [:]
+            d[p] = Assinatura.resumir(root.appending(path: p)) ?? ""
+            cp.depois = d
+        }
+    }
+
+    /// Antes de o shell do agente rodar um comando que escreve: guarda o original do que dá
+    /// para saber que ele vai tocar e devolve a hora em que a janela do comando abre.
+    public func antesDoShell(_ alvos: [String]) -> Int64 {
+        for alvo in alvos {
+            capturar(alvo)
+        }
+        return Assinatura.agora()
+    }
+
+    /// O comando terminou: fecha a janela aberta em `desde` e anota o que ficou nos
+    /// caminhos que ele tocou.
+    ///
+    /// A janela é o que faz o arquivo que o shell criou sem ninguém saber — um gerador de
+    /// código, um `npm init` — sair no desfazer, e o arquivo que a pessoa criou no editor
+    /// enquanto o agente trabalhava ficar. (`dist/`, `build/` e afins são ruído: o projeto
+    /// não os vê, e o desfazer também não.)
+    public func depoisDoShell(desde: Int64, alvos: [String]) {
+        let limpos = alvos.map(Self.limpo).filter { !$0.isEmpty }
+        noTurno { cp, st in
+            st.janelas.append((desde - FimDoTurno.folga) ... (Assinatura.agora() + FimDoTurno.folga))
+            var d = cp.depois ?? [:]
+            for p in Set(cp.capturados + cp.criados) where limpos.contains(where: { Self.casa(p, $0) }) {
+                let u = root.appending(path: p)
+                d[p] = FileManager.default.fileExists(atPath: u.path) ? Assinatura.resumir(u) ?? "" : ""
+            }
+            cp.depois = d
+        }
+    }
+
+    /// `p` é `alvo`, está dentro dele, ou casa com o curinga dele.
+    static func casa(_ p: String, _ alvo: String) -> Bool {
+        if p == alvo || p.hasPrefix(alvo + "/") {
+            return true
+        }
+        return alvo.contains { "*?[".contains($0) } && fnmatch(alvo, p, 0) == 0
+    }
+
+    /// Fecha o turno: anota como cada arquivo ficou e quais o turno mexeu.
+    ///
+    /// Vale para todo fim — resposta, erro, parada no meio. Depois disto o checkpoint não
+    /// recebe mais cópia nenhuma: o que mudar dali em diante é da pessoa.
+    public func encerrar() {
+        estado.withLock { st in
+            defer {
+                st.atual = nil
+                st.conhecidos = []
+                st.doComeco = []
+                st.inicio = [:]
+                st.janelas = []
+            }
+            guard let id = st.atual, let cp = st.lista?.first(where: { $0.id == id }) else { return }
+            let fim = FimDoTurno.medir(
+                cp,
+                raiz: root,
+                caminhos: host.allPaths(),
+                inicio: st.inicio,
+                janelas: st.janelas
             )
-            try? JSONEncoder().encode(escritas).write(
-                to: dir.appending(path: "\(id)/escritas.json"),
-                options: .atomic
-            )
+            try? JSONEncoder().encode(fim).write(to: dir.appending(path: "\(id)/fim.json"), options: .atomic)
         }
     }
 
@@ -247,52 +369,45 @@ public final class CheckpointStore: @unchecked Sendable {
         }
     }
 
-    /// Volta os arquivos ao começo do turno e tira o checkpoint da pilha.
-    ///
-    /// Na ordem: o que nasceu no turno sai; o retrato do começo volta; os arquivos
-    /// copiados na escrita voltam byte a byte; as pastas que o turno criou e ficaram vazias
-    /// saem. Depois o checkpoint some — o próximo desfazer volta o turno anterior, em vez
-    /// de repetir este por cima do que a pessoa já tiver mexido.
+    /// Volta o turno e tira o checkpoint da pilha; devolve a mensagem para a conversa.
     public func restore(_ id: String) -> String {
+        desfazer(id)?.mensagem ?? "checkpoint sumiu"
+    }
+
+    /// O que desfazer o turno `id` faria agora, sem mexer em nada. É o que a tela usa para
+    /// perguntar antes, quando a pessoa mexeu depois do turno em algo que ele tocou.
+    /// `manter`: ver `planejar`.
+    public func previa(_ id: String, manter: Set<String> = []) -> VoltaDoTurno? {
         estado.withLock { st in
-            guard let cp = lista(&st).first(where: { $0.id == id }) else { return "checkpoint sumiu" }
-            let fm = FileManager.default
-            let doComeco = Set(cp.paths)
-            for p in host.allPaths() where !doComeco.contains(p) {
-                try? fm.removeItem(at: root.appending(path: p))
-            }
-            for p in cp.criados {
-                try? fm.removeItem(at: root.appending(path: p))
-            }
-            for p in cp.saved + cp.capturados {
-                let src = dir.appending(path: "\(cp.id)/files/\(p)"), dst = root.appending(path: p)
-                guard fm.fileExists(atPath: src.path) else { continue }
-                try? fm.createDirectory(at: dst.deletingLastPathComponent(), withIntermediateDirectories: true)
-                try? fm.removeItem(at: dst)
-                try? fm.copyItem(at: src, to: dst)
-            }
-            // Das mais fundas para as mais rasas: `src/a/b` sai antes de `src/a`.
-            for pasta in cp.pastasCriadas.sorted(by: { $0.count > $1.count }) {
-                let u = root.appending(path: pasta)
-                if (try? fm.contentsOfDirectory(atPath: u.path))?.isEmpty == true {
-                    try? fm.removeItem(at: u)
-                }
-            }
-            try? fm.removeItem(at: dir.appending(path: cp.id))
+            lista(&st).first(where: { $0.id == id }).map { planejar($0, manter: manter) }
+        }
+    }
+
+    /// Volta o turno e tira o checkpoint da pilha.
+    ///
+    /// Só o que o turno mexeu: o que ele criou sai, o que ele mudou volta, e as pastas que
+    /// ele criou e ficaram vazias saem. O que a pessoa mexeu depois fica como ela deixou e
+    /// vai listado no resultado — ver `planejar`. A varredura de antes (apagar tudo o que
+    /// não existia no começo do turno, voltar todo o retrato do começo) não existe mais: era
+    /// ela que levava junto o arquivo que a pessoa criou e a edição que ela fez depois.
+    ///
+    /// Depois o checkpoint some: o próximo desfazer volta o turno anterior, em vez de
+    /// repetir este por cima do que a pessoa já tiver mexido.
+    public func desfazer(_ id: String, manter: Set<String> = []) -> VoltaDoTurno? {
+        estado.withLock { st in
+            guard let cp = lista(&st).first(where: { $0.id == id }) else { return nil }
+            let volta = planejar(cp, manter: manter)
+            aplicar(volta, de: cp)
+            try? FileManager.default.removeItem(at: dir.appending(path: cp.id))
             st.lista = lista(&st).filter { $0.id != cp.id }
             if st.atual == cp.id {
                 st.atual = nil
                 st.conhecidos = []
                 st.doComeco = []
+                st.inicio = [:]
+                st.janelas = []
             }
-            var msg = "voltou: \(cp.title)"
-            if !cp.grandes.isEmpty {
-                msg += "\n" + tr(
-                    "Não voltaram, por passarem de 10 MB: %1$@",
-                    cp.grandes.joined(separator: ", ")
-                )
-            }
-            return msg
+            return volta
         }
     }
 

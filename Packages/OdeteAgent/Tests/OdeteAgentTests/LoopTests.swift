@@ -239,16 +239,21 @@ func runAll(
         #expect(ps.get(h.id)?.status == .accepted && final == after)
     }
 
-    @Test func checkpoints() throws {
+    /// O turno muda, cria e apaga — pelas ferramentas do agente e pelo shell dele — e o
+    /// desfazer volta as três coisas.
+    @Test func checkpoints() async throws {
+        Texto.escolher(.ptBR)
         let root = try tmpProject()
-        let host = TestHost(root: root)
+        let host = ShellDeVerdade(root: root)
         let cs = CheckpointStore(root: root, host: host)
+        let r = ToolRunner(host: host, patches: PatchStore(root: root), checkpoints: cs)
         let cp = cs.take(title: "antes")
         #expect(cp.saved == ["a.txt", "src/x.ts"] && cs.list().count == 1)
-        try host.write("a.txt", "mudado")
-        try host.write("novo.txt", "x")
-        try FileManager.default.removeItem(at: root.appending(path: "src/x.ts"))
-        #expect(cs.restore(cp.id) == "voltou: antes")
+        _ = await r.run(call("write_file", ["path": "a.txt", "content": "mudado"]), mode: .build)
+        _ = await r.run(call("write_file", ["path": "novo.txt", "content": "x"]), mode: .build)
+        _ = await r.run(call("run_shell", ["command": "rm src/x.ts"]), mode: .build)
+        cs.encerrar()
+        #expect(cs.restore(cp.id).hasPrefix("voltou: antes"))
         #expect(host.read("a.txt") == "a\nb\nc\n" && host.read("src/x.ts") == "export const x = 1;\n" && !host
             .exists("novo.txt"))
         cs.limit = 2

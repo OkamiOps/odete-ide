@@ -13,6 +13,9 @@ struct AgentPane: View {
     @State private var history = false
     @State private var showAccounts = false
     @State private var contas = false
+    /// Os arquivos que a pessoa mexeu depois do último turno, enquanto a pergunta do
+    /// desfazer está aberta.
+    @State private var mexidosDepois: [String]?
 
     var body: some View {
         let ag = ws.agent!
@@ -82,8 +85,28 @@ struct AgentPane: View {
                 PaneAction("clock.arrow.circlepath", label: tr("Conversas"), conta: ag.numeroDeConversas) {
                     history = true
                 }
-                PaneAction("arrow.uturn.backward", label: tr("Desfazer último turno")) { _ = ag.undoLastTurn() }
+                PaneAction("arrow.uturn.backward", label: tr("Desfazer último turno")) { desfazer(ag) }
                     .disabled(!ag.canUndoTurn)
+                    .confirmationDialog(
+                        tr("Desfazer o último turno?"),
+                        isPresented: Binding(get: { mexidosDepois != nil }, set: {
+                            if !$0 {
+                                mexidosDepois = nil
+                            }
+                        }),
+                        titleVisibility: .visible
+                    ) {
+                        Button(tr("Desfazer o resto"), role: .destructive) {
+                            _ = ag.undoLastTurn()
+                            mexidosDepois = nil
+                        }
+                        Button(tr("Cancelar"), role: .cancel) { mexidosDepois = nil }
+                    } message: {
+                        Text(tr(
+                            "Você mexeu nestes arquivos depois do turno, e eles vão ficar como estão: %1$@. O resto volta ao que era antes do turno.",
+                            VoltaDoTurno.lista(mexidosDepois ?? [])
+                        ))
+                    }
                 PaneAction("square.and.pencil", label: tr("Nova conversa")) { ag.newChat() }
                     .disabled(ag.thread.isEmpty)
                 if sizeClass != .compact {
@@ -97,6 +120,18 @@ struct AgentPane: View {
         .padding(.trailing, 8)
         .frame(height: 52)
         .overlay(alignment: .bottom) { Rectangle().fill(theme.separator).frame(height: 0.5) }
+    }
+
+    /// Desfaz na hora, ou pergunta antes quando a pessoa mexeu depois do turno em algo que
+    /// ele tocou: esses ficam como estão, e ela precisa saber disso antes de achar que
+    /// voltaram.
+    func desfazer(_ ag: AgentModel) {
+        let mexidos = ag.mexidosDepoisDoUltimoTurno()
+        if mexidos.isEmpty {
+            _ = ag.undoLastTurn()
+        } else {
+            mexidosDepois = mexidos
+        }
     }
 
     func abreContas() {
@@ -220,7 +255,7 @@ struct ModelMenu: View {
                 )
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 4) {
-                    Text(agent.account?.label ?? tr("Sem conta"))
+                    Text(titulo)
                         .font(.subheadline.weight(.semibold)).foregroundStyle(theme.fg).lineLimit(1)
                     Image(systemName: "chevron.down").font(.system(size: 9, weight: .bold))
                         .foregroundStyle(aberto ? theme.accent : theme.fgSubtle)
@@ -233,7 +268,22 @@ struct ModelMenu: View {
         .contentShape(Rectangle())
     }
 
+    var titulo: String {
+        #if DEBUG
+            if agent.emRoteiro {
+                return ProvedorDeRoteiro.rotulo
+            }
+        #endif
+        return agent.account?.label ?? tr("Sem conta")
+    }
+
     var subtitle: String {
+        #if DEBUG
+            // O nome do arquivo do roteiro, para o QA saber qual está tocando.
+            if let c = ProvedorDeRoteiro.caminhoDoAmbiente() {
+                return (c as NSString).lastPathComponent
+            }
+        #endif
         guard let a = agent.account else { return tr("conectar") }
         return a.login.isEmpty ? a.kind.vendor : a.login
     }

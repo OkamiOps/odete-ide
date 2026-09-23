@@ -86,9 +86,21 @@ public final class AgentModel {
                 self.porId = Self.indexar(self.patches.all)
             }
         }
-        if prefs.accountId == nil, let first = accounts.accounts.first {
+        // Com o roteiro de QA ligado nada de conta nem modelo vai para o estado do app.
+        if prefs.accountId == nil, let first = accounts.accounts.first, !emRoteiro {
             setAccount(first)
         }
+    }
+
+    /// O agente está tocando o roteiro de QA em vez de um modelo? Só pode ser verdade em
+    /// DEBUG, com `ODETE_AGENTE_ROTEIRO` no ambiente — ver `ProvedorDeRoteiro`. Na versão
+    /// da loja nem o nome da variável existe no binário.
+    public var emRoteiro: Bool {
+        #if DEBUG
+            return ProvedorDeRoteiro.caminhoDoAmbiente() != nil
+        #else
+            return false
+        #endif
     }
 
     // MARK: escolhas
@@ -153,7 +165,9 @@ public final class AgentModel {
     }
 
     public func loadModels() async {
-        guard let acc = account, !loadingModels else { return }
+        // O roteiro não tem lista de modelos, e pedir a de uma conta que exista poderia
+        // limpar o modelo escolhido no estado do app.
+        guard let acc = account, !loadingModels, !emRoteiro else { return }
         if modelsFor == acc.id, !models.isEmpty {
             return
         }
@@ -269,10 +283,10 @@ public final class AgentModel {
         !running && perguntaParaRepetir != nil && Self.ehErroQueDaParaRepetir(items.last)
     }
 
-    /// Parar foi escolha da pessoa, não falha: ali não se oferece repetir.
+    /// Parar foi escolha da pessoa, não falha: ali não se oferece repetir. Desfazer também.
     nonisolated static func ehErroQueDaParaRepetir(_ ultimo: ChatItem?) -> Bool {
-        if case let .error(_, texto) = ultimo {
-            return texto != "parado"
+        if case let .error(id, texto) = ultimo {
+            return texto != "parado" && !ehAvisoDoDesfazer(id)
         }
         return false
     }
@@ -330,25 +344,11 @@ public final class AgentModel {
         if running {
             loop?.steer(text); draft = ""; return
         }
-        guard let acc = account else {
-            items.append(.error(
-                id: UUID().uuidString,
-                text: tr("Conecte uma conta em Ajustes → Contas para usar o agente.")
-            ))
-            return
-        }
-        if acc.needsReconnect {
-            items.append(.error(
-                id: UUID().uuidString,
-                text: tr("A sessão da conta %1$@ expirou. Reconecte em Ajustes → Contas.", "\(acc.label)")
-            ))
-            return
-        }
+        guard let provider = provedorParaEnviar() else { return }
         let images = attachments
         draft = ""
         attachments = []
         ultimaPergunta = (text, images)
-        let provider = ProviderFactory.make(account: acc, session: accounts.session(for: acc))
         let loop = AgentLoop(provider: provider, host: host, patches: patches, checkpoints: checkpoints)
         self.loop = loop
         running = true
@@ -384,6 +384,31 @@ public final class AgentModel {
             ws.reload()
             ws.git.agendarMarcas()
         }
+    }
+
+    /// O provedor desta mensagem, ou o aviso na conversa de por que não há um.
+    private func provedorParaEnviar() -> (any Provider)? {
+        #if DEBUG
+            // Um provedor por mensagem: é assim que cada envio toca o próximo turno.
+            if let roteiro = ProvedorDeRoteiro.doAmbiente() {
+                return roteiro
+            }
+        #endif
+        guard let acc = account else {
+            items.append(.error(
+                id: UUID().uuidString,
+                text: tr("Conecte uma conta em Ajustes → Contas para usar o agente.")
+            ))
+            return nil
+        }
+        if acc.needsReconnect {
+            items.append(.error(
+                id: UUID().uuidString,
+                text: tr("A sessão da conta %1$@ expirou. Reconecte em Ajustes → Contas.", "\(acc.label)")
+            ))
+            return nil
+        }
+        return ProviderFactory.make(account: acc, session: accounts.session(for: acc))
     }
 
     public func stop() {
@@ -432,21 +457,6 @@ public final class AgentModel {
         temCheckpoint && !running
     }
 
-    public func undoLastTurn() -> String {
-        guard let cp = checkpoints.last else { return tr("nada pra desfazer") }
-        let msg = checkpoints.restore(cp.id)
-        // O checkpoint desfeito sai da pilha: o próximo toque volta o turno anterior.
-        temCheckpoint = checkpoints.last != nil
-        patches.rejectAll()
-        for p in ws.tabs.map(\.path) {
-            ws.reloadBuffer(p)
-        }
-        ws.reload()
-        items.append(.error(id: UUID().uuidString, text: msg))
-        persist()
-        return msg
-    }
-
     // MARK: anexos
 
     public func attach(_ image: UIImage) {
@@ -488,5 +498,66 @@ public final class AgentModel {
         }
         estimativa = (atuais, n)
         return n
+    }
+}
+
+// MARK: desfazer o último turno
+
+/// No mesmo arquivo da classe: o desfazer mexe em `items` e `temCheckpoint`, que só se
+/// escrevem daqui.
+public extension AgentModel {
+    /// Os arquivos que o último turno mexeu e a pessoa mudou depois. O desfazer deixa esses
+    /// como estão; a tela pergunta antes, com a lista, para ninguém achar que voltaram.
+    func mexidosDepoisDoUltimoTurno() -> [String] {
+        guard !running, let cp = checkpoints.last else { return [] }
+        return checkpoints.previa(cp.id, manter: protegerOEditor())?.mantidos ?? []
+    }
+
+    func undoLastTurn() -> String {
+        guard !running, let cp = checkpoints.last,
+              let volta = checkpoints.desfazer(cp.id, manter: protegerOEditor())
+        else {
+            return tr("nada pra desfazer")
+        }
+        // O checkpoint desfeito sai da pilha: o próximo toque volta o turno anterior.
+        temCheckpoint = checkpoints.last != nil
+        // Só os patches do que voltou ou saiu. Rejeitar todos devolvia ao original também
+        // os pendentes de turnos anteriores, em arquivos que este turno nem tocou — e o
+        // patch de um arquivo que a pessoa apagou depois o recriava.
+        let tocados = Set(volta.voltaram + volta.apagados)
+        for p in patches.pending where tocados.contains(p.path) {
+            patches.reject(p.id)
+        }
+        // E só as abas do que voltou: o resto do disco não mudou.
+        for p in volta.voltaram {
+            ws.reloadBuffer(p)
+        }
+        ws.reload()
+        let msg = volta.mensagem
+        items.append(.error(id: Self.prefixoDoDesfazer + UUID().uuidString, text: msg))
+        persist()
+        return msg
+    }
+
+    /// O resultado do desfazer entra na conversa como os outros avisos, mas não é erro:
+    /// com este começo de id a lista o desenha neutro e não oferece "Tentar de novo".
+    nonisolated static let prefixoDoDesfazer = "desfeito-"
+
+    nonisolated static func ehAvisoDoDesfazer(_ id: String) -> Bool {
+        id.hasPrefix(prefixoDoDesfazer)
+    }
+
+    /// O que está no editor e ainda não foi para o disco.
+    ///
+    /// Com o salvamento automático ligado, grava agora — a edição ia para o disco em um
+    /// segundo de qualquer jeito, e assim o desfazer a enxerga. Desligado, não grava por
+    /// cima da escolha da pessoa: devolve as abas sujas, que o desfazer deixa como estão.
+    /// Antes o desfazer recarregava todas as abas do disco, e o que estava digitado e não
+    /// salvo — até em arquivo que o turno nem tocou — sumia.
+    private func protegerOEditor() -> Set<String> {
+        if chrome.snapshot.editor.autoSave {
+            ws.saveAll()
+        }
+        return Set(ws.tabs.filter(\.isDirty).map(\.path))
     }
 }

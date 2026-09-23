@@ -69,7 +69,7 @@ struct PoliticaDeNavegacaoTests {
         }
     }
 
-    @Test func recusaEnderecoDeFora() async throws {
+    @Test(.semNavegadorNoCI) func recusaEnderecoDeFora() async throws {
         let model = PreviewModel(root: FileManager.default.temporaryDirectory)
         let coord = PreviewView.Coordinator(model: model)
         let wv = WKWebView(frame: .init(x: 0, y: 0, width: 320, height: 480))

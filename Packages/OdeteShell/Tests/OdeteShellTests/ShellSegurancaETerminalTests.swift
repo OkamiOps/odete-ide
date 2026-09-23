@@ -157,12 +157,20 @@ func linha(_ sh: Shell, _ l: String) async -> (Int32, String, String) {
         (try? Data(contentsOf: u))?.count ?? 0
     }
 
+    func espera(_ prazo: Duration = .seconds(15), ate condicao: () -> Bool) async {
+        let fim = ContinuousClock.now + prazo
+        while ContinuousClock.now < fim, !condicao() {
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+    }
+
     @Test func killDoJobMataONode() async throws {
         let raiz = try project()
         let sh = Shell(root: raiz)
         let tick = raiz.appending(path: "tick.txt")
         _ = await linha(sh, #"node -e "setInterval(() => require('fs').appendFileSync('tick.txt', 'x'), 20)" &"#)
-        try await Task.sleep(for: .milliseconds(700))
+        // Espera o node começar a escrever: num simulador lento subir o motor passa de 700 ms.
+        await espera(ate: { ticks(tick) > 0 })
         #expect(sh.jobs.count == 1 && ticks(tick) > 0)
         _ = await linha(sh, "kill %1")
         try await Task.sleep(for: .milliseconds(300))
@@ -176,7 +184,7 @@ func linha(_ sh: Shell, _ l: String) async -> (Int32, String, String) {
         let sh = Shell(root: raiz)
         let tick = raiz.appending(path: "tick.txt")
         _ = await linha(sh, #"node -e "setInterval(() => require('fs').appendFileSync('tick.txt', 'x'), 20)" &"#)
-        try await Task.sleep(for: .milliseconds(500))
+        await espera(ate: { ticks(tick) > 0 })
         let fg = Task { await linha(sh, #"node -e "setTimeout(() => {}, 5000)""#) }
         try await Task.sleep(for: .milliseconds(500))
         sh.cancel()

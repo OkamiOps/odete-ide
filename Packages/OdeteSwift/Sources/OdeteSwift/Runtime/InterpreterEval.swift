@@ -19,8 +19,7 @@ extension ViewInstance {
             return .string(s)
         case let .array(items): return try .array(items.map { try eval($0, env) })
         case let .range(a, b, closed):
-            let lo = try eval(a, env).asInt ?? 0, hi = try eval(b, env).asInt ?? 0
-            return .array((lo ..< (closed ? hi + 1 : hi)).map { .int($0) })
+            return try intervalo(eval(a, env), eval(b, env), fechado: closed, linha: a.line)
         case let .closure(c): return .closure(c, self)
         case let .ident(name, line):
             if name.hasPrefix("$") {
@@ -69,7 +68,7 @@ extension ViewInstance {
                 return .bool(!v.asBool)
             }
             if case let .int(i) = v {
-                return .int(-i)
+                return try .int(Self.conferido(0.subtractingReportingOverflow(i), x.line))
             }
             return .double(-(v.asDouble ?? 0))
         case let .binary(op, a, b): return try binary(op, eval(a, env).deref, eval(b, env).deref, a.line)
@@ -121,20 +120,21 @@ extension ViewInstance {
                 return .array(x + y)
             }
             if case let .int(x) = a, case let .int(y) = b {
-                return .int(x + y)
+                return try .int(Self.conferido(x.addingReportingOverflow(y), line))
             }
             return .double((a.asDouble ?? 0) + (b.asDouble ?? 0))
         case "-", "*", "/", "%":
+            // Conta de inteiro que passa do limite derrubava o app inteiro: no Swift de
+            // verdade é uma parada do programa, aqui é um erro na linha.
             if case let .int(x) = a, case let .int(y) = b {
+                if op == "/" || op == "%", y == 0 {
+                    throw RuntimeError(line: line, message: tr("divisão por zero"))
+                }
                 switch op {
-                case "-": return .int(x - y); case "*": return .int(x * y); case "/": guard y != 0
-                    else { throw RuntimeError(
-                        line: line,
-                        message: tr("divisão por zero")
-                    ) }; return .int(x / y); default: guard y != 0 else { throw RuntimeError(
-                        line: line,
-                        message: tr("divisão por zero")
-                    ) }; return .int(x % y)
+                case "-": return try .int(Self.conferido(x.subtractingReportingOverflow(y), line))
+                case "*": return try .int(Self.conferido(x.multipliedReportingOverflow(by: y), line))
+                case "/": return try .int(Self.conferido(x.dividedReportingOverflow(by: y), line))
+                default: return try .int(Self.conferido(x.remainderReportingOverflow(dividingBy: y), line))
                 }
             }
             let x = a.asDouble ?? 0, y = b.asDouble ?? 0
@@ -382,14 +382,31 @@ extension ViewInstance {
                 builder: false
             )
         }
-        let evArgs = try args.map { try ($0.label, eval($0.value, env)) }
+        let evArgs = try args.map { try ($0.label, argumento($0, env, de: name)) }
         switch name {
         case "String": return .string(evArgs.first?.1.asString ?? "")
-        case "Int": return .int(evArgs.first?.1.asInt ?? 0)
+        case "Int":
+            // `Int(1e21)` para o programa no Swift; aqui é erro, não queda do app.
+            if case let .double(d)? = evArgs.first?.1.deref, Int(exactly: d.rounded(.towardZero)) == nil {
+                throw RuntimeError(line: line, message: tr("%1$@ não cabe num Int", "\(d)"))
+            }
+            return .int(evArgs.first?.1.asInt ?? 0)
         case "Double", "CGFloat": return .double(evArgs.first?.1.asDouble ?? 0)
         case "Bool": return .bool(evArgs.first?.1.asBool ?? false)
-        case "min": return .double(evArgs.compactMap(\.1.asDouble).min() ?? 0).intIfWhole(evArgs)
-        case "max": return .double(evArgs.compactMap(\.1.asDouble).max() ?? 0).intIfWhole(evArgs)
+        case "min", "max":
+            // Só inteiros: a conta é em inteiros. Passar por `Double` e voltar com `Int(_:)`
+            // derrubava o app com o maior inteiro, que em `Double` arredonda para fora.
+            let ints = evArgs.compactMap { a -> Int? in
+                if case let .int(i) = a.1.deref {
+                    return i
+                }
+                return nil
+            }
+            if ints.count == evArgs.count, !ints.isEmpty {
+                return .int((name == "min" ? ints.min() : ints.max()) ?? 0)
+            }
+            let ds = evArgs.compactMap(\.1.asDouble)
+            return .double((name == "min" ? ds.min() : ds.max()) ?? 0)
         case "abs": return evArgs[0].1.deref.absValue
         case "print": return .none
         case "withAnimation": if let c = trailing.first?.1 {
@@ -551,24 +568,10 @@ extension Value {
         }
     }
 
-    func intIfWhole(_ args: [(String?, Value)]) -> Value {
-        if args.allSatisfy({
-            if case .int = $0.1.deref {
-                true
-            } else {
-                false
-            }
-        }),
-            let d = asDouble
-        {
-            return .int(Int(d))
-        }
-        return self
-    }
-
     var absValue: Value {
+        // `abs(Int.min)` não cabe num Int e para o programa; vira Double.
         if case let .int(i) = self {
-            return .int(abs(i))
+            return i == .min ? .double(-Double(i)) : .int(abs(i))
         }; return .double(abs(asDouble ?? 0))
     }
 }

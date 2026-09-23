@@ -332,12 +332,10 @@ struct SettingsShell: View {
                     Button(tr("Restaurar layout")) { chrome.resetLayout() }
                 } header: { header(tr("Layout")) }
                 Section {
-                    Toggle(tr("Projetos no iCloud Drive"), isOn: Binding(
-                        get: { chrome.snapshot.projectsInCloud },
-                        set: { chrome.snapshot.projectsInCloud = app.setCloud($0) }
-                    ))
-                    .disabled(!app.cloudAvailable && !chrome.snapshot.projectsInCloud)
-                    Text(app.cloudAvailable
+                    // Confirma, move fora do ator principal e mostra o andamento — ver `Janelas.mudarLugar`.
+                    ChaveDoICloud()
+                    AndamentoDaMudanca()
+                    Text(app.nuvemDisponivel != false
                         ? tr("Move a pasta Projects para o iCloud Drive; continua funcionando offline.")
                         :
                         tr(

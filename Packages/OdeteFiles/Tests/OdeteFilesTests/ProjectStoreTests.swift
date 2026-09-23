@@ -103,3 +103,89 @@ struct CriarEmPastaTests {
         #expect(FileManager.default.fileExists(atPath: raiz.appending(path: "normal").path))
     }
 }
+
+/// O `project.json` guarda o id do projeto, e o id é a chave das abas, dos rascunhos e
+/// das conversas. Regravar com um id novo quando a leitura falha é perder tudo isso.
+struct MetadadoDoProjetoTests {
+    init() {
+        Texto.escolher(.ptBR)
+    }
+
+    func meta(_ store: ProjectStore, _ nome: String) -> URL {
+        store.root.appending(path: "\(nome)/.odete/project.json")
+    }
+
+    @Test func metaIlegivelNaoEhRegravado() throws {
+        let store = try ProjectStore(root: tempDir())
+        _ = try store.create(name: "A")
+        try "{ quebrado".write(to: meta(store, "A"), atomically: true, encoding: .utf8)
+        let um = try store.list()
+        let dois = try store.list()
+        #expect(um.map(\.name) == ["A"])
+        #expect(try String(contentsOf: meta(store, "A"), encoding: .utf8) == "{ quebrado")
+        #expect(um.first?.id == dois.first?.id, "o id mudou de uma listagem para outra")
+    }
+
+    /// Um campo que não decodifica não pode levar o id junto.
+    @Test func idSobreviveACampoQuebrado() throws {
+        let store = try ProjectStore(root: tempDir())
+        let a = try store.create(name: "A")
+        let json = #"{"id":"\#(a.id.uuidString)","name":"A","createdAt":"ontem"}"#
+        try json.write(to: meta(store, "A"), atomically: true, encoding: .utf8)
+        #expect(try store.list().first?.id == a.id)
+        #expect(try String(contentsOf: meta(store, "A"), encoding: .utf8) == json)
+    }
+
+    /// Ainda na nuvem: o `project.json` é só o marcador `.project.json.icloud`. Criar um
+    /// novo por cima fazia o de verdade, ao chegar, virar conflito — ou sumir.
+    @Test func aindaNaNuvemNaoViraProjetoNovo() throws {
+        let store = try ProjectStore(root: tempDir())
+        let dir = store.root.appending(path: "Baixando/.odete")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        try Data().write(to: dir.appending(path: ".project.json.icloud"))
+        let lista = try store.list()
+        #expect(lista.map(\.name) == ["Baixando"])
+        #expect(!FileManager.default.fileExists(atPath: dir.appending(path: "project.json").path))
+        // Quem lista fica sabendo que vale tentar de novo.
+        #expect(try store.listar().aguardando == 1)
+        // Quando o de verdade chega, vale o id dele.
+        let real = Project(name: "Baixando")
+        let enc = JSONEncoder()
+        enc.dateEncodingStrategy = .iso8601
+        try FileManager.default.removeItem(at: dir.appending(path: ".project.json.icloud"))
+        try enc.encode(real).write(to: dir.appending(path: "project.json"))
+        let p = try #require(lista.first)
+        #expect(try store.touch(p).id == real.id)
+        #expect(try store.list().first?.id == real.id)
+    }
+
+    /// Um projeto com problema não esvazia o hub inteiro.
+    @Test func umErroNaoEsvaziaOHub() throws {
+        let store = try ProjectStore(root: tempDir())
+        _ = try store.create(name: "Bom")
+        let ruim = store.root.appending(path: "Ruim")
+        try FileManager.default.createDirectory(at: ruim, withIntermediateDirectories: true)
+        // `.odete` é um arquivo: não dá para criar o metadado ali.
+        try Data("x".utf8).write(to: ruim.appending(path: ".odete"))
+        let nomes = try store.list().map(\.name)
+        #expect(nomes.contains("Bom"))
+    }
+
+    @Test func achaOProjetoDaPasta() throws {
+        let store = try ProjectStore(root: tempDir())
+        let a = try store.create(name: "A")
+        #expect(store.projeto(naPasta: store.url(for: a))?.id == a.id)
+        #expect(store.projeto(naPasta: store.url(for: a).appending(path: "src")) == nil)
+        #expect(try store.projeto(naPasta: tempDir()) == nil)
+    }
+
+    /// Abrir o projeto marca a data — mas não por cima de um metadado que não deu para ler.
+    @Test func abrirNaoRegravaMetaIlegivel() throws {
+        let store = try ProjectStore(root: tempDir())
+        _ = try store.create(name: "A")
+        try "{ quebrado".write(to: meta(store, "A"), atomically: true, encoding: .utf8)
+        let p = try #require(try store.list().first)
+        _ = try store.touch(p)
+        #expect(try String(contentsOf: meta(store, "A"), encoding: .utf8) == "{ quebrado")
+    }
+}

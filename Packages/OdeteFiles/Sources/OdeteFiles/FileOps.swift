@@ -133,16 +133,38 @@ public struct FileOps: Sendable {
             // No sandbox do iOS `trashItem` não funciona; na prática é sempre por aqui.
             // A lixeira do projeto faz o mesmo papel, e o desfazer traz de volta.
             try? FileManager.default.createDirectory(at: lixeira, withIntermediateDirectories: true)
-            let destino = lixeira.appending(path: Self.nomeNaLixeira(rel, agora: Date()))
+            let destino = destinoNaLixeira(rel, agora: Date())
             do {
                 try FileManager.default.moveItem(at: alvo, to: destino)
-                podarLixeira()
-                return destino
             } catch {
-                try FileManager.default.removeItem(at: alvo)
-                return nil
+                // Não deu para guardar: o arquivo fica onde está. Antes caía num
+                // `removeItem` — o apagar "com desfazer" virava apagar de vez, sem aviso.
+                throw FileError.lixeiraFalhou(rel)
             }
+            podarLixeira(chegou: destino)
+            return destino
         }
+    }
+
+    /// Um lugar livre na lixeira. Dois apagares do mesmo nome no mesmo segundo davam o
+    /// mesmo destino, e o segundo `moveItem` falhava.
+    func destinoNaLixeira(_ rel: String, agora: Date) -> URL {
+        let nome = Self.nomeNaLixeira(rel, agora: agora)
+        var destino = lixeira.appending(path: nome)
+        var n = 2
+        while FileManager.default.fileExists(atPath: destino.path) {
+            // A hora continua na frente: é por ela que a poda sabe a idade.
+            let hora = Int(agora.timeIntervalSince1970)
+            destino = lixeira.appending(path: "\(hora)-\(n)" + nome.dropFirst(String(hora).count))
+            n += 1
+        }
+        return destino
+    }
+
+    /// Quando o item foi para a lixeira, lido do começo do nome (`<segundos>-nome`).
+    static func horaNaLixeira(_ nome: String) -> Date? {
+        guard let s = nome.split(separator: "-", maxSplits: 1).first, let t = Int(s), t > 0 else { return nil }
+        return Date(timeIntervalSince1970: TimeInterval(t))
     }
 
     /// Nome do item dentro da lixeira: a hora, para não colidir, e o nome original.
@@ -184,23 +206,31 @@ public struct FileOps: Sendable {
 
     /// Guarda os mais novos e joga fora o resto: sem isto a lixeira só cresce, e num iPad
     /// espaço é o que falta primeiro.
-    func podarLixeira(manter: Int = 50, dias: Int = 7) {
+    ///
+    /// A idade é a hora do nome — quando foi apagado. A data de modificação não serve:
+    /// `moveItem` a preserva, e um arquivo de um mês atrás chegava à lixeira já "velho",
+    /// era podado no mesmo instante e o desfazer não tinha o que trazer. `chegou`, o que
+    /// acabou de entrar, nunca sai na mesma poda.
+    func podarLixeira(manter: Int = 50, dias: Int = 7, chegou: URL? = nil, agora: Date = Date()) {
         let fm = FileManager.default
         guard let itens = try? fm.contentsOfDirectory(
             at: lixeira,
             includingPropertiesForKeys: [.contentModificationDateKey]
         ) else { return }
-        let limite = Date().addingTimeInterval(-Double(dias) * 86400)
-        let ordenados = itens.sorted {
-            let a = (try? $0.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ??
-                .distantPast
-            let b = (try? $1.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ??
-                .distantPast
-            return a > b
+        let limite = agora.addingTimeInterval(-Double(dias) * 86400)
+        /// Sem hora no nome (algo posto ali à mão): vale a data do arquivo, como antes.
+        func idade(_ u: URL) -> Date {
+            Self.horaNaLixeira(u.lastPathComponent)
+                ?? (try? u.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate)
+                ?? .distantPast
         }
-        for (i, u) in ordenados.enumerated() {
-            let data = (try? u.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ??
-                .distantPast
+        let novo = chegou?.standardizedFileURL.lastPathComponent
+        // O que acabou de chegar vai na frente de tudo, mesmo empatado no segundo com
+        // outros: ele conta entre os `manter` e nunca é o que sobra.
+        let ordenados = itens
+            .map { ($0, $0.lastPathComponent == novo ? Date.distantFuture : idade($0)) }
+            .sorted { $0.1 != $1.1 ? $0.1 > $1.1 : $0.0.lastPathComponent > $1.0.lastPathComponent }
+        for (i, (u, data)) in ordenados.enumerated() where u.lastPathComponent != novo {
             if i >= manter || data < limite {
                 try? fm.removeItem(at: u)
             }

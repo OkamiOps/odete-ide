@@ -66,6 +66,96 @@ struct LixeiraTests {
         ops.esvaziarLixeira()
         #expect(ops.tamanhoDaLixeira() == 0)
     }
+
+    /// `moveItem` guarda a data de modificação: a poda, que olhava essa data, apagava de
+    /// vez um arquivo antigo no mesmo instante em que ele chegava — e o desfazer falhava.
+    @Test func arquivoAntigoNaoSomeAoChegarNaLixeira() throws {
+        let ops = try projeto()
+        try ops.write("velho.txt", "de outubro")
+        let mes = Date().addingTimeInterval(-30 * 86400)
+        try FileManager.default.setAttributes([.modificationDate: mes], ofItemAtPath: ops.url("velho.txt").path)
+        let lixo = try #require(try ops.delete("velho.txt"))
+        #expect(FileManager.default.fileExists(atPath: lixo.path), "a poda apagou o que acabou de chegar")
+        try ops.restore(from: lixo, to: "velho.txt")
+        #expect(try ops.read("velho.txt") == "de outubro")
+    }
+
+    @Test func pastaAntigaTambemVoltaDaLixeira() throws {
+        let ops = try projeto()
+        try ops.write("antiga/dentro.txt", "x")
+        let ano = Date().addingTimeInterval(-365 * 86400)
+        try FileManager.default.setAttributes([.modificationDate: ano], ofItemAtPath: ops.url("antiga").path)
+        let lixo = try #require(try ops.delete("antiga"))
+        try ops.restore(from: lixo, to: "antiga")
+        #expect(try ops.read("antiga/dentro.txt") == "x")
+    }
+
+    /// A idade na lixeira é a hora do nome — quando foi apagado —, não a do arquivo.
+    @Test func podaPelaHoraDoNome() throws {
+        let ops = try projeto()
+        try FileManager.default.createDirectory(at: ops.lixeira, withIntermediateDirectories: true)
+        let dezDias = Int(Date().addingTimeInterval(-10 * 86400).timeIntervalSince1970)
+        let ontem = Int(Date().addingTimeInterval(-86400).timeIntervalSince1970)
+        let velho = ops.lixeira.appending(path: "\(dezDias)-velho.txt")
+        let novo = ops.lixeira.appending(path: "\(ontem)-novo.txt")
+        try "v".write(to: velho, atomically: true, encoding: .utf8)
+        try "n".write(to: novo, atomically: true, encoding: .utf8)
+        // O novo tem data de arquivo antiga; o velho, data de agora. Vale o nome.
+        let ano = Date().addingTimeInterval(-365 * 86400)
+        try FileManager.default.setAttributes([.modificationDate: ano], ofItemAtPath: novo.path)
+        ops.podarLixeira()
+        #expect(!FileManager.default.fileExists(atPath: velho.path))
+        #expect(FileManager.default.fileExists(atPath: novo.path))
+    }
+
+    /// Mandar para a lixeira falhou: antes o código apagava de vez. Agora é erro, e o
+    /// arquivo fica onde estava.
+    @Test func semLixeiraNadaEApagado() throws {
+        let ops = try projeto()
+        try ops.write("importante.txt", "não pode sumir")
+        // Um arquivo no lugar da pasta da lixeira: mover para dentro dela não dá.
+        try FileManager.default.createDirectory(
+            at: ops.lixeira.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try "atrapalha".write(to: ops.lixeira, atomically: true, encoding: .utf8)
+        #expect(throws: FileError.self) { try ops.delete("importante.txt") }
+        #expect(try ops.read("importante.txt") == "não pode sumir")
+    }
+
+    /// Dois apagares do mesmo nome no mesmo segundo: o segundo `moveItem` batia no
+    /// primeiro e caía no `removeItem`.
+    @Test func mesmoNomeNoMesmoSegundoNaoColide() throws {
+        let ops = try projeto()
+        try ops.write("a.txt", "primeiro")
+        let um = try #require(try ops.delete("a.txt"))
+        try ops.write("a.txt", "segundo")
+        let dois = try #require(try ops.delete("a.txt"))
+        #expect(um != dois)
+        #expect(try String(contentsOf: um, encoding: .utf8) == "primeiro")
+        #expect(try String(contentsOf: dois, encoding: .utf8) == "segundo")
+    }
+
+    /// O mesmo nome em pastas diferentes, apagados juntos (uma seleção, `src/index.ts` e
+    /// `test/index.ts`): os dois vão para a lixeira e os dois voltam.
+    @Test func mesmoNomeEmPastasDiferentesApagadosJuntos() throws {
+        let ops = try projeto()
+        try ops.write("src/index.ts", "do src")
+        try ops.write("test/index.ts", "do test")
+        let a = try #require(try ops.delete("src/index.ts"))
+        let b = try #require(try ops.delete("test/index.ts"))
+        #expect(a != b)
+        try ops.restore(from: b, to: "test/index.ts")
+        try ops.restore(from: a, to: "src/index.ts")
+        #expect(try ops.read("src/index.ts") == "do src")
+        #expect(try ops.read("test/index.ts") == "do test")
+    }
+
+    @Test func horaDoNome() {
+        #expect(FileOps.horaNaLixeira("1700000000-a.txt") == Date(timeIntervalSince1970: 1_700_000_000))
+        #expect(FileOps.horaNaLixeira("1700000000-2-a.txt") == Date(timeIntervalSince1970: 1_700_000_000))
+        #expect(FileOps.horaNaLixeira("sem-hora.txt") == nil)
+    }
 }
 
 /// Ler não pode estragar o arquivo. `String(decoding:as:)` troca byte inválido por

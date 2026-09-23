@@ -51,7 +51,8 @@ public indirect enum Value {
     public var asInt: Int? {
         switch self {
         case let .int(i): i
-        case let .double(d): Int(d)
+        // `Int(d)` para o programa com NaN, infinito ou número fora do Int.
+        case let .double(d): Int(exactly: d.rounded(.towardZero))
         case let .string(s): Int(s)
         case let .binding(inst, n): inst.get(n).asInt
         default: nil

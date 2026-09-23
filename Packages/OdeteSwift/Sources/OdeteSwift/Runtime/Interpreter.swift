@@ -283,7 +283,19 @@ public final class ViewInstance {
     func iterate(_ v: Value) throws -> [Value] {
         switch v.deref {
         case let .array(a): return a
-        case let .int(n): return (0 ..< max(0, n)).map { .int($0) }
+        case let .int(n):
+            // `ForEach(n)`: n vezes. Com o mesmo teto do intervalo, pelo mesmo motivo.
+            guard n <= Self.maiorIntervalo else {
+                throw RuntimeError(
+                    line: 0,
+                    message: tr(
+                        "intervalo grande demais: %1$@ (o máximo são %2$@ itens)",
+                        "\(n)",
+                        "\(Self.maiorIntervalo)"
+                    )
+                )
+            }
+            return (0 ..< max(0, n)).map { .int($0) }
         default: throw RuntimeError(line: 0, message: tr("não dá para iterar %1$@", "\(v.asString)"))
         }
     }
@@ -305,17 +317,17 @@ public final class ViewInstance {
             } else if case let .array(a) = cur.deref {
                 new = .array(a + [value])
             } else {
-                new = .int((cur.asInt ?? 0) + (value.asInt ?? 0))
+                new = try .int(Self.conferido((cur.asInt ?? 0).addingReportingOverflow(value.asInt ?? 0), line))
             }
         case "-=": if case .double = cur.deref {
                 new = .double((cur.asDouble ?? 0) - (value.asDouble ?? 0))
             } else {
-                new = .int((cur.asInt ?? 0) - (value.asInt ?? 0))
+                new = try .int(Self.conferido((cur.asInt ?? 0).subtractingReportingOverflow(value.asInt ?? 0), line))
             }
         case "*=": if case .double = cur.deref {
                 new = .double((cur.asDouble ?? 0) * (value.asDouble ?? 1))
             } else {
-                new = .int((cur.asInt ?? 0) * (value.asInt ?? 1))
+                new = try .int(Self.conferido((cur.asInt ?? 0).multipliedReportingOverflow(by: value.asInt ?? 1), line))
             }
         case "/=": new = .double((cur.asDouble ?? 0) / max(value.asDouble ?? 1, 0.000001))
         default: throw RuntimeError(line: line, message: tr("operador %1$@", "\(op)"))

@@ -2,6 +2,8 @@ import Foundation
 import OdeteAccounts
 import OdeteAgent
 import OdeteCore
+import OdeteFiles
+import OdeteI18n
 import SwiftUI
 import UIKit
 
@@ -51,29 +53,139 @@ public final class Janelas {
     /// por cima da outra a conta que a vizinha acabara de adicionar.
     public private(set) lazy var accounts = AccountStore()
     public private(set) lazy var aiAccounts = AIAccountStore()
+    /// As pastas de fora do app, uma lista para todas as janelas — pelo mesmo motivo das
+    /// contas: duas cópias gravavam o `external.json` uma por cima da outra.
+    public let external: ExternalProjects
+    /// Onde fica o iCloud, perguntado fora do ator principal.
+    let nuvem: LocalDaNuvem
+    /// Como um projeto muda de lugar; os testes trocam por um `moveItem` simples.
+    var moverProjetos: MudancaDeLugar.Mover = MudancaDeLugar.moverDeVerdade
+    /// A mudança dos projetos entre o app e o iCloud, vista por todas as janelas.
+    public let mudanca = EstadoDaMudanca()
+    /// A leitura do `state.json` falhou nesta execução: não é instalação nova.
+    private var leituraFalhou = false
+    /// A pasta dos projetos dentro do app; os testes trocam por uma temporária.
+    var raizLocal = ProjectStore.defaultRoot()
 
-    init(store: StateStore = StateStore()) {
+    init(
+        store: StateStore = StateStore(),
+        external: ExternalProjects = ExternalProjects(),
+        nuvem: LocalDaNuvem = .shared
+    ) {
         self.store = store
+        self.external = external
+        self.nuvem = nuvem
     }
 
     // MARK: ajustes
 
     /// O estado com que uma janela nasce. Na primeira vez vem do disco.
+    ///
+    /// Não pergunta nada ao iCloud: isto roda no `init` da `RootView`, e a pergunta pode
+    /// levar segundos. A decisão de instalação nova vem depois, em `prepararNuvem`.
     public func snapshotInicial() -> ChromeSnapshot {
         if let c = canonico {
             return c
         }
-        var snap = store.load()
-        // Instalação nova com iCloud à mão: os projetos nascem no iCloud Drive. Dentro do
-        // container do app eles não sobrevivem a uma desinstalação — some tudo, incluindo
-        // o histórico git e as conversas do agente. Só vale para instalação nova: mudar o
-        // lugar de quem já tem projeto é decisão da pessoa, nos Ajustes.
-        if !snap.welcomeDone, !snap.projectsInCloud, AppModel.cloudRoot() != nil {
-            snap.projectsInCloud = true
-            try? store.saveNow(snap)
+        let lido = store.carregar()
+        leituraFalhou = lido.falhou
+        canonico = lido.snapshot
+        return lido.snapshot
+    }
+
+    /// Instalação nova com iCloud à mão: os projetos nascem no iCloud Drive. Dentro do
+    /// container do app eles não sobrevivem a uma desinstalação — some tudo, incluindo
+    /// o histórico git e as conversas do agente.
+    ///
+    /// Só vale para instalação nova de verdade. Um `state.json` que não deu para ler
+    /// voltava como estado novo, com as boas-vindas por fazer, e isto ligava o iCloud —
+    /// o app passava a olhar outra pasta e os projetos de quem já usava sumiam do hub.
+    /// Mudar o lugar de quem já tem projeto é decisão da pessoa, nos Ajustes.
+    func prepararNuvem() async {
+        guard let snap = canonico, !leituraFalhou, !snap.welcomeDone, !snap.projectsInCloud else { return }
+        guard let raiz = await nuvem.raiz() else { return }
+        // Enquanto o iCloud respondia a pessoa pode ter criado um projeto aqui dentro:
+        // aí ela já tem projeto, e a decisão não é mais de instalação nova.
+        let temProjeto = entradas.values.contains { !($0.app?.projects.isEmpty ?? true) }
+        guard !temProjeto, canonico?.projectsInCloud == false else { return }
+        definirNuvem(true, raiz: raiz)
+    }
+
+    /// Todas as janelas passam a olhar `raiz`, e o ajuste vai para o estado de todos.
+    private func definirNuvem(_ ligada: Bool, raiz: URL) {
+        podar()
+        for e in entradas.values {
+            e.app?.apontar(para: raiz)
         }
-        canonico = snap
-        return snap
+        if var s = canonico {
+            s.projectsInCloud = ligada
+            canonico = s
+            store.scheduleSave(s)
+        }
+        repassando = true
+        defer { repassando = false }
+        for e in entradas.values {
+            if let c = e.chrome, c.snapshot.projectsInCloud != ligada {
+                c.snapshot.projectsInCloud = ligada
+            }
+        }
+    }
+
+    // MARK: projetos no iCloud
+
+    /// Leva os projetos para o iCloud Drive, ou de volta para dentro do app.
+    ///
+    /// Roda fora do ator principal, com andamento em `mudanca`. Os projetos abertos em
+    /// qualquer janela fecham antes (com o que estava sendo digitado gravado), e todas as
+    /// janelas passam a olhar o lugar novo ao fim. Se algo falha no meio, o que já tinha
+    /// ido volta, e o app continua olhando o lugar de antes.
+    func mudarLugar(paraNuvem: Bool) async {
+        guard !mudanca.andando else { return }
+        podar()
+        let atual = canonico?.projectsInCloud ?? false
+        guard atual != paraNuvem else { return }
+        let raizNuvem = await nuvem.raiz()
+        guard let raizNuvem else {
+            mudanca.aviso = MudancaDeLugar.Falha.semICloud.errorDescription
+            return
+        }
+        let origem = entradas.values.compactMap(\.app).first?.store.root
+            ?? (atual ? raizNuvem : raizLocal)
+        let destino = paraNuvem ? raizNuvem : raizLocal
+        for e in entradas.values {
+            e.app?.closeWorkspace()
+        }
+        mudanca.andando = true
+        mudanca.feitos = 0
+        mudanca.total = 0
+        let mover = moverProjetos
+        let estado = mudanca
+        let resultado = await Task.detached(priority: .userInitiated) {
+            Result {
+                try MudancaDeLugar.executar(de: origem, para: destino, paraNuvem: paraNuvem, mover: mover) { f, t in
+                    Task { @MainActor in
+                        estado.feitos = f
+                        estado.total = t
+                    }
+                }
+            }
+        }.value
+        mudanca.andando = false
+        switch resultado {
+        case let .success(renomeados):
+            definirNuvem(paraNuvem, raiz: destino)
+            if !renomeados.isEmpty {
+                mudanca.aviso = tr(
+                    "Já havia projetos com estes nomes no destino; os que chegaram ganharam outro nome: %1$@.",
+                    renomeados.map { "\($0.de) → \($0.para)" }.joined(separator: ", ")
+                )
+            }
+        case let .failure(erro):
+            mudanca.aviso = erro.localizedDescription
+            for e in entradas.values {
+                e.app?.refresh()
+            }
+        }
     }
 
     /// Uma janela mudou o estado dela: vira o estado de todos, é gravado uma vez, e as
@@ -125,6 +237,31 @@ public final class Janelas {
     func dona(de projeto: UUID, fora app: AppModel) -> Entrada? {
         podar()
         return entradas.values.first { $0.app !== app && $0.app?.workspace?.project.id == projeto }
+    }
+
+    /// Fecha o projeto nas outras janelas — antes de renomear ou apagar a pasta dele.
+    /// Fechar grava o que estava sendo digitado e para o salvamento automático, que de
+    /// outro jeito recriaria a pasta no caminho velho.
+    func fechar(_ projeto: UUID, fora app: AppModel) {
+        podar()
+        for e in entradas.values where e.app !== app && e.app?.workspace?.project.id == projeto {
+            e.app?.closeWorkspace()
+        }
+    }
+
+    /// Os projetos abertos agora, em qualquer janela.
+    func projetosAbertos() -> Set<UUID> {
+        podar()
+        return Set(entradas.values.compactMap { $0.app?.workspace?.project.id })
+    }
+
+    /// Os projetos mudaram no disco (criado, renomeado, apagado): toda janela relê a
+    /// lista, e não só a que fez a mudança.
+    func projetosMudaram() {
+        podar()
+        for e in entradas.values {
+            e.app?.refresh()
+        }
     }
 
     private func podar() {

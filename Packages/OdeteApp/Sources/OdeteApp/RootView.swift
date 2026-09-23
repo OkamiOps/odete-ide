@@ -36,10 +36,22 @@ public struct RootView: View {
         let janelas = Janelas.shared
         let snap = janelas.snapshotInicial()
         _chrome = State(initialValue: ChromeState(snapshot: snap))
+        // Projetos no iCloud: onde fica o iCloud é perguntado fora do ator principal (ver
+        // `LocalDaNuvem`); antes a pergunta era feita aqui, e a janela esperava por ela
+        // para aparecer. Se outra janela já perguntou, a resposta está guardada.
+        let raiz: URL? = if !snap.projectsInCloud {
+            ProjectStore.defaultRoot()
+        } else if let sabida = janelas.nuvem.sabido {
+            sabida ?? ProjectStore.defaultRoot()
+        } else {
+            nil
+        }
         _app = State(initialValue: AppModel(
-            store: ProjectStore(root: AppModel.projectsRoot(cloud: snap.projectsInCloud)),
+            store: ProjectStore(root: raiz ?? ProjectStore.defaultRoot()),
             accounts: janelas.accounts,
-            aiAccounts: janelas.aiAccounts
+            aiAccounts: janelas.aiAccounts,
+            external: janelas.external,
+            aguardandoRaiz: raiz == nil
         ))
     }
 
@@ -128,8 +140,20 @@ public struct RootView: View {
             let outras = Janelas.shared.haOutras(alem: idDaJanela)
             Janelas.shared.entrar(idDaJanela, app: app, chrome: chrome) { [caixaDaCena] in caixaDaCena.ativar() }
             IntentBridge.shared.bind(app: app, chrome: chrome)
-            abrirOProjetoDaJanela(sessoes: outras ? 2 : UIApplication.shared.openSessions.count)
+            let sessoes = outras ? 2 : UIApplication.shared.openSessions.count
+            if app.aguardandoRaiz {
+                // A lista só existe depois que o iCloud responde; o projeto da janela
+                // abre quando ela chegar.
+                Task {
+                    await app.prepararRaiz(nuvem: Janelas.shared.nuvem)
+                    abrirOProjetoDaJanela(sessoes: sessoes)
+                }
+            } else {
+                abrirOProjetoDaJanela(sessoes: sessoes)
+            }
         }
+        // Instalação nova com iCloud: os projetos passam a nascer lá (ver `Janelas`).
+        .task { await Janelas.shared.prepararNuvem() }
         .onChange(of: app.workspace?.project.id) { _, id in
             guard !saindoDeCena else { return }
             projetoDaJanela = id?.uuidString ?? "hub"

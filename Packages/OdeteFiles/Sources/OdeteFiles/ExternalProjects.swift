@@ -61,10 +61,12 @@ public final class ExternalProjects: @unchecked Sendable {
             }
         }
         let bm = try url.bookmarkData(options: .minimalBookmark, includingResourceValuesForKeys: nil, relativeTo: nil)
-        if let i = entries
-            .firstIndex(where: { $0.bookmark == bm || resolved[$0.id]?.standardizedFileURL == url.standardizedFileURL
-            })
-        {
+        // Compara com a pasta de cada entrada, resolvendo o que ainda não foi resolvido:
+        // olhar só o que já estava resolvido deixava a mesma pasta entrar duas vezes.
+        let alvo = url.resolvingSymlinksInPath().standardizedFileURL
+        if let i = entries.firstIndex(where: {
+            $0.bookmark == bm || resolve($0)?.resolvingSymlinksInPath().standardizedFileURL == alvo
+        }) {
             return project(entries[i])
         }
         let e = Entry(id: UUID(), name: url.lastPathComponent, bookmark: bm, createdAt: .now, lastOpenedAt: nil)
@@ -83,11 +85,42 @@ public final class ExternalProjects: @unchecked Sendable {
         save()
     }
 
-    /// Projetos externos; pastas cujo bookmark não resolve mais ficam de fora. Só resolve:
-    /// listar não abre acesso a pasta nenhuma.
+    /// Projetos externos; pastas cujo bookmark não resolve mais ficam de fora — elas
+    /// aparecem em `indisponiveis()`. Só resolve: listar não abre acesso a pasta nenhuma.
     public func list() -> [Project] {
         lock.lock(); defer { lock.unlock() }
         return entries.compactMap { resolve($0) != nil ? project($0) : nil }
+    }
+
+    /// Os projetos cuja pasta não se acha mais: apagada, movida para onde o bookmark não
+    /// alcança, num disco que saiu. Antes eles sumiam do hub sem aviso; agora o hub os
+    /// mostra como indisponíveis, com a opção de apontar para a pasta de novo.
+    public func indisponiveis() -> [Project] {
+        lock.lock(); defer { lock.unlock() }
+        return entries.compactMap { resolve($0) == nil ? project($0) : nil }
+    }
+
+    /// Aponta um projeto para outra pasta, mantendo o id — e com ele as abas, os
+    /// rascunhos e as conversas guardados por id. A pasta vem do seletor com acesso.
+    @discardableResult
+    public func reapontar(_ id: UUID, para url: URL) throws -> Project? {
+        lock.lock(); defer { lock.unlock() }
+        guard let i = entries.firstIndex(where: { $0.id == id }) else { return nil }
+        let accessed = url.startAccessingSecurityScopedResource()
+        defer {
+            if accessed {
+                url.stopAccessingSecurityScopedResource()
+            }
+        }
+        let bm = try url.bookmarkData(options: .minimalBookmark, includingResourceValuesForKeys: nil, relativeTo: nil)
+        if acessando.remove(id) != nil {
+            resolved[id]?.stopAccessingSecurityScopedResource()
+        }
+        resolved[id] = nil
+        entries[i].bookmark = bm
+        entries[i].name = url.lastPathComponent
+        save()
+        return project(entries[i])
     }
 
     /// A pasta do projeto, com o acesso aberto — uma vez por projeto, até `liberar(_:)`.
@@ -113,8 +146,14 @@ public final class ExternalProjects: @unchecked Sendable {
 
     /// Fecha o acesso de todos os projetos, menos o de `exceto` — o que está aberto.
     public func liberarTodos(exceto: UUID? = nil) {
+        liberarTodos(exceto: Set([exceto].compactMap(\.self)))
+    }
+
+    /// Fecha o acesso de todos os projetos, menos os de `exceto`. O registro é um só para
+    /// todas as janelas: o hub de uma não pode fechar a pasta aberta na outra.
+    public func liberarTodos(exceto: Set<UUID>) {
         lock.lock(); defer { lock.unlock() }
-        for id in acessando where id != exceto {
+        for id in acessando where !exceto.contains(id) {
             resolved[id]?.stopAccessingSecurityScopedResource()
             acessando.remove(id)
         }

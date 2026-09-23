@@ -555,7 +555,9 @@ struct SettingsContent: View {
                 "Os projetos ficam no iCloud Drive: sincronizam entre aparelhos, funcionam offline e sobrevivem a desinstalar o app."
             )
         }
-        if app.cloudAvailable {
+        // `nuvemDisponivel` e não uma pergunta ao iCloud aqui: isto é o corpo da view,
+        // e a pergunta travava a folha a cada redesenho (ver `LocalDaNuvem`).
+        if app.nuvemDisponivel != false {
             return tr(
                 "Os projetos estão dentro do app. Desinstalar apaga tudo — código, histórico do git e conversas. Ligue o iCloud Drive, ou copie a pasta Odete pelo app Arquivos de vez em quando."
             )
@@ -571,14 +573,10 @@ struct SettingsContent: View {
             SectionTitle(tr("Projetos"))
             CardList {
                 CardRow(tr("Projetos no iCloud Drive"), symbol: "icloud", color: .cyan, first: true) {
-                    Toggle("", isOn: Binding(
-                        get: { chrome.snapshot.projectsInCloud },
-                        set: { chrome.snapshot.projectsInCloud = app.setCloud($0) }
-                    ))
-                    .labelsHidden()
-                    .disabled(!app.cloudAvailable && !chrome.snapshot.projectsInCloud)
+                    ChaveDoICloud(comRotulo: false)
                 }
             }
+            AndamentoDaMudanca()
             CardNote(nota)
         }
         VStack(alignment: .leading, spacing: 8) {

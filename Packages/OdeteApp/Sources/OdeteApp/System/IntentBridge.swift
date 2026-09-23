@@ -26,10 +26,20 @@ public final class IntentBridge {
         if let app {
             return app.projects.map { ProjectRef(id: $0.id, name: $0.name) }
         }
+        let local = Self.lojaSemTela().flatMap { try? $0.list() } ?? []
+        return (local + Janelas.shared.external.list()).map { ProjectRef(id: $0.id, name: $0.name) }
+    }
+
+    /// A raiz dos projetos quando o atalho roda sem tela nenhuma.
+    ///
+    /// Sem tela não há o que travar, e a resposta do iCloud é a mesma que as janelas
+    /// usam (`LocalDaNuvem`). Com o iCloud ligado e a pergunta ainda sem resposta, pergunta
+    /// agora — é o único caso em que se espera por ela no ator principal.
+    static func lojaSemTela() -> ProjectStore? {
         let snap = StateStore().load()
-        let store = ProjectStore(root: AppModel.projectsRoot(cloud: snap.projectsInCloud))
-        let local = (try? store.list()) ?? []
-        return (local + ExternalProjects().list()).map { ProjectRef(id: $0.id, name: $0.name) }
+        guard snap.projectsInCloud else { return ProjectStore() }
+        let raiz = LocalDaNuvem.shared.sabido ?? LocalDaNuvem.shared.raizAgora()
+        return ProjectStore(root: raiz ?? ProjectStore.defaultRoot())
     }
 
     public func openProject(_ id: UUID) -> Bool {
@@ -38,13 +48,22 @@ public final class IntentBridge {
         return true
     }
 
-    /// Abre o projeto (se preciso) e roda a linha no terminal.
+    /// Roda a linha no terminal do projeto, na janela em que ele está aberto.
+    ///
+    /// A ponte fala com a janela usada por último. Com o projeto aberto em *outra*
+    /// janela, `open` só trazia a outra para a frente, e a linha rodava no terminal do
+    /// projeto desta — outro projeto. Agora o comando vai para a janela dona; e só roda
+    /// se o terminal for mesmo o do projeto pedido.
     public func runCommand(_ line: String, in id: UUID) -> Bool {
-        guard let app, let chrome else { return false }
-        if app.workspace?.project.id != id {
+        guard let app else { return false }
+        var alvo = app
+        if let dona = app.janelas?.dona(de: id, fora: app), let outra = dona.app {
+            dona.ativar()
+            alvo = outra
+        } else if app.workspace?.project.id != id {
             guard openProject(id) else { return false }
         }
-        guard let ws = app.workspace else { return false }
+        guard let ws = alvo.workspace, ws.project.id == id else { return false }
         ws.showTerminal()
         ws.run.run(line)
         return true
@@ -88,9 +107,7 @@ public final class IntentBridge {
             guard let p = app.create(name: name, template: t) else { return nil }
             return ProjectRef(id: p.id, name: p.name)
         }
-        let snap = StateStore().load()
-        let store = ProjectStore(root: AppModel.projectsRoot(cloud: snap.projectsInCloud))
-        guard let p = try? store.create(name: name, template: t) else { return nil }
+        guard let p = try? Self.lojaSemTela()?.create(name: name, template: t) else { return nil }
         return ProjectRef(id: p.id, name: p.name)
     }
 }

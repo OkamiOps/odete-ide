@@ -157,27 +157,29 @@ public struct EditorPrefs: Codable, Hashable, Sendable {
              fontFamily, kern, scrollPastEnd, trimOnSave, finalNewline
     }
 
+    /// Campo a campo: um valor que esta versão não conhece (um tamanho de minimapa
+    /// novo, uma fonte que saiu) vira o padrão daquele campo e não derruba os outros.
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         let d = EditorPrefs()
-        fontSize = try c.decodeIfPresent(Double.self, forKey: .fontSize) ?? d.fontSize
-        autoSave = try c.decodeIfPresent(Bool.self, forKey: .autoSave) ?? d.autoSave
-        wrap = try c.decodeIfPresent(Bool.self, forKey: .wrap) ?? d.wrap
-        minimap = try c.decodeIfPresent(MinimapSize.self, forKey: .minimap) ?? d.minimap
-        lineNumbers = try c.decodeIfPresent(Bool.self, forKey: .lineNumbers) ?? d.lineNumbers
-        indentGuides = try c.decodeIfPresent(Bool.self, forKey: .indentGuides) ?? d.indentGuides
-        tabWidth = try c.decodeIfPresent(Int.self, forKey: .tabWidth) ?? d.tabWidth
-        lineHeight = try c.decodeIfPresent(Double.self, forKey: .lineHeight) ?? d.lineHeight
-        showWhitespace = try c.decodeIfPresent(Bool.self, forKey: .showWhitespace) ?? d.showWhitespace
-        showLineBreaks = try c.decodeIfPresent(Bool.self, forKey: .showLineBreaks) ?? d.showLineBreaks
-        pageGuide = try c.decodeIfPresent(Int.self, forKey: .pageGuide) ?? d.pageGuide
-        highlightLine = try c.decodeIfPresent(Bool.self, forKey: .highlightLine) ?? d.highlightLine
-        autoClosePairs = try c.decodeIfPresent(Bool.self, forKey: .autoClosePairs) ?? d.autoClosePairs
-        fontFamily = try c.decodeIfPresent(EditorFont.self, forKey: .fontFamily) ?? d.fontFamily
-        kern = try c.decodeIfPresent(Double.self, forKey: .kern) ?? d.kern
-        scrollPastEnd = try c.decodeIfPresent(Bool.self, forKey: .scrollPastEnd) ?? d.scrollPastEnd
-        trimOnSave = try c.decodeIfPresent(Bool.self, forKey: .trimOnSave) ?? d.trimOnSave
-        finalNewline = try c.decodeIfPresent(Bool.self, forKey: .finalNewline) ?? d.finalNewline
+        fontSize = c.ler(.fontSize, d.fontSize)
+        autoSave = c.ler(.autoSave, d.autoSave)
+        wrap = c.ler(.wrap, d.wrap)
+        minimap = c.ler(.minimap, d.minimap)
+        lineNumbers = c.ler(.lineNumbers, d.lineNumbers)
+        indentGuides = c.ler(.indentGuides, d.indentGuides)
+        tabWidth = c.ler(.tabWidth, d.tabWidth)
+        lineHeight = c.ler(.lineHeight, d.lineHeight)
+        showWhitespace = c.ler(.showWhitespace, d.showWhitespace)
+        showLineBreaks = c.ler(.showLineBreaks, d.showLineBreaks)
+        pageGuide = c.ler(.pageGuide, d.pageGuide)
+        highlightLine = c.ler(.highlightLine, d.highlightLine)
+        autoClosePairs = c.ler(.autoClosePairs, d.autoClosePairs)
+        fontFamily = c.ler(.fontFamily, d.fontFamily)
+        kern = c.ler(.kern, d.kern)
+        scrollPastEnd = c.ler(.scrollPastEnd, d.scrollPastEnd)
+        trimOnSave = c.ler(.trimOnSave, d.trimOnSave)
+        finalNewline = c.ler(.finalNewline, d.finalNewline)
     }
 }
 
@@ -190,6 +192,21 @@ public struct AgentPrefs: Codable, Hashable, Sendable {
     public var permit = "auto"
     public var threadId: String?
     public init() {}
+
+    enum CodingKeys: String, CodingKey { case accountId, model, effort, mode, permit, threadId }
+
+    /// Tolerante como o resto do estado: preferência gravada antes de um campo existir
+    /// continua valendo, com o padrão no campo que falta.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let d = AgentPrefs()
+        accountId = c.ler(.accountId, d.accountId)
+        model = c.ler(.model, d.model)
+        effort = c.ler(.effort, d.effort)
+        mode = c.ler(.mode, d.mode)
+        permit = c.ler(.permit, d.permit)
+        threadId = c.ler(.threadId, d.threadId)
+    }
 }
 
 /// Estado persistido de layout e preferências, espelhando `useChrome` da web.
@@ -243,43 +260,106 @@ public struct ChromeSnapshot: Codable, Hashable, Sendable {
     public var agentEffortByModel: [String: String] = [:]
     public init() {}
 
-    /// Campos novos podem faltar no state.json antigo: cada um cai no padrão.
+    /// Campo a campo, sem deixar um derrubar os outros.
+    ///
+    /// Campos novos podem faltar no state.json antigo, e campos velhos podem trazer um
+    /// valor que esta versão não conhece — um tema que saiu, um modo que mudou de nome.
+    /// Antes, um enum estrito aqui fazia a decodificação inteira falhar, e o app voltava
+    /// com tudo zerado: abas, ajustes, o fim do onboarding — e, sem saber que já tinha
+    /// passado por ele, ligava o iCloud como numa instalação nova. Agora cada campo que
+    /// não dá para ler vale o seu padrão, e só ele; nos dicionários por projeto, cada
+    /// entrada vale por si.
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         let d = ChromeSnapshot()
-        welcomeDone = try c.decodeIfPresent(Bool.self, forKey: .welcomeDone) ?? d.welcomeDone
-        projectsInCloud = try c.decodeIfPresent(Bool.self, forKey: .projectsInCloud) ?? d.projectsInCloud
-        theme = try c.decodeIfPresent(ThemeId.self, forKey: .theme) ?? d.theme
-        themeAuto = try c.decodeIfPresent(Bool.self, forKey: .themeAuto) ?? d.themeAuto
-        themeLight = try c.decodeIfPresent(ThemeId.self, forKey: .themeLight) ?? d.themeLight
-        themeDark = try c.decodeIfPresent(ThemeId.self, forKey: .themeDark) ?? d.themeDark
-        showTabBar = try c.decodeIfPresent(Bool.self, forKey: .showTabBar) ?? d.showTabBar
-        showStatusBar = try c.decodeIfPresent(Bool.self, forKey: .showStatusBar) ?? d.showStatusBar
-        uiScale = try c.decodeIfPresent(Double.self, forKey: .uiScale) ?? d.uiScale
-        syntaxOverrides = try c.decodeIfPresent([String: String].self, forKey: .syntaxOverrides) ?? [:]
-        sideSide = try c.decodeIfPresent(LadoDoPainel.self, forKey: .sideSide) ?? d.sideSide
-        agentSide = try c.decodeIfPresent(LadoDoPainel.self, forKey: .agentSide) ?? d.agentSide
-        termPlace = try c.decodeIfPresent(LugarDoTerminal.self, forKey: .termPlace) ?? d.termPlace
-        termFontSize = try c.decodeIfPresent(Double.self, forKey: .termFontSize) ?? d.termFontSize
-        termFont = try c.decodeIfPresent(EditorFont.self, forKey: .termFont) ?? d.termFont
-        side = try c.decodeIfPresent(SidePanel.self, forKey: .side) ?? d.side
-        sideOpen = try c.decodeIfPresent(Bool.self, forKey: .sideOpen) ?? d.sideOpen
-        center = try c.decodeIfPresent(CenterMode.self, forKey: .center) ?? d.center
-        agentVisible = try c.decodeIfPresent(Bool.self, forKey: .agentVisible) ?? d.agentVisible
-        termVisible = try c.decodeIfPresent(Bool.self, forKey: .termVisible) ?? d.termVisible
-        sideWidth = try c.decodeIfPresent(Double.self, forKey: .sideWidth) ?? d.sideWidth
-        agentWidth = try c.decodeIfPresent(Double.self, forKey: .agentWidth) ?? d.agentWidth
-        termHeight = try c.decodeIfPresent(Double.self, forKey: .termHeight) ?? d.termHeight
-        phoneTab = try c.decodeIfPresent(PhoneTab.self, forKey: .phoneTab) ?? d.phoneTab
-        editor = try c.decodeIfPresent(EditorPrefs.self, forKey: .editor) ?? d.editor
-        mostrarOcultos = try c.decodeIfPresent(Bool.self, forKey: .mostrarOcultos) ?? d.mostrarOcultos
-        avisoSafariVisto = try c.decodeIfPresent(Bool.self, forKey: .avisoSafariVisto) ?? d.avisoSafariVisto
-        lastProjectId = try c.decodeIfPresent(UUID.self, forKey: .lastProjectId)
-        tabsByProject = try c.decodeIfPresent([UUID: [EditorTab]].self, forKey: .tabsByProject) ?? [:]
-        activeTabByProject = try c.decodeIfPresent([UUID: String].self, forKey: .activeTabByProject) ?? [:]
-        expandedByProject = try c.decodeIfPresent([UUID: [String]].self, forKey: .expandedByProject) ?? [:]
-        agentByProject = try c.decodeIfPresent([UUID: AgentPrefs].self, forKey: .agentByProject) ?? [:]
-        agentEffortByModel = try c.decodeIfPresent([String: String].self, forKey: .agentEffortByModel) ?? [:]
+        welcomeDone = c.ler(.welcomeDone, d.welcomeDone)
+        projectsInCloud = c.ler(.projectsInCloud, d.projectsInCloud)
+        theme = c.ler(.theme, d.theme)
+        themeAuto = c.ler(.themeAuto, d.themeAuto)
+        themeLight = c.ler(.themeLight, d.themeLight)
+        themeDark = c.ler(.themeDark, d.themeDark)
+        showTabBar = c.ler(.showTabBar, d.showTabBar)
+        showStatusBar = c.ler(.showStatusBar, d.showStatusBar)
+        uiScale = c.ler(.uiScale, d.uiScale)
+        syntaxOverrides = c.ler(.syntaxOverrides, d.syntaxOverrides)
+        sideSide = c.ler(.sideSide, d.sideSide)
+        agentSide = c.ler(.agentSide, d.agentSide)
+        termPlace = c.ler(.termPlace, d.termPlace)
+        termFontSize = c.ler(.termFontSize, d.termFontSize)
+        termFont = c.ler(.termFont, d.termFont)
+        side = c.ler(.side, d.side)
+        sideOpen = c.ler(.sideOpen, d.sideOpen)
+        center = c.ler(.center, d.center)
+        agentVisible = c.ler(.agentVisible, d.agentVisible)
+        termVisible = c.ler(.termVisible, d.termVisible)
+        sideWidth = c.ler(.sideWidth, d.sideWidth)
+        agentWidth = c.ler(.agentWidth, d.agentWidth)
+        termHeight = c.ler(.termHeight, d.termHeight)
+        phoneTab = c.ler(.phoneTab, d.phoneTab)
+        editor = c.ler(.editor, d.editor)
+        mostrarOcultos = c.ler(.mostrarOcultos, d.mostrarOcultos)
+        avisoSafariVisto = c.ler(.avisoSafariVisto, d.avisoSafariVisto)
+        lastProjectId = c.ler(.lastProjectId, d.lastProjectId)
+        tabsByProject = c.lerPorProjeto(.tabsByProject, ListaTolerante<EditorTab>.self).mapValues(\.itens)
+        activeTabByProject = c.lerPorProjeto(.activeTabByProject, String.self)
+        expandedByProject = c.lerPorProjeto(.expandedByProject, ListaTolerante<String>.self).mapValues(\.itens)
+        agentByProject = c.lerPorProjeto(.agentByProject, AgentPrefs.self)
+        agentEffortByModel = c.ler(.agentEffortByModel, d.agentEffortByModel)
+    }
+}
+
+// MARK: - leitura tolerante
+
+extension KeyedDecodingContainer {
+    /// Lê um campo do estado salvo. Ausente, de outro tipo ou com um valor que esta
+    /// versão não conhece: vale `padrao` — para este campo, e só para ele.
+    func ler<T: Decodable>(_ chave: Key, _ padrao: T) -> T {
+        (try? decodeIfPresent(T.self, forKey: chave)) ?? padrao
+    }
+
+    /// Dicionário por projeto, entrada a entrada.
+    ///
+    /// Com chave `UUID` o JSON guarda o dicionário como lista `[id, valor, id, valor…]`.
+    /// Lido de uma vez, uma entrada estragada levava as de todos os projetos; aqui cada
+    /// par que não dá para ler fica de fora sozinho.
+    func lerPorProjeto<V: Decodable>(_ chave: Key, _: V.Type) -> [UUID: V] {
+        guard var lista = try? nestedUnkeyedContainer(forKey: chave) else { return [:] }
+        var out: [UUID: V] = [:]
+        while !lista.isAtEnd {
+            guard let k = try? lista.decode(Talvez<UUID>.self), !lista.isAtEnd,
+                  let v = try? lista.decode(Talvez<V>.self) else { break }
+            if let id = k.valor, let valor = v.valor {
+                out[id] = valor
+            }
+        }
+        return out
+    }
+}
+
+/// Decodifica sem lançar: o valor, ou nada. Numa lista, um item que falha ao decodificar
+/// deixa o cursor parado nele; embrulhado aqui, ele sempre anda.
+struct Talvez<T: Decodable>: Decodable {
+    let valor: T?
+
+    init(from decoder: Decoder) throws {
+        valor = try? T(from: decoder)
+    }
+}
+
+/// Uma lista em que o item estragado sai sozinho, sem levar os outros.
+struct ListaTolerante<T: Decodable>: Decodable {
+    let itens: [T]
+
+    init(from decoder: Decoder) throws {
+        var c = try decoder.unkeyedContainer()
+        var out: [T] = []
+        while !c.isAtEnd {
+            guard let t = try? c.decode(Talvez<T>.self) else { break }
+            if let v = t.valor {
+                out.append(v)
+            }
+        }
+        itens = out
     }
 }
 

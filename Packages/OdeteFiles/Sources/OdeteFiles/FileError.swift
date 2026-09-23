@@ -8,6 +8,8 @@ public enum FileError: LocalizedError, Equatable {
     case outsideRoot(String)
     /// O conteúdo não é texto em UTF-8; abrir no editor destruiria o arquivo ao salvar.
     case naoEhTexto(String)
+    /// Não deu para pôr na lixeira do projeto. Nada foi apagado.
+    case lixeiraFalhou(String)
 
     public var errorDescription: String? {
         switch self {
@@ -16,6 +18,7 @@ public enum FileError: LocalizedError, Equatable {
         case let .notFound(p): tr("Não encontrado: %1$@", "\(p)")
         case let .outsideRoot(p): tr("Fora do projeto: %1$@", "\(p)")
         case let .naoEhTexto(p): tr("%1$@ não é texto em UTF-8", "\(p)")
+        case let .lixeiraFalhou(p): tr("Não deu para mover %1$@ para a lixeira; nada foi apagado.", "\(p)")
         }
     }
 }

@@ -13,29 +13,65 @@ import UniformTypeIdentifiers
 @Observable
 public final class AppModel {
     public private(set) var store: ProjectStore
-    public let external = ExternalProjects()
+    /// As pastas de fora do app. Um registro só para todas as janelas (ver
+    /// `Janelas.external`): com um por janela, cada um gravava o `external.json` inteiro
+    /// com o que *ele* sabia, e a pasta que uma janela abria sumia pela outra.
+    public let external: ExternalProjects
     public var projects: [Project] = []
+    /// Projetos de fora do app cuja pasta não se acha mais. Ficam no hub, apagados, com a
+    /// opção de apontar para a pasta de novo — antes sumiam sem aviso.
+    public private(set) var indisponiveis: [Project] = []
     public var workspace: WorkspaceModel?
     public var error: String?
+
+    /// A raiz dos projetos ainda não é sabida: está no iCloud, e onde fica o iCloud é
+    /// perguntado fora do ator principal (ver `LocalDaNuvem`). Enquanto isso o hub
+    /// mostra que está carregando, em vez de uma lista vazia ou a lista da pasta errada.
+    public private(set) var aguardandoRaiz = false
+    /// Há iCloud Drive neste aparelho? `nil` enquanto não se sabe.
+    public private(set) var nuvemDisponivel: Bool?
 
     public let aiAccounts: AIAccountStore
 
     public init(
         store: ProjectStore = ProjectStore(),
         accounts: AccountStore = AccountStore(),
-        aiAccounts: AIAccountStore = AIAccountStore()
+        aiAccounts: AIAccountStore = AIAccountStore(),
+        external: ExternalProjects = Janelas.shared.external,
+        aguardandoRaiz: Bool = false
     ) {
         self.store = store
         self.accounts = accounts
         self.aiAccounts = aiAccounts
+        self.external = external
+        self.aguardandoRaiz = aguardandoRaiz
         refresh()
     }
 
+    /// Quantas vezes seguidas a lista foi relida esperando um metadado baixar do iCloud.
+    @ObservationIgnored private var releituras = 0
+    @ObservationIgnored private var releitura: Task<Void, Never>?
+
     public func refresh() {
+        guard !aguardandoRaiz else { return }
         do {
-            let local = try store.list()
-            projects = (local + external.list())
+            let lida = try store.listar()
+            projects = (lida.projetos + external.list())
                 .sorted { ($0.lastOpenedAt ?? $0.createdAt) > ($1.lastOpenedAt ?? $1.createdAt) }
+            indisponiveis = external.indisponiveis()
+            // Projeto cujo `project.json` ainda está na nuvem aparece com um id
+            // provisório; o download foi pedido, e a lista é relida até ele chegar.
+            if lida.aguardando > 0, releituras < 20 {
+                releituras += 1
+                releitura?.cancel()
+                releitura = Task { [weak self] in
+                    try? await Task.sleep(for: .seconds(3))
+                    guard !Task.isCancelled else { return }
+                    self?.refresh()
+                }
+            } else if lida.aguardando == 0 {
+                releituras = 0
+            }
         } catch { self.error = error.localizedDescription }
     }
 
@@ -47,19 +83,79 @@ public final class AppModel {
         return store.url(for: p)
     }
 
+    // MARK: onde moram os projetos
+
+    /// Passa a olhar outra raiz de projetos — depois de o iCloud responder, ou de os
+    /// projetos mudarem de lugar.
+    func apontar(para root: URL) {
+        store = ProjectStore(root: root)
+        aguardandoRaiz = false
+        refresh()
+    }
+
+    /// Descobre a raiz no iCloud sem travar a tela e passa a olhar para ela.
+    func prepararRaiz(nuvem: LocalDaNuvem = .shared) async {
+        guard aguardandoRaiz else { return }
+        let u = await nuvem.raiz()
+        nuvemDisponivel = u != nil
+        // Sem iCloud (conta saiu, iCloud Drive desligado): a pasta de dentro do app,
+        // como sempre foi.
+        apontar(para: u ?? ProjectStore.defaultRoot())
+    }
+
+    /// Atualiza `nuvemDisponivel`, perguntando fora do ator principal.
+    func atualizarNuvem(_ nuvem: LocalDaNuvem = .shared) async {
+        nuvemDisponivel = await nuvem.raiz() != nil
+    }
+
+    /// Relê a lista nesta janela e nas outras: o que muda no disco muda para todas.
+    private func avisarMudanca() {
+        if let janelas {
+            janelas.projetosMudaram()
+        } else {
+            refresh()
+        }
+    }
+
     // MARK: pastas externas, zip e iCloud
 
     /// Abre uma pasta de fora (Arquivos, iCloud, outro app) como projeto.
+    ///
+    /// Se a pasta é a de um projeto do próprio app, é ele que abre: registrar de novo
+    /// fazia dois projetos, com dois ids, nos mesmos arquivos.
     @discardableResult
     public func addExternal(_ url: URL) -> Project? {
+        if let p = store.projeto(naPasta: url) {
+            return p
+        }
         do {
             let p = try external.add(url)
-            refresh()
+            avisarMudanca()
             return p
         } catch {
             self.error = error.localizedDescription
             return nil
         }
+    }
+
+    /// Fecha o acesso às pastas de fora que nenhuma janela está usando. O registro é um
+    /// só: a pasta aberta em outra janela continua aberta.
+    public func liberarPastasSemUso() {
+        var abertos = janelas?.projetosAbertos() ?? []
+        if let id = workspace?.project.id {
+            abertos.insert(id)
+        }
+        external.liberarTodos(exceto: abertos)
+    }
+
+    /// Aponta um projeto externo indisponível para a pasta onde ele está agora.
+    public func reapontar(_ p: Project, para url: URL) {
+        do {
+            try external.reapontar(p.id, para: url)
+        } catch {
+            self.error = error.localizedDescription
+        }
+        avisarMudanca()
     }
 
     /// Recebe um arquivo (`.zip` vira projeto; pasta vira projeto externo).
@@ -83,7 +179,7 @@ public final class AppModel {
                 }
                 try FileManager.default.createDirectory(at: store.root, withIntermediateDirectories: true)
                 try FileManager.default.moveItem(at: src, to: store.root.appending(path: name))
-                refresh()
+                avisarMudanca()
                 if let p = projects.first(where: { $0.name == name && !$0.external }) {
                     open(p, chrome: chrome)
                 }
@@ -122,58 +218,10 @@ public final class AppModel {
         )
     }
 
-    /// Raiz dos projetos: iCloud Drive quando ligado e disponível, senão Documents.
-    public static func cloudRoot() -> URL? {
-        FileManager.default.url(forUbiquityContainerIdentifier: nil)?.appending(
-            path: "Documents/Projects",
-            directoryHint: .isDirectory
-        )
-    }
-
-    public static func projectsRoot(cloud: Bool) -> URL {
-        cloud ? (cloudRoot() ?? ProjectStore.defaultRoot()) : ProjectStore.defaultRoot()
-    }
-
-    public var cloudAvailable: Bool {
-        Self.cloudRoot() != nil
-    }
-
-    /// Move `Projects` entre Documents e o iCloud Drive (mesclando pastas pelo nome).
-    public func setCloud(_ on: Bool) -> Bool {
-        let from = store.root
-        let to = Self.projectsRoot(cloud: on)
-        guard from != to else { return on }
-        let fm = FileManager.default
-        do {
-            closeWorkspace()
-            try fm.createDirectory(at: to, withIntermediateDirectories: true)
-            for item in (try? fm.contentsOfDirectory(at: from, includingPropertiesForKeys: nil)) ?? [] {
-                let dest = to.appending(path: item.lastPathComponent)
-                if fm.fileExists(atPath: dest.path) {
-                    continue
-                }
-                if on {
-                    // Antes de mover: senão o iCloud começa a subir o node_modules no
-                    // próprio movimento. Ver `PastaDeModulos`.
-                    _ = PastaDeModulos.migrarSePreciso(item, nuvem: true)
-                    try fm.setUbiquitous(true, itemAt: item, destinationURL: dest)
-                } else {
-                    try fm.moveItem(at: item, to: dest)
-                }
-            }
-            store = ProjectStore(root: to)
-            refresh()
-            return on
-        } catch {
-            self.error = error.localizedDescription
-            return !on
-        }
-    }
-
     public func create(name: String, template: Template) -> Project? {
         do {
             let p = try store.create(name: name, template: template)
-            refresh()
+            avisarMudanca()
             return p
         } catch {
             self.error = error.localizedDescription
@@ -197,7 +245,7 @@ public final class AppModel {
         do {
             let (_, dir) = try ProjectStore.criar(name: name, template: template, dentroDe: pasta)
             let p = try external.add(dir)
-            refresh()
+            avisarMudanca()
             return p
         } catch {
             self.error = error.localizedDescription
@@ -205,24 +253,46 @@ public final class AppModel {
         }
     }
 
+    /// O projeto está aberto em outra janela? O hub avisa antes de renomear ou apagar.
+    public func abertoEmOutraJanela(_ p: Project) -> Bool {
+        janelas?.dona(de: p.id, fora: self) != nil
+    }
+
+    /// Fecha o projeto onde quer que ele esteja aberto — esta janela ou outra —, com o
+    /// que estava sendo digitado gravado antes.
+    ///
+    /// Renomear ou apagar pelo hub de uma janela o projeto aberto em outra deixava a
+    /// outra trabalhando no caminho velho: o salvamento automático dela recriava a pasta,
+    /// e nascia um projeto-fantasma só com os arquivos que estavam abertos.
+    private func fecharEmTodasAsJanelas(_ p: Project) {
+        if workspace?.project.id == p.id {
+            closeWorkspace()
+        }
+        janelas?.fechar(p.id, fora: self)
+    }
+
     public func rename(_ p: Project, to name: String) {
         guard !p.external else { return }
-        do { _ = try store.rename(p, to: name); refresh() } catch { self.error = error.localizedDescription }
+        fecharEmTodasAsJanelas(p)
+        do { _ = try store.rename(p, to: name) } catch { self.error = error.localizedDescription }
+        avisarMudanca()
     }
 
     public func duplicate(_ p: Project) {
         guard !p.external else { return }
-        do { try store.duplicate(p); refresh() } catch { self.error = error.localizedDescription }
+        do { try store.duplicate(p) } catch { self.error = error.localizedDescription }
+        avisarMudanca()
     }
 
     /// Apaga um projeto local; um externo só sai do hub (a pasta fica onde está).
     public func delete(_ p: Project) {
+        fecharEmTodasAsJanelas(p)
         if p.external {
             external.remove(p.id)
-            refresh()
-            return
+        } else {
+            do { try store.delete(p) } catch { self.error = error.localizedDescription }
         }
-        do { try store.delete(p); refresh() } catch { self.error = error.localizedDescription }
+        avisarMudanca()
     }
 
     public let accounts: AccountStore
@@ -274,9 +344,10 @@ public final class AppModel {
 
 /// Um projeto que vira `.zip` quando o destino da folha de compartilhar pede o arquivo.
 ///
-/// Pastas pesadas (`node_modules`, `.build`, `dist`) ficam de fora, como sempre; o `.git`
-/// vai junto, porque mandar o projeto com a história é o que se quer ao compartilhar —
-/// agora só quando alguém compartilha de fato.
+/// Pastas pesadas (`node_modules`, `.build`, `dist`) ficam de fora, como sempre, e `.odete`
+/// também — conversas do agente, checkpoints e lixeira não são para quem recebe o zip (ver
+/// `Zip.pastasDeFora`); o `.git` vai junto, porque mandar o projeto com a história é o que
+/// se quer ao compartilhar — agora só quando alguém compartilha de fato.
 public struct ProjetoZipado: Transferable, Sendable {
     /// Projeto de fora do app: o zip lê a pasta com o acesso aberto só enquanto zipa.
     struct Externo: Sendable {

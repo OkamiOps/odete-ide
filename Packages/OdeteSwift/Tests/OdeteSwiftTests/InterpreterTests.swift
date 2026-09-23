@@ -172,4 +172,131 @@ func texts(_ nodes: [ViewNode]) -> [String] {
         #expect(img != nil && (img?.size.width ?? 0) >= 300)
         #expect(inst.diagnostics.isEmpty, "\(inst.diagnostics)")
     }
+
+    // MARK: intervalos e contas que derrubavam o app
+
+    /// `3...1` montava `3 ..< 2` e o Swift parava o app inteiro. Agora é erro na linha.
+    @Test func intervaloAoContrarioViraErro() {
+        let (_, inst) = root("""
+        struct ContentView: View {
+            var body: some View {
+                VStack {
+                    ForEach(3...1, id: \\.self) { i in Text("\\(i)") }
+                    Text("depois")
+                }
+            }
+        }
+        """)
+        let nodes = inst.evalBody()
+        #expect(texts(nodes).contains("depois"))
+        #expect(inst.diagnostics.contains { $0.kind == .error })
+    }
+
+    @Test func forComIntervaloAoContrarioNaAcao() throws {
+        let (_, inst) = root("""
+        struct ContentView: View {
+            @State var n = 0
+            var body: some View {
+                Button("vai") { for i in 5..<1 { n += i } }
+            }
+        }
+        """)
+        let nodes = inst.evalBody()
+        try inst.perform(#require(find(nodes, "Button").first?.action))
+        #expect(inst.get("n").asInt == 0)
+        #expect(inst.diagnostics.contains { $0.kind == .error })
+    }
+
+    /// Um intervalo enorme virava um array de bilhões de itens no ator principal.
+    @Test func intervaloEnormeViraErro() {
+        let (_, inst) = root("""
+        struct ContentView: View {
+            var body: some View {
+                VStack {
+                    ForEach(0..<9000000000000000000, id: \\.self) { i in Text("\\(i)") }
+                    Text("depois")
+                }
+            }
+        }
+        """)
+        let nodes = inst.evalBody()
+        #expect(texts(nodes).contains("depois"))
+        #expect(inst.diagnostics.contains { $0.kind == .error })
+    }
+
+    /// `hi + 1` do intervalo fechado estourava com o maior inteiro.
+    @Test func intervaloAteOMaiorInteiroNaoEstoura() {
+        let (_, inst) = root("""
+        struct ContentView: View {
+            var body: some View {
+                VStack {
+                    ForEach(9223372036854775806...9223372036854775807, id: \\.self) { i in Text("\\(i)") }
+                }
+            }
+        }
+        """)
+        let nodes = inst.evalBody()
+        #expect(texts(nodes) == ["9223372036854775806", "9223372036854775807"])
+    }
+
+    /// Soma, subtração, multiplicação e `+=` que passam do limite: erro, não queda.
+    @Test func contaQueEstouraViraErro() throws {
+        let (_, inst) = root("""
+        struct ContentView: View {
+            @State var n = 9223372036854775807
+            var body: some View {
+                VStack {
+                    Text("\\(n + 1)")
+                    Text("\\(n * 2)")
+                    Text("\\(0 - n - 2)")
+                    Button("mais") { n += 1 }
+                    Text("fim")
+                }
+            }
+        }
+        """)
+        let nodes = inst.evalBody()
+        #expect(texts(nodes).contains("fim"))
+        #expect(find(nodes, "__placeholder").count == 3)
+        try inst.perform(#require(find(nodes, "Button").first?.action))
+        #expect(inst.get("n").asInt == 9_223_372_036_854_775_807)
+        #expect(inst.diagnostics.contains { $0.kind == .error })
+    }
+
+    /// `Int(1e21)` e `max` de inteiros grandes passavam por `Int(Double)` e caíam.
+    @Test func doubleGrandeParaIntNaoDerruba() {
+        let (_, inst) = root("""
+        struct ContentView: View {
+            var body: some View {
+                VStack {
+                    Text("\\(Int(1000000000000000000000.0))")
+                    Text("\\(max(9223372036854775807, 1))")
+                    Text("fim")
+                }
+            }
+        }
+        """)
+        let nodes = inst.evalBody()
+        #expect(texts(nodes).contains("fim"))
+        #expect(texts(nodes).contains("9223372036854775807"))
+    }
+
+    /// O teto do intervalo não pega o `in:` do `Slider`: ali só as pontas importam.
+    @Test func sliderComFaixaGrandeContinuaValendo() {
+        let (_, inst) = root("""
+        struct ContentView: View {
+            @State var v = 10.0
+            var body: some View {
+                Slider(value: $v, in: 0...1000000)
+            }
+        }
+        """)
+        let nodes = inst.evalBody()
+        #expect(inst.diagnostics.isEmpty, "\(inst.diagnostics)")
+        guard case let .array(pontas)? = find(nodes, "Slider").first?.arg("in") else {
+            Issue.record("sem faixa")
+            return
+        }
+        #expect(pontas.map(\.asString) == ["0", "1000000"])
+    }
 }

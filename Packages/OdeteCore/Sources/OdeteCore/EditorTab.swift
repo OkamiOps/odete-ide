@@ -11,4 +11,13 @@ public struct EditorTab: Identifiable, Codable, Hashable, Sendable {
         self.path = path
         self.isDirty = isDirty
     }
+
+    enum CodingKeys: String, CodingKey { case path, isDirty }
+
+    /// Sem caminho não há aba; sem `isDirty`, a aba volta limpa.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        path = try c.decode(String.self, forKey: .path)
+        isDirty = c.ler(.isDirty, false)
+    }
 }

@@ -16,6 +16,8 @@ struct HubView: View {
     @State private var importing = false
     @State private var renaming: Project?
     @State private var deleting: Project?
+    /// Projeto indisponível à espera da pasta nova, escolhida no app Arquivos.
+    @State private var reapontando: Project?
     @State private var newName = ""
     @State private var cartoes = CartoesDoHub()
 
@@ -33,7 +35,9 @@ struct HubView: View {
             ScrollPane {
                 VStack(alignment: .leading, spacing: 20) {
                     header
-                    if app.projects.isEmpty {
+                    if app.aguardandoRaiz {
+                        ProcurandoProjetos()
+                    } else if app.projects.isEmpty, app.indisponiveis.isEmpty {
                         WelcomeView { creating = true }
                     } else {
                         LazyVGrid(
@@ -81,6 +85,9 @@ struct HubView: View {
                                         }
                                     }
                             }
+                            ForEach(app.indisponiveis) { p in
+                                CartaoIndisponivel(project: p) { reapontando = p }
+                            }
                             // Fecha a grade em vez de deixar a fila pela metade, e é o
                             // segundo caminho para criar — o botão do cabeçalho fica no
                             // canto oposto da tela.
@@ -91,11 +98,26 @@ struct HubView: View {
                 .padding(24)
                 .frame(maxWidth: 1100)
                 .frame(maxWidth: .infinity)
+                // Num nível abaixo do outro `fileImporter` (o de abrir pasta): dois no
+                // mesmo nível disputam, e só um aparece.
+                .fileImporter(
+                    isPresented: Binding(get: { reapontando != nil }, set: {
+                        if !$0 {
+                            reapontando = nil
+                        }
+                    }),
+                    allowedContentTypes: [.folder]
+                ) { result in
+                    if case let .success(url) = result, let p = reapontando {
+                        app.reapontar(p, para: url)
+                    }
+                    reapontando = nil
+                }
             }
         }
         // No hub nenhum projeto está aberto: o acesso às pastas externas que o workspace
         // abriu volta a ser fechado aqui, em vez de ficar aberto até o app sair.
-        .onAppear { app.external.liberarTodos(exceto: app.workspace?.project.id) }
+        .onAppear { app.liberarPastasSemUso() }
         .sheet(isPresented: $creating) { NewProjectSheet() }
         .sheet(isPresented: $cloning) { CloneSheet() }
         .fileImporter(isPresented: $importing, allowedContentTypes: [.folder, .zip]) { result in
@@ -115,6 +137,11 @@ struct HubView: View {
                 }; renaming = nil
             }
             Button(tr("Cancelar"), role: .cancel) { renaming = nil }
+        } message: {
+            // Aberto em outra janela: ela fecha o projeto, com o que foi digitado salvo.
+            if let p = renaming, app.abertoEmOutraJanela(p) {
+                Text(tr("Este projeto está aberto em outra janela; ela vai fechá-lo, com tudo salvo."))
+            }
         }
         .confirmationDialog(
             tr("Apagar \"%1$@\"?", "\(deleting?.name ?? "")"),
@@ -132,7 +159,12 @@ struct HubView: View {
             }
             Button(tr("Cancelar"), role: .cancel) { deleting = nil }
         } message: {
-            Text(tr("Os arquivos saem deste iPad. Não dá para desfazer."))
+            if let p = deleting, app.abertoEmOutraJanela(p) {
+                Text(tr("Os arquivos saem deste iPad. Não dá para desfazer.") + " "
+                    + tr("Este projeto está aberto em outra janela; ela vai fechá-lo, com tudo salvo."))
+            } else {
+                Text(tr("Os arquivos saem deste iPad. Não dá para desfazer."))
+            }
         }
         .alert(tr("Erro"), isPresented: Binding(get: { app.error != nil }, set: {
             if !$0 {
@@ -338,6 +370,8 @@ struct ProjectCard: View {
     var project: Project
     /// Pilha e descrição; `nil` enquanto a leitura não chegou — ver `CartoesDoHub`.
     var dados: DadosDoCartao?
+    /// A pasta de fora não se acha mais: o cartão aparece apagado e diz o que fazer.
+    var indisponivel = false
 
     var body: some View {
         let stack = dados?.stack
@@ -353,7 +387,9 @@ struct ProjectCard: View {
                         in: RoundedRectangle(cornerRadius: 12, style: .continuous)
                     )
                 Spacer()
-                if project.external {
+                if indisponivel {
+                    Pill(tr("indisponível"), on: true, color: theme.danger)
+                } else if project.external {
                     Pill(tr("externo"), on: false)
                 }
                 if let stack {
@@ -365,7 +401,11 @@ struct ProjectCard: View {
                 .font(OdeteFont.ui(16, weight: .semibold))
                 .foregroundStyle(theme.fg)
                 .lineLimit(1)
-            if let blurb = dados?.blurb {
+            if indisponivel {
+                Text(tr("A pasta não foi encontrada. Toque para apontar onde ela está agora."))
+                    .font(OdeteFont.ui(12)).foregroundStyle(theme.fgMuted).lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if let blurb = dados?.blurb {
                 Text(blurb).font(OdeteFont.ui(12)).foregroundStyle(theme.fgMuted).lineLimit(2).fixedSize(
                     horizontal: false,
                     vertical: true
@@ -386,6 +426,7 @@ struct ProjectCard: View {
             lineWidth: 0.5
         ))
         .shadow(color: .black.opacity(theme.dark ? 0.25 : 0.08), radius: 12, y: 5)
+        .opacity(indisponivel ? 0.6 : 1)
         .contentShape(RoundedRectangle(cornerRadius: Metrics.rCard, style: .continuous))
         .hoverEffect(.lift)
         .accessibilityElement(children: .combine)

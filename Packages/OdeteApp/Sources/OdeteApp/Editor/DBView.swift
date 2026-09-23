@@ -1,3 +1,4 @@
+import Observation
 import OdeteCore
 import OdeteFiles
 import OdeteI18n
@@ -5,9 +6,223 @@ import OdeteUI
 import SwiftUI
 import UIKit
 
+/// O banco aberto na tela e a edição em curso — tudo o que a `DBView` desenha e muda.
+///
+/// Mora fora da view para as regras da edição poderem ser testadas sem tela. E as regras
+/// são o motivo de existir: a célula em edição guardava só a posição (linha, coluna) e
+/// gravava na tabela *escolhida na hora de gravar*. Trocar de tabela com uma célula
+/// aberta gravava o texto na tabela nova, direto no `.sqlite`, e a coluna pela posição
+/// podia nem existir lá — o app caía. Tocar em outra célula jogava fora o que se estava
+/// digitando. Agora a célula leva o nome da tabela e da coluna, e todo movimento (outra
+/// célula, outra tabela, outra página) grava antes o que estava aberto.
+@MainActor
+@Observable
+final class EdicaoDoBanco {
+    /// Uma célula em edição: onde ela está, e com que valor ela abriu.
+    struct Celula: Identifiable, Hashable {
+        var tabela: String
+        var coluna: String
+        var rowid: Int64
+        /// Posição na página, só para desenhar.
+        var linha: Int
+        var indiceDaColuna: Int
+        var original: String
+        var id: String {
+            "\(tabela):\(rowid):\(coluna)"
+        }
+    }
+
+    private(set) var leitor: SQLiteReader?
+    /// O banco não abriu. Só isso troca a tabela pela tela de erro.
+    private(set) var erro: String?
+    private(set) var tabelas: [DBTable] = []
+    private(set) var escolhida: String?
+    private(set) var pagina = DBPage()
+    private(set) var offset = 0
+    let porPagina = 200
+
+    private(set) var editando: Celula?
+    var rascunho = ""
+    /// O que o banco recusou numa edição. Fica numa tarja: trocar a tabela inteira por
+    /// uma tela de erro perdia de vista os dados — e, com eles, o que se estava editando.
+    var aviso: String?
+
+    /// Veio de um `.sql`: o banco é montado em memória a partir do texto, e editar
+    /// regrava o arquivo inteiro como dump — comentários e formatação vão embora. Por
+    /// isso começa só para leitura e edita só depois de a pessoa confirmar.
+    private(set) var deSQL = false
+    private(set) var edicaoDoSQLConfirmada = false
+    /// Recebe o dump novo depois de cada edição num `.sql`.
+    @ObservationIgnored var regravarSQL: ((String) -> Void)?
+
+    // MARK: abrir
+
+    func abrir(url: URL, script: String?) {
+        // Outro banco no lugar deste: o que estava aberto grava antes de ir embora.
+        gravarPendente()
+        deSQL = script != nil
+        edicaoDoSQLConfirmada = false
+        editando = nil
+        aviso = nil
+        do {
+            let r = try script.map { try SQLiteReader(script: $0) } ?? SQLiteReader(arquivo: url, escrita: true)
+            leitor = r
+            erro = nil
+            tabelas = r.tabelas()
+            escolhida = nil
+            if let primeira = tabelas.first?.nome {
+                escolher(primeira)
+            }
+        } catch {
+            leitor = nil
+            erro = error.localizedDescription
+            tabelas = []
+        }
+    }
+
+    // MARK: navegar
+
+    func escolher(_ nome: String) {
+        guard gravarPendente() else { return }
+        escolhida = nome
+        offset = 0
+        recarregar()
+    }
+
+    func mover(_ delta: Int) {
+        guard gravarPendente() else { return }
+        offset = max(0, offset + delta)
+        recarregar()
+    }
+
+    func recarregar() {
+        guard let leitor, let escolhida else { return }
+        pagina = leitor.pagina(escolhida, limite: porPagina, offset: offset)
+    }
+
+    // MARK: editar
+
+    /// Editar precisa de banco aberto para escrita, de `rowid` para achar a linha e, num
+    /// `.sql`, da confirmação de que o arquivo pode ser regravado.
+    var podeEditar: Bool {
+        (leitor?.editavel ?? false) && pagina.editavel && (!deSQL || edicaoDoSQLConfirmada)
+    }
+
+    /// Um `.sql` que só falta confirmar para editar.
+    var precisaConfirmarSQL: Bool {
+        deSQL && !edicaoDoSQLConfirmada && (leitor?.editavel ?? false)
+    }
+
+    func confirmarEdicaoDoSQL() {
+        edicaoDoSQLConfirmada = true
+    }
+
+    /// Abre a célula para editar. Se outra estava aberta, grava a outra antes; se o banco
+    /// recusar, a outra continua aberta, com o que foi digitado.
+    @discardableResult
+    func abrirCelula(linha: Int, coluna: Int) -> Bool {
+        guard podeEditar, let tabela = escolhida, linha >= 0, linha < pagina.ids.count, linha < pagina.linhas.count,
+              coluna >= 0, coluna < pagina.colunas.count, coluna < pagina.linhas[linha].count else { return false }
+        let nova = Celula(
+            tabela: tabela,
+            coluna: pagina.colunas[coluna],
+            rowid: pagina.ids[linha],
+            linha: linha,
+            indiceDaColuna: coluna,
+            original: pagina.linhas[linha][coluna]
+        )
+        if nova.id == editando?.id {
+            return true
+        }
+        guard gravarPendente() else { return false }
+        rascunho = nova.original
+        editando = nova
+        return true
+    }
+
+    /// Grava a célula aberta, se houver. `false` quando o banco recusou — a célula fica
+    /// aberta e o aviso diz por quê.
+    @discardableResult
+    func gravarPendente() -> Bool {
+        guard let c = editando else { return true }
+        // Nada mudou: não grava (num `.sql`, gravar é regravar o arquivo inteiro).
+        if rascunho == c.original {
+            editando = nil
+            return true
+        }
+        guard let leitor else {
+            editando = nil
+            return true
+        }
+        let falhou = leitor.executar(
+            "UPDATE \(leitor.citarNome(c.tabela)) SET \(leitor.citarNome(c.coluna)) = ? WHERE rowid = ?",
+            [rascunho.isEmpty ? nil : rascunho, String(c.rowid)]
+        )
+        if let falhou {
+            aviso = falhou
+            return false
+        }
+        editando = nil
+        depoisDeEditar()
+        return true
+    }
+
+    /// Larga a célula sem gravar.
+    func descartarEdicao() {
+        editando = nil
+    }
+
+    func novaLinha() {
+        guard podeEditar, gravarPendente(), let leitor, let tabela = escolhida else { return }
+        // `DEFAULT VALUES` respeita NOT NULL com padrão; quando não dá, o erro aparece.
+        if let falhou = leitor.inserirLinha(tabela) {
+            aviso = falhou
+            return
+        }
+        depoisDeEditar()
+        // A linha nova está no fim: vai para a última página para ela ficar à vista.
+        offset = max(0, (pagina.total - 1) / porPagina) * porPagina
+        recarregar()
+    }
+
+    func criarColuna(_ nome: String) {
+        guard podeEditar, !nome.isEmpty, gravarPendente(), let leitor, let tabela = escolhida else { return }
+        if let falhou = leitor
+            .executar("ALTER TABLE \(leitor.citarNome(tabela)) ADD COLUMN \(leitor.citarNome(nome)) TEXT")
+        {
+            aviso = falhou
+            return
+        }
+        depoisDeEditar()
+    }
+
+    func apagarLinha(_ i: Int) {
+        guard podeEditar, gravarPendente(), let leitor, let tabela = escolhida, i >= 0, i < pagina.ids.count
+        else { return }
+        if let falhou = leitor.executar(
+            "DELETE FROM \(leitor.citarNome(tabela)) WHERE rowid = ?",
+            [String(pagina.ids[i])]
+        ) {
+            aviso = falhou
+            return
+        }
+        depoisDeEditar()
+    }
+
+    /// Recarrega a página e, num `.sql`, manda o dump para regravar o texto do arquivo.
+    private func depoisDeEditar() {
+        tabelas = leitor?.tabelas() ?? []
+        recarregar()
+        if deSQL, edicaoDoSQLConfirmada, let leitor {
+            regravarSQL?(leitor.dump())
+        }
+    }
+}
+
 /// Um banco SQLite mostrado como tabela: lista de tabelas de um lado, linhas do outro.
 ///
-/// Aberto só para leitura — ver o banco do projeto não pode ser um jeito de estragá-lo.
+/// Um `.sqlite` abre para editar direto no arquivo; um `.sql` abre só para ver, e edita
+/// depois de a pessoa aceitar que o arquivo volte como dump — ver `EdicaoDoBanco`.
 struct DBView: View {
     @Environment(\.theme) private var theme
     @Environment(WorkspaceModel.self) private var ws
@@ -19,13 +234,7 @@ struct DBView: View {
     /// Caminho do `.sql` no projeto: editar a tabela regrava o texto por lá.
     var sqlPath: String?
 
-    @State private var leitor: SQLiteReader?
-    @State private var erro: String?
-    @State private var tabelas: [DBTable] = []
-    @State private var escolhida: String?
-    @State private var pagina = DBPage()
-    @State private var offset = 0
-    private let porPagina = 200
+    @State private var banco = EdicaoDoBanco()
 
     init(url: URL, nome: String, script: String? = nil, sqlPath: String? = nil) {
         self.url = url
@@ -34,33 +243,21 @@ struct DBView: View {
         self.sqlPath = sqlPath
     }
 
-    @State private var editando: Celula?
-    @State private var rascunho = ""
     @State private var novaColuna = false
+    @State private var confirmandoSQL = false
     /// Largura do próprio painel: decide entre a coluna de tabelas e a fila de fichas.
     @State private var largura: CGFloat = 0
     @State private var nomeDaColuna = ""
     /// Sem foco programático o campo aparecia aberto e o teclado escrevia em outro lugar.
-    @FocusState private var focoNaCelula: Bool
-    /// Erro de uma edição. Fica numa tarja: trocar a tabela inteira por uma tela de erro
-    /// perdia de vista os dados por causa de um `NOT NULL`.
-    @State private var aviso: String?
-
-    /// Uma célula em edição: linha na página, coluna, e o `rowid` para achar no banco.
-    struct Celula: Identifiable, Hashable {
-        var linha: Int
-        var coluna: Int
-        var rowid: Int64
-        var id: String {
-            "\(rowid):\(coluna)"
-        }
-    }
+    /// O valor é o id da célula: ao passar de uma célula para outra, só a que perdeu o
+    /// foco grava — com um `Bool` a célula nova recebia a perda de foco da velha e fechava.
+    @FocusState private var foco: String?
 
     var body: some View {
         Group {
-            if let erro {
+            if let erro = banco.erro {
                 EmptyState("exclamationmark.triangle", title: tr("Não deu para ler o banco"), text: erro)
-            } else if tabelas.isEmpty {
+            } else if banco.tabelas.isEmpty {
                 EmptyState(
                     "tablecells",
                     title: tr("Banco sem tabelas"),
@@ -85,14 +282,26 @@ struct DBView: View {
         }
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { largura = $0 }
         .task(id: url) { abrir() }
+        // Fechar a aba com uma célula aberta também grava o que foi digitado.
+        .onDisappear { banco.gravarPendente() }
         .alert(tr("Nova coluna"), isPresented: $novaColuna) {
             TextField(tr("nome"), text: $nomeDaColuna)
                 .autocorrectionDisabled()
                 .textInputAutocapitalization(.never)
-            Button(tr("Criar")) { criarColuna(nomeDaColuna); nomeDaColuna = "" }
+            Button(tr("Criar")) { banco.criarColuna(nomeDaColuna); nomeDaColuna = "" }
             Button(tr("Cancelar"), role: .cancel) { nomeDaColuna = "" }
         } message: {
             Text(tr("Entra como TEXT no fim da tabela, vazia em todas as linhas."))
+        }
+        .confirmationDialog(
+            tr("Editar a tabela regrava o .sql inteiro"),
+            isPresented: $confirmandoSQL,
+            titleVisibility: .visible
+        ) {
+            Button(tr("Editar e regravar")) { banco.confirmarEdicaoDoSQL() }
+            Button(tr("Cancelar"), role: .cancel) {}
+        } message: {
+            Text(tr("O arquivo volta como um dump do banco: comentários e formatação se perdem."))
         }
     }
 
@@ -102,9 +311,9 @@ struct DBView: View {
     var fichas: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
-                ForEach(tabelas) { t in
-                    let atual = escolhida == t.nome
-                    Button { escolher(t.nome) } label: {
+                ForEach(banco.tabelas) { t in
+                    let atual = banco.escolhida == t.nome
+                    Button { banco.escolher(t.nome) } label: {
                         HStack(spacing: 6) {
                             Text(t.nome).font(.subheadline).foregroundStyle(atual ? theme.accent : theme.fg)
                             Text("\(t.linhas)").font(.caption2).monospacedDigit()
@@ -126,12 +335,12 @@ struct DBView: View {
     var lista: some View {
         ScrollPane {
             LazyVStack(alignment: .leading, spacing: 0) {
-                ForEach(tabelas) { t in
-                    Button { escolher(t.nome) } label: {
+                ForEach(banco.tabelas) { t in
+                    Button { banco.escolher(t.nome) } label: {
                         HStack(spacing: 8) {
                             Image(systemName: "tablecells")
                                 .font(.system(size: 12))
-                                .foregroundStyle(escolhida == t.nome ? theme.accent : theme.fgSubtle)
+                                .foregroundStyle(banco.escolhida == t.nome ? theme.accent : theme.fgSubtle)
                             VStack(alignment: .leading, spacing: 1) {
                                 Text(t.nome).font(.subheadline).foregroundStyle(theme.fg).lineLimit(1)
                                 Text(tr("%1$@ linha%2$@", "\(t.linhas)", "\(t.linhas == 1 ? "" : "s")"))
@@ -141,7 +350,7 @@ struct DBView: View {
                         }
                         .padding(.horizontal, 10).padding(.vertical, 8)
                         .background(
-                            escolhida == t.nome ? theme.accent.opacity(0.14) : .clear,
+                            banco.escolhida == t.nome ? theme.accent.opacity(0.14) : .clear,
                             in: RoundedRectangle(cornerRadius: 8, style: .continuous)
                         )
                         .padding(.horizontal, 6)
@@ -157,12 +366,12 @@ struct DBView: View {
 
     /// O que o banco recusou, sem tirar a tabela da frente.
     @ViewBuilder var tarja: some View {
-        if let aviso {
+        if let aviso = banco.aviso {
             HStack(spacing: 8) {
                 Image(systemName: "exclamationmark.triangle.fill").font(.caption)
                 Text(aviso).font(.caption).lineLimit(2)
                 Spacer(minLength: 0)
-                Button { self.aviso = nil } label: { Image(systemName: "xmark").font(.caption2) }
+                Button { banco.aviso = nil } label: { Image(systemName: "xmark").font(.caption2) }
                     .buttonStyle(.plain)
                     .accessibilityLabel(tr("Fechar aviso"))
             }
@@ -183,8 +392,8 @@ struct DBView: View {
             ScrollPane(.vertical) {
                 ScrollView(.horizontal, showsIndicators: true) {
                     VStack(alignment: .leading, spacing: 0) {
-                        linha(pagina.colunas, cabecalho: true)
-                        ForEach(Array(pagina.linhas.enumerated()), id: \.offset) { i, l in
+                        linha(banco.pagina.colunas, cabecalho: true)
+                        ForEach(Array(banco.pagina.linhas.enumerated()), id: \.offset) { i, l in
                             linha(l, cabecalho: false, alterna: i.isMultiple(of: 2), indice: i)
                         }
                     }
@@ -192,6 +401,12 @@ struct DBView: View {
                 .padding(.bottom, 12)
             }
             rodape
+        }
+        // Sair da célula grava, como em qualquer planilha.
+        .onChange(of: foco) { antigo, novo in
+            if novo == nil, let e = banco.editando, antigo == e.id {
+                banco.gravarPendente()
+            }
         }
     }
 
@@ -207,24 +422,19 @@ struct DBView: View {
 
     @ViewBuilder
     func celula(_ c: String, cabecalho: Bool, linha: Int, coluna: Int) -> some View {
-        let emEdicao = editando?.linha == linha && editando?.coluna == coluna
+        let emEdicao = !cabecalho && banco.editando?.tabela == banco.escolhida
+            && banco.editando?.linha == linha && banco.editando?.indiceDaColuna == coluna
         Group {
             if emEdicao {
-                TextField("", text: $rascunho)
+                TextField("", text: $banco.rascunho)
                     .font(OdeteFont.mono(11))
                     .textFieldStyle(.plain)
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.never)
                     .foregroundStyle(theme.fg)
-                    .focused($focoNaCelula)
+                    .focused($foco, equals: banco.editando?.id ?? "")
                     .submitLabel(.done)
-                    .onSubmit { gravarCelula() }
-                    // Sair da célula grava, como em qualquer planilha.
-                    .onChange(of: focoNaCelula) { _, temFoco in
-                        if !temFoco, editando != nil {
-                            gravarCelula()
-                        }
-                    }
+                    .onSubmit { banco.gravarPendente() }
             } else {
                 Text(c.isEmpty && !cabecalho ? "NULL" : c)
                     .font(cabecalho ? OdeteFont.mono(11).weight(.semibold) : OdeteFont.mono(11))
@@ -241,7 +451,7 @@ struct DBView: View {
         .contentShape(Rectangle())
         // Toque simples abre para editar, que é o gesto direto no dedo; copiar e enviar
         // ficam no toque longo, junto com as ações da linha inteira.
-        .onTapGesture { abrirCelula(linha: linha, coluna: coluna, valor: c, cabecalho: cabecalho) }
+        .onTapGesture { tocar(linha: linha, coluna: coluna, cabecalho: cabecalho) }
         .contextMenu {
             if !cabecalho, linha >= 0 {
                 Button(tr("Copiar célula"), systemImage: "doc.on.doc") { UIPasteboard.general.string = c }
@@ -250,28 +460,43 @@ struct DBView: View {
         }
     }
 
+    func tocar(linha: Int, coluna: Int, cabecalho: Bool) {
+        guard !cabecalho, linha >= 0 else { return }
+        if banco.precisaConfirmarSQL {
+            confirmandoSQL = true
+            return
+        }
+        if banco.abrirCelula(linha: linha, coluna: coluna) {
+            // O campo só existe no quadro seguinte; pedir foco antes disso não pega.
+            DispatchQueue.main.async { foco = banco.editando?.id }
+        }
+    }
+
     @ViewBuilder
     func menuDaLinha(_ i: Int) -> some View {
-        Button(tr("Copiar linha"), systemImage: "doc.on.doc") {
-            UIPasteboard.general.string = pagina.linhas[i].joined(separator: "\t")
-        }
-        Button(tr("Copiar como CSV"), systemImage: "tablecells") {
-            UIPasteboard.general.string = csv(pagina.linhas[i])
-        }
-        Button(tr("Copiar como INSERT"), systemImage: "curlybraces") {
-            UIPasteboard.general.string = insert(pagina.linhas[i])
-        }
-        Button(tr("Enviar para a Odete"), systemImage: "sparkles") {
-            ws.agent.anexarTrecho(
-                origem: "\(nome) · \(escolhida ?? "")",
-                texto: ([pagina.colunas.joined(separator: " | ")] + [pagina.linhas[i].joined(separator: " | ")])
-                    .joined(separator: "\n")
-            )
-            chrome.snapshot.agentVisible = true
-        }
-        if podeEditar {
-            Divider()
-            Button(tr("Apagar linha"), systemImage: "trash", role: .destructive) { apagarLinha(i) }
+        let linhas = banco.pagina.linhas
+        if i < linhas.count {
+            Button(tr("Copiar linha"), systemImage: "doc.on.doc") {
+                UIPasteboard.general.string = linhas[i].joined(separator: "\t")
+            }
+            Button(tr("Copiar como CSV"), systemImage: "tablecells") {
+                UIPasteboard.general.string = csv(linhas[i])
+            }
+            Button(tr("Copiar como INSERT"), systemImage: "curlybraces") {
+                UIPasteboard.general.string = insert(linhas[i])
+            }
+            Button(tr("Enviar para a Odete"), systemImage: "sparkles") {
+                ws.agent.anexarTrecho(
+                    origem: "\(nome) · \(banco.escolhida ?? "")",
+                    texto: ([banco.pagina.colunas.joined(separator: " | ")] + [linhas[i].joined(separator: " | ")])
+                        .joined(separator: "\n")
+                )
+                chrome.snapshot.agentVisible = true
+            }
+            if banco.podeEditar {
+                Divider()
+                Button(tr("Apagar linha"), systemImage: "trash", role: .destructive) { banco.apagarLinha(i) }
+            }
         }
     }
 
@@ -285,7 +510,7 @@ struct DBView: View {
 
     func insert(_ l: [String]) -> String {
         let v = l.map { $0.isEmpty ? "NULL" : "'" + $0.replacingOccurrences(of: "'", with: "''") + "'" }
-        return "INSERT INTO \(escolhida ?? "tabela") VALUES(\(v.joined(separator: ", ")));"
+        return "INSERT INTO \(banco.escolhida ?? "tabela") VALUES(\(v.joined(separator: ", ")));"
     }
 
     /// `NULL` não é dado: fica apagado para não se confundir com a palavra escrita numa célula.
@@ -299,24 +524,26 @@ struct DBView: View {
     var rodape: some View {
         HStack(spacing: 10) {
             Text(faixa).font(.caption).foregroundStyle(.secondary).monospacedDigit()
-            if podeEditar {
+            if banco.podeEditar {
                 // Um menu só: dois botões com rótulo truncavam para "Colu…" na largura
                 // normal do painel.
                 Menu {
-                    Button(tr("Nova linha"), systemImage: "plus.rectangle") { novaLinha() }
+                    Button(tr("Nova linha"), systemImage: "plus.rectangle") { banco.novaLinha() }
                     Button(tr("Nova coluna"), systemImage: "plus.rectangle.portrait") { novaColuna = true }
                 } label: {
                     Image(systemName: "plus")
                 }
                 .menuIndicator(.hidden)
                 .accessibilityLabel(tr("Adicionar"))
+            } else if banco.precisaConfirmarSQL {
+                Button(tr("Editar tabela"), systemImage: "pencil") { confirmandoSQL = true }
             }
             Spacer(minLength: 0)
-            Button { mover(-porPagina) } label: { Image(systemName: "chevron.left") }
-                .disabled(offset == 0)
+            Button { banco.mover(-banco.porPagina) } label: { Image(systemName: "chevron.left") }
+                .disabled(banco.offset == 0)
                 .accessibilityLabel(tr("Página anterior"))
-            Button { mover(porPagina) } label: { Image(systemName: "chevron.right") }
-                .disabled(offset + porPagina >= pagina.total)
+            Button { banco.mover(banco.porPagina) } label: { Image(systemName: "chevron.right") }
+                .disabled(banco.offset + banco.porPagina >= banco.pagina.total)
                 .accessibilityLabel(tr("Próxima página"))
         }
         .buttonStyle(.bordered)
@@ -327,119 +554,20 @@ struct DBView: View {
     }
 
     var faixa: String {
-        guard pagina.total > 0 else { return tr("sem linhas") }
-        let ate = min(offset + pagina.linhas.count, pagina.total)
-        return tr("%1$@–%2$@ de %3$@", "\(offset + 1)", "\(ate)", "\(pagina.total)")
-    }
-
-    // MARK: editar
-
-    /// Editar precisa de banco aberto para escrita e de `rowid` para achar a linha.
-    var podeEditar: Bool {
-        (leitor?.editavel ?? false) && pagina.editavel
-    }
-
-    func abrirCelula(linha: Int, coluna: Int, valor: String, cabecalho: Bool) {
-        guard !cabecalho, podeEditar, linha >= 0, linha < pagina.ids.count else { return }
-        rascunho = valor
-        editando = Celula(linha: linha, coluna: coluna, rowid: pagina.ids[linha])
-        // O campo só existe no quadro seguinte; pedir foco antes disso não pega.
-        DispatchQueue.main.async { focoNaCelula = true }
-    }
-
-    func gravarCelula() {
-        guard let c = editando, let leitor, let tabela = escolhida else { return }
-        let coluna = pagina.colunas[c.coluna]
-        let erro = leitor.executar(
-            "UPDATE \(leitor.citarNome(tabela)) SET \(leitor.citarNome(coluna)) = ? WHERE rowid = ?",
-            [rascunho.isEmpty ? nil : rascunho, String(c.rowid)]
-        )
-        editando = nil
-        if let erro {
-            self.erro = erro; return
-        }
-        depoisDeEditar()
-    }
-
-    func novaLinha() {
-        guard let leitor, let tabela = escolhida else { return }
-        // `DEFAULT VALUES` respeita NOT NULL com padrão; quando não dá, o erro aparece.
-        if let erro = leitor.inserirLinha(tabela) {
-            aviso = erro
-            return
-        }
-        depoisDeEditar()
-        // A linha nova está no fim: vai para a última página para ela ficar à vista.
-        offset = max(0, (pagina.total - 1) / porPagina) * porPagina
-        recarregar()
-    }
-
-    func criarColuna(_ nome: String) {
-        guard let leitor, let tabela = escolhida, !nome.isEmpty else { return }
-        if let erro = leitor
-            .executar("ALTER TABLE \(leitor.citarNome(tabela)) ADD COLUMN \(leitor.citarNome(nome)) TEXT")
-        {
-            self.erro = erro
-            return
-        }
-        depoisDeEditar()
-    }
-
-    func apagarLinha(_ i: Int) {
-        guard let leitor, let tabela = escolhida, i < pagina.ids.count else { return }
-        if let erro = leitor.executar(
-            "DELETE FROM \(leitor.citarNome(tabela)) WHERE rowid = ?",
-            [String(pagina.ids[i])]
-        ) {
-            self.erro = erro
-            return
-        }
-        depoisDeEditar()
-    }
-
-    /// Recarrega a página e, quando a origem é um `.sql`, regrava o texto do arquivo.
-    ///
-    /// No dump o banco é só um meio: a fonte da verdade é o texto, e ele precisa refletir
-    /// a edição para o arquivo não mentir sobre o próprio conteúdo.
-    func depoisDeEditar() {
-        tabelas = leitor?.tabelas() ?? []
-        recarregar()
-        if let sqlPath, let leitor {
-            ws.setText(leitor.dump(), for: sqlPath)
-            ws.save(sqlPath)
-        }
+        let p = banco.pagina
+        guard p.total > 0 else { return tr("sem linhas") }
+        let ate = min(banco.offset + p.linhas.count, p.total)
+        return tr("%1$@–%2$@ de %3$@", "\(banco.offset + 1)", "\(ate)", "\(p.total)")
     }
 
     // MARK: dados
 
     func abrir() {
-        do {
-            let r = try script.map { try SQLiteReader(script: $0) } ?? SQLiteReader(arquivo: url, escrita: true)
-            leitor = r
-            erro = nil
-            tabelas = r.tabelas()
-            if let primeira = tabelas.first?.nome {
-                escolher(primeira)
-            }
-        } catch {
-            erro = error.localizedDescription
-            tabelas = []
+        banco.abrir(url: url, script: script)
+        banco.regravarSQL = { [ws, sqlPath] dump in
+            guard let sqlPath else { return }
+            ws.setText(dump, for: sqlPath)
+            ws.save(sqlPath)
         }
-    }
-
-    func escolher(_ nome: String) {
-        escolhida = nome
-        offset = 0
-        recarregar()
-    }
-
-    func mover(_ delta: Int) {
-        offset = max(0, offset + delta)
-        recarregar()
-    }
-
-    func recarregar() {
-        guard let leitor, let escolhida else { return }
-        pagina = leitor.pagina(escolhida, limite: porPagina, offset: offset)
     }
 }

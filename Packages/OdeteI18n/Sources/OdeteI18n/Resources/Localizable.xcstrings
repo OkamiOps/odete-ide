@@ -841,6 +841,34 @@
         }
       }
     },
+    "%1$@ não cabe num Int": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ doesn't fit in an Int"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ passt nicht in einen Int"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ ne tient pas dans un Int"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ no cabe en un Int"
+          }
+        }
+      }
+    },
     "%1$@ não encontrado": {
       "localizations": {
         "en": {
@@ -1145,6 +1173,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "%1$@ · línea %2$@"
+          }
+        }
+      }
+    },
+    "%1$@ é grande demais para o zip": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ is too large for the zip"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ ist zu groß für das Zip"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ est trop gros pour le zip"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ es demasiado grande para el zip"
           }
         }
       }
@@ -2241,6 +2297,34 @@
         }
       }
     },
+    "A pasta não foi encontrada. Toque para apontar onde ela está agora.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The folder wasn't found. Tap to show where it is now."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Ordner wurde nicht gefunden. Tippe, um zu zeigen, wo er jetzt ist."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le dossier est introuvable. Touche pour indiquer où il se trouve maintenant."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se encontró la carpeta. Toca para indicar dónde está ahora."
+          }
+        }
+      }
+    },
     "A resposta chegou incompleta: a conexão fechou antes do fim. Tente de novo.": {
       "localizations": {
         "en": {
@@ -3245,6 +3329,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Ajustes…"
+          }
+        }
+      }
+    },
+    "Alguns arquivos de %1$@ ainda estão só no iCloud. O download foi pedido; tente de novo quando terminar.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Some files in %1$@ are still only in iCloud. The download has been requested; try again when it finishes."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Einige Dateien in %1$@ sind noch nur in iCloud. Der Download wurde angefordert; versuche es erneut, wenn er fertig ist."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Certains fichiers de %1$@ sont encore uniquement dans iCloud. Le téléchargement a été demandé ; réessaie quand il sera terminé."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Algunos archivos de %1$@ todavía están solo en iCloud. Se pidió la descarga; vuelve a intentarlo cuando termine."
           }
         }
       }
@@ -4309,6 +4421,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Aplicar"
+          }
+        }
+      }
+    },
+    "Apontar para a pasta…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Locate Folder…"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ordner zuweisen…"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Indiquer le dossier…"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Indicar la carpeta…"
           }
         }
       }
@@ -9101,6 +9241,34 @@
         }
       }
     },
+    "Editar a tabela regrava o .sql inteiro": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Editing the table rewrites the whole .sql"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Tabelle zu bearbeiten schreibt die ganze .sql neu"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modifier la table réécrit tout le .sql"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Editar la tabla reescribe todo el .sql"
+          }
+        }
+      }
+    },
     "Editar como texto": {
       "localizations": {
         "en": {
@@ -9125,6 +9293,62 @@
           "stringUnit": {
             "state": "translated",
             "value": "Editar como texto"
+          }
+        }
+      }
+    },
+    "Editar e regravar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Edit and rewrite"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bearbeiten und neu schreiben"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modifier et réécrire"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Editar y reescribir"
+          }
+        }
+      }
+    },
+    "Editar tabela": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Edit table"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tabelle bearbeiten"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modifier la table"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Editar tabla"
           }
         }
       }
@@ -10133,6 +10357,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Este commit no cambió el contenido de este archivo."
+          }
+        }
+      }
+    },
+    "Este projeto está aberto em outra janela; ela vai fechá-lo, com tudo salvo.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This project is open in another window; that window will close it, with everything saved."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dieses Projekt ist in einem anderen Fenster geöffnet; es wird dort geschlossen, alles wird gespeichert."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ce projet est ouvert dans une autre fenêtre ; elle va le fermer, en enregistrant tout."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este proyecto está abierto en otra ventana; esa ventana lo cerrará, con todo guardado."
           }
         }
       }
@@ -12489,6 +12741,34 @@
         }
       }
     },
+    "Já havia projetos com estes nomes no destino; os que chegaram ganharam outro nome: %1$@.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Projects with these names already existed at the destination; the incoming ones were renamed: %1$@."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Am Ziel gab es schon Projekte mit diesen Namen; die neuen haben einen anderen Namen bekommen: %1$@."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Des projets portant ces noms existaient déjà à destination ; ceux qui sont arrivés ont été renommés : %1$@."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ya había proyectos con estos nombres en el destino; los que llegaron recibieron otro nombre: %1$@."
+          }
+        }
+      }
+    },
     "Laranja.": {
       "localizations": {
         "en": {
@@ -12541,6 +12821,62 @@
           "stringUnit": {
             "state": "translated",
             "value": "Disposición"
+          }
+        }
+      }
+    },
+    "Levar os projetos para o iCloud Drive?": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move the projects to iCloud Drive?"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Projekte in iCloud Drive verschieben?"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Déplacer les projets vers iCloud Drive ?"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Llevar los proyectos a iCloud Drive?"
+          }
+        }
+      }
+    },
+    "Levar para o iCloud": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move to iCloud"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In iCloud verschieben"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Déplacer vers iCloud"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Llevar a iCloud"
           }
         }
       }
@@ -13745,6 +14081,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Mueve la carpeta Projects al iCloud Drive; sigue funcionando offline."
+          }
+        }
+      }
+    },
+    "Movendo projetos… %1$@ de %2$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Moving projects… %1$@ of %2$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Projekte werden verschoben … %1$@ von %2$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Déplacement des projets… %1$@ sur %2$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Moviendo proyectos… %1$@ de %2$@"
           }
         }
       }
@@ -15009,6 +15373,90 @@
         }
       }
     },
+    "Não deu para mover %1$@ (%2$@). Estes ficaram no destino e não voltaram: %3$@.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't move %1$@ (%2$@). These stayed at the destination and couldn't be moved back: %3$@."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ konnte nicht verschoben werden (%2$@). Diese sind am Ziel geblieben und konnten nicht zurück: %3$@."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossible de déplacer %1$@ (%2$@). Ceux-ci sont restés à destination et ne sont pas revenus : %3$@."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo mover %1$@ (%2$@). Estos se quedaron en el destino y no volvieron: %3$@."
+          }
+        }
+      }
+    },
+    "Não deu para mover %1$@ (%2$@). Nada mudou de lugar.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't move %1$@ (%2$@). Nothing was moved."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ konnte nicht verschoben werden (%2$@). Nichts wurde verschoben."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossible de déplacer %1$@ (%2$@). Rien n’a changé de place."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo mover %1$@ (%2$@). Nada cambió de lugar."
+          }
+        }
+      }
+    },
+    "Não deu para mover %1$@ para a lixeira; nada foi apagado.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't move %1$@ to the trash; nothing was deleted."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ konnte nicht in den Papierkorb verschoben werden; es wurde nichts gelöscht."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossible de déplacer %1$@ dans la corbeille ; rien n’a été supprimé."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se pudo mover %1$@ a la papelera; no se borró nada."
+          }
+        }
+      }
+    },
     "Não dá para mostrar o conteúdo, mas dá para restaurar.": {
       "localizations": {
         "en": {
@@ -15453,6 +15901,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "El archivo tiene extensión de imagen pero no se decodifica."
+          }
+        }
+      }
+    },
+    "O arquivo volta como um dump do banco: comentários e formatação se perdem.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The file comes back as a database dump: comments and formatting are lost."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Datei wird als Dump der Datenbank neu geschrieben: Kommentare und Formatierung gehen verloren."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le fichier revient sous forme de dump de la base : les commentaires et la mise en forme sont perdus."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El archivo vuelve como un volcado de la base: se pierden los comentarios y el formato."
           }
         }
       }
@@ -16545,6 +17021,62 @@
           "stringUnit": {
             "state": "translated",
             "value": "Los %1$@ archivos del merge vuelven a como estaban antes, y lo que ya resolviste en los conflictos se pierde. Los archivos fuera del merge se quedan como están."
+          }
+        }
+      }
+    },
+    "Os %1$@ projetos do app vão para o iCloud Drive. Os projetos abertos fecham enquanto isso.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The app's %1$@ projects will move to iCloud Drive. Open projects close while this happens."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die %1$@ Projekte der App kommen in iCloud Drive. Geöffnete Projekte werden währenddessen geschlossen."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les %1$@ projets de l’app vont dans iCloud Drive. Les projets ouverts se ferment pendant ce temps."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Los %1$@ proyectos de la app irán a iCloud Drive. Los proyectos abiertos se cierran mientras tanto."
+          }
+        }
+      }
+    },
+    "Os %1$@ projetos saem do iCloud Drive e passam a morar só neste iPad: desinstalar o app apaga tudo. Os projetos abertos fecham enquanto isso.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The %1$@ projects leave iCloud Drive and will live only on this iPad: uninstalling the app deletes everything. Open projects close while this happens."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die %1$@ Projekte verlassen iCloud Drive und liegen dann nur noch auf diesem iPad: Wenn du die App löschst, ist alles weg. Geöffnete Projekte werden währenddessen geschlossen."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les %1$@ projets quittent iCloud Drive et ne vivront plus que sur cet iPad : désinstaller l’app efface tout. Les projets ouverts se ferment pendant ce temps."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Los %1$@ proyectos salen de iCloud Drive y pasan a estar solo en este iPad: desinstalar la app lo borra todo. Los proyectos abiertos se cierran mientras tanto."
           }
         }
       }
@@ -17721,6 +18253,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Problemas"
+          }
+        }
+      }
+    },
+    "Procurando os projetos no iCloud Drive…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Looking for your projects in iCloud Drive…"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Suche Projekte in iCloud Drive…"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recherche des projets dans iCloud Drive…"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Buscando los proyectos en iCloud Drive…"
           }
         }
       }
@@ -21085,6 +21645,62 @@
         }
       }
     },
+    "Trazer os projetos para dentro do app?": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bring the projects back into the app?"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Projekte zurück in die App holen?"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ramener les projets dans l’app ?"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Traer los proyectos de vuelta a la app?"
+          }
+        }
+      }
+    },
+    "Trazer para o app": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bring into the app"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In die App holen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ramener dans l’app"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Traer a la app"
+          }
+        }
+      }
+    },
     "Trocar %1$@ ocorrência(s) em %2$@ arquivo(s)?": {
       "localizations": {
         "en": {
@@ -23321,6 +23937,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "la rama %1$@ está protegida en el remote y rechazó el push directo: envía a una rama nueva y abre un pull request"
+          }
+        }
+      }
+    },
+    "a conta passa do limite do Int": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "the result exceeds the limits of Int"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "das Ergebnis überschreitet die Grenzen von Int"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "le calcul dépasse les limites de Int"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "la cuenta supera el límite de Int"
           }
         }
       }
@@ -27105,6 +27749,34 @@
         }
       }
     },
+    "iCloud Drive indisponível neste aparelho.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iCloud Drive isn't available on this device."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iCloud Drive ist auf diesem Gerät nicht verfügbar."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iCloud Drive n’est pas disponible sur cet appareil."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iCloud Drive no está disponible en este dispositivo."
+          }
+        }
+      }
+    },
     "iCloud Drive indisponível neste aparelho; os projetos ficam dentro do app e desinstalar apaga tudo. Entre com o Apple ID, ou copie a pasta Odete pelo app Arquivos de vez em quando.": {
       "localizations": {
         "en": {
@@ -27329,6 +28001,34 @@
         }
       }
     },
+    "indisponível": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "unavailable"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "nicht verfügbar"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "indisponible"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "no disponible"
+          }
+        }
+      }
+    },
     "iniciar repositório": {
       "localizations": {
         "en": {
@@ -27353,6 +28053,62 @@
           "stringUnit": {
             "state": "translated",
             "value": "iniciar repositorio"
+          }
+        }
+      }
+    },
+    "intervalo grande demais: %1$@ (o máximo são %2$@ itens)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "range too large: %1$@ (the maximum is %2$@ items)"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bereich zu groß: %1$@ (höchstens %2$@ Elemente)"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "intervalle trop grand : %1$@ (le maximum est de %2$@ éléments)"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "rango demasiado grande: %1$@ (el máximo son %2$@ elementos)"
+          }
+        }
+      }
+    },
+    "intervalo inválido: %1$@ (o começo passa do fim)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "invalid range: %1$@ (the start is past the end)"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ungültiger Bereich: %1$@ (der Anfang liegt hinter dem Ende)"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "intervalle invalide : %1$@ (le début dépasse la fin)"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "rango inválido: %1$@ (el inicio pasa del final)"
           }
         }
       }

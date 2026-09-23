@@ -188,10 +188,10 @@ public struct SwiftView: View {
         if case let .array(a)? = v?.deref,
            a.count >= 2
         {
-            let lo = a.first?.asDouble ?? 0, hi = a.last?.asDouble ?? 1; return lo ... max(
-                hi,
-                lo + 0.001
-            )
+            let lo = a.first?.asDouble ?? 0, hi = a.last?.asDouble ?? 1
+            // NaN ou infinito montariam um `ClosedRange` inválido, e isso para o app.
+            guard lo.isFinite, hi.isFinite else { return 0 ... 1 }
+            return lo ... max(hi, lo + 0.001)
         }
         return 0 ... 1
     }

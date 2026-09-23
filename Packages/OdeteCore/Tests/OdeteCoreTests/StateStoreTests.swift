@@ -48,4 +48,22 @@ struct StateStoreTests {
         state.select(side: .git)
         #expect(state.snapshot.side == .git && state.snapshot.sideOpen)
     }
+
+    /// Um state.json que não dá para ler de jeito nenhum não é jogado fora: fica ao lado,
+    /// com a data, e o app volta sem repetir o onboarding de quem já passou por ele.
+    @Test func arquivoIlegivelFicaGuardadoAoLado() throws {
+        let url = temp()
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("isto não é json {".utf8).write(to: url)
+        let store = StateStore(url: url)
+        let snap = store.load()
+        #expect(snap.welcomeDone, "quem já tinha state.json não é pessoa nova")
+        let irmaos = try FileManager.default.contentsOfDirectory(atPath: url.deletingLastPathComponent().path)
+        let guardado = try #require(irmaos.first { $0.hasPrefix("state.json.falhou-") })
+        let conteudo = try String(
+            contentsOf: url.deletingLastPathComponent().appending(path: guardado),
+            encoding: .utf8
+        )
+        #expect(conteudo == "isto não é json {")
+    }
 }

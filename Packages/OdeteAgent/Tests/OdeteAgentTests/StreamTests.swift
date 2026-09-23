@@ -19,6 +19,7 @@ func collect(_ s: AsyncThrowingStream<StreamEvent, Error>) async throws
         case let .usage(u): use = use.filled(with: u)
         case .done: done = true
         case let .error(m): Issue.record("erro: \(m)")
+        case .raciocinio: break
         }
     }
     return (think, text, tools, use, done)
@@ -64,21 +65,25 @@ struct StreamTests {
             model: "m",
             effort: "medium"
         )
-        let cc = ChatCompletionsStream.body(turn, maxTokensKey: "max_tokens")
+        let cc = ChatCompletionsStream.body(turn).corpo
         let ccm = try #require(cc["messages"] as? [[String: Any]])
         #expect(ccm.count == 5 && ccm[0]["role"] as? String == "system" && (ccm[1]["content"] as? [[String: Any]])?
             .count == 2)
         #expect(ccm[3]["role"] as? String == "tool" && ccm[3]["tool_call_id"] as? String == "t1" &&
             cc["reasoning_effort"] as? String == "medium")
-        let an = MessagesStream.body(turn)
+        #expect(cc["max_tokens"] == nil && cc["temperature"] == nil)
+        let an = MessagesStream.body(turn).corpo
         let anm = try #require(an["messages"] as? [[String: Any]])
         #expect(anm.count == 4 && an["system"] as? String == "sys")
         let toolResult = (anm[2]["content"] as? [[String: Any]])?.first
         #expect(anm[2]["role"] as? String == "user" && toolResult?["type"] as? String == "tool_result" &&
             toolResult?["tool_use_id"] as? String == "t1")
-        #expect((an["thinking"] as? [String: Any])?["budget_tokens"] as? Int == 4096 &&
+        // Sem capacidade conhecida: o formato mais novo — adaptativo, esforço à parte.
+        #expect((an["thinking"] as? [String: Any])?["type"] as? String == "adaptive" &&
+            (an["output_config"] as? [String: Any])?["effort"] as? String == "medium" &&
+            an["temperature"] == nil && an["max_tokens"] as? Int == 128_000 &&
             ((an["tools"] as? [[String: Any]])?.first?["input_schema"]) != nil)
-        let rs = ResponsesStream.body(turn)
+        let rs = ResponsesStream.body(turn).corpo
         let inp = try #require(rs["input"] as? [[String: Any]])
         #expect(inp[1]["role"] as? String == "assistant" && inp[2]["type"] as? String == "function_call" &&
             inp[2]["call_id"] as? String == "t1")
@@ -87,15 +92,14 @@ struct StreamTests {
         #expect((rs["tools"] as? [[String: Any]])?.first?["name"] as? String == "read_file")
     }
 
+    /// Os níveis saem do que se sabe do modelo (ver `CapacidadesTests`); aqui, só o
+    /// padrão da tela e o orçamento de quem ainda pede `budget_tokens`.
     @Test func effortTable() {
-        #expect(Effort.options(kind: .claude, model: "claude-sonnet-5") == ["low", "medium", "high", "xhigh", "max"])
-        #expect(Effort.options(kind: .claude, model: "claude-haiku-4-5").isEmpty)
-        #expect(Effort.options(kind: .codex, model: "gpt-5.4-codex") == ["low", "medium", "high", "xhigh"])
-        #expect(Effort.options(kind: .grok, model: "grok-4.6") == ["low", "medium", "high", "xhigh"])
-        #expect(Effort.options(kind: .grok, model: "grok-composer-2.5-fast").isEmpty)
+        #expect(Effort.options(kind: .codex, model: "gpt-5.4-codex", fromAPI: ["high", "low"]) == ["low", "high"])
         #expect(Effort.defaultOption(["low", "high"]) == "high" && Effort.defaultOption([]) == "")
-        #expect(Effort.anthropic("max")?.maxTokens == 24000 && Effort.openai("minimal") == "low" && Effort
-            .openai("none") == nil)
+        #expect(Effort.defaultOption(Effort.niveisDeOrcamento) == "medium")
+        #expect(Effort.orcamento("max", saida: 64000) == 32000 && Effort.orcamento("none", saida: 64000) == nil)
+        #expect((Effort.orcamento("max", saida: 2048) ?? 0) < 2048)
     }
 
     @Test func modelListParsing() {

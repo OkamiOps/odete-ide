@@ -15,7 +15,7 @@ import OdeteI18n
 /// (FoundationModels.LanguageModelSession.GenerationError error -1.)" — foi o que o QA
 /// viu num simulador sem o modelo pronto.
 enum FalhaApple: Equatable {
-    /// A conversa passou da janela. Leva o tamanho da janela, em fichas.
+    /// A conversa passou da janela. Leva o tamanho da janela, em tokens.
     case janelaEstourada(Int)
     /// O modelo não está no aparelho: desligado, baixando ou aparelho sem suporte. Leva o
     /// motivo que a disponibilidade informa, quando ela informa.
@@ -37,7 +37,7 @@ enum FalhaApple: Equatable {
     var frase: String {
         switch self {
         case let .janelaEstourada(janela):
-            tr("A conversa passou da janela de %1$@ fichas do modelo. Comece uma conversa nova.", "\(janela)")
+            tr("A conversa passou da janela de %1$@ tokens do modelo. Comece uma conversa nova.", "\(janela)")
         case let .modeloIndisponivel(motivo?):
             tr("%1$@ Para continuar agora, escolha outro modelo no seletor.", motivo)
         case .modeloIndisponivel(nil):

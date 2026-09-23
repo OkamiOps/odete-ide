@@ -103,13 +103,27 @@ public final class AIAccountStore {
                 switch result {
                 case let .success(t): a.expiresAt = t.expiresAt; a.accountId = t.accountId ?? a.accountId; a
                     .needsReconnect = false
-                case .failure: a.needsReconnect = true
+                case let .failure(erro):
+                    // Wifi caindo no meio da renovação não é conta desconectada: a próxima
+                    // tentativa renova. Só a recusa do servidor pede reconectar.
+                    guard Self.precisaReconectar(erro) else { return }
+                    a.needsReconnect = true
                 }
                 self.update(a)
             }
         }
         sessions[account.id] = s
         return s
+    }
+
+    /// A renovação falhou porque o servidor recusou o refresh token (400/401,
+    /// `invalid_grant`) — e não por rede, servidor fora do ar ou limite de uso.
+    nonisolated static func precisaReconectar(_ erro: Error) -> Bool {
+        switch erro as? AgentError {
+        case .invalidGrant: true
+        case let .http(code, _): code == 400 || code == 401
+        default: false
+        }
     }
 
     public func accounts(of kind: ProviderKind) -> [AIAccount] {

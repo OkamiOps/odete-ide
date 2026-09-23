@@ -1,4 +1,5 @@
 import Foundation
+import OdeteI18n
 
 /// Os tipos de conta de IA. `apple` é o modelo do próprio sistema e não tem conta.
 public enum ProviderKind: String, Codable, CaseIterable, Sendable, Identifiable {
@@ -20,14 +21,15 @@ public enum ProviderKind: String, Codable, CaseIterable, Sendable, Identifiable 
         }
     }
 
+    /// A linha de baixo da conta nos Ajustes e no seletor — texto de tela, traduzido.
     public var vendor: String {
         switch self {
-        case .apple: "no aparelho"
-        case .claude: "Anthropic · assinatura Pro/Max"
-        case .codex: "OpenAI · conta ChatGPT"
+        case .apple: tr("no aparelho")
+        case .claude: tr("Anthropic · assinatura Pro/Max")
+        case .codex: tr("OpenAI · conta ChatGPT")
         case .grok: "xAI · SuperGrok / X Premium"
-        case .openaiCompat: "chave de API e URL base"
-        case .anthropicCompat: "chave de API e URL base"
+        case .openaiCompat: tr("chave de API e URL base")
+        case .anthropicCompat: tr("chave de API e URL base")
         }
     }
 

@@ -190,7 +190,7 @@ public final class AgentLoop: @unchecked Sendable {
             }
             let thinkId = UUID().uuidString, textId = UUID().uuidString
             let think = Mutex(""), text = Mutex(""), calls = Mutex<[ToolCall]>([]), use = Mutex(TokenUse()),
-                err = Mutex<String?>(nil)
+                err = Mutex<String?>(nil), bruto = Mutex<RaciocinioBruto?>(nil)
             let turn = TurnRequest(
                 system: systemPrompt(mode: config.mode, userText: userText),
                 messages: Self.comOPedido(messages, ultimas: 24),
@@ -234,6 +234,8 @@ public final class AgentLoop: @unchecked Sendable {
                         case let .tools(c): calls.withLock { $0 = c }
                         case let .usage(u): use.withLock { $0 = $0.filled(with: u) }
                         case let .error(m): err.withLock { $0 = m }
+                        // O raciocínio assinado/criptografado volta intacto na próxima rodada.
+                        case let .raciocinio(r): bruto.withLock { $0 = r }
                         case .done: break
                         }
                     }
@@ -294,7 +296,8 @@ public final class AgentLoop: @unchecked Sendable {
                 role: .assistant,
                 content: answer,
                 thinking: thinkText.isEmpty ? nil : thinkText,
-                toolCalls: toolCalls.isEmpty ? nil : toolCalls
+                toolCalls: toolCalls.isEmpty ? nil : toolCalls,
+                raciocinio: bruto.withLock { $0 }
             ))
             emit(.history(messages))
             if toolCalls.isEmpty {

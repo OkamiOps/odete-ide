@@ -39,8 +39,8 @@ public enum AgentError: LocalizedError, Sendable, Equatable {
         case let .transport(s): s
         case let .http(code, body): "HTTP \(code)" + (body.isEmpty ? "" : ": \(body.prefix(240))")
         case let .auth(s): s
-        case .noAccount: "Conecte uma conta em Ajustes → Contas."
-        case .invalidGrant: "A sessão expirou. Reconecte a conta em Ajustes."
+        case .noAccount: tr("Conecte uma conta em Ajustes → Contas.")
+        case .invalidGrant: tr("A sessão expirou. Reconecte a conta em Ajustes.")
         case .cancelled: "parado"
         }
     }
@@ -59,7 +59,11 @@ extension URLRequest {
         for (k, v) in headers {
             r.setValue(v, forHTTPHeaderField: k)
         }
-        r.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        // Chaves em ordem fixa: o dicionário do Swift sai cada vez numa ordem, e o
+        // provedor renderiza o JSON (schemas das ferramentas, argumentos devolvidos) na
+        // ordem em que chegou. Ordem trocando a cada pedido é prefixo diferente a cada
+        // pedido — cache de prompt perdido e raciocínio assinado invalidado.
+        r.httpBody = try? JSONSerialization.data(withJSONObject: body, options: [.sortedKeys])
         return r
     }
 

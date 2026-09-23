@@ -32,6 +32,11 @@ public struct ToolRunner: Sendable {
     }
 
     public func run(_ call: ToolCall, mode: AgentMode) async -> ToolOutcome {
+        // Chamada cortada no limite de saída ou com argumentos quebrados: quem leu o
+        // stream já explicou o que houve, e é isso que o modelo precisa ler.
+        if let problema = call.problema {
+            return .init(text: problema)
+        }
         guard let args = try? JSONSerialization.jsonObject(with: Data(call.arguments.utf8)) as? [String: Any]
         else { return .init(text: "argumentos JSON inválidos") }
         func str(_ k: String) -> String {

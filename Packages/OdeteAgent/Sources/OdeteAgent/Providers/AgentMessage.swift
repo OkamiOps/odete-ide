@@ -13,12 +13,48 @@ public struct ToolCall: Codable, Sendable, Hashable, Identifiable {
     public var id: String
     public var name: String
     public var arguments: String
-    public init(id: String, name: String, arguments: String) {
-        self.id = id; self.name = name; self.arguments = arguments
+    /// Por que esta chamada não pode rodar, dito para o modelo — nulo quando pode.
+    ///
+    /// Uma chamada cortada no limite de saída chegava ao executor com o JSON pela metade
+    /// e voltava "argumentos JSON inválidos": o modelo não sabia que tinha sido cortado e
+    /// mandava o mesmo `write_file` gigante de novo. Quem lê o stream sabe o que houve;
+    /// o executor devolve esta frase no lugar do resultado.
+    public var problema: String?
+    public init(id: String, name: String, arguments: String, problema: String? = nil) {
+        self.id = id; self.name = name; self.arguments = arguments; self.problema = problema
     }
 
     public var args: [String: Any] {
         jsonObject(Data(arguments.utf8))
+    }
+}
+
+/// O raciocínio no formato do próprio provedor, para voltar intacto na rodada seguinte.
+///
+/// O Claude assina cada bloco de `thinking`, e a OpenAI e a xAI devolvem o raciocínio
+/// criptografado: os dois só valem se voltarem exatamente como chegaram. Texto e
+/// ferramentas a gente remonta do formato neutro; isto não dá para remontar.
+public struct RaciocinioBruto: Codable, Sendable, Hashable {
+    /// `anthropic`: os blocos de conteúdo da resposta, na ordem. `responses`: os itens
+    /// `reasoning` da resposta.
+    public var formato: String
+    /// Quem produziu (provedor e endereço). Não volta para outro lugar.
+    public var origem: String
+    public var modelo: String
+    /// Os itens em JSON.
+    public var json: String
+    public init(formato: String, origem: String, modelo: String, json: String) {
+        self.formato = formato; self.origem = origem; self.modelo = modelo; self.json = json
+    }
+
+    var itens: [[String: Any]] {
+        (try? JSONSerialization.jsonObject(with: Data(json.utf8)) as? [[String: Any]]) ?? []
+    }
+
+    static func de(_ itens: [[String: Any]], formato: String, origem: String, modelo: String) -> RaciocinioBruto? {
+        guard !itens.isEmpty,
+              let d = try? JSONSerialization.data(withJSONObject: itens, options: [.sortedKeys]) else { return nil }
+        return RaciocinioBruto(formato: formato, origem: origem, modelo: modelo, json: String(decoding: d, as: UTF8.self))
     }
 }
 
@@ -31,6 +67,8 @@ public struct AgentMessage: Codable, Sendable, Hashable {
     public var images: [AgentImage]?
     public var toolCalls: [ToolCall]?
     public var toolCallId: String?
+    /// O raciocínio desta resposta como o provedor mandou (só em mensagens do assistente).
+    public var raciocinio: RaciocinioBruto?
 
     public init(
         role: Role,
@@ -38,10 +76,11 @@ public struct AgentMessage: Codable, Sendable, Hashable {
         thinking: String? = nil,
         images: [AgentImage]? = nil,
         toolCalls: [ToolCall]? = nil,
-        toolCallId: String? = nil
+        toolCallId: String? = nil,
+        raciocinio: RaciocinioBruto? = nil
     ) {
         self.role = role; self.content = content; self.thinking = thinking; self.images = images; self
-            .toolCalls = toolCalls; self.toolCallId = toolCallId
+            .toolCalls = toolCalls; self.toolCallId = toolCallId; self.raciocinio = raciocinio
     }
 
     public static func user(_ text: String, images: [AgentImage]? = nil) -> AgentMessage {
@@ -121,6 +160,9 @@ public struct TokenUse: Codable, Sendable, Hashable {
 
 public enum StreamEvent: Sendable, Equatable {
     case think(String), text(String), tools([ToolCall]), usage(TokenUse), error(String), done
+    /// O raciocínio da resposta no formato do provedor; vai junto da mensagem do
+    /// assistente no histórico (`AgentMessage.raciocinio`).
+    case raciocinio(RaciocinioBruto)
 }
 
 /// Ferramenta no formato neutro (schema JSON como dicionário).

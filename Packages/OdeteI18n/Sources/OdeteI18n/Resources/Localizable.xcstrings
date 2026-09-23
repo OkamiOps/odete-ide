@@ -1821,6 +1821,34 @@
         }
       }
     },
+    "A chamada de %1$@ foi cortada: a resposta do modelo chegou ao limite de saída enquanto os argumentos eram escritos, então eles chegaram incompletos e nada foi executado. Divida o trabalho em partes menores (arquivos menores ou várias edições) e chame de novo.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The %1$@ call was cut off: the model's response hit its output limit while the arguments were being written, so they arrived incomplete and nothing was run. Split the work into smaller parts (smaller files or several edits) and call it again."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Aufruf von %1$@ wurde abgeschnitten: Die Antwort des Modells hat ihr Ausgabelimit erreicht, während die Argumente geschrieben wurden. Sie kamen unvollständig an, und nichts wurde ausgeführt. Teile die Arbeit in kleinere Schritte auf (kleinere Dateien oder mehrere Änderungen) und rufe ihn erneut auf."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L'appel à %1$@ a été coupé : la réponse du modèle a atteint sa limite de sortie pendant l'écriture des arguments, qui sont donc arrivés incomplets, et rien n'a été exécuté. Divise le travail en parties plus petites (fichiers plus petits ou plusieurs modifications) et relance l'appel."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La llamada a %1$@ se cortó: la respuesta del modelo llegó a su límite de salida mientras se escribían los argumentos, así que llegaron incompletos y no se ejecutó nada. Divide el trabajo en partes más pequeñas (archivos más pequeños o varias ediciones) y vuelve a llamarla."
+          }
+        }
+      }
+    },
     "A conta do GitHub não tem acesso a este repositório.": {
       "localizations": {
         "en": {
@@ -1877,7 +1905,7 @@
         }
       }
     },
-    "A conversa passou da janela de %1$@ fichas do modelo. Comece uma conversa nova.": {
+    "A conversa passou da janela de %1$@ tokens do modelo. Comece uma conversa nova.": {
       "localizations": {
         "en": {
           "stringUnit": {
@@ -1894,13 +1922,13 @@
         "fr": {
           "stringUnit": {
             "state": "translated",
-            "value": "La conversation dépasse la fenêtre de %1$@ jetons du modèle. Commencez-en une nouvelle."
+            "value": "La conversation dépasse la fenêtre de %1$@ tokens du modèle. Commence-en une nouvelle."
           }
         },
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "La conversación pasó de la ventana de %1$@ fichas del modelo. Empieza una nueva."
+            "value": "La conversación pasó de la ventana de %1$@ tokens del modelo. Empieza una nueva."
           }
         }
       }
@@ -2101,6 +2129,62 @@
         }
       }
     },
+    "A resposta chegou incompleta: a conexão fechou antes do fim. Tente de novo.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The response arrived incomplete: the connection closed before the end. Try again."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Antwort kam unvollständig an: Die Verbindung wurde vor dem Ende geschlossen. Versuch es noch einmal."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La réponse est arrivée incomplète : la connexion s'est fermée avant la fin. Réessaie."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La respuesta llegó incompleta: la conexión se cerró antes del final. Inténtalo de nuevo."
+          }
+        }
+      }
+    },
+    "A resposta foi cortada: o modelo chegou ao limite de saída dele antes de terminar. Peça para continuar ou divida o pedido em partes menores.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The response was cut off: the model hit its output limit before finishing. Ask it to continue or split the request into smaller parts."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Antwort wurde abgeschnitten: Das Modell hat sein Ausgabelimit erreicht, bevor es fertig war. Bitte es weiterzumachen oder teile die Anfrage in kleinere Teile auf."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La réponse a été coupée : le modèle a atteint sa limite de sortie avant de terminer. Demande-lui de continuer ou divise la demande en parties plus petites."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La respuesta se cortó: el modelo llegó a su límite de salida antes de terminar. Pídele que continúe o divide el pedido en partes más pequeñas."
+          }
+        }
+      }
+    },
     "A sessão da conta %1$@ expirou. Reconecte em Ajustes → Contas.": {
       "localizations": {
         "en": {
@@ -2153,6 +2237,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "La sesión de la cuenta se cayó. Reconecta en Ajustes → Cuentas."
+          }
+        }
+      }
+    },
+    "A sessão expirou. Reconecte a conta em Ajustes.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The session expired. Reconnect the account in Settings."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Sitzung ist abgelaufen. Verbinde das Konto in den Einstellungen neu."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La session a expiré. Reconnecte le compte dans Réglages."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La sesión expiró. Vuelve a conectar la cuenta en Ajustes."
           }
         }
       }
@@ -3553,6 +3665,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Antes de la terminal"
+          }
+        }
+      }
+    },
+    "Anthropic · assinatura Pro/Max": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anthropic · Pro/Max subscription"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anthropic · Pro/Max-Abo"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anthropic · abonnement Pro/Max"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anthropic · suscripción Pro/Max"
           }
         }
       }
@@ -6185,6 +6325,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Conecta una cuenta en Ajustes → Cuentas para usar el agente."
+          }
+        }
+      }
+    },
+    "Conecte uma conta em Ajustes → Contas.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect an account in Settings → Accounts."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Verbinde ein Konto unter Einstellungen → Konten."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connecte un compte dans Réglages → Comptes."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Conecta una cuenta en Ajustes → Cuentas."
           }
         }
       }
@@ -9601,6 +9769,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Hablar con el agente"
+          }
+        }
+      }
+    },
+    "Faltou o argumento obrigatório \"%1$@\" nesta chamada de %2$@, então nada foi executado. Mande a chamada de novo com todos os argumentos.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The required argument \"%1$@\" is missing from this %2$@ call, so nothing was run. Send the call again with all arguments."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In diesem Aufruf von %2$@ fehlt das Pflichtargument \"%1$@\", daher wurde nichts ausgeführt. Sende den Aufruf erneut mit allen Argumenten."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L'argument obligatoire « %1$@ » manque dans cet appel à %2$@, donc rien n'a été exécuté. Renvoie l'appel avec tous les arguments."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Falta el argumento obligatorio \"%1$@\" en esta llamada a %2$@, así que no se ejecutó nada. Envía la llamada de nuevo con todos los argumentos."
           }
         }
       }
@@ -14449,6 +14645,34 @@
         }
       }
     },
+    "O filtro de conteúdo do provedor interrompeu a resposta. Reescreva o pedido ou escolha outro modelo.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The provider's content filter stopped the response. Rephrase the request or pick another model."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Inhaltsfilter des Anbieters hat die Antwort unterbrochen. Formuliere die Anfrage um oder wähle ein anderes Modell."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le filtre de contenu du fournisseur a interrompu la réponse. Reformule la demande ou choisis un autre modèle."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El filtro de contenido del proveedor interrumpió la respuesta. Reformula el pedido o elige otro modelo."
+          }
+        }
+      }
+    },
     "O filtro de segurança da Apple barrou este pedido. Reescreva o pedido ou escolha outro modelo no seletor.": {
       "localizations": {
         "en": {
@@ -14841,6 +15065,118 @@
         }
       }
     },
+    "O modelo pausou o turno %1$@ vezes seguidas. Mande de novo para continuar.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The model paused the turn %1$@ times in a row. Send again to continue."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das Modell hat den Durchgang %1$@-mal hintereinander pausiert. Sende erneut, um weiterzumachen."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le modèle a mis le tour en pause %1$@ fois de suite. Renvoie pour continuer."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El modelo pausó el turno %1$@ veces seguidas. Envía de nuevo para continuar."
+          }
+        }
+      }
+    },
+    "O modelo recusou este pedido (categoria: %1$@). Reescreva o pedido ou escolha outro modelo.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The model declined this request (category: %1$@). Rephrase the request or pick another model."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das Modell hat diese Anfrage abgelehnt (Kategorie: %1$@). Formuliere die Anfrage um oder wähle ein anderes Modell."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le modèle a refusé cette demande (catégorie : %1$@). Reformule la demande ou choisis un autre modèle."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El modelo rechazó este pedido (categoría: %1$@). Reformula el pedido o elige otro modelo."
+          }
+        }
+      }
+    },
+    "O modelo recusou este pedido. Reescreva o pedido ou escolha outro modelo.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The model declined this request. Rephrase the request or pick another model."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das Modell hat diese Anfrage abgelehnt. Formuliere die Anfrage um oder wähle ein anderes Modell."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le modèle a refusé cette demande. Reformule la demande ou choisis un autre modèle."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El modelo rechazó este pedido. Reformula el pedido o elige otro modelo."
+          }
+        }
+      }
+    },
+    "O modelo recusou este pedido: %1$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The model declined this request: %1$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das Modell hat diese Anfrage abgelehnt: %1$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le modèle a refusé cette demande : %1$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El modelo rechazó este pedido: %1$@"
+          }
+        }
+      }
+    },
     "O preview abre aqui e recarrega sozinho toda vez que você salva.": {
       "localizations": {
         "en": {
@@ -15205,6 +15541,34 @@
         }
       }
     },
+    "OpenAI · conta ChatGPT": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OpenAI · ChatGPT account"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OpenAI · ChatGPT-Konto"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OpenAI · compte ChatGPT"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OpenAI · cuenta de ChatGPT"
+          }
+        }
+      }
+    },
     "Opções da busca": {
       "localizations": {
         "en": {
@@ -15257,6 +15621,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Opciones de %1$@"
+          }
+        }
+      }
+    },
+    "Os argumentos desta chamada de %1$@ não são um JSON válido, então nada foi executado. Mande a chamada de novo com um objeto JSON válido. Recebido: %2$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The arguments of this %1$@ call are not valid JSON, so nothing was run. Send the call again with a valid JSON object. Received: %2$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Argumente dieses Aufrufs von %1$@ sind kein gültiges JSON, daher wurde nichts ausgeführt. Sende den Aufruf erneut mit einem gültigen JSON-Objekt. Erhalten: %2$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les arguments de cet appel à %1$@ ne sont pas un JSON valide, donc rien n'a été exécuté. Renvoie l'appel avec un objet JSON valide. Reçu : %2$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Los argumentos de esta llamada a %1$@ no son un JSON válido, así que no se ejecutó nada. Envía la llamada de nuevo con un objeto JSON válido. Recibido: %2$@"
           }
         }
       }
@@ -22849,6 +23241,34 @@
         }
       }
     },
+    "chave de API e URL base": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "API key and base URL"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "API-Schlüssel und Basis-URL"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "clé d'API et URL de base"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "clave de API y URL base"
+          }
+        }
+      }
+    },
     "chega na Fase %1$@": {
       "localizations": {
         "en": {
@@ -26289,6 +26709,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "next build todavía no funciona en el iPad; usa next dev"
+          }
+        }
+      }
+    },
+    "no aparelho": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "on device"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "auf dem Gerät"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "sur l'appareil"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "en el dispositivo"
           }
         }
       }

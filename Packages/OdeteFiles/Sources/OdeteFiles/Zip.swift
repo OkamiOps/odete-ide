@@ -402,9 +402,13 @@ public enum Zip {
 
     static func dosTime(_ d: Date) -> (time: UInt16, date: UInt16) {
         let c = Calendar(identifier: .gregorian).dateComponents([.year, .month, .day, .hour, .minute, .second], from: d)
-        let time = UInt16((c.hour ?? 0) << 11 | (c.minute ?? 0) << 5 | (c.second ?? 0) / 2)
-        let date = UInt16(max((c.year ?? 1980) - 1980, 0) << 9 | (c.month ?? 1) << 5 | (c.day ?? 1))
-        return (time, date)
+        // Em partes com tipo explícito: numa expressão só, o Xcode do CI desiste de inferir
+        // os tipos ("unable to type-check this expression in reasonable time").
+        let hora: Int = c.hour ?? 0, minuto: Int = c.minute ?? 0, segundo: Int = c.second ?? 0
+        let ano: Int = max((c.year ?? 1980) - 1980, 0), mes: Int = c.month ?? 1, dia: Int = c.day ?? 1
+        let time: Int = (hora << 11) | (minuto << 5) | (segundo / 2)
+        let date: Int = (ano << 9) | (mes << 5) | dia
+        return (UInt16(truncatingIfNeeded: time), UInt16(truncatingIfNeeded: date))
     }
 }
 

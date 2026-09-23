@@ -17,7 +17,17 @@
   };
 
   const LOADERS = { ".js": "js", ".mjs": "js", ".cjs": "js", ".jsx": "jsx", ".ts": "ts", ".mts": "ts", ".cts": "ts", ".tsx": "tsx", ".json": "json", ".css": "css", ".txt": "text", ".md": "text", ".svg": "dataurl", ".png": "dataurl", ".jpg": "dataurl", ".jpeg": "dataurl", ".gif": "dataurl", ".webp": "dataurl", ".woff": "dataurl", ".woff2": "dataurl", ".ttf": "dataurl", ".wasm": "binary" };
-  const loaderFor = (p) => LOADERS[path.extname(p).toLowerCase()] || "file";
+  // `a.module.css` é CSS Modules: `import s from "./a.module.css"` recebe o mapa das classes.
+  // Com o loader `css` ele recebia `{}`, calado.
+  const loaderFor = (p) => (/\.module\.css$/i.test(p) ? "local-css" : LOADERS[path.extname(p).toLowerCase()] || "file");
+
+  // Frases para a pessoa ler, na língua do app: o Esbuild.swift põe a tabela em
+  // `__odeteTextos`, com os `%1$@` do `tr()`.
+  globalThis.__odeteTexto = (k, ...a) => {
+    const t = (globalThis.__odeteTextos && globalThis.__odeteTextos[k]) || k;
+    return t.replace(/%(\d+)\$@/g, (_, n) => String(a[Number(n) - 1]));
+  };
+  const texto = globalThis.__odeteTexto;
 
   // ---- memória entre builds ----
   // O rebuild incremental do esbuild só pula a análise de quem chegou igual: o plugin
@@ -37,11 +47,21 @@
   // `node_modules.nosync` é onde os pacotes moram de verdade em projeto do iCloud.
   const ehDoProjeto = (p) => p.indexOf("/node_modules/") < 0 && p.indexOf("/node_modules.nosync/") < 0;
 
+  // O CSS pronto (Sass, Tailwind) e o glob também guardam coisa por arquivo; e um tsconfig
+  // ou vite.config que muda muda os aliases, e com eles a resolução.
   globalThis.__esqueceArquivos = (caminhos, estrutura) => {
-    for (const c of caminhos || []) { leituras.delete(c); mtimes.delete(c); }
-    if (estrutura) geracaoDeResolucao++;
+    for (const c of caminhos || []) { leituras.delete(c); mtimes.delete(c); comGlob.delete(c); }
+    if (estrutura || (caminhos || []).some((c) => globalThis.__odeteAlias && globalThis.__odeteAlias.ehConfig(c))) geracaoDeResolucao++;
+    if (globalThis.__odeteEstilos) globalThis.__odeteEstilos.esquece(caminhos);
+    if (globalThis.__odeteTailwind) globalThis.__odeteTailwind.esquece(caminhos);
   };
-  globalThis.__esqueceTudo = () => { leituras.clear(); mtimes.clear(); geracaoDeResolucao++; };
+  globalThis.__esqueceTudo = () => {
+    leituras.clear(); mtimes.clear(); comGlob.clear(); geracaoDeResolucao++;
+    if (globalThis.__odeteEstilos) globalThis.__odeteEstilos.esqueceTudo();
+    if (globalThis.__odeteTailwind) globalThis.__odeteTailwind.esqueceTudo();
+  };
+  // Arquivo do app → tem `import.meta.glob`? Guardado até ele mudar.
+  const comGlob = new Map();
   // Só o que ainda é dependência de alguém fica: um arquivo que saiu do grafo deixa de
   // ser vigiado, e bytes guardados dele ficariam velhos sem ninguém avisar.
   globalThis.__guardaSo = (vivos) => {
@@ -148,24 +168,88 @@
     return out;
   }
 
-  // plugin: resolve via o loader Node do host (node_modules, exports) e lê do disco
+  // Os módulos do Node (a mesma lista do ResolucaoDoNavegador.swift).
+  const EMBUTIDOS_DO_NODE = new Set(["assert", "assert/strict", "async_hooks", "buffer", "child_process", "cluster", "console", "constants",
+    "crypto", "dgram", "diagnostics_channel", "dns", "dns/promises", "domain", "events", "fs", "fs/promises", "http", "http2", "https",
+    "inspector", "module", "net", "os", "path", "path/posix", "path/win32", "perf_hooks", "process", "punycode", "querystring", "readline",
+    "readline/promises", "repl", "stream", "stream/consumers", "stream/promises", "stream/web", "string_decoder", "sys", "timers",
+    "timers/promises", "tls", "trace_events", "tty", "url", "util", "util/types", "v8", "vm", "wasi", "worker_threads", "zlib"]);
+
+  // Como o esbuild chama a importação: o `@import` de CSS resolve com a condição `style`, e
+  // o `require()` com `require` no lugar de `import`.
+  const modoDe = (kind) => (kind === "import-rule" || kind === "composes-from" ? "style" : kind === "require-call" || kind === "require-resolve" ? "require" : "import");
+
+  // O módulo do Node que o código do navegador importou (`fs`, `node:crypto`), como o
+  // `__vite-browser-external` do Vite: existe, é vazio, e diz no console quem tentou usar
+  // o quê — em vez de derrubar a página com "Dynamic require of … is not supported".
+  const moduloEmbutido = (nome) => "module.exports = new Proxy({}, { get(_, k) {\n" +
+    '  if (typeof k === "symbol" || k === "__esModule" || k === "then" || k === "default") return undefined;\n' +
+    "  console.warn(" + JSON.stringify("[odete] " + texto("embutidoNoNavegador", nome) + " (" + nome + ".") + " + String(k) + \")\");\n" +
+    "  return undefined;\n} });\n";
+
+  // plugin: resolve como o navegador (ou como o Node, no pacote do servidor do Next) e lê
+  // do disco
   const fsPlugin = (root, opts = {}) => ({
     name: "odete-fs",
     setup(build) {
       // Com memória, a resolução de cada import também fica guardada entre rebuilds: são
       // centenas de idas ao nativo por build num projeto de verdade, para a mesma resposta.
-      let resolvidos = new Map(), geracao = geracaoDeResolucao;
+      let resolvidos = new Map(), geracao = geracaoDeResolucao, versaoDosAliases = -1;
+      // O pacote que roda no navegador resolve como navegador: condição `browser`, campo
+      // `browser`, versão ESM. O do servidor do Next (`platform: "node"`) segue como Node.
+      const navegador = (opts.platform || "browser") !== "node";
+      let declaradas = null;
+      // Os aliases conferem a config uma vez por build; se ela mudou, o que estava guardado
+      // pode ter resolvido pelo alias velho.
+      build.onStart(() => {
+        if (!opts.vigiados) opts.vigiados = new Set();
+        declaradas = null;
+        const v = globalThis.__odeteAlias.prepara(root, opts.vigiados);
+        if (v !== versaoDosAliases) { versaoDosAliases = v; resolvidos = new Map(); }
+      });
       build.onResolve({ filter: /.*/ }, (args) => {
         if (!opts.memoria) return resolve(args);
         if (geracao !== geracaoDeResolucao) { resolvidos = new Map(); geracao = geracaoDeResolucao; }
-        const chave = args.importer + "\0" + args.path;
+        const chave = args.importer + "\0" + args.kind + "\0" + args.path;
         const guardado = resolvidos.get(chave);
         if (guardado) return guardado;
         const r = resolve(args);
         if (r && !r.errors) resolvidos.set(chave, r);
         return r;
       });
+      // O que o CSS e os recursos do Vite leem fora do esbuild vai para `vigiados` (o dev
+      // server vigia), e as pastas onde arquivo novo importa, para `faltando`.
+      const ctx = () => ({
+        root, vigiados: opts.vigiados || (opts.vigiados = new Set()), pastas: opts.faltando || new Set(),
+        dev: opts.dev !== false, novo: opts.dev === false, limiteDeInline: opts.limiteDeInline,
+      });
+      // Pacote que está no package.json e ainda não foi instalado: no dev ele vem do esm.sh,
+      // mesmo que tenha nome de módulo do Node (o `buffer` e o `events` do npm).
+      const declarada = (nome) => {
+        if (!declaradas) {
+          declaradas = new Set();
+          try {
+            const pkg = JSON.parse(fs.readFileSync(path.join(root, "package.json"), "utf8"));
+            for (const k of Object.keys(Object.assign({}, pkg.dependencies || {}, pkg.devDependencies || {}))) declaradas.add(k);
+          } catch (e) { /* sem package.json */ }
+        }
+        return declaradas.has(nome);
+      };
+      const resolveNoHost = (spec, importer, kind) => (navegador ? H.resolveNavegador(spec, importer, modoDe(kind)) : H.resolve(spec, importer));
       const resolve = (args) => {
+        // `?raw`, `?url`, `?inline`, `?worker`: o arquivo resolve como sempre e o conteúdo
+        // sai por outro caminho (vite-recursos.js).
+        const consulta = navegador && args.path.indexOf("?") > 0 ? globalThis.__odeteVite.separa(args.path) : null;
+        if (consulta) {
+          // Com um `kind` que não é import de código: o arquivo de um pacote
+          // (`pdfjs-dist/…/pdf.worker.mjs?url`) não vai para o pacote de dependências.
+          const r = resolve(Object.assign({}, args, { path: consulta.caminho, kind: "odete-consulta" }));
+          if (!r || r.errors || r.external || r.namespace !== "file") return r;
+          // Um namespace por tipo: o mesmo arquivo com `?raw` e com `?url` são dois módulos. E o
+          // caminho vai sem o `?` — com ele, o esbuild levava o `?url` para o nome do arquivo
+          // que sai em dist/.
+          return { path: r.path, namespace: "odete-consulta-" + consulta.consulta, pluginData: { params: consulta.params } };
+        }
         // O arquivo real por trás de uma ilha. Precisa ser tratado aqui, e não num
         // `onResolve` próprio: o genérico é registrado primeiro e engoliria o prefixo.
         if (args.path.startsWith("odete-real:")) {
@@ -191,6 +275,7 @@
             return { path: chave, namespace: "odete-virtual" };
           }
         }
+        if (navegador && args.path.startsWith("node:")) return embutido(args.path.slice(5), args);
         if (/^(https?:|data:|node:)/.test(args.path)) return { path: args.path, external: true };
         // Externos pedidos por quem chamou: no render do Next o React precisa ser o
         // mesmo do servidor, e `next/*` é atendido por substitutos nossos. Empacotar
@@ -200,27 +285,75 @@
         }
         if (args.path.startsWith("virtual:") ) return { path: args.path, namespace: "virtual" };
         const importer = args.importer || path.join(root, "index.js");
-        // condição browser: tenta "browser"/"import" antes de "require"
-        let r = H.resolve(args.path, importer);
         const bare = !args.path.startsWith(".") && !args.path.startsWith("/");
+        // `@/components/Botao`: o alias do vite.config ou o `paths` do tsconfig, antes de
+        // procurar pacote. Cada alvo em ordem; o primeiro que existe ganha. Nenhum existindo,
+        // vale a resolução comum (o `paths` do TypeScript também cai nela), e só se ela
+        // também falhar o erro fala do alias — é ele que a pessoa escreveu errado.
+        if (bare) {
+          const alvos = globalThis.__odeteAlias.aplica(root, args.path, opts.vigiados, importer);
+          if (alvos) {
+            for (const alvo of alvos) {
+              const r = resolveCaminho(alvo, args, importer, !path.isAbsolute(alvo), true);
+              if (r && !r.errors) return r;
+            }
+            const comum = resolveCaminho(args.path, args, importer, bare, true);
+            if (comum && !comum.errors) return comum;
+            if (opts.externalMissing && !path.isAbsolute(alvos[0]) && !alvos[0].startsWith(".")) return { path: alvos[0], external: true };
+            const onde = path.isAbsolute(alvos[0]) ? path.relative(root, alvos[0]) : alvos[0];
+            return { errors: [{ text: texto("aliasSemArquivo", args.path, onde, path.relative(root, importer)) }] };
+          }
+        }
+        return resolveCaminho(args.path, args, importer, bare);
+      };
+      const embutido = (nome, args) => {
+        const r = { path: nome, namespace: "odete-embutido" };
+        // No build de produção o aviso sai também no terminal, como o Vite faz.
+        if (opts.dev === false && args.importer) r.warnings = [{ text: texto("embutidoAviso", nome, path.relative(root, args.importer)) }];
+        return r;
+      };
+      // `tentativa`: um dos alvos de um alias. Não achar não vira externo (o import map não
+      // conhece `@/lib/utils`), e quem chamou decide o erro.
+      const resolveCaminho = (spec, args, importer, bare, tentativa) => {
+        let r = resolveNoHost(spec, importer, args.kind);
+        // No pacote do Node (o servidor do Next, o `@plugin` do Tailwind), `path` e `fs` são
+        // do runtime: ficam de fora e o `require` dele atende.
+        if (!navegador && r && typeof r === "object" && EMBUTIDOS_DO_NODE.has(spec)) return { path: spec, external: true };
+        if (r && typeof r === "object" && r.vazio) return { path: spec, namespace: "odete-vazio" };
+        if (r && typeof r === "object" && r.embutido) {
+          if (opts.externalMissing && declarada(spec.split("/")[0])) return { path: spec, external: true };
+          return embutido(r.embutido, args);
+        }
+        // `baseUrl` do tsconfig: `import "components/Botao"` com `baseUrl: "src"`.
+        if (r && typeof r === "object" && bare) {
+          const daBase = globalThis.__odeteAlias.daBase(root, spec);
+          const rb = daBase ? resolveNoHost(daBase, importer, args.kind) : null;
+          if (typeof rb === "string") { r = rb; bare = false; }
+        }
         // Caminho absoluto que não existe no disco é da raiz do projeto, como no Vite
         // (`import "/src/util"`, `url(/src/fundo.png)`). E no CSS, se nem lá existe, é um
         // endereço do site — o `url(/fundo.png)` de um arquivo de public/ —, que fica como
         // está (com o `base` na frente); antes derrubava o build inteiro por "não achei".
-        if (r && typeof r === "object" && args.path.startsWith("/") && !args.path.startsWith(root + "/")) {
-          const daRaiz = H.resolve(path.join(root, args.path), importer);
+        if (r && typeof r === "object" && spec.startsWith("/") && !spec.startsWith(root + "/")) {
+          const daRaiz = resolveNoHost(path.join(root, spec), importer, args.kind);
           if (typeof daRaiz === "string") r = daRaiz;
           else if (args.kind === "url-token") {
             const pre = opts.base && opts.base !== "./" ? opts.base : "/";
-            return { path: pre + args.path.slice(1), external: true };
+            return { path: pre + spec.slice(1), external: true };
           }
         }
         if (r && typeof r === "object") {
-          if (opts.externalMissing && bare) return { path: args.path, external: true }; // vai pelo import map (esm.sh)
+          // Vai pelo import map (esm.sh) — só JS: um `@import "pacote"` de CSS externo chegava
+          // ao navegador cru, e a folha sumia calada em vez de dizer que falta instalar.
+          if (opts.externalMissing && bare && !tentativa && modoDe(args.kind) !== "style" && args.kind !== "url-token") return { path: spec, external: true };
+          // Pacote para rodar no motor (o Tailwind 3, um `@plugin`): o que falta fica para o
+          // `require` dele, como no Node — o `require("@tailwindcss/line-clamp")` opcional,
+          // dentro de um try, não pode derrubar o build.
+          if (opts.pacoteFaltandoFora && bare) return { path: spec, external: true };
           // A pasta onde o arquivo que falta nasceria: o observador passa a olhar lá, e o
           // import quebrado se conserta sozinho quando o arquivo aparece.
-          if (!bare && opts.faltando) opts.faltando.add(path.dirname(path.resolve(path.dirname(importer), args.path)));
-          return { errors: [{ text: bare ? `Não achei o pacote "${args.path}" (importado por ${path.relative(root, importer)}). Rode npm install.` : `Não achei "${args.path}" importado por ${path.relative(root, importer)}.` }] };
+          if (!bare && opts.faltando) opts.faltando.add(path.dirname(path.resolve(path.dirname(importer), spec)));
+          return { errors: [{ text: bare ? `Não achei o pacote "${spec}" (importado por ${path.relative(root, importer)}). Rode npm install.` : `Não achei "${spec}" importado por ${path.relative(root, importer)}.` }] };
         }
         if (r.startsWith("node:")) return { path: r, external: true };
         // O resolvedor do runtime devolve `src/./App.tsx` para `./App`. Normalizado, o
@@ -281,6 +414,14 @@
         const chave = JSON.stringify(args.path.slice(0, -SUFIXO_DEP_CJS.length));
         return { contents: `module.exports = globalThis.__odeteDep(${chave});\n`, loader: "js" };
       });
+      // `"browser": { "./node.js": false }`: o pacote diz que no navegador isto não existe.
+      // Módulo vazio, como o esbuild faz.
+      build.onLoad({ filter: /.*/, namespace: "odete-vazio" }, () => ({ contents: "module.exports = {};\n", loader: "js" }));
+      build.onLoad({ filter: /.*/, namespace: "odete-embutido" }, (args) => ({ contents: moduloEmbutido(args.path), loader: "js" }));
+      for (const tipo of ["raw", "url", "inline", "worker", "sharedworker"]) {
+        build.onLoad({ filter: /.*/, namespace: "odete-consulta-" + tipo }, (args) =>
+          globalThis.__odeteVite.carrega(args.path, tipo, (args.pluginData && args.pluginData.params) || [tipo], ctx()));
+      }
       // Fronteira de cliente: um módulo que começa com "use client" roda nos dois lados.
       // No servidor ele vira uma ilha — o componente real renderiza dentro de uma marca
       // que diz ao navegador qual módulo montar ali e com que props. Sem isso o Preview
@@ -336,11 +477,38 @@
             return { contents: linhas.join("\n"), loader: "js", resolveDir: path.dirname(args.path) };
           }
         }
+        // Sass, Less, CSS Modules e CSS com Tailwind (estilos.js). O `.css` comum segue pelo
+        // carregador de sempre.
+        if (globalThis.__odeteEstilos.ehEstilo(args.path) && globalThis.__odeteEstilos.precisa(args.path)) {
+          anotaMtime(args.path);
+          return globalThis.__odeteEstilos.carrega(args.path, ctx());
+        }
         return carregaArquivo(args);
       });
+      // `import.meta.glob` num arquivo do app: a lista de arquivos vira imports comuns. Sai
+      // de novo a cada build, sem a memória de bytes — um arquivo novo na pasta muda a lista
+      // sem mudar o arquivo que importa.
+      // A resposta "não tem" fica guardada com a data do arquivo: o `vite build` não passa
+      // pelo observador, e um glob escrito entre dois builds tem de ser visto.
+      const comGlobDoApp = (p) => {
+        if (!CODIGO_DE_PACOTE.test(p) || !ehDoProjeto(p)) return null;
+        let mt = null;
+        try { mt = fs.statSync(p).mtimeMs; } catch (e) { return null; }
+        const g = comGlob.get(p);
+        if (g && g.mt === mt && !g.tem) return null;
+        let t;
+        try { t = fs.readFileSync(p, "utf8"); } catch (e) { return null; }
+        const tem = t.indexOf("import.meta.glob") >= 0;
+        comGlob.set(p, { mt, tem });
+        if (!tem) return null;
+        anotaMtime(p);
+        return globalThis.__odeteVite.transformaGlob(t, p, root, ctx());
+      };
       const carregaArquivo = (args) => {
         const loader = loaderFor(args.path);
         const final = loader === "file" ? "dataurl" : loader;
+        const glob = comGlobDoApp(args.path);
+        if (glob != null) return { contents: glob, loader: final, resolveDir: path.dirname(args.path) };
         // Com memória, o que vai ao esbuild são bytes: texto seria recodificado em UTF-8 a
         // cada build, e bytes atravessam para o wasm como estão.
         if (opts.memoria) {
@@ -474,6 +642,9 @@ const __odeteChama = (id) => async (...args) => {
     // O bundle do app com dependências pré-empacotadas começa importando o pacote delas:
     // pela regra do ESM, ele roda antes de qualquer linha do app.
     if (opts.banner) o.banner = { js: opts.banner };
+    // Produção sai com o CSS aninhado achatado, como o Vite (lightningcss) entrega para os
+    // navegadores que ele mira: o `@apply hover:x` do Tailwind escreve `&:hover { … }`.
+    if (opts.dev === false && o.platform === "browser") o.supported = { nesting: false };
     // Os nomes do `vite build`: `assets/index-<hash>.js`, e o que o bundle referencia
     // pelo endereço de onde o site é servido (o `base`).
     if (opts.entryNames) o.entryNames = opts.entryNames;
@@ -508,7 +679,9 @@ const __odeteChama = (id) => async (...args) => {
   // dependências. Um `.env` com VITE_X novo, por exemplo, muda os defines e a chave.
   globalThis.__opcoesQueMudamASaida = (opts) => {
     const o = opcoes(opts);
-    return JSON.stringify([o.format, o.platform, o.target, o.jsx, o.jsxDev, o.minify, o.define, o.loader, o.resolveExtensions, o.mainFields, o.conditions, !!opts.externalMissing]);
+    // `RESOLUCAO` muda quando a resolução muda de regra: um pacote guardado com a versão
+    // de Node dos pacotes (antes da resolução de navegador) não serve mais.
+    return JSON.stringify([RESOLUCAO, o.format, o.platform, o.target, o.jsx, o.jsxDev, o.minify, o.define, o.loader, o.resolveExtensions, o.mainFields, o.conditions, !!opts.externalMissing]);
   };
 
   // Os arquivos que o build leu, em caminho absoluto, a partir do metafile. Módulos que
@@ -525,12 +698,23 @@ const __odeteChama = (id) => async (...args) => {
     return out;
   }
 
+  const RESOLUCAO = "navegador-1";
+
+  // Os arquivos lidos fora do esbuild (o `@use` do Sass, os arquivos que o Tailwind
+  // varreu, o tsconfig dos aliases) são dependência do build tanto quanto os do metafile.
+  function comVigiados(entradas, vigiados) {
+    if (!entradas || !vigiados || !vigiados.size) return entradas;
+    const todos = new Set(entradas);
+    for (const f of vigiados) todos.add(f);
+    return [...todos];
+  }
+
   // Resultado cru, para quem está no JS: as saídas continuam sendo os objetos do esbuild,
   // com `contents` (bytes), `hash` e o `text` preguiçoso. Comparar o hash diz se a saída
   // mudou sem decodificar nada; servir os bytes evita decodificar e recodificar o bundle.
   const sucesso = (r, opts) => ({
     ok: true, saidas: r.outputFiles || [], warnings: r.warnings.map(fmtMsg), errors: [],
-    entradas: entradasDe(opts.root, r.metafile), faltando: opts.faltando ? [...opts.faltando] : [],
+    entradas: comVigiados(entradasDe(opts.root, r.metafile), opts.vigiados), faltando: opts.faltando ? [...opts.faltando] : [],
     dependencias: opts.preempacota ? dependenciasDe(r.metafile) : null,
   });
   const falha = (e, opts) => ({
@@ -541,6 +725,7 @@ const __odeteChama = (id) => async (...args) => {
   globalThis.__buildBruto = async (opts) => {
     await ready;
     if (opts.metafile) opts.faltando = new Set();
+    opts.vigiados = new Set();
     try {
       return sucesso(await globalThis.esbuild.build(opcoes(opts)), opts);
     } catch (e) {
@@ -586,6 +771,7 @@ const __odeteChama = (id) => async (...args) => {
     }
     const vez = c.fila.then(async () => {
       c.opts.faltando = new Set();
+      c.opts.vigiados = new Set();
       try {
         const ctx = await c.ctx;
         return sucesso(await ctx.rebuild(), c.opts);

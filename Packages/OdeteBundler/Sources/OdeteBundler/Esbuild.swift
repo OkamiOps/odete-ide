@@ -188,6 +188,19 @@ public final class Esbuild: @unchecked Sendable {
                     String(contentsOf: js.appending(path: "bundler.js"), encoding: .utf8),
                     name: "bundler.js"
                 )
+                try await engine.evaluate(
+                    "globalThis.__odeteTextos = \(Self.textosDoMotor());",
+                    name: "textos.js"
+                )
+                // O que o plugin do bundler.js chama: aliases, CSS (Sass, Less, Tailwind) e
+                // os recursos do Vite (glob, `?raw`, `?url`…). Valem no dev server, no build
+                // avulso e no `vite build`.
+                for arquivo in ["alias.js", "tailwind.js", "estilos.js", "vite-recursos.js"] {
+                    try await engine.evaluate(
+                        String(contentsOf: js.appending(path: arquivo), encoding: .utf8),
+                        name: arquivo
+                    )
+                }
                 let v = try await engine.call(
                     "__esbuildInit",
                     [res.appending(path: "browser.js").path, res.appending(path: "esbuild.wasm").path]
@@ -198,6 +211,23 @@ public final class Esbuild: @unchecked Sendable {
             return nova
         }
         return try await t.value
+    }
+
+    /// As frases que o JS do motor mostra à pessoa (erro de build, aviso no console do
+    /// Preview), traduzidas aqui: o `tr()` só existe do lado do Swift. Os `%1$@` ficam
+    /// para o JS preencher (`__odeteTexto`, no bundler.js).
+    static func textosDoMotor() -> String {
+        let t: [String: String] = [
+            "aliasSemArquivo": tr("O alias de \"%1$@\" aponta para %2$@, que não existe (importado por %3$@)."),
+            "embutidoNoNavegador": tr("O módulo \"%1$@\" é do Node e não existe no navegador: aqui ele é um módulo vazio."),
+            "embutidoAviso": tr("O módulo \"%1$@\" é do Node e virou um módulo vazio no navegador (importado por %2$@)."),
+            "estiloSemPacote": tr("Para compilar %2$@ é preciso o pacote %1$@: rode npm i -D %1$@"),
+            "tailwindImport": tr("Tailwind: não achei \"%1$@\" (a partir de %2$@)."),
+            "tailwindModulo": tr("Tailwind: não consegui carregar %1$@."),
+            "tailwindV3SemPostcss": tr("O Tailwind 3 precisa do pacote postcss: rode npm i -D postcss"),
+        ]
+        let dados = (try? JSONSerialization.data(withJSONObject: t, options: [.sortedKeys])) ?? Data("{}".utf8)
+        return String(decoding: dados, as: UTF8.self)
     }
 
     public func transform(_ code: String, loader: String, options: [String: Any] = [:]) async throws -> String {

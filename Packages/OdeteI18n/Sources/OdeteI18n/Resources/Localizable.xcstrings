@@ -15821,6 +15821,34 @@
         }
       }
     },
+    "O Tailwind 3 precisa do pacote postcss: rode npm i -D postcss": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tailwind 3 needs the postcss package: run npm i -D postcss"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tailwind 3 braucht das Paket postcss: führe npm i -D postcss aus"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tailwind 3 a besoin du paquet postcss : lance npm i -D postcss"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tailwind 3 necesita el paquete postcss: ejecuta npm i -D postcss"
+          }
+        }
+      }
+    },
     "O agente só edita com a sua aprovação": {
       "localizations": {
         "en": {
@@ -15845,6 +15873,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "El agente solo edita con tu aprobación"
+          }
+        }
+      }
+    },
+    "O alias de \"%1$@\" aponta para %2$@, que não existe (importado por %3$@).": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The alias \"%1$@\" points to %2$@, which doesn't exist (imported by %3$@)."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Alias \"%1$@\" zeigt auf %2$@, das nicht existiert (importiert von %3$@)."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L'alias \"%1$@\" pointe vers %2$@, qui n'existe pas (importé par %3$@)."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El alias \"%1$@\" apunta a %2$@, que no existe (importado por %3$@)."
           }
         }
       }
@@ -16545,6 +16601,62 @@
           "stringUnit": {
             "state": "translated",
             "value": "El modelo rechazó este pedido: %1$@"
+          }
+        }
+      }
+    },
+    "O módulo \"%1$@\" é do Node e não existe no navegador: aqui ele é um módulo vazio.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The module \"%1$@\" belongs to Node and doesn't exist in the browser: here it is an empty module."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das Modul \"%1$@\" gehört zu Node und existiert im Browser nicht: hier ist es ein leeres Modul."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le module \"%1$@\" appartient à Node et n'existe pas dans le navigateur : ici, c'est un module vide."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El módulo \"%1$@\" es de Node y no existe en el navegador: aquí es un módulo vacío."
+          }
+        }
+      }
+    },
+    "O módulo \"%1$@\" é do Node e virou um módulo vazio no navegador (importado por %2$@).": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The module \"%1$@\" belongs to Node and became an empty module in the browser (imported by %2$@)."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das Modul \"%1$@\" gehört zu Node und wurde im Browser zu einem leeren Modul (importiert von %2$@)."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le module \"%1$@\" appartient à Node et est devenu un module vide dans le navigateur (importé par %2$@)."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El módulo \"%1$@\" es de Node y quedó como un módulo vacío en el navegador (importado por %2$@)."
           }
         }
       }
@@ -17581,6 +17693,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Paleta de comandos"
+          }
+        }
+      }
+    },
+    "Para compilar %2$@ é preciso o pacote %1$@: rode npm i -D %1$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compiling %2$@ needs the %1$@ package: run npm i -D %1$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Um %2$@ zu kompilieren, brauchst du das Paket %1$@: führe npm i -D %1$@ aus"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pour compiler %2$@, il te faut le paquet %1$@ : lance npm i -D %1$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Para compilar %2$@ hace falta el paquete %1$@: ejecuta npm i -D %1$@"
           }
         }
       }
@@ -21053,6 +21193,62 @@
           "stringUnit": {
             "state": "translated",
             "value": "Tablas"
+          }
+        }
+      }
+    },
+    "Tailwind: não achei \"%1$@\" (a partir de %2$@).": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tailwind: couldn't find \"%1$@\" (from %2$@)."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tailwind: \"%1$@\" nicht gefunden (ausgehend von %2$@)."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tailwind : \"%1$@\" introuvable (depuis %2$@)."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tailwind: no encontré \"%1$@\" (desde %2$@)."
+          }
+        }
+      }
+    },
+    "Tailwind: não consegui carregar %1$@.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tailwind: couldn't load %1$@."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tailwind: %1$@ konnte nicht geladen werden."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tailwind : impossible de charger %1$@."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tailwind: no pude cargar %1$@."
           }
         }
       }

@@ -15,6 +15,8 @@ public final class JSEngine: @unchecked Sendable {
         rt = JSRuntime(cwd: cwd, env: e, argv: [])
         rt.output = output
         ModuleLoader.install(rt)
+        // O motor é o do bundler: o que ele empacota para o navegador resolve como navegador.
+        ResolucaoDoNavegador.install(rt)
     }
 
     public func setTransform(_ t: @escaping @Sendable (String, String) throws -> String) {

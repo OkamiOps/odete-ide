@@ -382,9 +382,25 @@ globalThis.__devCria = function () {
       const pacotes = state.pre.ligado ? `<link rel="stylesheet" href="/@odete/deps.css?de=${encodeURIComponent(rel)}">` : "";
       return `${pacotes}<link rel="stylesheet" href="/@odete/css/${rel}"><script type="module" src="/@odete/js/${rel}"></script>`;
     });
+    src = src.replace(/<link\b[^>]*>/g, folhaDoProjeto);
     const head = importMap() + CLIENT;
     src = src.includes("</head>") ? src.replace("</head>", head + "</head>") : head + src;
     return src;
+  }
+
+  // `<link rel="stylesheet" href="/src/style.css">`, o jeito do guia do Tailwind com Vite:
+  // servida crua, a folha chegava com o `@import "tailwindcss"` sem processar. Ela passa
+  // pelo mesmo build que o CSS importado do JS (Tailwind, Sass, Less) e, em /@odete/css/,
+  // troca sem recarregar a página. Folha de fora ou de public/ fica como está.
+  function folhaDoProjeto(tag) {
+    if (!/rel\s*=\s*["']?stylesheet/i.test(tag)) return tag;
+    const m = /href\s*=\s*["']([^"']+)["']/i.exec(tag);
+    if (!m || /^(?:[a-z]+:)?\/\//i.test(m[1]) || m[1].startsWith("/@odete/")) return tag;
+    const rel = m[1].split("?")[0].replace(/^\.?\//, "");
+    if (!/\.(css|scss|sass|less)$/i.test(rel)) return tag;
+    const f = path.join(state.root, rel);
+    if (!f.startsWith(state.root + "/") || f.startsWith(path.join(state.root, "public") + "/") || !fs.existsSync(f)) return tag;
+    return tag.replace(m[0], `href="/@odete/css/${rel}"`);
   }
 
   // Um 404 seco não diz nada a quem acabou de subir o servidor e vê a tela em branco.

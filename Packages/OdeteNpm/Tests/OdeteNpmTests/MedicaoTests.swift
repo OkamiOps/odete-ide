@@ -1,6 +1,7 @@
 import CryptoKit
 import Darwin
 import Foundation
+import OdeteI18n
 @testable import OdeteNpm
 import Synchronization
 import Testing
@@ -98,6 +99,12 @@ func resumoDoDisco(_ raiz: URL) -> (arquivos: Int, bytes: Int, hash: String) {
 @Suite(.serialized)
 struct MedicaoTests {
     static let total = 120
+
+    /// O fim da resolução é reconhecido pela frase em português; no simulador em inglês
+    /// ela chegaria traduzida e a marca nunca seria posta.
+    init() {
+        Texto.escolher(.ptBR)
+    }
 
     func registroGrande() -> (FakeRegistry, deps: [String: String], comprimido: Int) {
         let r = FakeRegistry()

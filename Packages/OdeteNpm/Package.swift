@@ -21,7 +21,10 @@ let package = Package(
         ),
         .testTarget(
             name: "OdeteNpmTests",
-            dependencies: ["OdeteNpm", .product(name: "OdeteFiles", package: "OdeteFiles")]
+            dependencies: [
+                "OdeteNpm", .product(name: "OdeteFiles", package: "OdeteFiles"),
+                .product(name: "OdeteI18n", package: "OdeteI18n"),
+            ]
         ),
     ]
 )

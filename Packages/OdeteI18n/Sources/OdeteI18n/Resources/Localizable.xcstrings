@@ -57,6 +57,34 @@
         }
       }
     },
+    "  [nativo, não roda]": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "  [native, doesn't run]"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "  [nativ, läuft nicht]"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "  [natif, ne tourne pas]"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "  [nativo, no funciona]"
+          }
+        }
+      }
+    },
     "  kill all para derrubar antes de subir outro": {
       "localizations": {
         "en": {
@@ -837,6 +865,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "%1$@ paquete(s) de otros sistemas ignorado(s): "
+          }
+        }
+      }
+    },
+    "%1$@ pacote(s) instalado(s)": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ package(s) installed"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ Paket(e) installiert"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ paquet(s) installé(s)"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ paquete(s) instalado(s)"
           }
         }
       }
@@ -21197,6 +21253,34 @@
         }
       }
     },
+    "aviso: %1$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "warning: %1$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Warnung: %1$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "avertissement : %1$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "advertencia: %1$@"
+          }
+        }
+      }
+    },
     "aviso: %1$@ não instalados; o preview vai buscar no esm.sh": {
       "localizations": {
         "en": {
@@ -21305,6 +21389,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "aviso: typescript@%1$@ es el compilador nativo (Go); su tsc no funciona en el iPad. Para comprobar tipos aquí: npm i -D typescript@6"
+          }
+        }
+      }
+    },
+    "baixando %1$@ pacote(s)…": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "downloading %1$@ package(s)…"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ Paket(e) werden heruntergeladen…"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "téléchargement de %1$@ paquet(s)…"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "descargando %1$@ paquete(s)…"
           }
         }
       }
@@ -23997,6 +24109,34 @@
         }
       }
     },
+    "ignorado: %1$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ignored: %1$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ignoriert: %1$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ignoré : %1$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ignorado: %1$@"
+          }
+        }
+      }
+    },
     "index.html estático": {
       "localizations": {
         "en": {
@@ -26681,6 +26821,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "redirigir al agente…"
+          }
+        }
+      }
+    },
+    "registro: %1$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "registry: %1$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registry: %1$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "registre : %1$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "registro: %1$@"
           }
         }
       }

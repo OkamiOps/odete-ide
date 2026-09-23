@@ -28421,6 +28421,34 @@
         }
       }
     },
+    "este é o primeiro commit do repositório: não há commit anterior para onde voltar": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "this is the repository's first commit: there is no earlier commit to go back to"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "das ist der erste Commit des Repositorys: es gibt keinen früheren Commit, zu dem du zurückkannst"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "c'est le premier commit du dépôt : il n'y a pas de commit précédent où revenir"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "este es el primer commit del repositorio: no hay un commit anterior al que volver"
+          }
+        }
+      }
+    },
     "externo": {
       "localizations": {
         "en": {

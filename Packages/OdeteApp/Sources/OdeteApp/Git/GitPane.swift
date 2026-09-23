@@ -354,7 +354,7 @@ struct CommitBox: View {
                     .labelStyle(.iconOnly)
                     .buttonStyle(.glass)
                     .controlSize(.small)
-                    .disabled(git.busy || git.log.isEmpty)
+                    .disabled(git.busy || git.log.count < 2)
                 }
             }
             if !git.conflicts.isEmpty {

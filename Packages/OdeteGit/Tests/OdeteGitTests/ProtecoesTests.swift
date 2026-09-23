@@ -44,6 +44,22 @@ struct ProtecoesTests {
         Texto.escolher(.ptBR)
     }
 
+    /// Desfazer o único commit: frase em português, não "parent 0 does not exist".
+    @Test func desfazerOPrimeiroCommitDizPorQueNao() async throws {
+        let (repo, url) = try tempRepo()
+        defer { try? FileManager.default.removeItem(at: url) }
+        try write(url, "a.txt", "a\n")
+        try await repo.stageAll()
+        try await repo.commit(message: "um", author: me)
+        do {
+            try await repo.undoLastCommit()
+            Issue.record("devia recusar")
+        } catch let e as GitError {
+            #expect(e.message.contains("primeiro commit"))
+        }
+        #expect(try await repo.log(limit: 5).count == 1)
+    }
+
     // MARK: 1. push recusado pelo servidor
 
     /// O remoto aceita o pacote e recusa a ref (aqui, um lock na ref do bare; no GitHub,

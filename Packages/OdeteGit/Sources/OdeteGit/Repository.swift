@@ -331,7 +331,14 @@ public actor Repository {
     /// Volta HEAD um commit, mantendo as alterações no índice (reset --soft).
     public func undoLastCommit() throws {
         var head: OpaquePointer?
-        try check(git_revparse_single(&head, repo, "HEAD~1"), "commit anterior")
+        // O primeiro commit não tem pai: o libgit2 respondia "parent 0 does not exist".
+        guard git_revparse_single(&head, repo, "HEAD~1") == 0 else {
+            throw GitError(
+                kind: .invalid,
+                code: -1,
+                message: tr("este é o primeiro commit do repositório: não há commit anterior para onde voltar")
+            )
+        }
         defer { git_object_free(head) }
         try check(git_reset(repo, head, GIT_RESET_SOFT, nil), "desfazer commit")
     }

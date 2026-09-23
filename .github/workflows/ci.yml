@@ -1,9 +1,8 @@
 name: CI
 
-# Precisa de um runner com Xcode 26 ou mais novo: o projeto compila contra o SDK do
-# iOS 26 e os pacotes declaram `platforms: [.iOS(.v26)]`. Enquanto a imagem do GitHub
-# não tiver esse Xcode, o passo de setup falha aqui mesmo, dizendo o que falta, em vez
-# de quebrar no meio da compilação.
+# Precisa do Xcode 27: os pacotes declaram `platforms: [.iOS(.v26)]`, e o provedor da
+# Apple Intelligence usa APIs do SDK novo (`contextSize`, `PrivateCloudComputeLanguageModel`)
+# que o Xcode 26.3 da imagem macos-15 não tem — com ele o build parava no OdeteAgent.
 on:
   push:
     branches: [main, iOS]
@@ -15,14 +14,14 @@ concurrency:
 
 jobs:
   ios:
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
       - uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: latest-stable
+          xcode-version: '27'
 
       - name: Ferramentas
         run: brew install xcodegen swiftformat swiftlint

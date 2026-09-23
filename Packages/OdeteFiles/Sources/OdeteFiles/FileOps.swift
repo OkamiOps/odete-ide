@@ -228,9 +228,16 @@ public struct FileOps: Sendable {
         let novo = chegou?.standardizedFileURL.lastPathComponent
         // O que acabou de chegar vai na frente de tudo, mesmo empatado no segundo com
         // outros: ele conta entre os `manter` e nunca é o que sobra.
-        let ordenados = itens
-            .map { ($0, $0.lastPathComponent == novo ? Date.distantFuture : idade($0)) }
-            .sorted { $0.1 != $1.1 ? $0.1 > $1.1 : $0.0.lastPathComponent > $1.0.lastPathComponent }
+        let comData: [(URL, Date)] = itens.map { u in
+            let d: Date = u.lastPathComponent == novo ? .distantFuture : idade(u)
+            return (u, d)
+        }
+        let ordenados = comData.sorted { (a: (URL, Date), b: (URL, Date)) -> Bool in
+            if a.1 != b.1 {
+                return a.1 > b.1
+            }
+            return a.0.lastPathComponent > b.0.lastPathComponent
+        }
         for (i, (u, data)) in ordenados.enumerated() where u.lastPathComponent != novo {
             if i >= manter || data < limite {
                 try? fm.removeItem(at: u)

@@ -365,6 +365,34 @@
         }
       }
     },
+    "%1$@ Para continuar agora, escolha outro modelo no seletor.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ To keep going now, choose another model in the picker."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ Um jetzt weiterzumachen, wähle in der Auswahl ein anderes Modell."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ Pour continuer maintenant, choisis un autre modèle dans le sélecteur."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ Para seguir ahora, elige otro modelo en el selector."
+          }
+        }
+      }
+    },
     "%1$@ abertos": {
       "localizations": {
         "en": {
@@ -8625,6 +8653,34 @@
         }
       }
     },
+    "Este aparelho não roda o Apple Intelligence.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This device can't run Apple Intelligence."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dieses Gerät kann Apple Intelligence nicht ausführen."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cet appareil ne peut pas faire tourner Apple Intelligence."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Este dispositivo no puede ejecutar Apple Intelligence."
+          }
+        }
+      }
+    },
     "Este aparelho não é elegível para a nuvem privada da Apple.": {
       "localizations": {
         "en": {
@@ -10777,6 +10833,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Disposición"
+          }
+        }
+      }
+    },
+    "Ligue o Apple Intelligence em Ajustes › Apple Intelligence e Siri.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turn on Apple Intelligence in Settings › Apple Intelligence & Siri."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Schalte Apple Intelligence unter Einstellungen › Apple Intelligence & Siri ein."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Active Apple Intelligence dans Réglages › Apple Intelligence et Siri."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activa Apple Intelligence en Ajustes › Apple Intelligence y Siri."
           }
         }
       }
@@ -13409,6 +13493,342 @@
           "stringUnit": {
             "state": "translated",
             "value": "El diff del archivo en ese punto aparece aquí."
+          }
+        }
+      }
+    },
+    "O filtro de segurança da Apple barrou este pedido. Reescreva o pedido ou escolha outro modelo no seletor.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple's safety filter blocked this request. Rephrase it or choose another model in the picker."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apples Sicherheitsfilter hat diese Anfrage blockiert. Formuliere sie um oder wähle in der Auswahl ein anderes Modell."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le filtre de sécurité d’Apple a bloqué cette demande. Reformule-la ou choisis un autre modèle dans le sélecteur."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El filtro de seguridad de Apple bloqueó esta petición. Reescríbela o elige otro modelo en el selector."
+          }
+        }
+      }
+    },
+    "O modelo ainda está sendo baixado. Tente de novo daqui a pouco.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The model is still downloading. Try again shortly."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Das Modell wird noch geladen. Versuche es gleich noch einmal."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le modèle est encore en cours de téléchargement. Réessaie dans un instant."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El modelo todavía se está descargando. Prueba en un momento."
+          }
+        }
+      }
+    },
+    "O modelo da Apple ainda está respondendo ao pedido anterior. Espere terminar e tente de novo.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple's model is still answering the previous request. Wait for it to finish and try again."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apples Modell beantwortet noch die vorige Anfrage. Warte, bis es fertig ist, und versuche es erneut."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le modèle d’Apple répond encore à la demande précédente. Attends qu’il ait fini et réessaie."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El modelo de Apple todavía está respondiendo a la petición anterior. Espera a que termine y prueba de nuevo."
+          }
+        }
+      }
+    },
+    "O modelo da Apple ainda não está pronto neste aparelho. Confira em Ajustes › Apple Intelligence e Siri, ou escolha outro modelo no seletor.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple's model isn't ready on this device yet. Check Settings › Apple Intelligence & Siri, or choose another model in the picker."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apples Modell ist auf diesem Gerät noch nicht bereit. Sieh unter Einstellungen › Apple Intelligence & Siri nach oder wähle in der Auswahl ein anderes Modell."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le modèle d’Apple n’est pas encore prêt sur cet appareil. Vérifie dans Réglages › Apple Intelligence et Siri, ou choisis un autre modèle dans le sélecteur."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El modelo de Apple todavía no está listo en este dispositivo. Revisa Ajustes › Apple Intelligence y Siri, o elige otro modelo en el selector."
+          }
+        }
+      }
+    },
+    "O modelo da Apple demorou demais para responder. Tente de novo.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple's model took too long to answer. Try again."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apples Modell hat zu lange für die Antwort gebraucht. Versuche es erneut."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le modèle d’Apple a mis trop de temps à répondre. Réessaie."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El modelo de Apple tardó demasiado en responder. Prueba de nuevo."
+          }
+        }
+      }
+    },
+    "O modelo da Apple devolveu uma resposta que não deu para ler. Tente de novo.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple's model sent back a response that couldn't be read. Try again."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apples Modell hat eine Antwort geliefert, die sich nicht lesen ließ. Versuche es erneut."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le modèle d’Apple a renvoyé une réponse illisible. Réessaie."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El modelo de Apple devolvió una respuesta que no se pudo leer. Prueba de nuevo."
+          }
+        }
+      }
+    },
+    "O modelo da Apple falhou (%1$@). Tente de novo ou escolha outro modelo no seletor.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple's model failed (%1$@). Try again or choose another model in the picker."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apples Modell ist ausgefallen (%1$@). Versuche es erneut oder wähle in der Auswahl ein anderes Modell."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le modèle d’Apple a échoué (%1$@). Réessaie ou choisis un autre modèle dans le sélecteur."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El modelo de Apple falló (%1$@). Prueba de nuevo o elige otro modelo en el selector."
+          }
+        }
+      }
+    },
+    "O modelo da Apple não aceita algo deste pedido, como uma ferramenta ou um anexo. Escolha outro modelo no seletor.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple's model can't handle part of this request, like a tool or an attachment. Choose another model in the picker."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apples Modell kann einen Teil dieser Anfrage nicht verarbeiten, etwa ein Werkzeug oder einen Anhang. Wähle in der Auswahl ein anderes Modell."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le modèle d’Apple ne gère pas une partie de cette demande, comme un outil ou une pièce jointe. Choisis un autre modèle dans le sélecteur."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El modelo de Apple no admite parte de esta petición, como una herramienta o un adjunto. Elige otro modelo en el selector."
+          }
+        }
+      }
+    },
+    "O modelo da Apple não atende este idioma. Escolha outro modelo no seletor.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple's model doesn't support this language. Choose another model in the picker."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apples Modell unterstützt diese Sprache nicht. Wähle in der Auswahl ein anderes Modell."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le modèle d’Apple ne prend pas en charge cette langue. Choisis un autre modèle dans le sélecteur."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El modelo de Apple no admite este idioma. Elige otro modelo en el selector."
+          }
+        }
+      }
+    },
+    "O modelo da Apple recebeu pedidos demais. Espere alguns segundos e tente de novo.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple's model got too many requests. Wait a few seconds and try again."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apples Modell hat zu viele Anfragen bekommen. Warte ein paar Sekunden und versuche es erneut."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le modèle d’Apple a reçu trop de demandes. Attends quelques secondes et réessaie."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El modelo de Apple recibió demasiadas peticiones. Espera unos segundos y prueba de nuevo."
+          }
+        }
+      }
+    },
+    "O modelo da Apple se recusou a responder a este pedido. Reescreva o pedido ou escolha outro modelo no seletor.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple's model declined to answer this request. Rephrase it or choose another model in the picker."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apples Modell hat es abgelehnt, diese Anfrage zu beantworten. Formuliere sie um oder wähle in der Auswahl ein anderes Modell."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le modèle d’Apple a refusé de répondre à cette demande. Reformule-la ou choisis un autre modèle dans le sélecteur."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El modelo de Apple se negó a responder esta petición. Reescríbela o elige otro modelo en el selector."
+          }
+        }
+      }
+    },
+    "O modelo da Apple se recusou a responder: %1$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple's model declined to answer: %1$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apples Modell hat die Antwort abgelehnt: %1$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Le modèle d’Apple a refusé de répondre : %1$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El modelo de Apple se negó a responder: %1$@"
           }
         }
       }
@@ -18197,6 +18617,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "¿Reemplazar %1$@ ocurrencia(s) en %2$@ archivo(s)?"
+          }
+        }
+      }
+    },
+    "Trocar de modelo": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Switch model"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Modell wechseln"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Changer de modèle"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cambiar de modelo"
           }
         }
       }

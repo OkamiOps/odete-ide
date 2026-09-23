@@ -226,6 +226,47 @@ struct InstallerTests {
         #expect(rep2.failed["inexistente"] != nil)
     }
 
+    /// O que começa com ponto em node_modules é de ferramenta, não pacote: o cache de
+    /// dependências do dev server (`.odete-deps`) e o do Vite sobrevivem a install e
+    /// uninstall, na raiz e nos node_modules aninhados. Pacote que sobrou continua saindo.
+    @Test func pastasComPontoSobrevivemAoInstall() async throws {
+        let reg = registry()
+        let dir = try project(["a": "^1.0.0", "c": "^3.0.0"])
+        let inst = Installer(project: dir, registry: reg)
+        _ = try await inst.install()
+        let fm = FileManager.default
+        func cria(_ caminho: String, _ texto: String = "{}") throws {
+            let u = dir.appending(path: caminho)
+            try fm.createDirectory(at: u.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try texto.write(to: u, atomically: true, encoding: .utf8)
+        }
+        let guardados = [
+            "node_modules/.odete-deps/x.json", "node_modules/.odete-deps/x.js", "node_modules/.vite/deps/_metadata.json",
+            "node_modules/c/node_modules/.cache/y.json",
+        ]
+        for g in guardados {
+            try cria(g)
+        }
+        try cria("node_modules/lixo/package.json", #"{"name":"lixo"}"#)
+        try cria("node_modules/c/node_modules/lixo-aninhado/package.json", #"{"name":"lixo-aninhado"}"#)
+
+        _ = try await inst.install()
+        for g in guardados {
+            #expect(fm.fileExists(atPath: dir.appending(path: g).path), "o install apagou \(g)")
+        }
+        #expect(!fm.fileExists(atPath: dir.appending(path: "node_modules/lixo").path), "pacote que sobrou ficou")
+        #expect(!fm.fileExists(atPath: dir.appending(path: "node_modules/c/node_modules/lixo-aninhado").path))
+
+        try cria("node_modules/lixo/package.json", #"{"name":"lixo"}"#)
+        _ = try await inst.uninstall(["a"])
+        #expect(!fm.fileExists(atPath: dir.appending(path: "node_modules/a").path))
+        for g in guardados.prefix(3) {
+            #expect(fm.fileExists(atPath: dir.appending(path: g).path), "o uninstall apagou \(g)")
+        }
+        #expect(!fm.fileExists(atPath: dir.appending(path: "node_modules/lixo").path))
+        #expect(fm.fileExists(atPath: dir.appending(path: "node_modules/.bin/cee").path), "o .bin sumiu")
+    }
+
     @Test func nativoComEquivalenteEmbutidoNaoViraAviso() {
         for n in ["esbuild", "@esbuild/linux-x64", "@rollup/rollup-darwin-arm64", "fsevents", "@swc/core"] {
             #expect(Installer.cobertoPorDentro(n))

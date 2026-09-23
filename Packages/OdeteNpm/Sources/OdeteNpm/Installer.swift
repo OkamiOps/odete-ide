@@ -331,7 +331,12 @@ extension Installer {
             // Pelo caminho, não pela URL: `contentsOfDirectory(at:)` não atravessa link.
             guard let items = try? fm.contentsOfDirectory(atPath: pasta.path) else { return }
             for name in items {
-                if name == ".bin" || name == ".package-lock.json" {
+                // Nome de pacote npm nunca começa com ponto: o que começa é de ferramenta
+                // (`.bin`, `.package-lock.json`, o `.odete-deps` do dev server, o `.vite`,
+                // o `.cache`) e fica, como no npm. Apagar o `.odete-deps` a cada install
+                // jogava fora o pacote de dependências e o próximo `npm run dev` o refazia
+                // do zero — seis segundos de CPU num iPad sem JIT.
+                if name.hasPrefix(".") {
                     continue
                 }
                 let item = pasta.appending(path: name)

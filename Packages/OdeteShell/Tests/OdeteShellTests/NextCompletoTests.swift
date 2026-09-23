@@ -179,7 +179,7 @@ struct NextCompletoTests {
     /// `<Providers>{children}</Providers>` vira ilha: os filhos de servidor vão como HTML, e
     /// a ilha de cliente que mora neles enxerga o contexto do provider — trocar o tema no
     /// provider muda o que ela mostra.
-    @Test func providerComFilhosHidrataEPassaOContexto() async throws {
+    @Test(.semNavegadorNoCI) func providerComFilhosHidrataEPassaOContexto() async throws {
         guard let raiz = try await base.projeto([
             "app/Tema.tsx": """
             "use client";
@@ -241,7 +241,7 @@ struct NextCompletoTests {
 
     /// Uma ilha dentro de um flex não pode virar um item a mais: `<odete-ilha>` e
     /// `<odete-filhos>` são `display: contents`.
-    @Test func ilhaNaoMudaOLayout() async throws {
+    @Test(.semNavegadorNoCI) func ilhaNaoMudaOLayout() async throws {
         guard let raiz = try await base.projeto([
             "app/Item.tsx": """
             "use client";
@@ -273,7 +273,7 @@ struct NextCompletoTests {
 
     /// Uma ilha que usa `next/link` e os hooks de `next/navigation` renderiza igual nos
     /// dois lados e navega de verdade no Preview.
-    @Test func linkENavegacaoFuncionamNaIlha() async throws {
+    @Test(.semNavegadorNoCI) func linkENavegacaoFuncionamNaIlha() async throws {
         guard let raiz = try await base.projeto([
             "app/Nav.tsx": """
             "use client";
@@ -452,5 +452,16 @@ struct NextCompletoTests {
         #expect(css.contains("--background: #ffffff"), "o globals.css não chegou: \(css.prefix(300))")
         let (svg, rs) = try await pega(dev, "/next.svg")
         #expect(rs?.statusCode == 200 && svg.contains("<svg"))
+    }
+}
+
+extension Trait where Self == ConditionTrait {
+    /// Hidratação num WKWebView de verdade: no simulador do GitHub o WebKit leva minutos para
+    /// subir e o teste desiste por tempo. O CI liga `ODETE_SEM_NAVEGADOR`; na máquina, roda.
+    static var semNavegadorNoCI: Self {
+        .disabled(
+            if: ProcessInfo.processInfo.environment["ODETE_SEM_NAVEGADOR"] != nil,
+            "WKWebView lento demais no simulador do CI"
+        )
     }
 }

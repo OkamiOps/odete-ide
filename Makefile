@@ -12,10 +12,16 @@ gen:
 build: gen
 	xcodebuild -project Odete.xcodeproj -scheme Odete -destination '$(DEST)' -derivedDataPath $(DERIVED) -quiet build
 
+# Mostra só o resumo de cada pacote, mas falha se algum teste falhar: antes o `grep` no
+# fim do pipe engolia o código de saída do xcodebuild e o CI ficava verde com teste vermelho.
 unit:
-	@for p in OdeteI18n OdeteCore OdeteFiles OdeteEditor OdeteGit OdeteAccounts OdeteRuntime OdeteNpm OdeteBundler OdeteShell OdetePreview OdeteAgent OdeteSwift OdeteUI OdeteApp; do \
-	  (cd Packages/$$p && xcodebuild test -scheme $$p -destination '$(DEST)' -derivedDataPath ../../$(DERIVED) 2>&1 | grep -E "error:|✘|Test run with|TEST (SUCCEEDED|FAILED)") ; \
-	done
+	@falhou=""; for p in OdeteI18n OdeteCore OdeteFiles OdeteEditor OdeteGit OdeteAccounts OdeteRuntime OdeteNpm OdeteBundler OdeteShell OdetePreview OdeteAgent OdeteSwift OdeteUI OdeteApp; do \
+	  echo "== $$p"; \
+	  saida=$$(cd Packages/$$p && xcodebuild test -scheme $$p -destination '$(DEST)' -derivedDataPath ../../$(DERIVED) 2>&1); st=$$?; \
+	  printf '%s\n' "$$saida" | grep -E "error:|✘|Test run with|TEST (SUCCEEDED|FAILED)"; \
+	  [ $$st -eq 0 ] || falhou="$$falhou $$p"; \
+	done; \
+	if [ -n "$$falhou" ]; then echo "falharam:$$falhou"; exit 1; fi
 
 test: gen
 	xcodebuild -project Odete.xcodeproj -scheme Odete -destination '$(DEST)' -derivedDataPath $(DERIVED) -quiet test

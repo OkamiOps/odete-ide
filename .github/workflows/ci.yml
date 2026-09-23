@@ -39,4 +39,8 @@ jobs:
         run: make build DEST='generic/platform=iOS Simulator'
 
       - name: Testes dos pacotes
+        # O `TEST_RUNNER_` chega ao processo dos testes sem o prefixo. Desliga só os testes
+        # que precisam de um WKWebView de verdade, lento demais neste simulador.
+        env:
+          TEST_RUNNER_ODETE_SEM_NAVEGADOR: "1"
         run: make unit DEST='platform=iOS Simulator,name=iPhone 17'

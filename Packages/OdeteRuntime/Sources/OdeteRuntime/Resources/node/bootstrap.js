@@ -436,6 +436,19 @@
     class URL {
       constructor(input, base) {
         input = String(input).trim();
+        // Esquema especial (http, https, ws, wss, ftp): o WHATWG ignora quantas barras (ou
+        // contrabarras) vierem depois do `:` e lê a autoridade em seguida — `https:/x.com/`
+        // e `https:\\x.com` são `https://x.com/`. Sem barra nenhuma e com uma base do mesmo
+        // esquema, é caminho relativo a ela. O `@astrojs/rss` monta `https:/site/` assim.
+        // Nesses esquemas a contrabarra também é barra, até o `?` ou o `#`.
+        const esq = /^([a-zA-Z][a-zA-Z0-9+.-]*:)([\/\\]*)([\s\S]*)$/.exec(input);
+        if (esq && esq[1].toLowerCase() in SPECIAL && esq[1].toLowerCase() !== "file:") {
+          const corte = esq[3].search(/[?#]/);
+          const resto = corte < 0 ? esq[3].replace(/\\/g, "/") : esq[3].slice(0, corte).replace(/\\/g, "/") + esq[3].slice(corte);
+          const b = base === undefined ? null : base instanceof URL ? base : (() => { try { return new URL(String(base)); } catch { return null; } })();
+          if (!esq[2] && b && b.protocol === esq[1].toLowerCase()) input = resto;
+          else input = esq[1] + "//" + resto;
+        }
         let m = RE.exec(input);
         if (!m) throw new TypeError("Invalid URL: " + input);
         let [, protocol, user, pass, host, port, path, search, hash] = m;

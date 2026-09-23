@@ -4,9 +4,9 @@
 // mesmo `require` que resolve `node_modules` e transpila TSX — então a página é
 // executada aqui e devolvida como HTML.
 //
-// O renderizador de componentes de servidor é nosso: `renderToString` do React não
-// aceita componente `async`, e componente de servidor é exatamente isso. A passagem
-// abaixo executa a árvore, espera cada um e entrega ao React uma árvore já resolvida.
+// Componente de servidor é função `async`. Quem espera cada um é o renderizador de
+// streaming do próprio React (`renderToPipeableStream`, lido só quando tudo ficou pronto):
+// ele executa a árvore inteira, síncronos e async misturados, como o Next faz.
 (function (raiz) {
   "use strict";
 
@@ -59,8 +59,11 @@
   // ordem de precedência do Next. Vai acumulando os layouts de fora para dentro e os
   // parâmetros que os segmentos dinâmicos capturaram.
   function achaNaArvore(fs, path, dir, partes, camadas, params, alvo) {
+    // `template` embrulha como o layout, por dentro dele: para a Odete, que remonta a
+    // página a cada pedido, os dois são a mesma coisa.
     const meu = achaArquivo(fs, path, dir, "layout");
-    const cam = meu ? camadas.concat([meu]) : camadas;
+    const molde = alvo === "page" ? achaArquivo(fs, path, dir, "template") : null;
+    const cam = camadas.concat(meu ? [meu] : [], molde ? [molde] : []);
     const dins = dinamicosEm(fs, path, dir);
 
     if (!partes.length) {
@@ -117,8 +120,32 @@
     return {
       tipo: alvo === "route" ? "handler" : "app",
       pagina: r.arquivo, layouts: r.layouts, params: r.params, pasta: r.pasta,
+      carregando: alvo === "route" ? null : carregandoAte(fs, path, base, r.pasta),
+      icones: iconesDoApp(fs, path, base),
     };
   }
+
+  // `loading.tsx` vale do segmento para dentro: o mais perto da página, subindo até app/.
+  function carregandoAte(fs, path, base, pasta) {
+    for (let dir = pasta; dir && dir.startsWith(base); dir = path.dirname(dir)) {
+      const f = achaArquivo(fs, path, dir, "loading");
+      if (f) return f;
+      if (dir === base) break;
+    }
+    return null;
+  }
+
+  // Os ícones por convenção de arquivo (`app/favicon.ico`, `app/icon.png`): o Next os
+  // serve na raiz do site e põe o <link> no <head> sozinho.
+  const ICONES = ["favicon.ico", "icon.ico", "icon.png", "icon.svg", "icon.jpg", "apple-icon.png", "apple-icon.jpg"];
+  function iconesDoApp(fs, path, base) {
+    const out = [];
+    for (const n of ICONES) {
+      try { if (fs.statSync(path.join(base, n)).isFile()) out.push(n); } catch (e) { /* não tem */ }
+    }
+    return out;
+  }
+  function ehIconeDoApp(nome) { return ICONES.indexOf(nome) >= 0; }
 
   // Pages Router: `pages/index.tsx` é `/`, `pages/sobre.tsx` é `/sobre`,
   // `pages/post/[id].tsx` casa /post/o-que-for, e `_app` embrulha.
@@ -180,7 +207,7 @@
       const dir = path.join(base, ...partes.slice(0, i));
       if (!dir.startsWith(base)) continue;
       const f = achaArquivo(fs, path, dir, nome);
-      if (f) return { tipo: "app", pagina: f, layouts: i === 0 ? layoutsAte(fs, path, base, []) : layoutsAte(fs, path, base, partes.slice(0, i)), params: {} };
+      if (f) return { tipo: "app", pagina: f, layouts: i === 0 ? layoutsAte(fs, path, base, []) : layoutsAte(fs, path, base, partes.slice(0, i)), params: {}, icones: iconesDoApp(fs, path, base) };
     }
     return null;
   }
@@ -200,39 +227,57 @@
   }
 
   // ---- render ----
-  // `renderToString` não espera promessa, e componente de servidor é função async. Esta
-  // passagem executa a árvore antes: cada componente que é função async vira o que ele
-  // devolveu, recursivamente. É o pedaço de RSC que a gente escreve, e não importa.
-  async function resolveServidor(React, el, fundo) {
-    if (el == null || typeof el !== "object") return el;
-    if (Array.isArray(el)) return await Promise.all(el.map((x) => resolveServidor(React, x, fundo)));
-    if (!el.type) return el;
-    const tipo = el.type;
-    const ehAsync = typeof tipo === "function" &&
-      (tipo.constructor && tipo.constructor.name === "AsyncFunction");
-    if (ehAsync) {
-      if (fundo.profundidade > 64) throw new Error("componentes de servidor aninhados demais");
-      fundo.profundidade++;
-      const saida = await tipo(el.props || {});
-      fundo.profundidade--;
-      return await resolveServidor(React, saida, fundo);
-    }
-    const filhos = el.props && el.props.children;
-    if (filhos === undefined) return el;
-    const resolvidos = await resolveServidor(React, filhos, fundo);
-    if (resolvidos === filhos) return el;
-    return React.cloneElement(el, undefined, resolvidos);
+  // Componente de servidor é função async, e o `renderToString` não espera promessa: uma
+  // página síncrona com um filho async dava "A component suspended while responding to
+  // synchronous input". O renderizador de streaming espera — e `onAllReady` só chama
+  // quando a árvore inteira resolveu, então o HTML sai de uma vez, com cada fronteira de
+  // Suspense já no lugar, sem os scripts de troca que o streaming mandaria aos pedaços.
+  function renderizaTudo(servidor, el) {
+    return new Promise((resolve, reject) => {
+      const partes = [];
+      let erro = null;
+      const destino = {
+        write(c) { partes.push(typeof c === "string" ? Buffer.from(c, "utf8") : Buffer.from(c)); return true; },
+        end() { if (erro) reject(erro); else resolve(Buffer.concat(partes).toString("utf8")); },
+        on() { return destino; }, once() { return destino; }, off() { return destino; },
+        removeListener() { return destino; }, emit() { return true; }, destroy() {},
+      };
+      let fluxo = null;
+      try {
+        fluxo = servidor.renderToPipeableStream(el, {
+          onAllReady() { fluxo.pipe(destino); },
+          onShellError(e) { reject(erro || e); },
+          // `redirect()`, `notFound()` e o erro de um componente dentro de uma fronteira
+          // de Suspense não derrubam o shell: o React os entrega aqui e segue com o
+          // fallback. O primeiro fica guardado e quem chama recebe o erro, como recebia do
+          // `renderToString` — é ele que decide entre 307, not-found e error.
+          onError(e) { if (!erro) erro = e; },
+        });
+      } catch (e) {
+        reject(e);
+      }
+    });
   }
 
-  async function renderiza(ctx, rota, url) {
+  // `coletadas` recebe os ids das ilhas que a página usou.
+  async function renderiza(ctx, rota, url, coletadas) {
     const { React, servidor } = ctx;
-    const req = ctx.carrega;
+    // Layouts, loading e página vêm num pacote só (devserver.js, `carregaRota`): o que eles
+    // importam em comum é o mesmo módulo para todos.
+    const lista = rota.layouts.concat(rota.carregando ? [rota.carregando] : [], [rota.pagina]);
+    const mods = ctx.carregaRota ? await ctx.carregaRota(lista) : await Promise.all(lista.map((f) => ctx.carrega(f)));
+    const modDe = new Map(lista.map((f, i) => [f, mods[i]]));
+    const req = async (f) => modDe.get(f) || (await ctx.carrega(f));
     const pagina = await req(rota.pagina);
     const Page = pagina.default || pagina;
     if (typeof Page !== "function") throw new Error(rota.pagina + " não exporta um componente");
 
     const busca = {};
-    if (url && url.searchParams) for (const [k, v] of url.searchParams) busca[k] = v;
+    if (url && url.searchParams) {
+      for (const [k, v] of url.searchParams) {
+        busca[k] = Object.prototype.hasOwnProperty.call(busca, k) ? [].concat(busca[k], v) : v;
+      }
+    }
     // No Next 15 `params` e `searchParams` são promessas. Um objeto comum atende os
     // dois jeitos: `await params` devolve o próprio objeto, e `params.id` também lê.
     const params = rota.params || {};
@@ -240,6 +285,14 @@
     // `error.tsx` não recebe params: recebe o erro e o botão de tentar de novo.
     if (rota.props) props = Object.assign({}, props, rota.props);
     let el = React.createElement(Page, props);
+    // `loading.tsx` é o fallback de uma fronteira de Suspense em volta da página. Aqui a
+    // página só sai quando tudo resolveu, então ele não aparece — mas a fronteira fica,
+    // igual à do Next, e um erro lá dentro cai no mesmo lugar.
+    if (rota.carregando) {
+      const m = await req(rota.carregando);
+      const L = m.default || m;
+      if (typeof L === "function") el = React.createElement(React.Suspense, { fallback: React.createElement(L, {}) }, el);
+    }
 
     const metas = [];
     // layouts de fora para dentro: o primeiro da lista é o mais externo
@@ -250,41 +303,107 @@
       if (typeof L !== "function") continue;
       el = rota.tipo === "pages"
         ? React.createElement(L, { Component: Page, pageProps: props })
-        : React.createElement(L, { children: el });
+        : React.createElement(L, { params, children: el });
       if (rota.tipo === "pages") break; // _app já recebe a página inteira
     }
     metas.push(pagina);
 
-    const pronta = await resolveServidor(React, el, { profundidade: 0 });
-    const corpo = servidor.renderToString(pronta);
-    return { corpo, cabeca: await cabecaDeMetadata(metas, props) };
+    contextoDentro(React);
+    el = React.createElement(raiz.__odeteColeta.Provider, { value: coletadas || null }, el);
+    const corpo = await renderizaTudo(servidor, el);
+    return {
+      corpo,
+      cabeca: await cabecaDeMetadata(metas, props, rota.icones || []),
+      // O layout raiz do App Router escreve `<html>` e `<body>`; o React então devolve o
+      // documento inteiro, e o que é da Odete entra no `<head>` dele.
+      documento: /^\s*(<!doctype html>|<html[\s>])/i.test(corpo),
+    };
   }
 
   // `metadata` (objeto) e `generateMetadata` (função) de cada camada, do layout de fora
-  // para a página; o de dentro ganha.
-  async function cabecaDeMetadata(modulos, props) {
-    let junto = {};
+  // para a página; o de dentro ganha. `title.template` de um layout vale para os títulos
+  // dos segmentos de dentro, e `title.absolute` escapa dele.
+  async function cabecaDeMetadata(modulos, props, icones) {
+    let junto = {}, titulo = null, molde = null, viewport = null;
+    let pai = Promise.resolve({});
     for (const m of modulos) {
       if (!m) continue;
       let meta = null;
-      if (typeof m.generateMetadata === "function") meta = await m.generateMetadata(props);
+      if (typeof m.generateMetadata === "function") meta = await m.generateMetadata(props, pai);
       else if (m.metadata && typeof m.metadata === "object") meta = m.metadata;
-      if (meta) for (const k of Object.keys(meta)) junto[k] = meta[k];
+      if (typeof m.generateViewport === "function") viewport = Object.assign({}, viewport, await m.generateViewport(props));
+      else if (m.viewport && typeof m.viewport === "object") viewport = Object.assign({}, viewport, m.viewport);
+      if (!meta) continue;
+      let proximoMolde = molde;
+      const t = meta.title;
+      if (typeof t === "string") titulo = molde ? molde.replace(/%s/g, t) : t;
+      else if (t && typeof t === "object") {
+        if (t.absolute) titulo = t.absolute;
+        else if (t.default) titulo = t.default;
+        if (t.template) proximoMolde = t.template;
+      }
+      molde = proximoMolde;
+      for (const k of Object.keys(meta)) if (k !== "title") junto[k] = meta[k];
+      pai = Promise.resolve(Object.assign({}, junto, { title: titulo }));
     }
-    const partes = [];
+    const partes = ['<meta charset="utf-8">'];
     const esc = (v) => String(v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
-    const titulo = typeof junto.title === "object" && junto.title
-      ? (junto.title.absolute || junto.title.default || junto.title.template)
-      : junto.title;
+    const meta = (nome, v, prop) => {
+      if (v == null || v === "") return;
+      partes.push("<meta " + (prop ? "property" : "name") + '="' + nome + '" content="' + esc(v) + '">');
+    };
+    const vp = Object.assign({ width: "device-width", initialScale: 1 }, viewport || {});
+    const vpTexto = Object.keys(vp)
+      .filter((k) => k !== "themeColor" && k !== "colorScheme" && vp[k] != null)
+      .map((k) => k.replace(/[A-Z]/g, (c) => "-" + c.toLowerCase()) + "=" + (typeof vp[k] === "boolean" ? (vp[k] ? "yes" : "no") : vp[k]))
+      .join(", ");
+    meta("viewport", vpTexto);
+    if (typeof vp.themeColor === "string") meta("theme-color", vp.themeColor);
+    if (vp.colorScheme) meta("color-scheme", vp.colorScheme);
     if (titulo) partes.push("<title>" + esc(titulo) + "</title>");
-    if (junto.description) partes.push('<meta name="description" content="' + esc(junto.description) + '">');
-    if (junto.keywords) partes.push('<meta name="keywords" content="' + esc([].concat(junto.keywords).join(", ")) + '">');
-    if (junto.openGraph && junto.openGraph.title) {
-      partes.push('<meta property="og:title" content="' + esc(junto.openGraph.title) + '">');
+    meta("description", junto.description);
+    if (junto.keywords) meta("keywords", [].concat(junto.keywords).join(", "));
+    if (junto.applicationName) meta("application-name", junto.applicationName);
+    if (junto.generator) meta("generator", junto.generator);
+    if (junto.robots) meta("robots", typeof junto.robots === "string" ? junto.robots :
+      [junto.robots.index === false ? "noindex" : "index", junto.robots.follow === false ? "nofollow" : "follow"].join(", "));
+    if (junto.alternates && junto.alternates.canonical) {
+      partes.push('<link rel="canonical" href="' + esc(junto.alternates.canonical) + '">');
     }
-    if (junto.openGraph && junto.openGraph.description) {
-      partes.push('<meta property="og:description" content="' + esc(junto.openGraph.description) + '">');
+    const og = junto.openGraph;
+    if (og) {
+      meta("og:title", og.title || titulo, true);
+      meta("og:description", og.description || junto.description, true);
+      meta("og:url", og.url, true);
+      meta("og:site_name", og.siteName, true);
+      meta("og:type", og.type, true);
+      for (const i of [].concat(og.images || [])) meta("og:image", typeof i === "string" ? i : i && (i.url || i.src), true);
     }
+    const tw = junto.twitter;
+    if (tw) {
+      meta("twitter:card", tw.card);
+      meta("twitter:title", tw.title);
+      meta("twitter:description", tw.description);
+      for (const i of [].concat(tw.images || [])) meta("twitter:image", typeof i === "string" ? i : i && i.url);
+    }
+    // Ícones: os de `metadata.icons`, e na falta deles os arquivos de convenção de app/.
+    const ic = junto.icons;
+    if (ic) {
+      const lista = typeof ic === "string" || Array.isArray(ic) ? { icon: ic } : ic;
+      for (const rel of ["icon", "shortcut", "apple"]) {
+        for (const i of [].concat(lista[rel] || [])) {
+          const href = typeof i === "string" ? i : i && i.url;
+          if (href) partes.push('<link rel="' + (rel === "apple" ? "apple-touch-icon" : rel === "shortcut" ? "shortcut icon" : "icon") + '" href="' + esc(href) + '">');
+        }
+      }
+    } else {
+      for (const n of icones) {
+        partes.push(n.startsWith("apple-icon")
+          ? '<link rel="apple-touch-icon" href="/' + n + '">'
+          : '<link rel="icon" href="/' + n + '"' + (n === "favicon.ico" ? ' sizes="any"' : "") + ">");
+      }
+    }
+    if (junto.manifest) partes.push('<link rel="manifest" href="' + esc(junto.manifest) + '">');
     return partes.join("");
   }
 
@@ -308,27 +427,106 @@
   // Um componente de cliente renderiza normalmente no servidor, mas embrulhado numa
   // marca que carrega o módulo e as props. O navegador acha essas marcas e hidrata só
   // elas — o resto da página é HTML e continua sendo HTML.
-  function instalaIlhas(React, coletadas) {
+  //
+  // Filhos que vêm do servidor (`<Providers>{children}</Providers>`) não atravessam JSON:
+  // são árvore de componentes de servidor. O que atravessa é o HTML deles — renderizado
+  // aqui dentro de `<odete-filhos>`, e no navegador devolvido ao componente como um nó
+  // que mostra esse HTML (ilhas-cliente.js). É o papel do payload de RSC, feito com o
+  // que já está na página. O mesmo vale para qualquer prop que seja elemento.
+  //
+  // Um componente de cliente dentro de outro não é ilha: no navegador o de fora já o
+  // renderiza. O contexto `Dentro` diz se estamos dentro de uma ilha; os filhos que
+  // voltam para o servidor saem dele.
+  //
+  // Quem anota as ilhas usadas é outro contexto, com o conjunto do pedido: o módulo da
+  // página fica em cache e seu embrulho é criado uma vez só, e dois pedidos podem estar
+  // renderizando ao mesmo tempo — um conjunto preso no embrulho seria o do primeiro.
+  function contextoDentro(React) {
+    if (!raiz.__odeteDentro || raiz.__odeteDentroDe !== React) {
+      raiz.__odeteDentro = React.createContext(false);
+      raiz.__odeteColeta = React.createContext(null);
+      raiz.__odeteDentroDe = React;
+    }
+    return raiz.__odeteDentro;
+  }
+
+  function temElemento(React, v, fundo) {
+    if (React.isValidElement(v)) return true;
+    if (Array.isArray(v) && (fundo || 0) < 8) return v.some((x) => temElemento(React, x, (fundo || 0) + 1));
+    return false;
+  }
+
+  // As props como vão para o navegador. Data, Server Action e erro ganham uma marca que o
+  // navegador desfaz; elemento vira slot. O que não tem volta (uma função comum, um
+  // ciclo) torna a ilha estática — melhor do que hidratar com a prop faltando.
+  function serializaProps(React, props) {
+    const slots = {};
+    let ok = true;
+    const vistos = [];
+    const conv = (v, slot) => {
+      if (v === undefined) return undefined;
+      if (v === null || typeof v === "string" || typeof v === "number" || typeof v === "boolean") return v;
+      if (typeof v === "function") {
+        if (typeof v.$$id === "string") return { $odeteAcao: v.$$id, ligados: v.$$ligados || [] };
+        ok = false;
+        return null;
+      }
+      if (typeof v !== "object") { ok = false; return null; }
+      if (v instanceof Date) return { $odeteData: isNaN(v) ? null : v.toISOString() };
+      if (v instanceof Error) return { $odeteErro: { message: String(v.message), name: v.name, digest: v.digest } };
+      if (temElemento(React, v)) {
+        if (slot) { slots[slot] = v; return { $odeteSlot: slot }; }
+        ok = false;
+        return null;
+      }
+      if (vistos.indexOf(v) >= 0) { ok = false; return null; }
+      vistos.push(v);
+      let out;
+      if (Array.isArray(v)) out = v.map((x) => { const r = conv(x); return r === undefined ? null : r; });
+      else {
+        out = {};
+        for (const k of Object.keys(v)) { const r = conv(v[k]); if (r !== undefined) out[k] = r; }
+      }
+      vistos.pop();
+      return out;
+    };
+    const dados = {};
+    for (const k of Object.keys(props || {})) {
+      if (k === "ref" || k === "key") continue;
+      const r = conv(props[k], k);
+      if (r !== undefined) dados[k] = r;
+    }
+    let json = null;
+    if (ok) { try { json = JSON.stringify(dados); } catch (e) { json = null; } }
+    return { json, slots };
+  }
+
+  function instalaIlhas(React) {
+    const Dentro = contextoDentro(React);
+    const Coleta = raiz.__odeteColeta;
+    const h = React.createElement;
     raiz.__odeteIlha = function (modulo, exportado, Componente) {
-      if (typeof Componente !== "function") return Componente;
+      const ehComponente = typeof Componente === "function" ||
+        (Componente && typeof Componente === "object" && Componente.$$typeof);
+      // Um módulo "use client" também exporta hooks e utilitários (`useCarrinho`,
+      // `formata`). Embrulhados, deixariam de funcionar como funções: só vira ilha o que
+      // tem nome de componente.
+      if (!ehComponente || (exportado !== "default" && !/^[A-Z]/.test(exportado))) return Componente;
       const Ilha = function (props) {
-        const semFilhos = {};
-        let temFilhos = false;
-        for (const k of Object.keys(props || {})) {
-          if (k === "children") { temFilhos = true; continue; }
-          semFilhos[k] = props[k];
-        }
-        let dados = null;
-        try { dados = JSON.stringify(semFilhos); } catch (e) { dados = null; }
+        const dentro = React.useContext(Dentro);
+        const coletadas = React.useContext(Coleta);
+        if (dentro) return h(Componente, props);
         const id = modulo + "#" + exportado;
-        coletadas.add(id);
-        // Props que não atravessam JSON, ou filhos vindos do servidor, tornam a
-        // hidratação insegura: melhor a ilha ficar estática do que remontar errado.
-        const podeHidratar = dados !== null && !temFilhos;
-        return React.createElement(
+        if (coletadas) coletadas.add(id);
+        const s = serializaProps(React, props || {});
+        const reais = Object.assign({}, props);
+        for (const nome of Object.keys(s.slots)) {
+          reais[nome] = h(Dentro.Provider, { value: false }, h("odete-filhos", { "data-slot": nome }, s.slots[nome]));
+        }
+        return h(
           "odete-ilha",
-          podeHidratar ? { "data-ilha": id, "data-props": dados } : { "data-ilha": id, "data-estatica": "1" },
-          React.createElement(Componente, props)
+          s.json !== null ? { "data-ilha": id, "data-props": s.json } : { "data-ilha": id, "data-estatica": "1" },
+          h(Dentro.Provider, { value: true }, h(Componente, reais))
         );
       };
       Ilha.displayName = "Ilha(" + exportado + ")";
@@ -337,112 +535,42 @@
   }
 
 
-  // ---- next/font ----
+  // ---- next/font e os outros substitutos de `next/*` ----
   // A fonte é criada no topo do módulo, quando a rota carrega, e não a cada render. O
   // registro é do processo, e o <head> das páginas do projeto leva o que estiver
   // registrado — um pouco mais do que o Next mandaria em cada rota, e muito menos do
   // que não ter fonte nenhuma.
+  //
+  // Link, Image, fontes, dynamic e os hooks de navegação vêm da fábrica de
+  // next-cliente.js, a mesma que o navegador recebe: o que o servidor escreve é o que a
+  // hidratação espera encontrar.
   const fontes = { links: new Map(), regras: new Map() };
+  const registroDeFontes = {
+    link: (familia, url) => fontes.links.set(familia, url),
+    regra: (classe, css) => fontes.regras.set(classe, css),
+    arquivo: (caminho) => (typeof raiz.__odeteArquivoDeFonte === "function" ? raiz.__odeteArquivoDeFonte(caminho) : null),
+  };
 
-  function apelido(s) {
-    return String(s).replace(/[^A-Za-z0-9]+/g, "_").replace(/^_+|_+$/g, "").toLowerCase();
+  // O pedido que está sendo renderizado: é o que `usePathname`, `useSearchParams`,
+  // `headers()` e `cookies()` leem no servidor.
+  let requisicao = { pathname: "/", search: "", params: {}, headers: {} };
+  function defineRequisicao(r) {
+    requisicao = Object.assign({ pathname: "/", search: "", params: {}, headers: {} }, r || {});
+    acoes.rota = requisicao.pathname;
   }
 
-  function comAspas(f) {
-    return /^[A-Za-z0-9-]+$/.test(f) ? f : "'" + String(f).replace(/'/g, "") + "'";
-  }
-
-  function familiaCSS(familia, o) {
-    const lista = [comAspas(familia)].concat([].concat(o.fallback || []).map(comAspas));
-    lista.push(o.generico || "sans-serif");
-    return lista.join(", ");
-  }
-
-  // O que o Next devolve: `className` para aplicar a fonte, `variable` para quem prefere
-  // a custom property, e `style` para quem aplica direto no elemento.
-  function resultadoFonte(familia, o, antes) {
-    const classe = "__odete_fonte_" + apelido(familia);
-    const fam = familiaCSS(familia, o);
-    let css = (antes || "") + "." + classe + "{font-family:" + fam;
-    if (o.weight && !Array.isArray(o.weight)) css += ";font-weight:" + o.weight;
-    if (o.style && !Array.isArray(o.style)) css += ";font-style:" + o.style;
-    css += "}";
-    let variavel = "";
-    if (o.variable) {
-      variavel = classe + "_var";
-      css += "." + variavel + "{" + o.variable + ":" + fam + "}";
+  let fabrica = null;
+  function daFabrica(React) {
+    if (!fabrica || fabrica.React !== React) {
+      if (typeof raiz.__odeteNextFabrica !== "function") throw new Error("next-cliente.js não foi carregado");
+      fabrica = { React, m: raiz.__odeteNextFabrica(React, null, "servidor", () => requisicao) };
+      fabrica.fontes = fabrica.m.fontes(registroDeFontes);
     }
-    fontes.regras.set(classe, css);
-    return { className: classe, variable: variavel, style: { fontFamily: fam } };
+    return fabrica;
   }
 
-  function urlGoogle(familia, o) {
-    const pesos = [].concat(o.weight || []).map(String).filter((w) => w && w !== "variable");
-    const estilos = [].concat(o.style || []).map(String);
-    const nome = familia.replace(/ /g, "+");
-    let eixo = "";
-    if (estilos.indexOf("italic") >= 0) {
-      const ps = pesos.length ? pesos : ["400"];
-      const its = estilos.indexOf("normal") >= 0 || estilos.length > 1 ? [0, 1] : [1];
-      const pares = [];
-      for (const i of its) for (const w of ps) pares.push(i + "," + w);
-      eixo = ":ital,wght@" + pares.sort().join(";");
-    } else if (pesos.length) {
-      eixo = ":wght@" + pesos.slice().sort().join(";");
-    }
-    return "https://fonts.googleapis.com/css2?family=" + nome + eixo + "&display=" + (o.display || "swap");
-  }
-
-  function fonteGoogle(exportado, opcoes) {
-    const o = opcoes || {};
-    const familia = String(exportado).replace(/_/g, " ");
-    fontes.links.set(familia, urlGoogle(familia, o));
-    return resultadoFonte(familia, o);
-  }
-
-  const FORMATO = { woff2: "woff2", woff: "woff", ttf: "truetype", otf: "opentype", eot: "embedded-opentype" };
-
-  function fonteLocal(opcoes) {
-    const o = opcoes || {};
-    const entradas = [].concat(o.src || []);
-    const primeiro = typeof entradas[0] === "string" ? entradas[0] : (entradas[0] && entradas[0].path) || "fonte";
-    const familia = o.family || "Odete " + apelido(primeiro.split("/").pop().replace(/\.[^.]+$/, ""));
-    const faces = [];
-    for (const e of entradas) {
-      const caminho = typeof e === "string" ? e : e && e.path;
-      if (!caminho) continue;
-      const url = typeof raiz.__odeteArquivoDeFonte === "function" ? raiz.__odeteArquivoDeFonte(caminho) : null;
-      if (!url) continue;
-      const ext = (url.split(".").pop() || "").toLowerCase();
-      faces.push(
-        "@font-face{font-family:" + comAspas(familia) + ";src:url('" + url + "')" +
-        (FORMATO[ext] ? " format('" + FORMATO[ext] + "')" : "") +
-        ";font-weight:" + ((typeof e === "object" && e.weight) || o.weight || "400") +
-        ";font-style:" + ((typeof e === "object" && e.style) || o.style || "normal") +
-        ";font-display:" + (o.display || "swap") + "}"
-      );
-    }
-    return resultadoFonte(familia, o, faces.join(""));
-  }
-
-  // `next/font/google` exporta uma função por família, e não dá para saber quais antes
-  // de ver o import. Um Proxy no *protótipo* resolve qualquer nome — e no protótipo
-  // porque o interop CJS do esbuild copia as próprias chaves do módulo, que num Proxy
-  // vazio são nenhuma; pelo protótipo a busca cai no trap e o nome aparece.
-  function moduloFonteGoogle() {
-    return Object.create(new Proxy({}, {
-      get(_, nome) {
-        if (typeof nome !== "string") return undefined;
-        if (nome === "__esModule") return true;
-        return (opcoes) => fonteGoogle(nome, opcoes);
-      },
-      has() { return true; },
-    }));
-  }
-
-  function moduloFonteLocal() {
-    return { __esModule: true, default: fonteLocal };
-  }
+  function moduloFonteGoogle(React) { return daFabrica(React).fontes.moduloGoogle; }
+  function moduloFonteLocal(React) { return { __esModule: true, default: daFabrica(React).fontes.local }; }
 
   function cabecalhoDeFontes() {
     let s = "";
@@ -450,6 +578,40 @@
     const css = [...fontes.regras.values()].join("");
     if (css) s += "<style>" + css + "</style>";
     return s;
+  }
+
+  // `next/headers`: no Next 15 `headers()` e `cookies()` são promessas, antes eram
+  // síncronos. Um objeto comum atende os dois — `await` de um valor devolve o valor.
+  function moduloHeaders() {
+    return {
+      __esModule: true,
+      headers: () => new Cabecalhos(requisicao.headers || {}),
+      cookies: () => {
+        const b = biscoitosDoPedido((requisicao.headers || {}).cookie);
+        return Object.assign(b, { set() { return b; }, delete() { return b; }, toString: () => (requisicao.headers || {}).cookie || "" });
+      },
+      draftMode: () => ({ isEnabled: false, enable() {}, disable() {} }),
+    };
+  }
+
+  // O módulo que o `require` da página recebe no lugar de `next/<nome>`.
+  function substituto(spec, React) {
+    const nome = spec.slice("next/".length);
+    if (nome === "server") return moduloNextServer();
+    if (nome === "navigation") return moduloNavegacao(React);
+    if (nome === "cache") return moduloCache();
+    if (nome === "headers") return moduloHeaders();
+    if (nome === "font/google") return moduloFonteGoogle(React);
+    if (nome === "font/local") return moduloFonteLocal(React);
+    const f = daFabrica(React).m;
+    if (nome === "link") return { __esModule: true, default: f.Link, useLinkStatus: f.useLinkStatus };
+    if (nome === "image") return { __esModule: true, default: f.Image, getImageProps: f.getImageProps };
+    if (nome === "head") return { __esModule: true, default: f.Head };
+    if (nome === "dynamic") return { __esModule: true, default: f.dynamic };
+    if (nome === "script") return { __esModule: true, default: f.Script };
+    if (nome === "router") return { __esModule: true, useRouter: f.useRouterPages, default: f.roteador };
+    if (nome === "form") return { __esModule: true, default: (props) => React.createElement("form", props) };
+    throw new Error("Odete ainda não tem substituto para " + spec);
   }
 
   // ---- next/server e middleware ----
@@ -664,6 +826,8 @@
       return fn.apply(null, ligados.concat(Array.prototype.slice.call(arguments)));
     };
     acao.$$id = id;
+    // A ilha que recebe a ação como prop chama pela rede com os mesmos argumentos ligados.
+    acao.$$ligados = ligados;
     acao.$$FORM_ACTION = function () {
       const dados = new Campos([[CAMPO, id]]);
       if (ligados.length) {
@@ -699,33 +863,18 @@
     };
   }
 
-  function rotaDasAcoes(p) { acoes.rota = p; }
+  function rotaDasAcoes(p) { defineRequisicao(Object.assign({}, requisicao, { pathname: p })); }
 
   function acaoPorId(id) { return acoes.registro.get(id) || null; }
 
   // `redirect()` e `notFound()` do Next funcionam lançando: quem chama não segue adiante.
   const REDIR = "__odeteRedirect", NAOACHOU = "__odeteNotFound";
 
-  function moduloNavegacao() {
-    const lanca = (url, status) => {
-      const e = new Error("NEXT_REDIRECT");
-      e[REDIR] = String(url); e.status = status;
-      throw e;
-    };
-    return {
-      __esModule: true,
-      redirect: (url) => lanca(url, 307),
-      permanentRedirect: (url) => lanca(url, 308),
-      notFound: () => { const e = new Error("NEXT_NOT_FOUND"); e[NAOACHOU] = true; throw e; },
-      RedirectType: { push: "push", replace: "replace" },
-      usePathname: () => acoes.rota,
-      useSearchParams: () => new URLSearchParams(),
-      useRouter: () => ({
-        push: () => {}, replace: () => {}, back: () => {}, forward: () => {},
-        refresh: () => {}, prefetch: () => {},
-      }),
-      useParams: () => ({}),
-    };
+  // O servidor precisa das duas metades: os hooks, que um componente de cliente chama
+  // enquanto é renderizado aqui, e o `redirect()` que lança a marca que `leErroDeNavegacao`
+  // lê. As duas vêm da fábrica, que é a mesma do navegador.
+  function moduloNavegacao(React) {
+    return Object.assign({ __esModule: true }, daFabrica(React).m.navegacao);
   }
 
   // O Preview re-renderiza a cada requisição: não há cache para invalidar.
@@ -745,7 +894,7 @@
   }
 
   raiz.__next = {
-    rota, renderiza, resolveServidor, instalaIlhas,
+    rota, renderiza, instalaIlhas, substituto, defineRequisicao, ehIconeDoApp,
     moduloFonteGoogle, moduloFonteLocal, cabecalhoDeFontes,
     moduloNextServer, pedidoNext, casaMatcher, leResposta, regexDoMatcher,
     instalaAcoes, rotaDasAcoes, acaoPorId, moduloNavegacao, moduloCache,

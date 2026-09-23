@@ -291,18 +291,29 @@ globalThis.__devCria = function () {
     globalThis.__esqueceArquivos(alterados, estrutura);
     if (!afetados.size) return { acao: "nada", refeitos: 0 };
     let recarrega = false, estilo = false, refeitos = 0;
+    const soEstilo = alterados.length > 0 && alterados.every((f) => /\.(css|scss|sass|less)$/i.test(f));
     for (const c of afetados) {
       if (c.startsWith("b:")) {
         if (!state.entradas.has(c.slice(2))) continue;
         const d = await refaz(c.slice(2));
         refeitos++;
         if (d.js) recarrega = true; else if (d.css) estilo = true;
+      } else if (c.startsWith("next:") || c.startsWith("astro:")) {
+        // Página do Next ou do Astro: o cache vai embora aqui — a data do arquivo da
+        // página não muda quando é o componente importado que muda. Se só CSS mudou, a
+        // página é refeita agora e comparada: JS igual quer dizer que só a folha troca,
+        // no lugar e sem recarregar, como no Vite.
+        const refeita = c.startsWith("next:") ? refazNext(c.slice(5), soEstilo) : refazAstro(c.slice(6), soEstilo);
+        const d = await refeita;
+        if (d.refeito) refeitos++;
+        if (d.js) recarrega = true; else if (d.css) estilo = true;
+      } else if (c.startsWith("ilhas:")) {
+        // O pacote das ilhas não leva CSS (a folha sai do build do servidor): CSS sozinho
+        // não muda o que ele entrega.
+        if (!soEstilo) recarrega = true;
       } else {
-        // Página do Next, ilhas, .astro, estático: a saída deles só existe no próximo
-        // pedido, então o navegador pede de novo. O cache da página vai embora aqui — a
-        // data do arquivo da página não muda quando é o componente importado que muda.
-        if (c.startsWith("next:")) pacoteNext.delete(c.slice(5));
-        if (c.startsWith("astro:")) modAstro.clear();
+        // Estático e index.html: a saída deles só existe no próximo pedido, então o
+        // navegador pede de novo.
         recarrega = true;
       }
     }
@@ -326,6 +337,8 @@ globalThis.__devCria = function () {
     state.entradas.clear();
     pacoteNext.clear();
     modAstro.clear();
+    configCache = null; definesAstroCache = null; colecoesCache = null; entradasCache.clear();
+    tsconfigCache = null; zodCache = null; jsYaml = undefined;
     ctxNext = null;
     for (const k of [...state.deps.keys()]) if (!k.startsWith("est:")) state.deps.delete(k);
     state.faltando.clear();
@@ -438,7 +451,10 @@ globalThis.__devCria = function () {
     const req = globalThis.__odete_makeRequire(path.join(state.root, "__odete_next__.js"));
     const React = req("react");
     const servidor = req("react-dom/server");
-    ctxNext = { React, servidor, req, carrega: carregaNext };
+    // O embrulho das ilhas precisa existir antes de o primeiro módulo "use client" ser
+    // avaliado — e isso pode ser o middleware ou uma Server Action, não só uma página.
+    globalThis.__next.instalaIlhas(React);
+    ctxNext = { React, servidor, req, carrega: carregaNext, carregaRota };
     return ctxNext;
   }
 
@@ -448,39 +464,138 @@ globalThis.__devCria = function () {
   // dentro do módulo é síncrono. Empacotando, tudo o que é relativo já entra junto e o
   // `__req` só precisa atender o que ficou de fora — e é aí que o React continua sendo
   // um só, o do servidor, senão hook e contexto quebram com duas cópias.
+  //
+  // Uma rota (layouts e página) é um pacote só: um módulo que os dois importam — o
+  // contexto de um provider, uma store, um cliente de banco — tem de ser o mesmo objeto
+  // para os dois, e em pacotes separados cada um levava a sua cópia. Middleware, route
+  // handler e o módulo de uma Server Action continuam sendo um arquivo cada.
+  //
+  // O CSS que a rota importa (globals.css, page.module.css, o do Tailwind) sai do mesmo
+  // build, pelo mesmo pipeline do bundler, numa folha à parte, na ordem do documento: é
+  // ela que `/@odete/css/@next/<rota>` serve.
   const pacoteNext = new Map();
+  // O último build de cada pacote, mesmo depois de o cache cair: se o JS saiu igual, os
+  // exports de antes continuam valendo, e trocar só o CSS não reavalia a página.
+  const ultimoNext = new Map();
   // Mapa da rota para os módulos de cliente que ela usa, preenchido no render e lido
   // quando o navegador pede o pacote de hidratação.
   const ilhasDaRota = new Map();
   const ilhasDoBuild = {};
+  // Os arquivos (layouts, página) do pacote de cada rota servida, para a folha dela.
+  const folhasDaRota = new Map();
   async function carregaNext(arquivo) {
-    const mt = fs.statSync(arquivo).mtimeMs;
-    const cache = pacoteNext.get(arquivo);
-    if (cache && cache.mt === mt) return cache.exports;
-    const r = await globalThis.__buildBruto({
-      root: state.root, entries: [path.relative(state.root, arquivo)],
-      format: "cjs", platform: "node", dev: true, outdir: "__odete_next",
+    return (await pacoteDoNext(arquivo)).exports;
+  }
+  // Os exports de cada arquivo da lista, na mesma ordem.
+  async function carregaRota(arquivos) {
+    return (await pacoteDoNext(arquivos)).exports;
+  }
+
+  const ENTRADA_DA_ROTA = "__odete_rota_next.js";
+
+  async function pacoteDoNext(alvo) {
+    const lista = [].concat(alvo);
+    const chave = Array.isArray(alvo) ? "rota:" + lista.join("|") : alvo;
+    const mt = lista.map((a) => fs.statSync(a).mtimeMs).join(",");
+    const cache = pacoteNext.get(chave);
+    if (cache && cache.mt === mt) return cache;
+    const opcoes = {
+      root: state.root, format: "cjs", platform: "node", dev: true, outdir: "__odete_next",
       external: ["react", "react-dom", "react/jsx-runtime", "react/jsx-dev-runtime", "next/*"],
-      ilhas: ilhasDoBuild, acoes: "servidor", metafile: true,
-    });
+      ilhas: ilhasDoBuild, acoes: "servidor",
+    };
+    if (Array.isArray(alvo)) {
+      opcoes.entries = [ENTRADA_DA_ROTA];
+      opcoes.virtuais = { [ENTRADA_DA_ROTA]: lista.map((a, i) => "export * as m" + i + " from " + JSON.stringify(a) + ";").join("\n") };
+    } else {
+      opcoes.entries = [path.relative(state.root, alvo)];
+    }
+    const r = await globalThis.__rebuild("dev" + state.id + ":next:" + chave, opcoes);
     // O que a página importa entra no grafo: mexer num componente dela tem de derrubar o
     // cache da página, e a data do arquivo da página não muda quando é o componente.
-    defineDeps("next:" + arquivo, r.entradas || lidosNaFalha("next:" + arquivo, arquivo, r.errors));
-    defineFaltando("next:" + arquivo, r.faltando);
+    const principal = lista[lista.length - 1];
+    defineDeps("next:" + chave, r.entradas ? r.entradas.concat(lista) : lidosNaFalha("next:" + chave, principal, r.errors));
+    defineFaltando("next:" + chave, r.faltando);
     anuncia();
     if (!r.ok) throw new Error((r.errors[0] && r.errors[0].text) || "build da página falhou");
     const saida = r.saidas.find((f) => f.path.endsWith(".js"));
     if (!saida) throw new Error("build da página não produziu JS");
-    const mod = { exports: {} };
-    const ctx = contextoNext();
-    const req = (spec) => {
-      if (spec.startsWith("next/")) return substitutoNext(spec, ctx.React);
-      return ctx.req(spec);
+    const folha = r.saidas.find((f) => f.path.endsWith(".css"));
+    const css = folha ? folha.text : "", cssHash = folha ? folha.hash : "";
+    const antes = ultimoNext.get(chave);
+    let exports;
+    if (antes && antes.jsHash === saida.hash) {
+      exports = antes.exports;
+    } else {
+      const mod = { exports: {} };
+      const ctx = contextoNext();
+      const req = (spec) => {
+        if (spec.startsWith("next/")) return globalThis.__next.substituto(spec, ctx.React);
+        return ctx.req(spec);
+      };
+      const fn = (0, eval)("(function (module, exports, require) {" + saida.text + "\n})\n//# sourceURL=" + principal);
+      fn(mod, mod.exports, req);
+      exports = Array.isArray(alvo) ? lista.map((_, i) => mod.exports["m" + i]) : mod.exports;
+    }
+    const pronto = { alvo, mt, exports, jsHash: saida.hash, css, cssHash };
+    pacoteNext.set(chave, pronto);
+    ultimoNext.set(chave, pronto);
+    return pronto;
+  }
+
+  // A folha de uma rota: o CSS dos layouts e da página, de fora para dentro. O esbuild
+  // já junta numa folha só o que dois deles importam (o globals.css do layout e da
+  // página sai uma vez).
+  async function folhaDaRota(p) {
+    const arquivos = folhasDaRota.get(p);
+    if (!arquivos) return "";
+    try { return (await pacoteDoNext(arquivos)).css; } catch (e) { return ""; }
+  }
+
+  // Depois de uma mudança no grafo de um pacote do Next. Com `soEstilo` (só CSS mudou)
+  // vale refazer já, para saber se a página pode ficar e só a folha trocar.
+  async function refazNext(chave, soEstilo) {
+    const antes = pacoteNext.get(chave) || ultimoNext.get(chave);
+    pacoteNext.delete(chave);
+    if (!antes || !soEstilo) return { js: true, css: false, refeito: false };
+    try {
+      const depois = await pacoteDoNext(antes.alvo);
+      return { js: depois.jsHash !== antes.jsHash, css: depois.cssHash !== antes.cssHash, refeito: true };
+    } catch (e) {
+      return { js: true, css: false, refeito: true };
+    }
+  }
+
+  // `next/*` no navegador: a mesma fábrica que o servidor usa (next-cliente.js), mais um
+  // módulo pequeno por especificador. Sem isto, `next/link` numa ilha resolvia para o
+  // pacote `next` instalado, que espera o roteador de verdade e quebra a hidratação.
+  //
+  // Os módulos virtuais que importam pacote (`react`) moram num caminho absoluto dentro
+  // do projeto: o resolvedor procura node_modules a partir da pasta de quem importa, e um
+  // nome solto ("odete-next-cliente") não tem pasta — o `react` ficava sem resolver e o
+  // navegador parava em "Module name 'react' does not resolve to a valid URL".
+  function substitutosNextDoCliente() {
+    const fabrica = path.join(state.root, "__odete_next_cliente.js");
+    const m = "import m from " + JSON.stringify(fabrica) + ";\n";
+    return {
+      [fabrica]: globalThis.__nextClienteJS +
+        '\nimport * as __R from "react";\nimport * as __RD from "react-dom";\n' +
+        'export default globalThis.__odeteNextFabrica(__R.default || __R, __RD.default || __RD, "cliente");\n',
+      "next/link": m + "export default m.Link;\nexport const useLinkStatus = m.useLinkStatus;\n",
+      "next/image": m + "export default m.Image;\nexport const getImageProps = m.getImageProps;\n",
+      "next/navigation": m + ["useRouter", "usePathname", "useSearchParams", "useParams", "useSelectedLayoutSegment",
+        "useSelectedLayoutSegments", "useServerInsertedHTML", "redirect", "permanentRedirect", "notFound", "forbidden",
+        "unauthorized", "unstable_rethrow", "RedirectType", "ReadonlyURLSearchParams"]
+        .map((n) => "export const " + n + " = m.navegacao." + n + ";").join("\n") + "\n",
+      // CommonJS de propósito: o nome da família é o do import, e só um módulo dinâmico
+      // atende qualquer nome (ver `moduloGoogle` na fábrica).
+      "next/font/google": "module.exports = require(" + JSON.stringify(fabrica) + ").default.fontes(null).moduloGoogle;\n",
+      "next/font/local": m + "export default m.fontes(null).local;\n",
+      "next/dynamic": m + "export default m.dynamic;\n",
+      "next/script": m + "export default m.Script;\n",
+      "next/head": m + "export default m.Head;\n",
+      "next/router": m + "export const useRouter = m.useRouterPages;\nexport default m.roteador;\n",
     };
-    const fn = (0, eval)("(function (module, exports, require) {" + saida.text + "\n})\n//# sourceURL=" + arquivo);
-    fn(mod, mod.exports, req);
-    pacoteNext.set(arquivo, { mt, exports: mod.exports });
-    return mod.exports;
   }
 
   // O pacote que o navegador baixa para hidratar: só os componentes de cliente daquela
@@ -498,13 +613,15 @@ globalThis.__devCria = function () {
       `import { ${e.nome} as __c${i} } from ${JSON.stringify("odete-real:" + e.abs)};`).join("\n");
     const mapa = entradas.map((e, i) => `  ${JSON.stringify(e.id)}: __c${i},`).join("\n");
     const virtual = `${importa}\nexport const MODULOS = {\n${mapa}\n};\n`;
+    // Caminho absoluto pelo mesmo motivo dos substitutos: a entrada importa `react`.
+    const entrada = path.join(state.root, "__odete_ilhas_entrada.js");
     const opcoes = {
-      root: state.root, entries: ["__odete_ilhas_entrada.js"], format: "esm", platform: "browser",
+      root: state.root, entries: [entrada], format: "esm", platform: "browser",
       dev: true, outdir: "__odete_ilhas", externalMissing: true, acoes: "cliente", metafile: true,
-      virtuais: {
-        "__odete_ilhas_entrada.js": globalThis.__ilhasClienteJS,
+      virtuais: Object.assign(substitutosNextDoCliente(), {
+        [entrada]: globalThis.__ilhasClienteJS,
         "virtual:odete-ilhas": virtual,
-      },
+      }),
     };
     // Este build é avulso (sem contexto) e roda a cada página: com o React e o react-dom
     // dentro, cada navegação reanalisava o react-dom do zero. Com o pacote de
@@ -524,38 +641,6 @@ globalThis.__devCria = function () {
     if (!r.ok) throw new Error((r.errors[0] && r.errors[0].text) || "build das ilhas falhou");
     const saida = r.saidas.find((f) => f.path.endsWith(".js"));
     return saida ? saida.contents : "// build das ilhas não produziu JS";
-  }
-
-  // `next/link` e `next/image` existem para o roteador e o otimizador do Next, que aqui
-  // não existem: viram a marcação que eles produziriam.
-  function substitutoNext(spec, React) {
-    const nome = spec.slice("next/".length);
-    if (nome === "server") return globalThis.__next.moduloNextServer();
-    if (nome === "navigation") return globalThis.__next.moduloNavegacao();
-    if (nome === "cache") return globalThis.__next.moduloCache();
-    if (nome === "font/google") return globalThis.__next.moduloFonteGoogle();
-    if (nome === "font/local") return globalThis.__next.moduloFonteLocal();
-    if (nome === "link") {
-      const Link = (props) => {
-        const { href, children, prefetch, replace, scroll, shallow, locale, ...resto } = props || {};
-        return React.createElement("a", Object.assign({ href: typeof href === "string" ? href : "#" }, resto), children);
-      };
-      return { __esModule: true, default: Link };
-    }
-    if (nome === "image") {
-      const Img = (props) => {
-        const { src, alt, width, height, priority, quality, fill, loader, placeholder, ...resto } = props || {};
-        return React.createElement("img", Object.assign({
-          src: typeof src === "object" && src ? src.src : src, alt: alt || "", width, height,
-        }, resto));
-      };
-      return { __esModule: true, default: Img };
-    }
-    if (nome === "head") {
-      const Head = (props) => React.createElement(React.Fragment, null, props && props.children);
-      return { __esModule: true, default: Head };
-    }
-    throw new Error("Odete ainda não tem substituto para " + spec);
   }
 
   // `localFont({ src: "./Inter.woff2" })` é relativo ao arquivo que chamou, e depois de
@@ -605,6 +690,20 @@ globalThis.__devCria = function () {
       try { if (fs.statSync(path.join(state.root, d)).isDirectory()) return true; } catch (e) { /* segue */ }
     }
     return false;
+  }
+
+  // Projeto Astro: o preset, o astro.config ou o pacote no package.json. Só `src/pages`
+  // não basta — um app Vite com React também tem, e os .ts de lá não são endpoints.
+  function ehProjetoAstro() {
+    if (!fs.existsSync(path.join(state.root, "src", "pages"))) return false;
+    if (state.preset === "astro") return true;
+    if (["astro.config.mjs", "astro.config.ts", "astro.config.js", "astro.config.mts"].some((n) => fs.existsSync(path.join(state.root, n)))) return true;
+    try {
+      const pkg = JSON.parse(fs.readFileSync(path.join(state.root, "package.json"), "utf8"));
+      return !!((pkg.dependencies || {}).astro || (pkg.devDependencies || {}).astro);
+    } catch (e) {
+      return false;
+    }
   }
 
   // Só em projeto Next: um `src/middleware.ts` num projeto Vite é código da pessoa, não
@@ -717,19 +816,46 @@ globalThis.__devCria = function () {
     }
   }
 
-  // Monta o documento de uma rota do Next: corpo renderizado, metadata, fontes e o
-  // script das ilhas quando a rota tem alguma.
+  // `<odete-ilha>` e `<odete-filhos>` são embrulhos e não podem ocupar lugar: sem isto um
+  // componente de cliente dentro de um flex ou de um grid vira um item inline a mais, e o
+  // layout muda só por ter virado ilha.
+  const ESTILO_DAS_ILHAS = "<style>odete-ilha,odete-filhos{display:contents}</style>";
+
+  // Monta o documento de uma rota do Next: corpo renderizado, metadata, a folha da rota,
+  // fontes e o script das ilhas quando a rota tem alguma.
+  //
+  // O layout raiz do App Router escreve `<html>` e `<body>`, e o React devolve o
+  // documento inteiro: o que é da Odete entra no `<head>` dele. Sem `<html>` (Pages
+  // Router, ou um layout que não o escreve), o documento é montado em volta.
   async function paginaNext(rotaNext, p, url) {
     const usadas = new Set();
-    globalThis.__next.instalaIlhas(contextoNext().React, usadas);
-    const { corpo, cabeca } = await globalThis.__next.renderiza(contextoNext(), rotaNext, url);
+    const ctx = contextoNext();
+    folhasDaRota.set(p, rotaNext.layouts.concat(rotaNext.carregando ? [rotaNext.carregando] : [], [rotaNext.pagina]));
+    const r = await globalThis.__next.renderiza(ctx, rotaNext, url, usadas);
     ilhasDaRota.set(p, [...usadas]);
-    const hidrata = usadas.size
-      ? '<script type="module" src="/@odete/ilhas' + encodeURI(p) + '"></script>'
+    const folha = (await folhaDaRota(p))
+      ? '<link rel="stylesheet" href="/@odete/css/@next' + encodeURI(p) + '">'
       : "";
-    return "<!doctype html><html><head>" + cabeca + importMap() +
-      globalThis.__next.cabecalhoDeFontes() + CLIENT +
-      "</head><body>" + corpo + hidrata + "</body></html>";
+    const cabeca = r.cabeca + folha + ESTILO_DAS_ILHAS + importMap() + globalThis.__next.cabecalhoDeFontes() + CLIENT;
+    // Os parâmetros da rota vão junto para o `useParams()` das ilhas; `<` escapado para o
+    // valor não fechar o script.
+    const hidrata = usadas.size
+      ? "<script>self.__odeteRota=" + JSON.stringify({ params: rotaNext.params || {} }).replace(/</g, "\\u003c") + "</script>" +
+        '<script type="module" src="/@odete/ilhas' + encodeURI(p) + '"></script>'
+      : "";
+    if (!r.documento) {
+      return "<!doctype html><html><head>" + cabeca + "</head><body>" + r.corpo + hidrata + "</body></html>";
+    }
+    let html = r.corpo;
+    const abre = /<head(\s[^>]*)?>/i.exec(html);
+    if (abre) {
+      const i = abre.index + abre[0].length;
+      html = html.slice(0, i) + cabeca + html.slice(i);
+    } else {
+      html = html.replace(/<html(\s[^>]*)?>/i, (t) => t + "<head>" + cabeca + "</head>");
+    }
+    const fim = html.lastIndexOf("</body>");
+    return fim >= 0 ? html.slice(0, fim) + hidrata + html.slice(fim) : html + hidrata;
   }
 
   // `not-found.tsx` e `error.tsx` são páginas do projeto: se existirem, é o que a
@@ -753,52 +879,1098 @@ globalThis.__devCria = function () {
   }
 
   // ---- páginas .astro ----
-  // Carrega um .astro como módulo, compilando na hora e resolvendo os imports dele —
-  // inclusive outros .astro, que são componentes e layouts. Cache por mtime, para
-  // editar um componente refletir sem reiniciar o servidor.
+  // Carrega um .astro como módulo, compilando na hora (astro.js) e resolvendo os imports
+  // dele: outros .astro (componentes e layouts), os módulos do projeto (.ts, .js, .json,
+  // CSS) — empacotados pelo esbuild, como o Next —, imagens, markdown e os módulos
+  // virtuais do Astro (`astro:content`, `astro:assets`). Cache por data do arquivo; o que
+  // o esbuild leu entra no grafo, então editar um .ts importado refaz a página.
   const modAstro = new Map();
-  function carregaAstro(arquivo) {
-    const mt = fs.statSync(arquivo).mtimeMs;
-    registraLido("astro:" + arquivo, arquivo);
-    const cache = modAstro.get(arquivo);
-    if (cache && cache.mt === mt) return cache.exports;
-    const js = globalThis.__astroCompila(fs.readFileSync(arquivo, "utf8"), arquivo);
-    const mod = { exports: {} };
-    const daPasta = path.dirname(arquivo);
-    const req = (spec) => {
-      const alvo = spec.startsWith(".") ? path.resolve(daPasta, spec) : spec;
-      if (typeof alvo === "string" && alvo.endsWith(".astro")) return carregaAstro(alvo);
-      // CSS e afins importados só por efeito não existem no servidor.
-      if (/\.(css|scss|sass|less|svg|png|jpe?g|webp|gif)$/i.test(spec)) return {};
-      return require(alvo);
-    };
-    const fn = (0, eval)("(function (module, __req, __astroRuntime) {" + js + "\n})\n//# sourceURL=" + arquivo);
-    fn(mod, req, globalThis.__astroRuntime);
-    modAstro.set(arquivo, { mt, exports: mod.exports });
-    return mod.exports;
+  const carregandoAstro = new Map();
+  const EXT_IMAGEM = /\.(png|jpe?g|gif|webp|avif|svg|ico|bmp|tiff?)$/i;
+  const EXT_ESTILO = /\.(css|scss|sass|less|styl|stylus|pcss|postcss)$/i;
+  const EXT_CODIGO_DE_PAGINA = /\.(ts|js|mjs|mts|cjs|cts)$/i;
+
+  let reqProjetoAstro = null;
+  function requireDoProjeto() {
+    if (!reqProjetoAstro) reqProjetoAstro = globalThis.__odete_makeRequire(path.join(state.root, "__odete_astro__.js"));
+    return reqProjetoAstro;
   }
 
-  // A rota vem do nome do arquivo: / → src/pages/index.astro, /a → src/pages/a.astro
-  // ou src/pages/a/index.astro.
-  function paginaAstro(p) {
-    const base = path.join(state.root, "src", "pages");
-    if (!fs.existsSync(base)) return null;
-    const rel = p.replace(/^\/+|\/+$/g, "");
-    const nomes = rel === "" ? ["index.astro"] : [rel + ".astro", path.join(rel, "index.astro")];
-    for (const n of nomes) {
-      const f = path.join(base, n);
-      if (!f.startsWith(base)) continue;
-      if (fs.existsSync(f) && fs.statSync(f).isFile()) return f;
+  // `import.meta.env` do Astro: o do Vite, mais `SITE`.
+  let definesAstroCache = null;
+  function definesAstro() {
+    if (definesAstroCache) return definesAstroCache;
+    const env = Object.assign({}, globalThis.__envDoVite(state.root, "development", "/", true));
+    const site = configDoAstro().site;
+    if (site) env.SITE = String(site);
+    env.ASSETS_PREFIX = undefined;
+    const d = { "import.meta.env": JSON.stringify(env) };
+    for (const k of Object.keys(env)) d["import.meta.env." + k] = env[k] === undefined ? "undefined" : JSON.stringify(env[k]);
+    definesAstroCache = d;
+    return d;
+  }
+
+  // Um id de escopo por arquivo, relativo à raiz: o mesmo em qualquer aparelho.
+  function cidDoAstro(arquivo) {
+    const rel = path.relative(state.root, arquivo);
+    let h = 0x811c9dc5;
+    for (let i = 0; i < rel.length; i++) { h ^= rel.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+    return "data-astro-cid-" + h.toString(36);
+  }
+
+  function hashTexto(s) {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+    return h.toString(36) + ":" + s.length;
+  }
+
+  // Os pacotes do package.json ficam de fora dos pacotes do esbuild: o `require` do
+  // runtime os carrega de node_modules, uma cópia só. Os módulos virtuais do Astro também,
+  // e quem os atende é `requireAstro`.
+  const VIRTUAIS_DO_ASTRO = ["astro:content", "astro:assets", "astro:env/client", "astro:env/server", "astro:transitions",
+    "astro:transitions/client", "astro:middleware", "astro:actions", "astro:i18n", "astro:schema", "astro:config/client",
+    "astro:config/server", "astro:components", "astro:prefetch", "astro:container"];
+  //
+  // Os outros pacotes entram no pacote do esbuild, convertidos para CommonJS: o `require`
+  // deste motor não transforma ESM, e pacote de Astro é quase sempre ESM (`@astrojs/rss`).
+  // Ficam de fora o `astro` (atendido por substitutos) e o `zod`, que precisa ser uma cópia
+  // só entre o schema do projeto e o `image()` daqui.
+  function externosDoAstro() {
+    return VIRTUAIS_DO_ASTRO.concat(["astro", "astro/*", "zod"]);
+  }
+
+  // Os do config: todo pacote do package.json fica de fora (as integrações nem precisam
+  // estar instaladas; ver `carregaConfigDoAstro`).
+  function externosDoConfig() {
+    const lista = externosDoAstro();
+    try {
+      const pkg = JSON.parse(fs.readFileSync(path.join(state.root, "package.json"), "utf8"));
+      for (const n of Object.keys(Object.assign({}, pkg.dependencies || {}, pkg.devDependencies || {}))) lista.push(n, n + "/*");
+    } catch (e) { /* sem package.json */ }
+    // E o que o próprio config importa: uma integração que só foi escrita, sem instalar.
+    try {
+      const txt = fs.readFileSync(configCache.arquivo, "utf8");
+      for (const m of txt.matchAll(/(?:from|import)\s*\(?\s*['"]([^'"./][^'"]*)['"]/g)) lista.push(m[1]);
+    } catch (e) { /* sem config */ }
+    return lista;
+  }
+
+  // O `require` dos módulos empacotados e dos imports de pacote do frontmatter.
+  function requireAstro(spec) {
+    const s = substitutoAstro(spec);
+    if (s) return s;
+    return requireDoProjeto()(spec);
+  }
+
+  function substitutoAstro(spec) {
+    if (spec === "astro:content") return moduloContent();
+    if (spec === "astro:assets") return moduloAssets();
+    if (spec === "astro/zod" || spec === "astro:schema" || (spec === "zod" && zodCache)) return moduloZod();
+    if (spec === "astro/loaders") return { __esModule: true, glob: (o) => Object.assign({ __odeteLoader: "glob" }, o), file: (f, o) => Object.assign({ __odeteLoader: "file", arquivo: f }, o) };
+    if (spec === "astro/config") return moduloConfigDoAstro();
+    if (spec === "astro:env/client" || spec === "astro:env/server") {
+      const env = JSON.parse(definesAstro()["import.meta.env"]);
+      return Object.assign({ __esModule: true, getSecret: (k) => env[k] }, env);
+    }
+    if (spec === "astro:transitions") {
+      return { __esModule: true, ClientRouter: () => "", ViewTransitions: () => "", fade: () => ({}), slide: () => ({}) };
+    }
+    if (spec === "astro:transitions/client") return { __esModule: true, navigate: (u) => { location.href = u; } };
+    if (spec === "astro:middleware") return { __esModule: true, defineMiddleware: (f) => f, sequence: (...f) => f[0] };
+    if (spec === "astro:i18n") return { __esModule: true, getRelativeLocaleUrl: (l, p) => "/" + (p || ""), getAbsoluteLocaleUrl: (l, p) => "/" + (p || "") };
+    if (/^astro:/.test(spec)) return { __esModule: true };
+    return null;
+  }
+
+  // ---- empacotamento dos imports ----
+  // Os imports de um .astro que são módulos do projeto (.ts, .js, .json, CSS) saem num
+  // build só do esbuild, com contexto incremental: `export * as m0 from "…"` para cada
+  // um. O CSS que eles trazem sai numa folha, que vai para a página. Um arquivo que o
+  // esbuild leu entra no grafo do .astro — mudar o .ts refaz a página.
+  function caminhoDoImport(spec, pasta) {
+    if (spec.startsWith("./") || spec.startsWith("../")) return path.resolve(pasta, spec);
+    if (spec.startsWith("/")) return spec.startsWith(state.root + "/") ? spec : path.join(state.root, spec);
+    // `@/x` e `~/x` do tsconfig (paths); o resto é pacote.
+    const alias = aliasDoTsconfig(spec);
+    return alias;
+  }
+
+  let tsconfigCache = null;
+  function aliasDoTsconfig(spec) {
+    if (tsconfigCache === null) {
+      tsconfigCache = [];
+      try {
+        const txt = fs.readFileSync(path.join(state.root, "tsconfig.json"), "utf8")
+          .replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"])\/\/.*$/gm, "$1").replace(/,(\s*[}\]])/g, "$1");
+        const co = (JSON.parse(txt).compilerOptions) || {};
+        const base = path.resolve(state.root, co.baseUrl || ".");
+        for (const k of Object.keys(co.paths || {})) {
+          const alvo = [].concat(co.paths[k])[0];
+          if (alvo) tsconfigCache.push({ prefixo: k.replace(/\*$/, ""), alvo: path.resolve(base, alvo.replace(/\*$/, "")), coringa: k.endsWith("*") });
+        }
+      } catch (e) { /* sem tsconfig ou sem paths */ }
+    }
+    for (const a of tsconfigCache) {
+      if (a.coringa ? spec.startsWith(a.prefixo) : spec === a.prefixo) return path.join(a.alvo, spec.slice(a.prefixo.length));
     }
     return null;
   }
 
-  async function renderizaAstro(arquivo) {
-    const mod = carregaAstro(arquivo);
-    if (typeof mod.render !== "function") throw new Error(arquivo + " não exporta uma página");
-    const html = await mod.render({ props: {}, url: new URL("http://localhost/") }, {});
-    const head = importMap() + CLIENT;
-    return html.includes("</head>") ? html.replace("</head>", head + "</head>") : head + html;
+  async function pacoteDoAstro(consumidor, specs, pasta) {
+    const alvos = [];
+    for (const spec of specs) {
+      if (/^astro([:/]|$)/.test(spec) || /^zod(\/|$)/.test(spec)) continue;
+      // Pacote (`@astrojs/rss`, `date-fns`): o esbuild resolve a partir da raiz e o traz
+      // convertido para CommonJS.
+      const abs = caminhoDoImport(spec, pasta) || (/^[@\w]/.test(spec) && !/^[a-z]+:/.test(spec) ? spec : null);
+      if (!abs || /\.astro$/.test(abs) || EXT_IMAGEM.test(abs) || /\.mdx?$/.test(abs)) continue;
+      alvos.push({ spec, abs });
+    }
+    if (!alvos.length) return { mods: new Map(), css: "", jsHash: "", entradas: [] };
+    return empacotaAstro(consumidor, alvos);
+  }
+
+  async function empacotaAstro(consumidor, alvos, requer, externos) {
+    const entrada = path.join(state.root, "__odete_astro_" + hashTexto(consumidor).replace(/\W/g, "") + ".js");
+    const virtual = alvos.map((a, i) => (EXT_ESTILO.test(a.abs) && !/\.module\.[a-z]+$/i.test(a.abs)
+      ? "import " + JSON.stringify(a.abs) + ";"
+      : "export * as m" + i + " from " + JSON.stringify(a.abs) + ";")).join("\n");
+    const r = await globalThis.__rebuild("dev" + state.id + ":astro:" + consumidor, {
+      root: state.root, entries: [entrada], virtuais: { [entrada]: virtual },
+      format: "cjs", platform: "node", dev: true, outdir: "__odete_astro", external: externos || externosDoAstro(),
+    });
+    if (!r.ok) {
+      const e = r.errors[0] || {};
+      throw new Error((e.file ? e.file + ":" + e.line + ": " : "") + (e.text || "build dos imports falhou"));
+    }
+    const js = r.saidas.find((f) => f.path.endsWith(".js"));
+    const css = r.saidas.find((f) => f.path.endsWith(".css"));
+    // Empacotar o zod custa segundos sem JIT: só quando alguém o pede de verdade.
+    if (js && consumidor !== "@zod" && /require\("(zod|astro\/zod|astro:schema|astro:content)"\)/.test(js.text)) await garanteZod();
+    const mod = { exports: {} };
+    if (js) {
+      const fn = (0, eval)("(function (module, exports, require) {" + js.text + "\n})\n//# sourceURL=" + consumidor + ".imports.js");
+      fn(mod, mod.exports, requer || requireAstro);
+    }
+    const mods = new Map();
+    alvos.forEach((a, i) => mods.set(a.spec, mod.exports["m" + i] || {}));
+    return { mods, css: css ? css.text : "", jsHash: (js ? js.hash : "") + "/" + (css ? css.hash : ""), entradas: r.entradas || [], exports: mod.exports };
+  }
+
+  // Um arquivo só (endpoint, content.config.ts, astro.config.mjs), empacotado do mesmo jeito.
+  async function moduloDeArquivo(consumidor, arquivo) {
+    const pk = await empacotaAstro(consumidor, [{ spec: arquivo, abs: arquivo }]);
+    defineDeps(consumidor, [arquivo].concat(pk.entradas));
+    anuncia();
+    return pk.mods.get(arquivo);
+  }
+
+  // ---- imagens ----
+  // `import foto from "./foto.jpg"` é o ImageMetadata do Astro: endereço, largura, altura
+  // e formato. O endereço serve o próprio arquivo do projeto. Um SVG também é componente
+  // (`<Logo />` escreve o SVG na página), como no Astro 5.
+  function dimensoes(bytes, ext) {
+    const b = bytes;
+    const u16 = (i) => (b[i] << 8) | b[i + 1];
+    const u32 = (i) => ((b[i] << 24) | (b[i + 1] << 16) | (b[i + 2] << 8) | b[i + 3]) >>> 0;
+    try {
+      if (ext === "png" && b[1] === 0x50) return { width: u32(16), height: u32(20) };
+      if (ext === "gif") return { width: b[6] | (b[7] << 8), height: b[8] | (b[9] << 8) };
+      if (ext === "jpg" || ext === "jpeg") {
+        let i = 2;
+        while (i < b.length) {
+          if (b[i] !== 0xff) { i++; continue; }
+          const m = b[i + 1];
+          if (m >= 0xc0 && m <= 0xcf && m !== 0xc4 && m !== 0xc8 && m !== 0xcc) return { height: u16(i + 5), width: u16(i + 7) };
+          i += 2 + u16(i + 2);
+        }
+      }
+      if (ext === "webp") {
+        const tipo = String.fromCharCode(b[12], b[13], b[14], b[15]);
+        if (tipo === "VP8X") return { width: 1 + (b[24] | (b[25] << 8) | (b[26] << 16)), height: 1 + (b[27] | (b[28] << 8) | (b[29] << 16)) };
+        if (tipo === "VP8 ") return { width: (b[26] | (b[27] << 8)) & 0x3fff, height: (b[28] | (b[29] << 8)) & 0x3fff };
+        if (tipo === "VP8L") { const v = b[21] | (b[22] << 8) | (b[23] << 16) | (b[24] << 24); return { width: (v & 0x3fff) + 1, height: ((v >> 14) & 0x3fff) + 1 }; }
+      }
+      if (ext === "svg") {
+        const t = Buffer.from(b).toString("utf8");
+        const svg = /<svg\b[^>]*>/i.exec(t);
+        if (svg) {
+          const w = /\swidth=["']?([\d.]+)/.exec(svg[0]), h = /\sheight=["']?([\d.]+)/.exec(svg[0]);
+          const vb = /viewBox=["']\s*[-\d.]+[\s,]+[-\d.]+[\s,]+([\d.]+)[\s,]+([\d.]+)/.exec(svg[0]);
+          return { width: w ? +w[1] : vb ? +vb[1] : 0, height: h ? +h[1] : vb ? +vb[2] : 0 };
+        }
+      }
+    } catch (e) { /* cabeçalho fora do esperado */ }
+    return { width: 0, height: 0 };
+  }
+
+  function urlDoArquivo(abs) {
+    const pub = path.join(state.root, "public");
+    if (abs.startsWith(pub + "/")) return "/" + path.relative(pub, abs).split(path.sep).join("/");
+    return "/@odete/arquivo/" + path.relative(state.root, abs).split(path.sep).map(encodeURIComponent).join("/");
+  }
+
+  function imagemDe(abs) {
+    const ext = path.extname(abs).slice(1).toLowerCase();
+    const bytes = fs.readFileSync(abs);
+    const d = dimensoes(bytes, ext);
+    const meta = { src: urlDoArquivo(abs), width: d.width, height: d.height, format: ext === "jpeg" ? "jpg" : ext, fsPath: abs };
+    if (ext === "svg") {
+      const fonte = Buffer.from(bytes).toString("utf8").replace(/<\?xml[^>]*>\s*/, "");
+      meta.render = (Astro) => {
+        const extras = globalThis.__astroRuntime.__attrs(Object.assign({}, Astro && Astro.props));
+        return fonte.replace(/<svg\b/i, "<svg" + extras);
+      };
+    }
+    return meta;
+  }
+
+  // ---- markdown ----
+  // `.md` e `.mdx`: o texto vira HTML (markdown.js) e o MDX, um .astro — os imports e os
+  // componentes dele passam pelo mesmo compilador.
+  function imagemDoMarkdown(pasta) {
+    return (href) => {
+      if (!href || /^[a-z][a-z0-9+.-]*:|^\/\/|^#/i.test(href)) return href;
+      const abs = href.startsWith("/") ? path.join(state.root, "public", href) : path.resolve(pasta, decodeURIComponent(href));
+      if (!href.startsWith("/") && fs.existsSync(abs)) return urlDoArquivo(abs);
+      return href;
+    };
+  }
+
+  let jsYaml;
+  function frontmatterDe(texto) {
+    if (jsYaml === undefined) { try { jsYaml = requireDoProjeto()("js-yaml"); } catch (e) { jsYaml = null; } }
+    return globalThis.__odeteMarkdown.frontmatter(texto, jsYaml);
+  }
+
+  // O MDX vira a fonte de um .astro: frontmatter com os imports e o `frontmatter`, e o
+  // corpo em HTML com os componentes no lugar.
+  function mdxParaAstro(texto, dados) {
+    const linhas = texto.split("\n");
+    const topo = [], resto = [];
+    let cerca = false, emImport = false;
+    for (const l of linhas) {
+      if (/^\s*(```|~~~)/.test(l)) cerca = !cerca;
+      if (!cerca && (emImport || /^(import|export)\s/.test(l))) {
+        topo.push(l);
+        emImport = !/(from\s+['"][^'"]+['"]|^import\s+['"][^'"]+['"])\s*;?\s*$/.test(l) && /^(import|export)\s[^;]*$/.test(l) && !/[;}]\s*$/.test(l) ? true : false;
+        continue;
+      }
+      resto.push(l);
+    }
+    return { topo: topo.join("\n") + "\nconst frontmatter = " + JSON.stringify(dados || {}) + ";", corpo: resto.join("\n") };
+  }
+
+  async function moduloMarkdown(abs) {
+    const mt = fs.statSync(abs).mtimeMs;
+    const cache = modAstro.get(abs);
+    if (cache && cache.mt === mt) return cache;
+    registraLido("astro:" + abs, abs);
+    const fm = frontmatterDe(fs.readFileSync(abs, "utf8"));
+    const pasta = path.dirname(abs);
+    const ehMdx = /\.mdx$/i.test(abs);
+    let Content, headings, css = "", jsHash;
+    if (ehMdx) {
+      const m = mdxParaAstro(fm.corpo, fm.dados);
+      const r = globalThis.__odeteMarkdown.markdown(m.corpo, { imagem: imagemDoMarkdown(pasta), mdx: true });
+      headings = r.headings;
+      const pronto = await montaAstro(abs, "---\n" + m.topo + "\n---\n" + r.html, mt);
+      Content = pronto.exports;
+      css = pronto.css;
+      jsHash = pronto.jsHash;
+    } else {
+      const r = globalThis.__odeteMarkdown.markdown(fm.corpo, { imagem: imagemDoMarkdown(pasta) });
+      headings = r.headings;
+      const html = r.html;
+      Content = { render: async () => html, __arquivo: abs };
+      jsHash = hashTexto(html);
+    }
+    const url = urlDaPaginaMarkdown(abs);
+    const exports = {
+      frontmatter: fm.dados, file: abs, url, Content, default: Content,
+      getHeadings: () => headings, rawContent: () => fm.corpo, compiledContent: async () => (await Content.render({ props: {} }, {})),
+    };
+    const pronto = { mt, exports, css, jsHash, headings, dados: fm.dados, corpo: fm.corpo };
+    modAstro.set(abs, pronto);
+    return pronto;
+  }
+
+  function urlDaPaginaMarkdown(abs) {
+    const base = path.join(state.root, "src", "pages");
+    if (!abs.startsWith(base + "/")) return undefined;
+    const rel = path.relative(base, abs).replace(/\.mdx?$/i, "").replace(/(^|\/)index$/, "");
+    return "/" + rel;
+  }
+
+  // O `<style>` de um .astro antes do escopo, pelo pipeline de CSS do bundler (estilos.js):
+  // Sass e Less pelo `lang`, e `@apply`/`@reference` do Tailwind. O CSS importado no
+  // frontmatter não passa aqui: é um build do esbuild, e o plugin dele já o trata. O que
+  // o Sass e o Tailwind leem vai para `ctx.vigiados`, que entra no grafo do .astro.
+  async function estiloDoAstro(css, lang, arquivo, ctx, n) {
+    const l = String(lang || "css").toLowerCase();
+    const E = globalThis.__odeteEstilos;
+    const tw = globalThis.__odeteTailwind;
+    if (!E || !E.compilaTexto || (l === "css" && !(tw && tw.ehDoTailwind(css)))) return css;
+    try {
+      return await E.compilaTexto(css, l, arquivo, arquivo + "#estilo" + (n || 0) + ".css", ctx);
+    } catch (e) {
+      const onde = e && e.lugar ? path.relative(state.root, e.lugar.file) + ":" + e.lugar.line + ": " : path.relative(state.root, arquivo) + ": ";
+      throw new Error(onde + ((e && e.message) || e));
+    }
+  }
+
+  // ---- carregar um .astro ----
+  async function carregaAstro(arquivo) {
+    const mt = fs.statSync(arquivo).mtimeMs;
+    const cache = modAstro.get(arquivo);
+    if (cache && cache.mt === mt) return cache;
+    // Dois componentes pedindo o mesmo ao mesmo tempo esperam o mesmo carregamento.
+    const chave = arquivo + "@" + mt;
+    if (carregandoAstro.has(chave)) return carregandoAstro.get(chave);
+    const p = (async () => {
+      try {
+        return await montaAstro(arquivo, fs.readFileSync(arquivo, "utf8"), mt);
+      } finally {
+        carregandoAstro.delete(chave);
+      }
+    })();
+    carregandoAstro.set(chave, p);
+    return p;
+  }
+
+  async function montaAstro(arquivo, fonte, mt) {
+    state.mtimes.set(arquivo, mt);
+    const ctxEstilo = { root: state.root, vigiados: new Set(), pastas: new Set(), dev: true, novo: false };
+    let c;
+    try {
+      c = await globalThis.__astroCompilaAsync(fonte, arquivo, {
+        define: definesAstro(), cid: cidDoAstro(arquivo),
+        processaEstilo: (css, lang, arq, n) => estiloDoAstro(css, lang, arq, ctxEstilo, n),
+      });
+    } catch (e) {
+      // Erro de sintaxe no .astro ou no `<style>`: o arquivo (e o que o estilo leu) fica
+      // vigiado, e consertar refaz a página.
+      defineDeps("astro:" + arquivo, [arquivo].concat([...ctxEstilo.vigiados]));
+      anuncia();
+      throw e;
+    }
+    const pasta = path.dirname(arquivo);
+    let pk;
+    try {
+      pk = await pacoteDoAstro(arquivo, c.specs, pasta);
+    } finally {
+      // O grafo do .astro: ele e o que o esbuild leu para os imports dele.
+      defineDeps("astro:" + arquivo, [arquivo].concat(pk ? pk.entradas : [], [...ctxEstilo.vigiados]));
+      anuncia();
+    }
+    if (c.specs.some((x) => /^(zod|astro\/zod|astro:schema|astro:content)$/.test(x))) await garanteZod();
+    const mod = { exports: {} };
+    const req = (spec, Astro) => importDoAstro(spec, pasta, pk, Astro);
+    const fn = (0, eval)("(function (module, __req, __astroRuntime) {" + c.codigo + "\n})\n//# sourceURL=" + arquivo);
+    fn(mod, req, globalThis.__astroRuntime);
+    const pronto = {
+      mt, exports: mod.exports,
+      // O CSS dos imports vem antes do `<style>` do componente, como no Astro.
+      cssImportado: pk.css, cssProprio: c.estilos.join("\n"),
+      jsHash: hashTexto(c.codigo) + "/" + pk.jsHash.split("/")[0],
+      cssHash: hashTexto(pk.css + c.estilos.join("\n")),
+    };
+    pronto.css = pronto.cssImportado + pronto.cssProprio;
+    modAstro.set(arquivo, pronto);
+    return pronto;
+  }
+
+  async function importDoAstro(spec, pasta, pk, Astro) {
+    if (pk.mods.has(spec)) return pk.mods.get(spec);
+    const s = substitutoAstro(spec);
+    if (s) return s;
+    const abs = caminhoDoImport(spec, pasta);
+    if (!abs) return requireDoProjeto()(spec);
+    if (/\.astro$/.test(abs)) {
+      const m = await carregaAstro(abs);
+      if (Astro && Astro.__usados) Astro.__usados.add(abs);
+      return m.exports;
+    }
+    if (EXT_IMAGEM.test(abs)) {
+      const meta = imagemDe(abs);
+      return { __esModule: true, default: meta };
+    }
+    if (/\.mdx?$/i.test(abs)) {
+      const m = await moduloMarkdown(abs);
+      if (Astro && Astro.__usados) Astro.__usados.add(abs);
+      return m.exports;
+    }
+    return requireDoProjeto()(abs);
+  }
+
+  // ---- astro.config ----
+  // O `site` (que vira `Astro.site`) e as fontes (`<Font />`) vêm dele. As integrações
+  // não rodam aqui: são plugins do Vite. Cada pacote que o config importa vira um objeto
+  // que aceita qualquer chamada, e o `defineConfig` devolve o que recebeu.
+  let configCache = null;
+  function moduloConfigDoAstro() {
+    const provedor = (nome) => (o) => Object.assign({ __odeteProvedor: nome }, o);
+    return {
+      __esModule: true, defineConfig: (c) => c, envField: new Proxy({}, { get: () => (o) => o }),
+      fontProviders: { local: provedor("local"), google: provedor("google"), fontsource: provedor("fontsource"), bunny: provedor("bunny"), adobe: provedor("adobe"), fontshare: provedor("fontshare") },
+      passthroughImageService: () => ({}), sharpImageService: () => ({}), squooshImageService: () => ({}),
+    };
+  }
+
+  // Sem `__esModule` e sem `then`: o interop do esbuild põe o próprio objeto no `default`,
+  // e um `then` faria dele uma promessa que nunca resolve.
+  function qualquerCoisa() {
+    const f = function () { return qualquer; };
+    const qualquer = new Proxy(f, {
+      get: (_, k) => (k === "__esModule" || k === "then" ? undefined : k === "default" ? qualquer : k === Symbol.toPrimitive ? () => "" : qualquer),
+      apply: () => qualquer, construct: () => qualquer,
+    });
+    return qualquer;
+  }
+
+  function configDoAstro() {
+    if (configCache) return configCache.config;
+    configCache = { config: {} };
+    const arquivo = ["astro.config.mjs", "astro.config.ts", "astro.config.js", "astro.config.mts"]
+      .map((n) => path.join(state.root, n)).find((f) => fs.existsSync(f));
+    configCache.arquivo = arquivo;
+    return configCache.config;
+  }
+
+  // O config é lido de verdade (esbuild, assíncrono) na primeira página; até lá vale vazio.
+  async function carregaConfigDoAstro() {
+    configDoAstro();
+    if (configCache.lido || !configCache.arquivo) return configCache.config;
+    configCache.lido = true;
+    try {
+      // Integrações (`@astrojs/mdx`, `@astrojs/sitemap`) são plugins do Vite e nem precisam
+      // estar instaladas: o que não se acha vira um objeto que aceita qualquer chamada.
+      const requer = (spec) => {
+        const s = substitutoAstro(spec);
+        if (s) return s;
+        try { return requireDoProjeto()(spec); } catch (e) { return qualquerCoisa(); }
+      };
+      const pk = await empacotaAstro("@config", [{ spec: "c", abs: configCache.arquivo }], requer, externosDoConfig());
+      defineDeps("astro:@config", [configCache.arquivo].concat(pk.entradas));
+      anuncia();
+      const m = pk.mods.get("c") || {};
+      // Os pacotes do config são integrações e plugins: aqui, qualquer coisa serve.
+      const cfg = m.default || {};
+      configCache.config = typeof cfg === "function" ? cfg({ command: "dev", mode: "development" }) || {} : cfg;
+    } catch (e) {
+      // Vai para o painel Problemas: sem o config, `Astro.site` e as fontes somem calados.
+      const texto = globalThis.__odeteTexto("astroConfigIlegivel", path.basename(configCache.arquivo), (e && e.message) || e);
+      console.warn("[odete] " + texto);
+      state.diagnostics = state.diagnostics.filter((d) => d.entry !== "@astro-config")
+        .concat([{ text: texto, file: path.relative(state.root, configCache.arquivo), line: null, column: null, lineText: null, kind: "warning", entry: "@astro-config" }]);
+      anuncia();
+    }
+    definesAstroCache = null;
+    return configCache.config;
+  }
+
+  // ---- astro:assets ----
+  function moduloAssets() {
+    const R = globalThis.__astroRuntime;
+    const srcDe = (src) => (src && typeof src === "object" ? (src.default || src) : { src });
+    const img = (props) => {
+      const p = Object.assign({}, props);
+      const meta = srcDe(p.src);
+      const largura = p.width != null ? p.width : meta.width, altura = p.height != null ? p.height : meta.height;
+      const extras = {};
+      for (const k of Object.keys(p)) {
+        if (["src", "width", "height", "format", "quality", "densities", "widths", "formats", "fallbackFormat", "pictureAttributes", "inferSize", "layout", "fit", "position", "priority"].indexOf(k) < 0) extras[k] = p[k];
+      }
+      if (p.priority) { extras.loading = extras.loading || "eager"; extras.fetchpriority = "high"; }
+      return "<img" + R.__attr("src", meta.src) + R.__attr("width", largura) + R.__attr("height", altura) +
+        R.__attrs(Object.assign({ loading: "lazy", decoding: "async" }, extras)) + ">";
+    };
+    const Image = (Astro) => img(Astro.props);
+    const Picture = (Astro) => {
+      const pa = Astro.props.pictureAttributes || {};
+      return "<picture" + R.__attrs(pa) + ">" + img(Astro.props) + "</picture>";
+    };
+    const Font = (Astro) => htmlDaFonte(Astro.props || {});
+    return {
+      __esModule: true, Image, Picture, Font,
+      getImage: async (o) => {
+        const meta = srcDe(o && o.src);
+        return { src: meta.src, attributes: { width: o.width || meta.width, height: o.height || meta.height }, options: o, rawOptions: o };
+      },
+      inferRemoteSize: async () => ({ width: 0, height: 0 }),
+      imageConfig: {},
+    };
+  }
+
+  // `<Font cssVariable="--x" />`: as `@font-face` da família que o config declara com essa
+  // variável, e a variável apontando para ela. Arquivo local é servido do projeto; Google
+  // vira o CSS da API deles.
+  function htmlDaFonte(props) {
+    const fontes = [].concat(configDoAstro().fonts || []);
+    const f = fontes.find((x) => x && x.cssVariable === props.cssVariable);
+    if (!f) return "";
+    const fam = "'" + String(f.name).replace(/'/g, "") + "'";
+    const pilha = [fam].concat([].concat(f.fallbacks || ["sans-serif"])).join(", ");
+    let css = "", links = "";
+    const prov = (f.provider && f.provider.__odeteProvedor) || "google";
+    const variantes = (f.options && f.options.variants) || f.variants || [];
+    if (prov === "local") {
+      for (const v of variantes) {
+        const srcs = [].concat(v.src || []).map((s) => (typeof s === "string" ? s : s && (s.url || s.path))).filter(Boolean);
+        const urls = srcs.map((s) => {
+          const abs = path.resolve(state.root, s);
+          if (props.preload) links += '<link rel="preload" href="' + urlDoArquivo(abs) + '" as="font" type="font/' + (path.extname(abs).slice(1) || "woff2") + '" crossorigin>';
+          return "url('" + urlDoArquivo(abs) + "')";
+        });
+        css += "@font-face{font-family:" + fam + ";src:" + urls.join(",") + ";font-weight:" + (v.weight || 400) +
+          ";font-style:" + (v.style || "normal") + ";font-display:" + (v.display || "swap") + "}";
+      }
+    } else {
+      const pesos = [].concat(f.weights || [400]).join(";");
+      links += '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=' + encodeURIComponent(f.name).replace(/%20/g, "+") + ":wght@" + pesos + '&amp;display=swap">';
+    }
+    css += ":root{" + f.cssVariable + ":" + pilha + "}";
+    return links + "<style>" + css + "</style>";
+  }
+
+  // ---- astro/zod ----
+  // O zod do projeto (o Astro depende dele), carregado uma vez: uma cópia
+  // só para o schema do projeto (`astro/zod`, `astro:content`, `zod`) e para o `image()`
+  // daqui. É preparado antes de a página rodar (`garanteZod`), porque quem o pede é um
+  // `require` síncrono.
+  let zodCache = null;
+  async function garanteZod() {
+    if (zodCache) return zodCache;
+    let achou = false;
+    for (let d = state.root; ; d = path.dirname(d)) {
+      if (fs.existsSync(path.join(d, "node_modules", "zod", "package.json"))) { achou = true; break; }
+      if (d === path.dirname(d)) break;
+    }
+    if (!achou) return null;
+    // Pelo `require` do motor primeiro: o CommonJS do zod carrega arquivo por arquivo,
+    // sem transformar — sem JIT, bem menos do que o esbuild reanalisar o pacote inteiro.
+    // O empacotamento fica para quando o `require` não der conta (um zod só ESM).
+    let zz = null;
+    const t0 = Date.now();
+    try {
+      const m = requireDoProjeto()("zod");
+      zz = m.z || m;
+    } catch (e) {
+      const pk = await empacotaAstro("@zod", [{ spec: "zod", abs: "zod" }], null, VIRTUAIS_DO_ASTRO);
+      zz = pk.mods.get("zod").z || pk.mods.get("zod");
+    }
+    state.stats.zodMs = Date.now() - t0;
+    zodCache = Object.assign({ __esModule: true }, zz, { z: zz, default: zz });
+    return zodCache;
+  }
+  function moduloZod() {
+    if (!zodCache) throw new Error(globalThis.__odeteTexto("astroSemZod"));
+    return zodCache;
+  }
+
+  // ---- astro:content ----
+  // As content collections do `src/content.config.ts` (e as do jeito antigo, pastas em
+  // `src/content/`). `glob()` e `file()` são lidos aqui; o schema é o zod do projeto, e o
+  // `image()` dele resolve o caminho relativo ao arquivo da entrada.
+  let colecoesCache = null;
+  const entradasCache = new Map();
+  let arquivoDaEntradaAtual = null;
+
+  async function colecoesDoProjeto() {
+    if (colecoesCache) return colecoesCache;
+    const cfg = ["src/content.config.ts", "src/content.config.js", "src/content.config.mjs", "src/content/config.ts", "src/content/config.js", "src/content/config.mjs"]
+      .map((n) => path.join(state.root, n)).find((f) => fs.existsSync(f));
+    let cols = {};
+    await garanteZod();
+    if (cfg) {
+      const m = await moduloDeArquivo("astro:@colecoes", cfg);
+      cols = (m && m.collections) || {};
+    }
+    colecoesCache = cols;
+    return cols;
+  }
+
+  function padraoParaRegex(p) {
+    let re = "";
+    for (let i = 0; i < p.length; i++) {
+      const c = p[i];
+      if (c === "*" && p[i + 1] === "*") { re += "(?:.*/)?"; i += p[i + 2] === "/" ? 2 : 1; continue; }
+      if (c === "*") { re += "[^/]*"; continue; }
+      if (c === "?") { re += "[^/]"; continue; }
+      if (c === "{") { const f = p.indexOf("}", i); re += "(?:" + p.slice(i + 1, f).split(",").map((x) => x.replace(/[.+^$()|[\]\\]/g, "\\$&")).join("|") + ")"; i = f; continue; }
+      re += c.replace(/[.+^$()|[\]\\]/g, "\\$&");
+    }
+    return new RegExp("^" + re + "$");
+  }
+
+  function arquivosEm(dir) {
+    const out = [];
+    const anda = (d) => {
+      let itens = [];
+      try { itens = fs.readdirSync(d); } catch (e) { return; }
+      for (const n of itens.sort()) {
+        if (n.startsWith(".") || PASTAS_DE_PACOTES.includes(n)) continue;
+        const f = path.join(d, n);
+        let st;
+        try { st = fs.statSync(f); } catch (e) { continue; }
+        if (st.isDirectory()) anda(f); else out.push(f);
+      }
+    };
+    anda(dir);
+    return out;
+  }
+
+  // O id que o glob() dá: o caminho relativo sem extensão, com cada parte em slug.
+  const slugDoId = (rel) => rel.replace(/\.[^./]+$/, "").split("/").map((p) => globalThis.__odeteMarkdown.slugDe(p)).join("/").replace(/\/index$/, "");
+
+  async function entradasDaColecao(nome) {
+    if (entradasCache.has(nome)) return entradasCache.get(nome);
+    const cols = await colecoesDoProjeto();
+    let col = cols[nome];
+    const pastaAntiga = path.join(state.root, "src", "content", nome);
+    if (!col && !fs.existsSync(pastaAntiga)) {
+      throw new Error(globalThis.__odeteTexto("astroColecaoNaoExiste", nome));
+    }
+    col = col || {};
+    const loader = col.loader;
+    const lidos = [];
+    const brutas = [];
+    let pastaVigiada = null;
+    if (loader && loader.__odeteLoader === "glob") {
+      const base = path.resolve(state.root, loader.base || ".");
+      pastaVigiada = base;
+      const padroes = [].concat(loader.pattern || "**/*").map(padraoParaRegex);
+      for (const f of arquivosEm(base)) {
+        const rel = path.relative(base, f).split(path.sep).join("/");
+        if (!padroes.some((r) => r.test(rel))) continue;
+        brutas.push(Object.assign(entradaDeArquivo(f), { id: null, rel }));
+        lidos.push(f);
+      }
+      for (const b of brutas) b.id = typeof loader.generateId === "function"
+        ? loader.generateId({ entry: b.rel, base: new URL("file://" + base + "/"), data: b.data })
+        : (b.data && b.data.slug) || slugDoId(b.rel);
+    } else if (loader && loader.__odeteLoader === "file") {
+      const f = path.resolve(state.root, loader.arquivo);
+      lidos.push(f);
+      const txt = fs.readFileSync(f, "utf8");
+      const dados = /\.ya?ml$/i.test(f) ? globalThis.__odeteMarkdown.yaml(txt) : JSON.parse(txt);
+      const lista = Array.isArray(dados) ? dados : Object.keys(dados).map((k) => Object.assign({ id: k }, dados[k]));
+      for (const d of lista) brutas.push({ id: String(d.id != null ? d.id : d.slug), data: d, body: undefined, arquivo: f });
+    } else if (typeof loader === "function") {
+      const lista = await loader();
+      for (const d of [].concat(lista || [])) brutas.push({ id: String(d.id), data: d, body: undefined, arquivo: null });
+    } else if (loader && typeof loader.load === "function") {
+      throw new Error(globalThis.__odeteTexto("astroLoaderProprio", nome, loader.name || "load"));
+    } else {
+      // Coleção do jeito antigo: `src/content/<nome>/`, id com extensão e `slug`.
+      pastaVigiada = pastaAntiga;
+      for (const f of arquivosEm(pastaAntiga)) {
+        if (!/\.(mdx?|json|ya?ml)$/i.test(f)) continue;
+        const rel = path.relative(pastaAntiga, f).split(path.sep).join("/");
+        const e = entradaDeArquivo(f);
+        e.id = rel;
+        e.slug = (e.data && e.data.slug) || slugDoId(rel);
+        brutas.push(e);
+        lidos.push(f);
+      }
+    }
+    // O schema: função (com `image()`) ou o próprio schema do zod.
+    let schema = col.schema;
+    if (typeof schema === "function") schema = schema({ image: imagemDoSchema });
+    const entradas = [];
+    for (const b of brutas) {
+      let data = b.data || {};
+      if (schema && typeof schema.parse === "function") {
+        arquivoDaEntradaAtual = b.arquivo;
+        try {
+          const r = schema.safeParse ? schema.safeParse(data) : { success: true, data: schema.parse(data) };
+          if (!r.success) {
+            const q = (r.error && r.error.issues && r.error.issues[0]) || {};
+            throw new Error(globalThis.__odeteTexto("astroSchema", b.id, nome,
+              ((q.path || []).join(".") || "?") + ": " + (q.message || String(r.error))));
+          }
+          data = r.data;
+        } finally {
+          arquivoDaEntradaAtual = null;
+        }
+      }
+      const e = { id: b.id, collection: nome, data, body: b.body, filePath: b.arquivo ? path.relative(state.root, b.arquivo) : undefined };
+      if (b.slug) e.slug = b.slug;
+      Object.defineProperty(e, "__odeteArquivo", { value: b.arquivo, enumerable: false });
+      entradas.push(e);
+    }
+    entradasCache.set(nome, entradas);
+    defineDeps("astro:@colecao:" + nome, lidos);
+    if (pastaVigiada) state.faltando.set("astro:@colecao:" + nome, new Set([pastaVigiada].concat(lidos.map((f) => path.dirname(f)))));
+    anuncia();
+    return entradas;
+  }
+
+  function entradaDeArquivo(f) {
+    const txt = fs.readFileSync(f, "utf8");
+    if (/\.mdx?$/i.test(f)) {
+      const fm = frontmatterDe(txt);
+      return { data: fm.dados, body: fm.corpo, arquivo: f };
+    }
+    if (/\.ya?ml$/i.test(f)) return { data: globalThis.__odeteMarkdown.yaml(txt), body: undefined, arquivo: f };
+    if (/\.json$/i.test(f)) return { data: JSON.parse(txt), body: undefined, arquivo: f };
+    return { data: {}, body: txt, arquivo: f };
+  }
+
+  // `image()` do schema: o caminho da entrada, relativo ao arquivo dela, vira ImageMetadata.
+  function imagemDoSchema() {
+    const z = moduloZod();
+    return z.string().transform((s) => {
+      if (/^(https?:)?\/\//.test(s) || s.startsWith("/")) return { src: s, width: 0, height: 0, format: path.extname(s).slice(1) };
+      const base = arquivoDaEntradaAtual ? path.dirname(arquivoDaEntradaAtual) : state.root;
+      const abs = s.startsWith("~/") || s.startsWith("@/") ? caminhoDoImport(s, base) || path.resolve(base, s) : path.resolve(base, s);
+      return imagemDe(abs);
+    });
+  }
+
+  function moduloContent() {
+    const acha = async (colecao, id) => (await entradasDaColecao(colecao)).find((e) => e.id === id || e.slug === id);
+    return {
+      __esModule: true,
+      defineCollection: (c) => c,
+      reference: (col) => moduloZod().string().transform((id) => ({ id, collection: col })),
+      // Preguiçoso: quem só lê a coleção (sem schema) não precisa do zod instalado.
+      get z() { return moduloZod(); },
+      getCollection: async (nome, filtro) => {
+        const todas = await entradasDaColecao(nome);
+        return typeof filtro === "function" ? todas.filter(filtro) : todas.slice();
+      },
+      getEntry: async (a, b) => (typeof a === "object" && a ? acha(a.collection, a.id || a.slug) : acha(a, b)),
+      getEntryBySlug: async (c, s) => acha(c, s),
+      getDataEntryById: async (c, id) => acha(c, id),
+      getEntries: async (refs) => Promise.all([].concat(refs || []).map((r) => acha(r.collection, r.id || r.slug))),
+      getLiveCollection: async () => ({ entries: [] }),
+      render: renderDaEntrada,
+    };
+  }
+
+  // `render(entrada)`: o `Content` que desenha o corpo (markdown ou MDX) e os títulos.
+  async function renderDaEntrada(entrada) {
+    const f = entrada && entrada.__odeteArquivo;
+    if (!f || !/\.mdx?$/i.test(f)) {
+      const html = entrada && entrada.rendered && entrada.rendered.html || "";
+      return { Content: { render: async () => html }, headings: [], remarkPluginFrontmatter: {} };
+    }
+    const m = await moduloMarkdown(f);
+    return { Content: m.exports.Content, headings: m.headings, remarkPluginFrontmatter: {} };
+  }
+
+  // ---- rotas ----
+  // As rotas saem de `src/pages`: `.astro`, `.md` e `.mdx` são páginas; `.ts`/`.js` são
+  // endpoints (`rss.xml.js` é `/rss.xml`). `[slug]` pega um segmento, `[...resto]` o que
+  // sobrar (inclusive nada). Rota literal ganha de dinâmica, que ganha de resto.
+  function rotasDoAstro() {
+    const base = path.join(state.root, "src", "pages");
+    const rotas = [];
+    for (const f of arquivosEm(base)) {
+      const rel = path.relative(base, f).split(path.sep).join("/");
+      if (rel.split("/").some((p) => p.startsWith("_")) || /\.d\.ts$/.test(rel)) continue;
+      let tipo = null;
+      if (/\.astro$/i.test(rel)) tipo = "astro";
+      else if (/\.mdx?$/i.test(rel)) tipo = "md";
+      else if (EXT_CODIGO_DE_PAGINA.test(rel)) tipo = "endpoint";
+      if (!tipo) continue;
+      const semExt = tipo === "endpoint" ? rel.replace(EXT_CODIGO_DE_PAGINA, "") : rel.replace(/\.[^./]+$/, "");
+      const partes = semExt.split("/");
+      if (partes[partes.length - 1] === "index") partes.pop();
+      const segs = partes.map((p) => {
+        const resto = /^\[\.\.\.([^\]]+)\]$/.exec(p);
+        if (resto) return { tipo: "resto", nome: resto[1], peso: 1 };
+        if (/\[[^\]]+\]/.test(p)) {
+          const nomes = [];
+          const re = new RegExp("^" + p.replace(/[.+^$()|\\]/g, "\\$&").replace(/\[([^\]]+)\]/g, (m, n) => { nomes.push(n); return "([^/]+?)"; }) + "$");
+          return { tipo: "um", re, nomes, peso: 2 };
+        }
+        return { tipo: "literal", valor: p, peso: 3 };
+      });
+      rotas.push({ arquivo: f, tipo, segs, rel });
+    }
+    rotas.sort((a, b) => {
+      const n = Math.max(a.segs.length, b.segs.length);
+      for (let i = 0; i < n; i++) {
+        const x = a.segs[i] ? a.segs[i].peso : 0, y = b.segs[i] ? b.segs[i].peso : 0;
+        if (x !== y) return y - x;
+      }
+      return b.segs.length - a.segs.length;
+    });
+    return rotas;
+  }
+
+  function casaSegmentos(segs, partes) {
+    const params = {};
+    let i = 0;
+    for (let k = 0; k < segs.length; k++) {
+      const s = segs[k];
+      if (s.tipo === "resto") {
+        if (k !== segs.length - 1) return null;
+        const r = partes.slice(i);
+        params[s.nome] = r.length ? r.join("/") : undefined;
+        return params;
+      }
+      if (i >= partes.length) return null;
+      if (s.tipo === "literal") { if (s.valor !== partes[i]) return null; }
+      else {
+        const m = s.re.exec(partes[i]);
+        if (!m) return null;
+        s.nomes.forEach((n, j) => { params[n] = m[j + 1]; });
+      }
+      i++;
+    }
+    return i === partes.length ? params : null;
+  }
+
+  function casaRotasDoAstro(p) {
+    const base = path.join(state.root, "src", "pages");
+    if (!fs.existsSync(base)) return [];
+    let partes;
+    try { partes = p.split("/").filter(Boolean).map(decodeURIComponent); } catch (e) { partes = p.split("/").filter(Boolean); }
+    const out = [];
+    for (const r of rotasDoAstro()) {
+      const params = casaSegmentos(r.segs, partes);
+      if (params) out.push({ rota: r, params });
+    }
+    return out;
+  }
+
+  const ehDinamica = (r) => r.segs.some((s) => s.tipo !== "literal");
+
+  // `getStaticPaths()` decide o que existe numa rota dinâmica e com que props. Sem ele, a
+  // rota é "servidor" e os params vêm da URL.
+  async function caminhosEstaticos(getStaticPaths, rota) {
+    const nomeDoResto = (rota.segs.find((s) => s.tipo === "resto") || {}).nome ||
+      ((rota.segs.find((s) => s.tipo === "um") || {}).nomes || [])[0];
+    const paginate = (dados, o) => {
+      const tam = (o && o.pageSize) || 10;
+      const total = dados.length, ultimas = Math.max(1, Math.ceil(total / tam));
+      const out = [];
+      for (let n = 1; n <= ultimas; n++) {
+        const inicio = (n - 1) * tam;
+        const params = Object.assign({}, o && o.params, { [nomeDoResto]: n === 1 && rota.segs.some((s) => s.tipo === "resto") ? undefined : String(n) });
+        out.push({
+          params, props: Object.assign({}, o && o.props, {
+            page: {
+              data: dados.slice(inicio, inicio + tam), start: inicio, end: Math.min(total, inicio + tam) - 1,
+              size: tam, total, currentPage: n, lastPage: ultimas,
+              url: { current: "", prev: n > 1 ? String(n - 1) : undefined, next: n < ultimas ? String(n + 1) : undefined, first: undefined, last: undefined },
+            },
+          }),
+        });
+      }
+      return out;
+    };
+    const lista = await getStaticPaths({ paginate });
+    return [].concat(lista || []).flat();
+  }
+
+  function mesmosParams(a, b) {
+    const ks = new Set(Object.keys(a || {}).concat(Object.keys(b || {})));
+    for (const k of ks) {
+      const x = a && a[k], y = b && b[k];
+      const nx = x == null || x === "" ? undefined : String(x), ny = y == null || y === "" ? undefined : String(y);
+      if (nx !== ny) return false;
+    }
+    return true;
+  }
+
+  // O `Astro` da página: URL, params, props, site, pedido e o registro dos componentes
+  // usados (é por ele que a folha da página junta o CSS de cada um).
+  function astroDaPagina(req, url, params, props) {
+    const cfg = configDoAstro();
+    const cabecalhos = req.headers || {};
+    const host = cabecalhos.host || "localhost:" + state.port;
+    const href = new URL(url.pathname + url.search, "http://" + host);
+    let pedido;
+    try { pedido = new Request(href.href, { method: req.method || "GET", headers: cabecalhos }); } catch (e) { pedido = { url: href.href, method: req.method, headers: cabecalhos }; }
+    const biscoitos = globalThis.__next && globalThis.__next.pedidoNext ? globalThis.__next.pedidoNext(href.href, req.method, cabecalhos).cookies : { get: () => undefined, has: () => false };
+    let versao = "5";
+    try { versao = JSON.parse(fs.readFileSync(path.join(state.root, "node_modules", "astro", "package.json"), "utf8")).version; } catch (e) { /* sem astro instalado */ }
+    return {
+      props: props || {}, params: params || {}, url: href, request: pedido,
+      site: cfg.site ? new URL(cfg.site) : undefined, generator: "Astro v" + versao,
+      redirect: (destino, status) => new Response(null, { status: status || 302, headers: { location: String(destino) } }),
+      cookies: { get: (n) => biscoitos.get(n), has: (n) => biscoitos.has(n), set() {}, delete() {} },
+      locals: {}, response: { status: 200, statusText: "", headers: new Headers() },
+      clientAddress: "127.0.0.1", isPrerendered: false, currentLocale: undefined, preferredLocale: undefined, preferredLocaleList: [],
+      glob: async () => [],
+      __usados: new Set(),
+    };
+  }
+
+  // A resposta de uma rota do Astro, ou null quando nenhuma casou.
+  async function rotaDoAstro(req, res, p, url, extras) {
+    const candidatas = casaRotasDoAstro(p);
+    if (!candidatas.length) return null;
+    await carregaConfigDoAstro();
+    for (const c of candidatas) {
+      const r = await tentaRotaDoAstro(c.rota, c.params, req, res, p, url, extras);
+      if (r !== null) return r;
+    }
+    return null;
+  }
+
+  async function tentaRotaDoAstro(rota, params, req, res, p, url, extras) {
+    if (rota.tipo === "endpoint") return endpointDoAstro(rota, params, req, res, url, extras);
+    let props = {};
+    if (rota.tipo === "astro" && ehDinamica(rota)) {
+      const mod = (await carregaAstro(rota.arquivo)).exports;
+      const r = typeof mod.__frente === "function" ? await mod.__frente(null, {}, "paths") : {};
+      if (r && typeof r.getStaticPaths === "function") {
+        const lista = await caminhosEstaticos(r.getStaticPaths, rota);
+        const achado = lista.find((x) => mesmosParams(x && x.params, params));
+        if (!achado) return null;
+        props = achado.props || {};
+        params = Object.assign({}, params, achado.params);
+      }
+    }
+    const astro = astroDaPagina(req, url, params, props);
+    let html;
+    if (rota.tipo === "md") html = await paginaMarkdown(rota.arquivo, astro);
+    else {
+      const pagina = await carregaAstro(rota.arquivo);
+      astro.__usados.add(rota.arquivo);
+      const R = globalThis.__astroRuntime;
+      const a = R.filho(astro, props, {}, pagina.exports);
+      a.__usados = astro.__usados;
+      html = await pagina.exports.render(a, {});
+    }
+    if (html && typeof html === "object" && typeof html.status === "number") {
+      // `return Astro.redirect("/x")` no frontmatter
+      const h = [];
+      if (html.headers && html.headers.forEach) html.headers.forEach((v, k) => h.push([k, v]));
+      return send(res, html.status, "text/plain; charset=utf-8", "", (extras || []).concat(h));
+    }
+    folhasDoAstro.set(p, [...astro.__usados]);
+    const status = /\/404\.(astro|mdx?)$/.test(rota.arquivo) ? 404 : 200;
+    return send(res, status, MIME[".html"], documentoDoAstro(String(html == null ? "" : html), p), extras);
+  }
+
+  async function paginaMarkdown(arquivo, astro) {
+    const m = await moduloMarkdown(arquivo);
+    astro.__usados.add(arquivo);
+    const conteudo = await m.exports.Content.render(Object.assign({}, astro, { props: {} }), {});
+    const layout = m.dados && m.dados.layout;
+    if (!layout) return conteudo;
+    const abs = caminhoDoImport(layout, path.dirname(arquivo)) || path.resolve(path.dirname(arquivo), layout);
+    const L = await carregaAstro(abs);
+    astro.__usados.add(abs);
+    const props = { frontmatter: m.dados, content: m.dados, headings: m.headings, file: arquivo, url: m.exports.url, rawContent: () => m.corpo };
+    return globalThis.__astroRuntime.__comp(L.exports, props, { default: async () => conteudo }, astro);
+  }
+
+  // O documento: `<!DOCTYPE>` se a página escreveu `<html>` sem ele, a folha da rota e o
+  // cliente do Preview no `<head>`.
+  function documentoDoAstro(html, p) {
+    const folha = '<link rel="stylesheet" href="/@odete/css/@astro' + encodeURI(p) + '">';
+    const cabeca = folha + importMap() + CLIENT;
+    let out = html.replace(/^\s+/, "");
+    if (/^<html[\s>]/i.test(out)) out = "<!DOCTYPE html>" + out;
+    const i = out.search(/<\/head>/i);
+    if (i >= 0) return out.slice(0, i) + cabeca + out.slice(i);
+    const b = out.search(/<body[\s>]/i);
+    if (b >= 0) return out.slice(0, b) + "<head>" + cabeca + "</head>" + out.slice(b);
+    return cabeca + out;
+  }
+
+  // A folha de uma rota: o CSS importado por cada componente usado, e depois o `<style>`
+  // de cada um, na ordem em que apareceram.
+  const folhasDoAstro = new Map();
+  async function folhaDoAstro(p) {
+    const arquivos = folhasDoAstro.get(p) || [];
+    const importados = [], proprios = [], vistos = new Set();
+    for (const f of arquivos) {
+      let m = modAstro.get(f);
+      if (!m || m.mt !== (fs.existsSync(f) ? fs.statSync(f).mtimeMs : -1)) {
+        try { m = /\.mdx?$/i.test(f) ? await moduloMarkdown(f) : await carregaAstro(f); } catch (e) { continue; }
+      }
+      if (m.cssImportado && !vistos.has(m.cssImportado)) { vistos.add(m.cssImportado); importados.push(m.cssImportado); }
+      if (m.cssProprio) proprios.push(m.cssProprio);
+    }
+    return importados.concat(proprios).join("\n");
+  }
+
+  // Endpoint: `export async function GET({ params, request })` devolve uma Response.
+  async function endpointDoAstro(rota, params, req, res, url, extras) {
+    const mod = await moduloDeArquivo("astro:" + rota.arquivo, rota.arquivo);
+    if (ehDinamica(rota) && typeof mod.getStaticPaths === "function") {
+      const lista = await caminhosEstaticos(mod.getStaticPaths, rota);
+      if (!lista.find((x) => mesmosParams(x && x.params, params))) return null;
+    }
+    const metodo = String(req.method || "GET").toUpperCase();
+    const fn = mod[metodo] || mod[metodo.toLowerCase()] || mod.ALL || mod.all || (metodo === "HEAD" ? mod.GET : null);
+    if (typeof fn !== "function") return send(res, 405, "text/plain; charset=utf-8", "", [["allow", Object.keys(mod).filter((k) => /^[A-Z]+$/.test(k)).join(", ")]]);
+    const astro = astroDaPagina(req, url, params, {});
+    if (metodo !== "GET" && metodo !== "HEAD") {
+      const corpo = await corpoDoPedido(req);
+      try { astro.request = new Request(astro.url.href, { method: metodo, headers: req.headers || {}, body: corpo }); } catch (e) { /* fica o de antes */ }
+    }
+    const r = await fn(astro);
+    // Sem `content-type` na resposta, vale a extensão da rota (`rss.xml` é XML), como no
+    // Astro. O `Response` do runtime põe `text/plain` sozinho num corpo de texto: esse
+    // também cede à extensão.
+    const pelaExtensao = Object.assign({}, MIME, {
+      ".xml": "application/xml; charset=utf-8", ".rss": "application/rss+xml; charset=utf-8",
+      ".webmanifest": "application/manifest+json", ".ics": "text/calendar; charset=utf-8",
+    })[path.extname(url.pathname).toLowerCase()];
+    if (r == null) return send(res, 204, "text/plain; charset=utf-8", "", extras);
+    if (typeof r === "string") return send(res, 200, pelaExtensao || "text/plain; charset=utf-8", r, extras);
+    const h = { "cache-control": "no-store" };
+    if (r.headers && typeof r.headers.forEach === "function") r.headers.forEach((v, k) => { h[k] = v; });
+    if (pelaExtensao && (!h["content-type"] || /^text\/plain;\s*charset=utf-8$/i.test(h["content-type"]))) h["content-type"] = pelaExtensao;
+    if (!h["content-type"]) h["content-type"] = "text/plain; charset=utf-8";
+    if (extras) for (const [k, v] of extras) h[k] = v;
+    let corpo = "";
+    if (typeof r.arrayBuffer === "function") corpo = Buffer.from(new Uint8Array(await r.arrayBuffer()));
+    else if (r.body != null) corpo = String(r.body);
+    res.writeHead(r.status || 200, h);
+    return res.end(corpo);
+  }
+
+  // Depois de uma mudança no grafo de um .astro (ou de uma coleção, ou do config). Um
+  // .astro é recompilado já: se só o CSS (o `<style>` dele ou uma folha importada) mudou,
+  // a página fica e a folha troca.
+  async function refazAstro(chave, soEstilo) {
+    if (chave.startsWith("@colecao:")) { entradasCache.delete(chave.slice(9)); return { js: true, css: false, refeito: false }; }
+    if (chave === "@colecoes") { colecoesCache = null; entradasCache.clear(); return { js: true, css: false, refeito: false }; }
+    if (chave === "@config") {
+      configCache = null; definesAstroCache = null; modAstro.clear(); colecoesCache = null; entradasCache.clear();
+      return { js: true, css: false, refeito: false };
+    }
+    const antes = modAstro.get(chave);
+    modAstro.delete(chave);
+    if (/\.(ts|js|mjs|mts|cjs)$/i.test(chave) || !antes || !fs.existsSync(chave)) return { js: true, css: false, refeito: false };
+    try {
+      const depois = /\.mdx?$/i.test(chave) ? await moduloMarkdown(chave) : await carregaAstro(chave);
+      return { js: depois.jsHash !== antes.jsHash, css: depois.css !== antes.css, refeito: true };
+    } catch (e) {
+      return { js: true, css: false, refeito: true };
+    }
+  }
+
+  // Um arquivo do projeto pelo endereço (imagens e fontes importadas, que não estão em public/).
+  function enviaArquivoDoProjeto(res, p) {
+    let rel;
+    try { rel = decodeURIComponent(p.slice("/@odete/arquivo/".length)); } catch (e) { rel = p.slice("/@odete/arquivo/".length); }
+    const f = path.join(state.root, rel);
+    if (!f.startsWith(state.root + "/") || !fs.existsSync(f) || !fs.statSync(f).isFile()) {
+      return send(res, 404, "text/plain; charset=utf-8", "não encontrado: " + rel);
+    }
+    registraLido("est:" + f, f);
+    return send(res, 200, MIME[path.extname(f).toLowerCase()] || "application/octet-stream", fs.readFileSync(f));
+  }
+
+  // Um erro no Astro vira uma página que diz onde foi, em vez do texto cru.
+  function paginaDeErroDoAstro(e) {
+    const msg = String((e && e.message) || e);
+    const pilha = String((e && e.stack) || "").split("\n").slice(0, 8).join("\n");
+    const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+    return "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>Erro</title>" + CLIENT +
+      "</head><body style=\"margin:0;background:#111;color:#eee;font:14px ui-monospace,monospace\"><pre style=\"white-space:pre-wrap;padding:16px;color:#e25d5d\">" +
+      esc(msg) + "</pre><pre style=\"white-space:pre-wrap;padding:0 16px;color:#999\">" + esc(pilha) + "</pre></body></html>";
   }
 
   function send(res, status, type, body, extras) {
@@ -817,6 +1989,15 @@ globalThis.__devCria = function () {
     if (state.base !== "/" && (p + "/").startsWith(state.base)) p = "/" + p.slice(state.base.length);
     try {
       if (p.startsWith("/@odete/js/")) { const b = await bundle(p.slice(11)); return send(res, 200, MIME[".js"], b.js); }
+      // As folhas das páginas do Next e do Astro moram sob /@odete/css/ também: é o que o
+      // cliente do Preview troca sozinho quando só o CSS mudou.
+      if (p.startsWith("/@odete/css/@next/") || p === "/@odete/css/@next") {
+        return send(res, 200, MIME[".css"], await folhaDaRota(p.slice("/@odete/css/@next".length) || "/"));
+      }
+      if (p.startsWith("/@odete/css/@astro/")) {
+        return send(res, 200, MIME[".css"], await folhaDoAstro(p.slice("/@odete/css/@astro".length)));
+      }
+      if (p.startsWith("/@odete/arquivo/")) return enviaArquivoDoProjeto(res, p);
       if (p.startsWith("/@odete/css/")) { const b = await bundle(p.slice(12)); return send(res, 200, MIME[".css"], b.css); }
       if (p === "/@odete/deps.js" || p === "/@odete/deps.css") return await enviaDeps(req, res, p, url);
       if (p === "/@odete/diag") return send(res, 200, "application/json", JSON.stringify(state.diagnostics));
@@ -839,6 +2020,16 @@ globalThis.__devCria = function () {
         }
       }
 
+      // Os ícones de convenção do App Router (`app/favicon.ico`, `app/icon.png`) são
+      // servidos na raiz do site, como o Next faz.
+      if (globalThis.__next && ehProjetoNext() && globalThis.__next.ehIconeDoApp(p.slice(1))) {
+        const f = path.join(state.root, "app", p.slice(1));
+        if (!fs.existsSync(path.join(state.root, "public", p.slice(1))) && fs.existsSync(f)) {
+          registraLido("est:" + f, f);
+          return send(res, 200, MIME[path.extname(f).toLowerCase()] || "application/octet-stream", fs.readFileSync(f), extras);
+        }
+      }
+
       // estáticos: public/ primeiro, depois raiz
       for (const base of [path.join(state.root, "public"), state.root]) {
         let f = path.join(base, p);
@@ -854,8 +2045,15 @@ globalThis.__devCria = function () {
         return send(res, 200, MIME[ext] || "application/octet-stream", fs.readFileSync(f), extras);
       }
       // páginas de framework, antes do fallback: nem Astro nem Next têm index.html
-      const pagina = paginaAstro(p);
-      if (pagina) return send(res, 200, MIME[".html"], await renderizaAstro(pagina), extras);
+      const astro = ehProjetoAstro();
+      if (astro) {
+        try {
+          const r = await rotaDoAstro(req, res, p, url, extras);
+          if (r !== null) return r;
+        } catch (e) {
+          return send(res, 500, MIME[".html"], paginaDeErroDoAstro(e), extras);
+        }
+      }
       if (p.startsWith("/@odete/ilhas/")) {
         const rota = decodeURIComponent(p.slice("/@odete/ilhas".length)) || "/";
         const js = await pacoteDeIlhas(rota);
@@ -874,7 +2072,11 @@ globalThis.__devCria = function () {
       if (rotaNext) {
         try {
           globalThis.__next.instalaAcoes();
-          globalThis.__next.rotaDasAcoes(p);
+          // O pedido que a página vai ler: `usePathname`, `useSearchParams`, `useParams`,
+          // `headers()` e `cookies()` respondem com ele.
+          globalThis.__next.defineRequisicao({
+            pathname: p, search: url.search, params: rotaNext.params || {}, headers: req.headers || {},
+          });
 
           // Route Handler não é página: devolve o que a função devolveu.
           if (rotaNext.tipo === "handler") {
@@ -944,6 +2146,16 @@ globalThis.__devCria = function () {
       }
       if (!path.extname(p) && ehProjetoNext()) {
         return await enviaEspecial(res, p, url, "not-found", 404, extras, null);
+      }
+      // O 404 do projeto Astro é a página `src/pages/404.astro`, se houver.
+      if (astro && !p.startsWith("/@odete/")) {
+        const nf = casaRotasDoAstro("/404").find((c) => /\/404\.(astro|mdx?)$/.test(c.rota.arquivo));
+        if (nf) {
+          try {
+            const r = await tentaRotaDoAstro(nf.rota, {}, req, res, p, url, extras);
+            if (r !== null) return r;
+          } catch (e) { /* cai no recado */ }
+        }
       }
       send(res, 404, "text/plain; charset=utf-8", recado404(p));
     } catch (e) {

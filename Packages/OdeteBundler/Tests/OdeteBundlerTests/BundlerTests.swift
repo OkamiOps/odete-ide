@@ -251,9 +251,12 @@ struct AstroTests {
         #expect(html.contains("<h1>Odete LP</h1>"), "o slot não entrou")
         #expect(html.contains(#"<span class="tag">novo</span>"#), "o componente não renderizou")
         #expect(html.contains("<li>um</li><li>dois</li>"), "a lista não renderizou")
-        // o CSS tem chaves e não pode ter sido tratado como expressão
-        #expect(html.contains("body { color: #111; }"))
-        #expect(html.contains("@media (min-width: 40rem)"))
+        // O CSS tem chaves e não pode ter sido tratado como expressão. O `<style>` do
+        // layout sai da página e vai para a folha dela, com o escopo do componente.
+        let (c, _) = try await URLSession.shared.data(from: dev.url.appending(path: "@odete/css/@astro/"))
+        let css = String(decoding: c, as: UTF8.self)
+        #expect(css.contains("color: #111; }"), "\(css)")
+        #expect(css.contains("@media (min-width: 40rem)"))
         // o reload continua sendo injetado
         #expect(html.contains("WebSocket"))
     }
@@ -310,7 +313,11 @@ struct AstroTests {
         try await dev.start(port: 20000 + Int.random(in: 0 ..< 20000), preset: .astro)
         defer { dev.stop() }
         let (d, _) = try await URLSession.shared.data(from: dev.url.appending(path: "cantos"))
-        let html = String(decoding: d, as: UTF8.self)
+        // A página tem `<style>`, então cada elemento dela leva o atributo de escopo; o que se
+        // confere aqui é o resto da marcação.
+        let html = String(decoding: d, as: UTF8.self).replacing(/\ data-astro-cid-[a-z0-9]+/, with: "")
+        let (c, _) = try await URLSession.shared.data(from: dev.url.appending(path: "@odete/css/@astro/cantos"))
+        let css = String(decoding: c, as: UTF8.self)
 
         // JSX é marcação e renderiza; o conteúdo dentro dele continua sendo escapado
         #expect(html.contains("<ul id=\"jsx\"><li>a</li><li>b</li></ul>"))
@@ -322,10 +329,12 @@ struct AstroTests {
         // nulo, falso e indefinido não viram texto
         #expect(html.contains("<p id=\"falso\"></p>"))
         #expect(html.contains("<p id=\"crase\">use `x` aqui</p>"))
-        // chaves de CSS e de JS do navegador continuam intactas
-        #expect(html.contains(".a { color: #111; }"))
-        #expect(html.contains("@media (min-width: 40rem) { .b { gap: 1px } }"))
-        #expect(html.contains("const o = {a: 1}; if (o) { console.log(1); }"))
+        // chaves de CSS e de JS do navegador continuam intactas (o CSS, na folha e com
+        // escopo; o script, sem tipos, como módulo)
+        #expect(css.contains("color: #111; }"), "\(css)")
+        #expect(css.contains("@media (min-width: 40rem) { .b[") && css.contains("{ gap: 1px } }"), "\(css)")
+        #expect(html.contains("<script type=\"module\">const o = { a: 1 };"), "\(html)")
+        #expect(html.contains("console.log(1);"))
     }
 
     /// Editar um componente tem que refletir sem reiniciar o servidor.

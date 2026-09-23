@@ -60,6 +60,20 @@ struct RuntimeTests {
         #expect(c.stderr.contains("erro x"))
     }
 
+    /// Esquema especial com uma barra só (ou nenhuma, ou contrabarra) é o que o WHATWG
+    /// aceita: o `@astrojs/rss` monta `https:/site/` e o RSS do blog do Astro dava 500.
+    @Test func urlComBarrasDoWhatwg() async throws {
+        let (code, c) = try await run("""
+        console.log(new URL("https:/example.com/a").href);
+        console.log(new URL("https:example.com").href);
+        console.log(new URL("http:\\\\\\\\x.com\\\\y").host);
+        console.log(new URL("https:rel", "https://base.com/d/").href);
+        console.log(new URL("file:///tmp/x").pathname);
+        """)
+        #expect(code == 0, "\(c.stderr)")
+        #expect(c.stdout == "https://example.com/a\nhttps://example.com/\nx.com\nhttps://base.com/d/rel\n/tmp/x", "saiu: [\(c.stdout)]")
+    }
+
     @Test func timersAndPromises() async throws {
         let (code, c) = try await run("""
         const t0 = Date.now();

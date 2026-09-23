@@ -2549,6 +2549,62 @@
         }
       }
     },
+    "A coleção \"%1$@\" não existe. Declare-a em src/content.config.ts.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The collection \"%1$@\" doesn't exist. Declare it in src/content.config.ts."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Collection „%1$@“ gibt es nicht. Deklarier sie in src/content.config.ts."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La collection « %1$@ » n'existe pas. Déclare-la dans src/content.config.ts."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La colección \"%1$@\" no existe. Declárala en src/content.config.ts."
+          }
+        }
+      }
+    },
+    "A coleção \"%1$@\" usa um loader próprio (%2$@), que a Odete ainda não roda.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The collection \"%1$@\" uses a custom loader (%2$@) that Odete can't run yet."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Die Collection „%1$@“ nutzt einen eigenen Loader (%2$@), den Odete noch nicht ausführen kann."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La collection « %1$@ » utilise son propre loader (%2$@), qu'Odete ne sait pas encore exécuter."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La colección \"%1$@\" usa un loader propio (%2$@) que Odete todavía no ejecuta."
+          }
+        }
+      }
+    },
     "A conta do GitHub não tem acesso a este repositório.": {
       "localizations": {
         "en": {
@@ -2741,6 +2797,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "La diferencia con el archivo actual aparece aquí."
+          }
+        }
+      }
+    },
+    "A entrada \"%1$@\" da coleção \"%2$@\" não passou no schema: %3$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The entry \"%1$@\" in collection \"%2$@\" failed the schema: %3$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Der Eintrag „%1$@“ der Collection „%2$@“ hat das Schema nicht bestanden: %3$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "L'entrée « %1$@ » de la collection « %2$@ » ne respecte pas le schéma : %3$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "La entrada \"%1$@\" de la colección \"%2$@\" no pasó el schema: %3$@"
           }
         }
       }
@@ -5541,6 +5625,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Array no tiene .%1$@ (fuera del subconjunto)"
+          }
+        }
+      }
+    },
+    "As content collections precisam do pacote zod. Rode npm install.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Content collections need the zod package. Run npm install."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Content Collections brauchen das Paket zod. Führ npm install aus."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Les content collections ont besoin du paquet zod. Lance npm install."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Las content collections necesitan el paquete zod. Ejecuta npm install."
           }
         }
       }
@@ -16209,6 +16321,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "No borré %1$@: los cambios de %2$@ no se pudieron guardar."
+          }
+        }
+      }
+    },
+    "Não consegui ler %1$@: %2$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn't read %1$@: %2$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Konnte %1$@ nicht lesen: %2$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Impossible de lire %1$@ : %2$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No pude leer %1$@: %2$@"
           }
         }
       }

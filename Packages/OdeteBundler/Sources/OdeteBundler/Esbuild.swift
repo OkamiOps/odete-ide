@@ -218,6 +218,12 @@ public final class Esbuild: @unchecked Sendable {
     /// para o JS preencher (`__odeteTexto`, no bundler.js).
     static func textosDoMotor() -> String {
         let t: [String: String] = [
+            // O Astro no dev server (devserver.js): content collections e astro.config.
+            "astroSemZod": tr("As content collections precisam do pacote zod. Rode npm install."),
+            "astroColecaoNaoExiste": tr("A coleção \"%1$@\" não existe. Declare-a em src/content.config.ts."),
+            "astroLoaderProprio": tr("A coleção \"%1$@\" usa um loader próprio (%2$@), que a Odete ainda não roda."),
+            "astroSchema": tr("A entrada \"%1$@\" da coleção \"%2$@\" não passou no schema: %3$@"),
+            "astroConfigIlegivel": tr("Não consegui ler %1$@: %2$@"),
             "aliasSemArquivo": tr("O alias de \"%1$@\" aponta para %2$@, que não existe (importado por %3$@)."),
             "embutidoNoNavegador": tr("O módulo \"%1$@\" é do Node e não existe no navegador: aqui ele é um módulo vazio."),
             "embutidoAviso": tr("O módulo \"%1$@\" é do Node e virou um módulo vazio no navegador (importado por %2$@)."),

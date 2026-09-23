@@ -179,6 +179,40 @@
     for (const c of caminhos || []) compilados.delete(c);
   }
 
+  // O mesmo caminho para CSS que não é arquivo: o `<style lang="scss">` de um .astro.
+  // `de` é o arquivo onde o bloco mora (o `@use` relativo e o pacote partem dele); `chave`
+  // separa os blocos de um mesmo arquivo no cache do Tailwind. Devolve o CSS pronto.
+  async function compilaTexto(conteudo, lang, de, chave, ctx) {
+    const l = String(lang || "css").toLowerCase();
+    let css = conteudo;
+    if (l === "scss" || l === "sass") {
+      const sass = carregaSass(de);
+      try {
+        const r = await sass.compileStringAsync(conteudo, {
+          syntax: l === "sass" ? "indented" : "scss", url: new URL("file://" + encodeURI(de)),
+          style: "expanded", sourceMap: false, loadPaths: [path.dirname(de), ctx.root],
+          importers: [importadorSass(ctx, de)], logger: { warn: () => {}, debug: () => {} },
+        });
+        for (const u of r.loadedUrls || []) {
+          const f = u.protocol === "file:" ? decodeURIComponent(u.pathname) : null;
+          if (f && f !== de) ctx.vigiados.add(f);
+        }
+        css = r.css;
+      } catch (e) {
+        throw erroComLugar(e, de);
+      }
+    } else if (l === "less") {
+      const r = await compilaLess(de, conteudo, ctx);
+      for (const f of r.deps.keys()) ctx.vigiados.add(f);
+      css = r.css;
+    }
+    if (globalThis.__odeteTailwind.ehDoTailwind(css)) {
+      const t = await globalThis.__odeteTailwind.processa(chave || de, css, ctx);
+      if (t != null) css = t;
+    }
+    return css;
+  }
+
   // Um `.css` comum, sem módulo e sem diretiva do Tailwind, não precisa de nada daqui:
   // segue pelo carregador de sempre, com os bytes guardados entre rebuilds. A resposta
   // fica guardada por arquivo até ele mudar — o CSS de um pacote não é decodificado a
@@ -201,7 +235,7 @@
   globalThis.__odeteEstilos = {
     ehEstilo: (p) => EH_ESTILO.test(p),
     ehModulo: (p) => EH_MODULO.test(p),
-    precisa, carrega,
+    precisa, carrega, compilaTexto,
     esquece: (caminhos) => { for (const c of caminhos || []) simples.delete(c); esquece(caminhos); },
     esqueceTudo: () => { compilados.clear(); sasses.clear(); simples.clear(); },
   };

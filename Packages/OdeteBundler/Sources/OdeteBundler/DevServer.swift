@@ -69,12 +69,16 @@ public final class DevServer: @unchecked Sendable {
         // O runtime das ilhas não roda aqui: ele é o texto que vai ser empacotado para o
         // navegador quando uma rota tiver componente de cliente.
         let ilhas = try String(contentsOf: js.appending(path: "ilhas-cliente.js"), encoding: .utf8)
+        // Os substitutos de `next/*` rodam dos dois lados: o texto vai para o pacote das
+        // ilhas, e o mesmo arquivo é avaliado aqui para o servidor renderizar igual.
+        let nextCliente = try String(contentsOf: js.appending(path: "next-cliente.js"), encoding: .utf8)
         try await esbuild.engine.evaluate(
-            "globalThis.__ilhasClienteJS = \(Self.comoLiteralJS(ilhas));",
+            "globalThis.__ilhasClienteJS = \(Self.comoLiteralJS(ilhas));\n"
+                + "globalThis.__nextClienteJS = \(Self.comoLiteralJS(nextCliente));",
             name: "ilhas-cliente-fonte.js"
         )
         // O pacote de dependências vem antes do servidor, que cria um por servidor.
-        for arquivo in ["astro.js", "next.js", "dependencias.js", "devserver.js"] {
+        for arquivo in ["markdown.js", "astro.js", "next-cliente.js", "next.js", "dependencias.js", "devserver.js"] {
             try await esbuild.engine.evaluate(
                 String(contentsOf: js.appending(path: arquivo), encoding: .utf8),
                 name: arquivo

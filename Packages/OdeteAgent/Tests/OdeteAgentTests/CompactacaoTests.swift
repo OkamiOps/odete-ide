@@ -16,7 +16,8 @@ import Testing
     // MARK: peças
 
     @Test func estouroDeJanelaEhReconhecido() {
-        #expect(Compactacao.ehEstouro("HTTP 400: {\"error\":{\"message\":\"prompt is too long: 250000 tokens > 200000 maximum\"}}"))
+        #expect(Compactacao
+            .ehEstouro("HTTP 400: {\"error\":{\"message\":\"prompt is too long: 250000 tokens > 200000 maximum\"}}"))
         #expect(Compactacao.ehEstouro("HTTP 413"))
         #expect(Compactacao.ehEstouro("This model's maximum context length is 128000 tokens"))
         #expect(Compactacao.ehEstouro("Your input exceeds the context window of this model"))
@@ -41,13 +42,13 @@ import Testing
             ms.append(AgentMessage(role: .assistant, content: "", thinking: "pensei \(i)", toolCalls: [
                 ToolCall(id: "\(i)", name: "read_file", arguments: "{}"),
             ]))
-            ms.append(.tool("\(i)", String(repeating: "\(i)", count: 40_000))) // 10 mil tokens cada
+            ms.append(.tool("\(i)", String(repeating: "\(i)", count: 40000))) // 10 mil tokens cada
         }
         let (podado, liberados) = try #require(Compactacao.podar(ms))
         let resultados = podado.filter { $0.role == .tool }
         #expect(resultados.prefix(6).allSatisfy { $0.content == Compactacao.marcaDePoda })
         #expect(resultados.suffix(4).allSatisfy { $0.content != Compactacao.marcaDePoda })
-        #expect(liberados > 50_000)
+        #expect(liberados > 50000)
         #expect(podado.allSatisfy { $0.thinking == nil }, "o raciocínio ficou depois de mexer no histórico")
         #expect(Transcricao.fecha(podado))
         // Já podado: a próxima para na marca e não acha o que tirar.
@@ -66,7 +67,7 @@ import Testing
             ms.append(AgentMessage(role: .assistant, content: "", thinking: "hm", toolCalls: [
                 ToolCall(id: "\(i)", name: "grep", arguments: "{}"),
             ]))
-            ms.append(.tool("\(i)", String(repeating: "r", count: 12_000)))
+            ms.append(.tool("\(i)", String(repeating: "r", count: 12000)))
         }
         let plano = try #require(Compactacao.planejar(ms, pedido: pedido, janela: 100_000))
         let novo = Compactacao.montar(ms, plano: plano, resumo: "## Objetivo\n- x", pedido: pedido, continuar: true)
@@ -80,8 +81,12 @@ import Testing
         // Um segundo resumo leva o primeiro junto, como resumo anterior.
         let segundo = try #require(Compactacao.planejar(
             novo.mensagens + (0 ..< 6).flatMap { i in [
-                AgentMessage(role: .assistant, content: "", toolCalls: [ToolCall(id: "n\(i)", name: "grep", arguments: "{}")]),
-                AgentMessage.tool("n\(i)", String(repeating: "s", count: 12_000)),
+                AgentMessage(
+                    role: .assistant,
+                    content: "",
+                    toolCalls: [ToolCall(id: "n\(i)", name: "grep", arguments: "{}")]
+                ),
+                AgentMessage.tool("n\(i)", String(repeating: "s", count: 12000)),
             ] },
             pedido: novo.pedido,
             janela: 100_000
@@ -110,13 +115,13 @@ import Testing
         ])
         let loop = AgentLoop(provider: p, host: TestHost(root: root), patches: PatchStore(root: root))
         var cfg = LoopConfig(mode: .chat, permit: .full, model: "m")
-        cfg.janelaDeContexto = 20_000
+        cfg.janelaDeContexto = 20000
         let antes: [AgentMessage] = [
             .user("primeiro pedido"),
             AgentMessage(role: .assistant, content: "", thinking: "pensando no primeiro", toolCalls: [
                 ToolCall(id: "r0", name: "read_file", arguments: #"{"path":"velho.txt"}"#),
             ]),
-            .tool("r0", String(repeating: "v", count: 30_000)),
+            .tool("r0", String(repeating: "v", count: 30000)),
             AgentMessage(role: .assistant, content: "resposta antiga", thinking: "hm"),
         ]
         var usos: [Int] = []
@@ -125,7 +130,7 @@ import Testing
         for await e in loop.run(history: antes, userText: "segundo pedido", config: cfg) {
             switch e {
             case let .contexto(usados, janela):
-                #expect(janela == 20_000)
+                #expect(janela == 20000)
                 usos.append(usados)
             case let .item(i): itens.append(i)
             case let .history(h): historia = h
@@ -153,9 +158,15 @@ import Testing
             return nil
         }.last
         #expect(cartao != nil && cartao!.2 < cartao!.1, "sem cartão de compactação, ou não diminuiu")
-        #expect(usos.contains { $0 >= 16_000 } && usos.last! < 16_000)
+        #expect(usos.contains { $0 >= 16000 } && usos.last! < 16000)
         #expect(Compactacao.ehResumo(historia[0]) && historia.last?.content == "pronto")
-        #expect(!itens.contains { if case .error = $0 { true } else { false } })
+        #expect(!itens.contains {
+            if case .error = $0 {
+                true
+            } else {
+                false
+            }
+        })
     }
 
     /// Primeiro a poda: se ela basta, nada de pedido de resumo.
@@ -182,7 +193,14 @@ import Testing
         let resultados = turnos[5].messages.filter { $0.role == .tool }.map(\.content)
         #expect(resultados.prefix(2).allSatisfy { $0 == Compactacao.marcaDePoda })
         #expect(resultados.suffix(3).allSatisfy { $0 != Compactacao.marcaDePoda })
-        #expect(r.items.contains { if case let .compactado(_, resumo, _, depois) = $0 { resumo.isEmpty && depois > 0 } else { false } })
+        #expect(r.items
+            .contains {
+                if case let .compactado(_, resumo, _, depois) = $0 {
+                    resumo.isEmpty && depois > 0
+                } else {
+                    false
+                }
+            })
     }
 
     /// O provedor recusou por tamanho: resume e tenta a mesma rodada de novo, uma vez.
@@ -197,7 +215,7 @@ import Testing
         let antes: [AgentMessage] = [
             .user("antigo"),
             AgentMessage(role: .assistant, content: "", toolCalls: [ToolCall(id: "t", name: "grep", arguments: "{}")]),
-            .tool("t", String(repeating: "g", count: 70_000)),
+            .tool("t", String(repeating: "g", count: 70000)),
             AgentMessage(role: .assistant, content: "ok"),
         ]
         let r = await runAll(loop, "novo", LoopConfig(mode: .chat, permit: .full, model: "m"), history: antes)
@@ -207,7 +225,13 @@ import Testing
         #expect(Compactacao.ehResumo(turnos[2].messages[0])
             && turnos[2].messages.last.map { Prompts.semContextoDoTurno($0.content) } == "novo")
         #expect(r.history.last?.content == "feito")
-        #expect(!r.items.contains { if case .error = $0 { true } else { false } }, "o estouro virou erro na tela")
+        #expect(!r.items.contains {
+            if case .error = $0 {
+                true
+            } else {
+                false
+            }
+        }, "o estouro virou erro na tela")
     }
 
     /// E se estourar de novo depois de resumir, aí é erro — sem laço de resumos.
@@ -219,12 +243,18 @@ import Testing
         let antes: [AgentMessage] = [
             .user("antigo"),
             AgentMessage(role: .assistant, content: "", toolCalls: [ToolCall(id: "t", name: "grep", arguments: "{}")]),
-            .tool("t", String(repeating: "g", count: 70_000)),
+            .tool("t", String(repeating: "g", count: 70000)),
             AgentMessage(role: .assistant, content: "ok"),
         ]
         let r = await runAll(loop, "novo", LoopConfig(mode: .chat, permit: .full, model: "m"), history: antes)
         #expect(p.turns.withLock { $0.count } == 3)
-        #expect(r.items.contains { if case let .error(_, t) = $0 { t.contains("too long") } else { false } })
+        #expect(r.items.contains {
+            if case let .error(_, t) = $0 {
+                t.contains("too long")
+            } else {
+                false
+            }
+        })
     }
 
     /// O `/compact`: resume na hora, sem turno, e a próxima mensagem segue do resumo.
@@ -257,7 +287,10 @@ import Testing
         let curto = AgentLoop(provider: FakeProvider([]), host: TestHost(root: root), patches: PatchStore(root: root))
         var aviso = false
         var mudou = false
-        for await e in curto.compactar(history: [.user("oi")], config: LoopConfig(mode: .build, permit: .full, model: "m")) {
+        for await e in curto.compactar(
+            history: [.user("oi")],
+            config: LoopConfig(mode: .build, permit: .full, model: "m")
+        ) {
             if case let .item(.error(id, _)) = e, id.hasPrefix(AgentLoop.prefixoDeAviso) {
                 aviso = true
             }

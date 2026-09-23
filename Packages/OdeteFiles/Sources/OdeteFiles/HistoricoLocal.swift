@@ -444,7 +444,10 @@ public final class HistoricoLocal: GuardaDeVersoes, @unchecked Sendable {
         for (i, v) in todas where soma > alvo {
             arquivos[i].indice.versoes.removeAll { $0.id == v.id }
             mexidos.insert(i)
-            if !arquivos[i].indice.versoes.contains(where: { $0.hash == v.hash }), let b = blob(v.hash, em: arquivos[i].dir) {
+            if !arquivos[i].indice.versoes.contains(where: { $0.hash == v.hash }), let b = blob(
+                v.hash,
+                em: arquivos[i].dir
+            ) {
                 soma -= (try? b.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
                 try? fm.removeItem(at: b)
             }

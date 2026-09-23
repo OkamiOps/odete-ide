@@ -250,7 +250,8 @@ struct PonteDeBytesTests {
         #expect(out.contains("tipos 1,2,3 2,1,4,3 8,9 5,6 0,1,2,255"))
         #expect(out.contains("codificado AAEA/wAAgAAAKg== 000100ff00008000002a 10"))
         #expect(out.contains("rnd 5242880 true 0"))
-        #expect(out.contains("erro ausente ENOENT") && out.contains("erro pasta EISDIR") && out.contains("erro semPasta ENOENT"))
+        #expect(out.contains("erro ausente ENOENT") && out.contains("erro pasta EISDIR") && out
+            .contains("erro semPasta ENOENT"))
         // NUL no caminho não pode virar um arquivo "nul" (o caminho cortado em C)
         #expect(out.contains("erro nul ENOENT"))
         #expect(!FileManager.default.fileExists(atPath: dir.appending(path: "nul").path))

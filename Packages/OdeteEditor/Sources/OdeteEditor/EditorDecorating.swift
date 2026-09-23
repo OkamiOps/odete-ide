@@ -81,9 +81,9 @@ extension CodeEditorView.Coordinator {
         let tamanho = tamanhoDoDocumento(tv)
         let ultimaDoArquivo = tv.textLocation(at: tamanho)?.lineNumber ?? 0
         let alturaMedia = max(tv.contentSize.height / CGFloat(ultimaDoArquivo + 1), 1)
-        // A linha num ponto da tela. O Runestone só sabe responder isso para linhas que já
-        // compôs; fora delas `closestPosition` devolve o fim do arquivo. Nesse caso a conta
-        // vai pela altura média das linhas, que sem quebra de linha é exata.
+        /// A linha num ponto da tela. O Runestone só sabe responder isso para linhas que já
+        /// compôs; fora delas `closestPosition` devolve o fim do arquivo. Nesse caso a conta
+        /// vai pela altura média das linhas, que sem quebra de linha é exata.
         func linha(em y: CGFloat) -> Int {
             let estimada = min(max(Int(y / alturaMedia), 0), ultimaDoArquivo)
             guard let p = tv.closestPosition(to: CGPoint(x: tv.gutterWidth + 4, y: y)) else { return estimada }

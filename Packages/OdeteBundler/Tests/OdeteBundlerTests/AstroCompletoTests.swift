@@ -41,7 +41,9 @@ struct AstroCompletoTests {
     func ate(_ prazo: Duration = .seconds(30), _ condicao: () async -> Bool) async -> Bool {
         let fim = ContinuousClock.now + prazo
         while ContinuousClock.now < fim {
-            if await condicao() { return true }
+            if await condicao() {
+                return true
+            }
             try? await Task.sleep(for: .milliseconds(50))
         }
         return await condicao()
@@ -88,7 +90,10 @@ struct AstroCompletoTests {
         defer { dev.stop() }
         let (html, r) = try await pega(dev, "/")
         #expect(r?.statusCode == 200, "\(html.prefix(600))")
-        #expect(html.contains(#"<div class="cartao azul" data-tam="g">um: 6<b>muitos</b></div>"#), "\(html.prefix(900))")
+        #expect(
+            html.contains(#"<div class="cartao azul" data-tam="g">um: 6<b>muitos</b></div>"#),
+            "\(html.prefix(900))"
+        )
         #expect(html.contains(#"<p id="soma">5</p>"#))
         #expect(html.contains("<li>item a</li><li>item b</li>"), "o .ts importado não veio: \(html.prefix(900))")
     }
@@ -128,19 +133,33 @@ struct AstroCompletoTests {
             """,
         ])
         // PNG de 3×2
-        let png = Data(base64Encoded: "iVBORw0KGgoAAAANSUhEUgAAAAMAAAACCAYAAACddGYaAAAAEUlEQVR4nGP4z8DwHwYYYBwAwNsI+NTq2hEAAAAASUVORK5CYII=")!
-        try FileManager.default.createDirectory(at: raiz.appending(path: "src/assets"), withIntermediateDirectories: true)
+        let png =
+            try #require(
+                Data(
+                    base64Encoded: "iVBORw0KGgoAAAANSUhEUgAAAAMAAAACCAYAAACddGYaAAAAEUlEQVR4nGP4z8DwHwYYYBwAwNsI+NTq2hEAAAAASUVORK5CYII="
+                )
+            )
+        try FileManager.default.createDirectory(
+            at: raiz.appending(path: "src/assets"),
+            withIntermediateDirectories: true
+        )
         try png.write(to: raiz.appending(path: "src/assets/ponto.png"))
         let dev = try await sobe(raiz)
         defer { dev.stop() }
 
         let (html, _) = try await pega(dev, "/")
-        #expect(html.contains(#"<link rel="stylesheet" href="/@odete/css/@astro/">"#), "faltou a folha: \(html.prefix(600))")
+        #expect(
+            html.contains(#"<link rel="stylesheet" href="/@odete/css/@astro/">"#),
+            "faltou a folha: \(html.prefix(600))"
+        )
         // O elemento do componente leva o atributo de escopo; o de fora, não.
         let cid = try #require(html.firstMatch(of: /<h1 class="t" (data-astro-cid-[a-z0-9]+)>/)?.1)
         #expect(html.contains(#"<h1 id="fora">fora</h1>"#), "o escopo vazou para fora do componente")
         #expect(!html.contains("<style>"), "o <style> ficou no meio da página: \(html.prefix(900))")
-        #expect(html.contains(#"src="/@odete/arquivo/src/assets/ponto.png" width="3" height="2""#), "a imagem não virou metadata: \(html.prefix(900))")
+        #expect(
+            html.contains(#"src="/@odete/arquivo/src/assets/ponto.png" width="3" height="2""#),
+            "a imagem não virou metadata: \(html.prefix(900))"
+        )
 
         let (css, _) = try await pega(dev, "/@odete/css/@astro/")
         #expect(css.contains("margin: 3px"), "o CSS importado não veio: \(css)")
@@ -172,7 +191,10 @@ struct AstroCompletoTests {
         defer { dev.stop() }
         _ = try await pega(dev, "/")
         let g = raiz.appending(path: "src/styles/g.css").path
-        #expect(await ate { dev.arquivosVigiados.contains(g) }, "o CSS importado não entrou no grafo: \(dev.arquivosVigiados)")
+        #expect(
+            await ate { dev.arquivosVigiados.contains(g) },
+            "o CSS importado não entrou no grafo: \(dev.arquivosVigiados)"
+        )
 
         #expect(await dev.arquivosMudaram([g]) == .nada, "arquivo igual não pode mudar nada")
         try "body { margin: 9px; }".write(toFile: g, atomically: true, encoding: .utf8)
@@ -286,7 +308,7 @@ struct AstroCompletoTests {
         #expect(j.contains(#""oi":"marcos""#) && j.contains(#""q":"1""#), "\(j)")
         #expect(rj?.value(forHTTPHeaderField: "content-type")?.contains("json") == true)
 
-        var req = URLRequest(url: URL(string: "/api/x", relativeTo: dev.url)!)
+        var req = try URLRequest(url: #require(URL(string: "/api/x", relativeTo: dev.url)))
         req.httpMethod = "POST"
         req.httpBody = Data(#"{"x":7}"#.utf8)
         let (d, r) = try await URLSession.shared.data(for: req)
@@ -386,8 +408,10 @@ struct AstroCompletoTests {
         #expect(r?.statusCode == 500)
         let esperado = try #require(tabela["astroColecaoNaoExiste"]).replacingOccurrences(of: "%1$@", with: "nada")
             .replacingOccurrences(of: "\"", with: "&quot;")
-        #expect(html.contains(esperado) || html.contains(esperado.replacingOccurrences(of: "&quot;", with: "\"")),
-                "a frase não veio da tabela: \(html.suffix(600))")
+        #expect(
+            html.contains(esperado) || html.contains(esperado.replacingOccurrences(of: "&quot;", with: "\"")),
+            "a frase não veio da tabela: \(html.suffix(600))"
+        )
     }
 
     /// O resto do que os modelos usam: `class:list`, `set:html`, `<Fragment>`, slot com
@@ -425,6 +449,9 @@ struct AstroCompletoTests {
         #expect(html.contains("<header><span>TOPO</span></header>"), "o slot com nome não foi: \(html.prefix(900))")
         #expect(html.contains("<p>meio</p>") && html.contains("<em>sem rodapé</em>"))
         #expect(html.contains(#"<p id="modo">development</p>"#))
-        #expect(html.contains(#"<svg width="10" xmlns="http://www.w3.org/2000/svg""#), "o SVG não virou componente: \(html.prefix(1200))")
+        #expect(
+            html.contains(#"<svg width="10" xmlns="http://www.w3.org/2000/svg""#),
+            "o SVG não virou componente: \(html.prefix(1200))"
+        )
     }
 }

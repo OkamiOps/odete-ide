@@ -34,7 +34,7 @@ struct FumacaDePacotesTests {
             // Cancelado o vigia, o `sleep` volta na hora: sem o `guard`, o Ctrl+C dele pegava
             // o próximo pacote.
             let vigia = Task {
-                guard (try? await Task.sleep(for: .seconds(180))) != nil else { return }
+                guard await (try? Task.sleep(for: .seconds(180))) != nil else { return }
                 sh.cancel()
             }
             var codigo = await sh.run("node fumaca/\(arquivo)", sink: o.sink)
@@ -62,7 +62,10 @@ struct FumacaDePacotesTests {
             let segundos = Double(dt.components.seconds) + Double(dt.components.attoseconds) / 1e18
             let resumo = (ok ? saida : "código \(codigo); saída: \(saida.prefix(200)); erro: \(o.err.prefix(400))")
                 .replacingOccurrences(of: "\n", with: "⏎").replacingOccurrences(of: "|", with: "\\|")
-            tabela.append("| \(arquivo) | \(ok ? "passa" : "FALHA") | \(String(format: "%.2f s", segundos)) | \(resumo) |")
+            tabela
+                .append(
+                    "| \(arquivo) | \(ok ? "passa" : "FALHA") | \(String(format: "%.2f s", segundos)) | \(resumo) |"
+                )
         }
         try (tabela.joined(separator: "\n") + "\n").write(
             to: raiz.appending(path: "resultado-\(modo).md"), atomically: true, encoding: .utf8

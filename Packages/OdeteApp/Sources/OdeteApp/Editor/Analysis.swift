@@ -254,7 +254,7 @@ extension WorkspaceModel {
         guard let repo = git.repo else { return }
         let suja = tabs.first { $0.path == path }?.isDirty == true
         if suja, !save(path) {
-            self.error = tr("Não descartei o trecho: as alterações de %1$@ não puderam ser salvas.", path)
+            error = tr("Não descartei o trecho: as alterações de %1$@ não puderam ser salvas.", path)
             return
         }
         let guardado = suja ? nil : hunk(at: line, in: path)
@@ -264,7 +264,9 @@ extension WorkspaceModel {
                 var alvo = guardado
                 if alvo == nil {
                     let r = try await repo.gutterMarks(path: path)
-                    if let f = r.file, let m = r.marks.first(where: { $0.line == line }), f.hunks.indices.contains(m.hunk) {
+                    if let f = r.file, let m = r.marks.first(where: { $0.line == line }),
+                       f.hunks.indices.contains(m.hunk)
+                    {
                         alvo = (f, f.hunks[m.hunk])
                     }
                 }

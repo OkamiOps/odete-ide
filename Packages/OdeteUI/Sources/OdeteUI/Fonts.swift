@@ -1,5 +1,5 @@
-import Synchronization
 import SwiftUI
+import Synchronization
 
 /// Tipografia: IBM Plex Sans e Mono (empacotadas no app), com SF como reserva.
 public enum OdeteFont {

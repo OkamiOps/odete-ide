@@ -124,7 +124,11 @@ public struct HTTPProvider: Provider {
                 lines = try await openSSE(
                     http,
                     url: pedido.url,
-                    headers: pedido.headers(headers(token: token, conversationId: turn.conversationId, betas: pedido.betas)),
+                    headers: pedido.headers(headers(
+                        token: token,
+                        conversationId: turn.conversationId,
+                        betas: pedido.betas
+                    )),
                     body: pedido.corpo,
                     espera: espera
                 )

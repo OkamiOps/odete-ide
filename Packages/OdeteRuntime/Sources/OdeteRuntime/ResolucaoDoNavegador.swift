@@ -222,7 +222,12 @@ enum ResolucaoDoNavegador {
     }
 
     /// `#interno` pelo campo `imports` do package.json mais perto, com as mesmas condições.
-    private static func importsDoPacote(_ spec: String, fromDir: String, modo: Modo, cache: CacheDeModulos?) -> String? {
+    private static func importsDoPacote(
+        _ spec: String,
+        fromDir: String,
+        modo: Modo,
+        cache: CacheDeModulos?
+    ) -> String? {
         guard let pacote = pacoteDe(fromDir, cache: cache), let imports = pacote.json["imports"],
               let t = subcaminho(imports, chave: spec, condicoes: modo.condicoes)
         else { return nil }

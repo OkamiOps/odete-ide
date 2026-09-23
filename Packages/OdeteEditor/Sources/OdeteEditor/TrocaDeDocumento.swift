@@ -348,7 +348,12 @@ extension CodeEditorView.Coordinator {
         // Não coube, ou por algum motivo as trocas não chegaram ao texto pedido: o texto
         // inteiro, como sempre foi.
         if textoAtual != texto {
-            aplicarEstado(tv, estado(texto: texto, sessao?.assinatura ?? assinaturaAtual), texto: texto, desfazivel: true)
+            aplicarEstado(
+                tv,
+                estado(texto: texto, sessao?.assinatura ?? assinaturaAtual),
+                texto: texto,
+                desfazivel: true
+            )
             anotarTexto(texto)
         }
     }

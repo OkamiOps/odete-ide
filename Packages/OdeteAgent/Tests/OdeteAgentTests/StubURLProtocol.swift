@@ -1,6 +1,6 @@
 import Foundation
-@testable import OdeteAgent
 import OdeteAccounts
+@testable import OdeteAgent
 import Synchronization
 
 /// Servidor falso no nível do `URLSession`: o provedor roda inteiro (cabeçalhos, SSE em
@@ -69,7 +69,12 @@ final class StubURLProtocol: URLProtocol, @unchecked Sendable {
             client?.urlProtocol(self, didFailWithError: URLError(.networkConnectionLost))
             return
         }
-        let resp = HTTPURLResponse(url: request.url!, statusCode: r.status, httpVersion: "HTTP/1.1", headerFields: r.headers)!
+        let resp = HTTPURLResponse(
+            url: request.url!,
+            statusCode: r.status,
+            httpVersion: "HTTP/1.1",
+            headerFields: r.headers
+        )!
         client?.urlProtocol(self, didReceive: resp, cacheStoragePolicy: .notAllowed)
         client?.urlProtocol(self, didLoad: Data(r.corpo.utf8))
         client?.urlProtocolDidFinishLoading(self)
@@ -108,9 +113,13 @@ func sse(_ eventos: [[String: Any]]) -> String {
 }
 
 /// Um stream da Messages API com os blocos dados e a parada dada.
-func sseAnthropic(_ blocos: [[String: Any]], parada: String = "end_turn", detalhes: [String: Any]? = nil,
-                  termina: Bool = true, modelo: String = "claude-sonnet-5") -> String
-{
+func sseAnthropic(
+    _ blocos: [[String: Any]],
+    parada: String = "end_turn",
+    detalhes: [String: Any]? = nil,
+    termina: Bool = true,
+    modelo: String = "claude-sonnet-5"
+) -> String {
     var ev: [[String: Any]] = [[
         "type": "message_start",
         "message": ["id": "msg_1", "model": modelo, "usage": ["input_tokens": 10, "output_tokens": 1]],
@@ -119,7 +128,11 @@ func sseAnthropic(_ blocos: [[String: Any]], parada: String = "end_turn", detalh
         let tipo = b["type"] as? String ?? ""
         switch tipo {
         case "thinking":
-            ev.append(["type": "content_block_start", "index": i, "content_block": ["type": "thinking", "thinking": ""]])
+            ev.append([
+                "type": "content_block_start",
+                "index": i,
+                "content_block": ["type": "thinking", "thinking": ""],
+            ])
             ev.append(["type": "content_block_delta", "index": i,
                        "delta": ["type": "thinking_delta", "thinking": b["thinking"] as? String ?? ""]])
             ev.append(["type": "content_block_delta", "index": i,
@@ -236,19 +249,43 @@ func eventos(_ s: AsyncThrowingStream<StreamEvent, Error>) async throws -> [Stre
 
 extension [StreamEvent] {
     var texto: String {
-        compactMap { if case let .text(t) = $0 { t } else { nil } }.joined()
+        compactMap {
+            if case let .text(t) = $0 {
+                t
+            } else {
+                nil
+            }
+        }.joined()
     }
 
     var erros: [String] {
-        compactMap { if case let .error(m) = $0 { m } else { nil } }
+        compactMap {
+            if case let .error(m) = $0 {
+                m
+            } else {
+                nil
+            }
+        }
     }
 
     var chamadas: [ToolCall] {
-        compactMap { if case let .tools(c) = $0 { c } else { nil } }.last ?? []
+        compactMap {
+            if case let .tools(c) = $0 {
+                c
+            } else {
+                nil
+            }
+        }.last ?? []
     }
 
     var raciocinio: RaciocinioBruto? {
-        compactMap { if case let .raciocinio(r) = $0 { r } else { nil } }.last
+        compactMap {
+            if case let .raciocinio(r) = $0 {
+                r
+            } else {
+                nil
+            }
+        }.last
     }
 
     var terminou: Bool {

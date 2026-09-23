@@ -39,7 +39,11 @@ import Testing
             ler,
             [.text("pronto"), .done],
         ]
-        let loop = AgentLoop(provider: FakeProvider(roteiro), host: TestHost(root: root), patches: PatchStore(root: root))
+        let loop = AgentLoop(
+            provider: FakeProvider(roteiro),
+            host: TestHost(root: root),
+            patches: PatchStore(root: root)
+        )
         let r = await runAll(loop, "muda b", LoopConfig(mode: .build, permit: .full, model: "m"))
         let resultados = r.history.filter { $0.role == .tool }.map(\.content)
         #expect(resultados.last == "a\nB\nc\n", "a releitura depois da edição foi bloqueada: \(resultados.last ?? "")")
@@ -74,7 +78,11 @@ import Testing
         let loop = AgentLoop(provider: p, host: TestHost(root: root), patches: PatchStore(root: root))
         var historia: [AgentMessage] = []
         var terminou = false
-        for await e in loop.run(history: [], userText: "lê", config: LoopConfig(mode: .build, permit: .full, model: "m")) {
+        for await e in loop.run(
+            history: [],
+            userText: "lê",
+            config: LoopConfig(mode: .build, permit: .full, model: "m")
+        ) {
             switch e {
             case let .history(h): historia = h
             case .done: terminou = true
@@ -119,7 +127,11 @@ import Testing
         let loop = AgentLoop(provider: p, host: TestHost(root: root), patches: PatchStore(root: root))
         let quebrada: [AgentMessage] = [
             .user("lê"),
-            AgentMessage(role: .assistant, content: "", toolCalls: [ToolCall(id: "x", name: "read_file", arguments: "{}")]),
+            AgentMessage(
+                role: .assistant,
+                content: "",
+                toolCalls: [ToolCall(id: "x", name: "read_file", arguments: "{}")]
+            ),
         ]
         _ = await runAll(loop, "e aí?", LoopConfig(mode: .chat, permit: .full, model: "m"), history: quebrada)
         let enviado = try #require(p.turns.withLock { $0.first })
@@ -145,7 +157,10 @@ import Testing
         t.items = [.user(id: "1", text: "começo", images: nil)]
         store.save(t)
         let lida = try #require(store.load(t.id))
-        #expect(lida.messages.first?.role == .user, "a conversa guardada começa num \(lida.messages.first?.role.rawValue ?? "")")
+        #expect(
+            lida.messages.first?.role == .user,
+            "a conversa guardada começa num \(lida.messages.first?.role.rawValue ?? "")"
+        )
         #expect(Transcricao.fecha(lida.messages))
         #expect(lida.messages.count <= ChatStore.mensagensGuardadas)
     }
@@ -169,7 +184,7 @@ import Testing
 }
 
 /// `isReadShell` dividia a linha só no `|`.
-@Suite struct LeituraDoShellTests {
+struct LeituraDoShellTests {
     @Test func oQueEscreveNaoPassaPorLeitura() {
         let escrevem = [
             "ls && rm -rf src", "echo x > f", "echo x >> f", "cat a >b", "git branch -D main", "git branch nova",
@@ -372,7 +387,7 @@ final class ShellEmSegmentos: FileToolHost, @unchecked Sendable {
         #expect(reaberto.pending(for: "grande.txt")?.after == grande)
         // O JSON não carrega mais os textos.
         let json = try Data(contentsOf: root.appending(path: ".odete/patches.json"))
-        #expect(json.count < 20_000)
+        #expect(json.count < 20000)
     }
 
     /// `acceptHunk` gravava `antes + hunk` por cima do arquivo: a edição da pessoa sumia.
@@ -437,7 +452,7 @@ final class ShellEmSegmentos: FileToolHost, @unchecked Sendable {
     }
 
     /// Resultado de ferramenta ia até 200 mil caracteres, cortando o fim — onde mora o erro.
-    @Test func resultadoGrandeGuardaComecoEFim() async throws {
+    @Test func resultadoGrandeGuardaComecoEFim() {
         let meio = String(repeating: "npm WARN barulho\n", count: 8000)
         let saida = "COMEÇO\n" + meio + "ERRO NO FIM\n"
         let cortado = ToolRunner.clip(saida)

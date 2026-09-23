@@ -267,7 +267,7 @@ public enum Parser {
             i = line.index(i, offsetBy: k - 1)
             return op
         }
-        /// O que a barra escapa dentro de aspas duplas.
+        // O que a barra escapa dentro de aspas duplas.
         let escapaveis: Set<Character> = ["$", "`", "\"", "\\", "\n"]
         while i < line.endIndex {
             let c = line[i]

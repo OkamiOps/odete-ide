@@ -177,7 +177,12 @@ enum Base64 {
     /// Decodifica ignorando o que não é do alfabeto (espaços, `=`). Resto de 1 caractere ainda
     /// rende um byte, e de 2 ou 3 rendem 1 ou 2 — o que o laço em JS fazia. `saida` precisa de
     /// `n / 4 * 3 + 3` bytes. Devolve quantos escreveu.
-    static func decodifica(_ u: UnsafePointer<UInt16>, _ n: Int, url: Bool, em saida: UnsafeMutablePointer<UInt8>) -> Int {
+    static func decodifica(
+        _ u: UnsafePointer<UInt16>,
+        _ n: Int,
+        url: Bool,
+        em saida: UnsafeMutablePointer<UInt8>
+    ) -> Int {
         var grupo: UInt32 = 0, cheios = 0, k = 0
         tabela.withUnsafeBufferPointer { t in
             for i in 0 ..< n {

@@ -118,13 +118,12 @@ extension Builtins {
             guard let pattern = rest.first else { ctx.io.err(tr("grep: padrão")); return 2 }
             // Expressão estendida por padrão do NSRegularExpression é a ERE com mais coisa; a
             // básica (sem -E) trata `|`, `+`, `?`, `(`, `)` e `{}` como texto, como no grep.
-            var fonte: String
-            if f.contains("F") {
-                fonte = NSRegularExpression.escapedPattern(for: pattern)
+            var fonte: String = if f.contains("F") {
+                NSRegularExpression.escapedPattern(for: pattern)
             } else if f.contains("E") {
-                fonte = pattern
+                pattern
             } else {
-                fonte = Self.basicaParaEstendida(pattern)
+                Self.basicaParaEstendida(pattern)
             }
             if f.contains("w") {
                 fonte = "\\b(?:" + fonte + ")\\b"

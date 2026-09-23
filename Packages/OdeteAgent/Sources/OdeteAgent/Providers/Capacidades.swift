@@ -413,7 +413,10 @@ final class CatalogoDeModelos: Sendable {
         let enc = JSONEncoder()
         enc.dateEncodingStrategy = .iso8601
         guard let d = try? enc.encode(i) else { return }
-        try? FileManager.default.createDirectory(at: arquivo.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? FileManager.default.createDirectory(
+            at: arquivo.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
         try? d.write(to: arquivo, options: .atomic)
     }
 
@@ -542,7 +545,9 @@ enum Aprendizado {
                 // "thinking.type.enabled is not supported … use thinking.type.adaptive" num
                 // modelo novo; "should be 'enabled' or 'disabled'" num endpoint antigo.
                 var outro: Pensamento = .nenhum
-                if p == .orcamento, t.contains("adaptive") || t.contains("budget_tokens") || t.contains("type.enabled") {
+                if p == .orcamento,
+                   t.contains("adaptive") || t.contains("budget_tokens") || t.contains("type.enabled")
+                {
                     outro = .adaptativo
                 } else if p == .adaptativo, t.contains("enabled") || t.contains("adaptive") {
                     outro = .orcamento
@@ -614,7 +619,15 @@ enum Aprendizado {
     /// Os níveis de esforço entre aspas numa mensagem como "Supported values are: 'low',
     /// 'medium' and 'high'".
     static func niveisCitados(_ t: String) -> [String] {
-        let ancoras = ["supported values", "allowed values", "valid values", "should be", "must be", "expected", "one of"]
+        let ancoras = [
+            "supported values",
+            "allowed values",
+            "valid values",
+            "should be",
+            "must be",
+            "expected",
+            "one of",
+        ]
         guard let r = ancoras.lazy.compactMap({ t.range(of: $0) }).first else { return [] }
         let resto = String(t[r.upperBound...])
         var achados: [String] = []

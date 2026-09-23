@@ -83,9 +83,9 @@ struct CicloDeVidaTests {
         #expect(code == 0, Comment(rawValue: c.stderr))
         let linhas = c.stdout.split(separator: "\n").map(String.init)
         let ordem = (linhas.first ?? "").split(separator: " ").map(String.init)
-        // setTimeout de 0/negativo/NaN roda na próxima volta junto com os setImmediate, na ordem de
-        // criação; o setImmediate criado dentro de um callback fica para a volta seguinte. Entre
-        // essa volta e o timer de 1 ms a ordem depende do relógio (no Node também).
+        /// setTimeout de 0/negativo/NaN roda na próxima volta junto com os setImmediate, na ordem de
+        /// criação; o setImmediate criado dentro de um callback fica para a volta seguinte. Entre
+        /// essa volta e o timer de 1 ms a ordem depende do relógio (no Node também).
         func emOrdem(_ nomes: [String]) -> Bool {
             let pos = nomes.compactMap { ordem.firstIndex(of: $0) }
             return pos.count == nomes.count && pos == pos.sorted()
@@ -117,7 +117,8 @@ struct CicloDeVidaTests {
         var porta = 0
         for _ in 0 ..< 200 where porta == 0 {
             try await Task.sleep(for: .milliseconds(10))
-            porta = cap.stdout.split(separator: "\n").first { $0.hasPrefix("porta ") }.flatMap { Int($0.dropFirst(6)) } ?? 0
+            porta = cap.stdout.split(separator: "\n").first { $0.hasPrefix("porta ") }
+                .flatMap { Int($0.dropFirst(6)) } ?? 0
         }
         #expect(porta > 0)
         func contagem() -> (conexoes: Int, ws: Int, respostas: Int) {
@@ -166,7 +167,9 @@ struct CicloDeVidaTests {
         f.locale = Locale(identifier: "en_US_POSIX")
         f.timeZone = TimeZone(identifier: "GMT")
         f.dateFormat = "EEE, dd MMM yyyy HH:mm:ss 'GMT'"
-        for segundos in [0.0, 784_111_777, 951_782_400, 1_700_000_000, 1_790_000_123.9, Date.now.timeIntervalSince1970] {
+        for segundos in [0.0, 784_111_777, 951_782_400, 1_700_000_000, 1_790_000_123.9,
+                         Date.now.timeIntervalSince1970]
+        {
             let d = Date(timeIntervalSince1970: segundos.rounded(.down))
             #expect(HttpParser.httpDate(d) == f.string(from: d))
         }

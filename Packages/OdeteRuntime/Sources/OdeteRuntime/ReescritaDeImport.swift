@@ -187,7 +187,7 @@ enum ReescritaDeImport {
                     }
                     i += 2
                 } else {
-                    let regex: Bool = switch anterior {
+                    let regex = switch anterior {
                     case .valor: false
                     default: true
                     }

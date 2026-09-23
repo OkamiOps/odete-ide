@@ -250,7 +250,10 @@ struct ProvedoresTests {
     /// `stop_reason: max_tokens` com só texto: erro explícito, não um fim silencioso.
     @Test func maxTokensViraErroExplicito() async throws {
         StubURLProtocol.servir { p in
-            Self.apiDaAnthropic(p) ?? .init(corpo: sseAnthropic([["type": "text", "text": "metade"]], parada: "max_tokens"))
+            Self.apiDaAnthropic(p) ?? .init(corpo: sseAnthropic(
+                [["type": "text", "text": "metade"]],
+                parada: "max_tokens"
+            ))
         }
         let ev = try await eventos(provedorDeTeste(.claude).stream(Self.turno("claude-sonnet-5")))
         #expect(ev.erros == [Cortes.respostaCortada])
@@ -402,19 +405,19 @@ struct ProvedoresTests {
             "summary": [["type": "summary_text", "text": "pensei"]],
         ]
         let resposta = sse([
-                ["type": "response.created", "response": ["id": "r1", "model": "gpt-6-sol"]],
-                ["type": "response.output_item.done", "output_index": 0, "item": item],
-                ["type": "response.output_item.added", "output_index": 1, "item": [
-                    "type": "function_call", "id": "fc_1", "call_id": "call_1", "name": "write_file", "arguments": "",
-                ]],
-                ["type": "response.function_call_arguments.delta", "item_id": "fc_1",
-                 "delta": #"{"path":"a","content":"b"}"#],
-                ["type": "response.output_item.done", "output_index": 1, "item": [
-                    "type": "function_call", "id": "fc_1", "call_id": "call_1", "name": "write_file",
-                    "arguments": #"{"path":"a","content":"b"}"#,
-                ]],
-                ["type": "response.completed", "response": ["id": "r1", "status": "completed"]],
-            ])
+            ["type": "response.created", "response": ["id": "r1", "model": "gpt-6-sol"]],
+            ["type": "response.output_item.done", "output_index": 0, "item": item],
+            ["type": "response.output_item.added", "output_index": 1, "item": [
+                "type": "function_call", "id": "fc_1", "call_id": "call_1", "name": "write_file", "arguments": "",
+            ]],
+            ["type": "response.function_call_arguments.delta", "item_id": "fc_1",
+             "delta": #"{"path":"a","content":"b"}"#],
+            ["type": "response.output_item.done", "output_index": 1, "item": [
+                "type": "function_call", "id": "fc_1", "call_id": "call_1", "name": "write_file",
+                "arguments": #"{"path":"a","content":"b"}"#,
+            ]],
+            ["type": "response.completed", "response": ["id": "r1", "status": "completed"]],
+        ])
         StubURLProtocol.servir { _ in .init(corpo: resposta) }
         let p = provedorDeTeste(.codex)
         let t1 = Self.turno("gpt-6-sol")
@@ -448,7 +451,10 @@ struct ProvedoresTests {
                 ((m["content"] as? [[String: Any]]) ?? []).contains { $0["type"] as? String == "thinking" }
             }
             return temThinking
-                ? .init(status: 400, corpo: #"{"type":"error","error":{"type":"invalid_request_error","message":"messages.1.content.0: Invalid `signature` in `thinking` block. The block is bound to a different conversation."}}"#)
+                ? .init(
+                    status: 400,
+                    corpo: #"{"type":"error","error":{"type":"invalid_request_error","message":"messages.1.content.0: Invalid `signature` in `thinking` block. The block is bound to a different conversation."}}"#
+                )
                 : .init(corpo: Self.respostaSimples)
         }
         let bruto = try #require(RaciocinioBruto.de(
@@ -475,7 +481,10 @@ struct ProvedoresTests {
             }
             let i = n.withLock { $0 += 1; return $0 }
             return i == 1
-                ? .init(status: 529, corpo: #"{"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}"#)
+                ? .init(
+                    status: 529,
+                    corpo: #"{"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}"#
+                )
                 : .init(corpo: Self.respostaSimples)
         }
         let esperas = Esperas()
@@ -529,8 +538,11 @@ struct ProvedoresTests {
             }
             let i = n.withLock { $0 += 1; return $0 }
             return i == 1
-                ? .init(status: 429, corpo: #"{"type":"error","error":{"type":"rate_limit_error","message":"slow"}}"#,
-                        headers: ["retry-after": "3"])
+                ? .init(
+                    status: 429,
+                    corpo: #"{"type":"error","error":{"type":"rate_limit_error","message":"slow"}}"#,
+                    headers: ["retry-after": "3"]
+                )
                 : .init(corpo: Self.respostaSimples)
         }
         let esperas = Esperas()
@@ -556,7 +568,12 @@ struct ProvedoresTests {
         let sonnet = try #require(modelos.first { $0.id == "claude-sonnet-5" })
         #expect(sonnet.efforts == ["low", "medium", "high", "xhigh", "max"] && sonnet.ctx == 1_000_000)
         #expect(modelos.first { $0.id == "claude-haiku-4-5" }?.efforts == Effort.niveisDeOrcamento)
-        let l = await LimitesDosModelos.limites(provider: .claude, model: "claude-haiku-4-5", registro: registro, catalogo: nil)
+        let l = await LimitesDosModelos.limites(
+            provider: .claude,
+            model: "claude-haiku-4-5",
+            registro: registro,
+            catalogo: nil
+        )
         #expect(l.contexto == 200_000 && l.saida == 64000)
     }
 }
@@ -720,7 +737,12 @@ struct CapacidadesTests {
         )
         #expect(b.contexto == 1_000_000)
         #expect(fake.count == 1) // baixado uma vez só
-        let nada = await LimitesDosModelos.limites(provider: .claude, model: "nao-existe", registro: r, catalogo: catalogo)
+        let nada = await LimitesDosModelos.limites(
+            provider: .claude,
+            model: "nao-existe",
+            registro: r,
+            catalogo: catalogo
+        )
         #expect(nada.contexto == nil && nada.saida == nil)
     }
 

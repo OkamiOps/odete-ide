@@ -182,7 +182,13 @@ struct WorkspaceView: View {
             onProjects: { app.closeWorkspace() }
         )
         .equatable()
-        let divisor = divisorArrastavel(.lado, eixo: .horizontal, menor: Metrics.minSide, maior: m.sideMax, direcao: naEsquerda ? 1 : -1)
+        let divisor = divisorArrastavel(
+            .lado,
+            eixo: .horizontal,
+            menor: Metrics.minSide,
+            maior: m.sideMax,
+            direcao: naEsquerda ? 1 : -1
+        )
         if naEsquerda {
             rail
             if chrome.snapshot.sideOpen {
@@ -243,7 +249,13 @@ struct WorkspaceView: View {
     }
 
     func agente(_ m: Medidas, naEsquerda: Bool) -> some View {
-        let divisor = divisorArrastavel(.agente, eixo: .horizontal, menor: Metrics.minAgent, maior: m.agentMax, direcao: naEsquerda ? 1 : -1)
+        let divisor = divisorArrastavel(
+            .agente,
+            eixo: .horizontal,
+            menor: Metrics.minAgent,
+            maior: m.agentMax,
+            direcao: naEsquerda ? 1 : -1
+        )
         return Group {
             if naEsquerda {
                 AgentPane().frame(width: m.agent)

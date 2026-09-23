@@ -41,7 +41,13 @@ final class FilaDeTeclas {
     static let validade: TimeInterval = 0.5
 
     var pendentes: Int {
-        fila.count(where: { if case .texto = $0 { true } else { false } })
+        fila.count(where: {
+            if case .texto = $0 {
+                true
+            } else {
+                false
+            }
+        })
     }
 
     /// A tecla que desceu vai virar texto no campo? Letras, números, pontuação, espaço e
@@ -63,7 +69,13 @@ final class FilaDeTeclas {
 
     /// Chegou ao campo o texto de uma tecla: risca a mais antiga e roda o que esperava por ela.
     func chegouTexto() {
-        if let i = fila.firstIndex(where: { if case .texto = $0 { true } else { false } }) {
+        if let i = fila.firstIndex(where: {
+            if case .texto = $0 {
+                true
+            } else {
+                false
+            }
+        }) {
             fila.remove(at: i)
         }
         drenar()

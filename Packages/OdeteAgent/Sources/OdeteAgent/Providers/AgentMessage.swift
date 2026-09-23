@@ -54,7 +54,12 @@ public struct RaciocinioBruto: Codable, Sendable, Hashable {
     static func de(_ itens: [[String: Any]], formato: String, origem: String, modelo: String) -> RaciocinioBruto? {
         guard !itens.isEmpty,
               let d = try? JSONSerialization.data(withJSONObject: itens, options: [.sortedKeys]) else { return nil }
-        return RaciocinioBruto(formato: formato, origem: origem, modelo: modelo, json: String(decoding: d, as: UTF8.self))
+        return RaciocinioBruto(
+            formato: formato,
+            origem: origem,
+            modelo: modelo,
+            json: String(decoding: d, as: UTF8.self)
+        )
     }
 }
 

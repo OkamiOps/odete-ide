@@ -71,7 +71,10 @@ struct RuntimeTests {
         console.log(new URL("file:///tmp/x").pathname);
         """)
         #expect(code == 0, "\(c.stderr)")
-        #expect(c.stdout == "https://example.com/a\nhttps://example.com/\nx.com\nhttps://base.com/d/rel\n/tmp/x", "saiu: [\(c.stdout)]")
+        #expect(
+            c.stdout == "https://example.com/a\nhttps://example.com/\nx.com\nhttps://base.com/d/rel\n/tmp/x",
+            "saiu: [\(c.stdout)]"
+        )
     }
 
     @Test func timersAndPromises() async throws {

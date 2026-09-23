@@ -40,19 +40,19 @@ public enum Compactacao {
     /// Fração da janela total a partir da qual a conversa é compactada.
     public static let gatilho = 0.8
     /// `PRUNE_MINIMUM` do opencode: podar menos que isto não vale mexer na conversa.
-    static let podaMinima = 20_000
+    static let podaMinima = 20000
     /// `PRUNE_PROTECT` do opencode: as saídas de ferramenta mais recentes, até esta soma,
     /// nunca são podadas.
-    static let podaProtege = 40_000
+    static let podaProtege = 40000
     /// `TOOL_OUTPUT_MAX_CHARS` do opencode: quanto de cada resultado entra no texto que vai
     /// ser resumido.
-    static let saidaNoResumo = 2_000
+    static let saidaNoResumo = 2000
     /// `MIN_PRESERVE_RECENT_TOKENS` e `MAX_PRESERVE_RECENT_TOKENS` do opencode: a cauda que
     /// fica como está é um quarto do que se pode usar, entre esses dois.
-    static let caudaMinima = 2_000
-    static let caudaMaxima = 15_000
+    static let caudaMinima = 2000
+    static let caudaMaxima = 15000
     /// `SUMMARY_OUTPUT_TOKENS` do opencode: o espaço reservado para o próprio resumo.
-    static let saidaDoResumo = 4_096
+    static let saidaDoResumo = 4096
 
     /// O que fica no lugar de um resultado podado — o `[Old tool result content cleared]`
     /// do opencode.
@@ -308,7 +308,7 @@ public enum Compactacao {
     /// precisa. (O opencode desiste nesse ponto — "Conversation history too large to
     /// compact"; desistir aqui deixaria o turno preso num 400 atrás do outro.)
     static func promptQueCabe(_ cabeca: [AgentMessage], resumoAnterior: String?, janela: Int) -> String {
-        let limite = max(8_000, Int(Double(janela) * gatilho) - saidaDoResumo)
+        let limite = max(8000, Int(Double(janela) * gatilho) - saidaDoResumo)
         var conversa = ""
         for teto in [saidaNoResumo, 500, 120] {
             conversa = cabeca.map { serializar($0, teto: teto) }.filter { !$0.isEmpty }.joined(separator: "\n\n")
@@ -318,7 +318,7 @@ public enum Compactacao {
             }
         }
         let fixo = estimar(prompt(conversa: "", resumoAnterior: resumoAnterior))
-        let cabe = max(1_000, (limite - fixo) * 4)
+        let cabe = max(1000, (limite - fixo) * 4)
         return prompt(
             conversa: "(o começo da conversa não coube e ficou de fora)\n\n" + String(conversa.suffix(cabe)),
             resumoAnterior: resumoAnterior

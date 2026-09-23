@@ -225,8 +225,12 @@ public final class Esbuild: @unchecked Sendable {
             "astroSchema": tr("A entrada \"%1$@\" da coleção \"%2$@\" não passou no schema: %3$@"),
             "astroConfigIlegivel": tr("Não consegui ler %1$@: %2$@"),
             "aliasSemArquivo": tr("O alias de \"%1$@\" aponta para %2$@, que não existe (importado por %3$@)."),
-            "embutidoNoNavegador": tr("O módulo \"%1$@\" é do Node e não existe no navegador: aqui ele é um módulo vazio."),
-            "embutidoAviso": tr("O módulo \"%1$@\" é do Node e virou um módulo vazio no navegador (importado por %2$@)."),
+            "embutidoNoNavegador": tr(
+                "O módulo \"%1$@\" é do Node e não existe no navegador: aqui ele é um módulo vazio."
+            ),
+            "embutidoAviso": tr(
+                "O módulo \"%1$@\" é do Node e virou um módulo vazio no navegador (importado por %2$@)."
+            ),
             "estiloSemPacote": tr("Para compilar %2$@ é preciso o pacote %1$@: rode npm i -D %1$@"),
             "tailwindImport": tr("Tailwind: não achei \"%1$@\" (a partir de %2$@)."),
             "tailwindModulo": tr("Tailwind: não consegui carregar %1$@."),

@@ -71,7 +71,8 @@ import Testing
         let app = try await Apoio.texto(dev.url.appending(path: "@odete/js/src/main.ts"))
         let deps = try await Apoio.texto(dev.url.appending(path: "@odete/deps.js"))
         #expect(deps.contains("uuid-do-navegador") && !deps.contains("randomUUID"), "\(deps.prefix(400))")
-        #expect(deps.contains("navegador") && !deps.contains("require(\"http\")") && !deps.contains("__require(\"http\")"))
+        #expect(deps.contains("navegador") && !deps.contains("require(\"http\")") && !deps
+            .contains("__require(\"http\")"))
         // O `fs` do app: módulo vazio que avisa no console quem o usar.
         #expect(app.contains("new Proxy") && !app.contains("__require(\"fs\")"))
     }

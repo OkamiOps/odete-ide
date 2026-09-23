@@ -371,7 +371,8 @@ enum ResponsesStream {
                                 cont.yield(.usage(u))
                             }
                             let r = j["response"] as? [String: Any]
-                            status = (r?["status"] as? String) ?? (type == "response.incomplete" ? "incomplete" : "completed")
+                            status = (r?["status"] as? String) ??
+                                (type == "response.incomplete" ? "incomplete" : "completed")
                             motivo = (r?["incomplete_details"] as? [String: Any])?["reason"] as? String
                             viuFim = true
                         case "response.failed", "error":
@@ -396,7 +397,12 @@ enum ResponsesStream {
                         cont.yield(.error(Cortes.filtro)); cont.finish(); return
                     }
                     let cortado = status == "incomplete"
-                    if let r = RaciocinioBruto.de(raciocinios, formato: "responses", origem: ctx.origem, modelo: modelo) {
+                    if let r = RaciocinioBruto.de(
+                        raciocinios,
+                        formato: "responses",
+                        origem: ctx.origem,
+                        modelo: modelo
+                    ) {
                         cont.yield(.raciocinio(r))
                     }
                     let calls = acc.calls(ferramentas: ctx.ferramentas, cortado: cortado)

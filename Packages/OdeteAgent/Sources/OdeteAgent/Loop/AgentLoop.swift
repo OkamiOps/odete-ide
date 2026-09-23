@@ -556,8 +556,11 @@ public final class AgentLoop: @unchecked Sendable {
                 let cortada = call.problema != nil
                 guard cortada || Tools.permitida(call.name, no: config.mode) else {
                     emit(.item(.tool(id: call.id, name: call.name, detail: hint)))
-                    messages.append(.tool(call.id, "\(call.name) não está disponível no modo \(config.mode.label). "
-                        + "Siga o modo do <contexto_do_turno>; para editar, a pessoa precisa mudar para Build."))
+                    messages.append(.tool(
+                        call.id,
+                        "\(call.name) não está disponível no modo \(config.mode.label). "
+                            + "Siga o modo do <contexto_do_turno>; para editar, a pessoa precisa mudar para Build."
+                    ))
                     continue
                 }
                 if !cortada, Tools.needsPermit(config.permit, call) {
@@ -592,7 +595,9 @@ public final class AgentLoop: @unchecked Sendable {
                         if fezPatch {
                             emit(.item(.assistant(
                                 id: UUID().uuidString,
-                                text: tr("Fiz as mudanças e parei de reler o projeto. O patch está aí para você revisar.")
+                                text: tr(
+                                    "Fiz as mudanças e parei de reler o projeto. O patch está aí para você revisar."
+                                )
                             )))
                         } else {
                             emit(.item(.error(

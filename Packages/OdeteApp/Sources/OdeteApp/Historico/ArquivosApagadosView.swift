@@ -30,7 +30,9 @@ struct ArquivosApagadosView: View {
                     EmptyState(
                         "trash.slash",
                         title: tr("Nenhum arquivo apagado"),
-                        text: tr("Quando um arquivo com versões guardadas some do projeto, ele aparece aqui para voltar.")
+                        text: tr(
+                            "Quando um arquivo com versões guardadas some do projeto, ele aparece aqui para voltar."
+                        )
                     )
                 } else {
                     lista

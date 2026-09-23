@@ -670,10 +670,14 @@ func runAll(
         let antes: [AgentMessage] = [.user("primeiro pedido"), AgentMessage(role: .assistant, content: "feito")]
         _ = await runAll(loop, "segundo pedido", LoopConfig(mode: .chat, permit: .full, model: "m"), history: antes)
         let ultimo = try #require(p.turns.withLock { $0.last })
-        #expect(ultimo.messages.contains { $0.role == .user && Prompts.semContextoDoTurno($0.content) == "segundo pedido" },
-                "o pedido do turno não chegou ao provedor")
-        #expect(ultimo.messages.filter { $0.content == "primeiro pedido" }.count == 1,
-                "o primeiro pedido foi reinjetado")
+        #expect(
+            ultimo.messages.contains { $0.role == .user && Prompts.semContextoDoTurno($0.content) == "segundo pedido" },
+            "o pedido do turno não chegou ao provedor"
+        )
+        #expect(
+            ultimo.messages.filter { $0.content == "primeiro pedido" }.count == 1,
+            "o primeiro pedido foi reinjetado"
+        )
         #expect(ultimo.messages.last?.role == .tool, "a conversa foi cortada no fim")
     }
 

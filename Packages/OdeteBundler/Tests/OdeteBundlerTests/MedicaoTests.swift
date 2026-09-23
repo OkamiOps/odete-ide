@@ -78,7 +78,11 @@ struct MedicaoTests {
         // Um import de pacote que o projeto ainda não usava: até o Preview ter o que
         // precisa para rodar (bundle e dependências).
         let novoImport = try await FixtureReact.mede {
-            try FixtureReact.appTSX(rotulo: "vezes", importaNovo: true).write(to: app, atomically: true, encoding: .utf8)
+            try FixtureReact.appTSX(rotulo: "vezes", importaNovo: true).write(
+                to: app,
+                atomically: true,
+                encoding: .utf8
+            )
             await ate { await (dev.estatisticas()["reload"] ?? 0) >= 4 }
             let t = try await pega(js)
             #expect(t.contains("com-react-dom"))

@@ -129,7 +129,10 @@ struct FilaDeTeclasTests {
         #expect(FilaDeTeclas.produzTexto(caracteres: "£", modificadores: .option, temTexto: false))
         // Tab, Enter, Esc, setas e teclas de função não inserem nada.
         for c in ["\t", "\r", "\u{1B}", "\u{F700}", "\u{F701}", "\u{F728}", ""] {
-            #expect(!FilaDeTeclas.produzTexto(caracteres: c, modificadores: [], temTexto: true), "\(c.debugDescription)")
+            #expect(
+                !FilaDeTeclas.produzTexto(caracteres: c, modificadores: [], temTexto: true),
+                "\(c.debugDescription)"
+            )
         }
         // Atalhos não são texto: ⌃C, ⌃L, ⌘V.
         #expect(!FilaDeTeclas.produzTexto(caracteres: "c", modificadores: .control, temTexto: true))

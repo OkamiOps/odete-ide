@@ -35,7 +35,7 @@ struct CompleteJanelaTests {
 
     /// Todos os pontos do texto em UTF-16, para comparar em cada posição possível.
     func posicoes(_ texto: String) -> [(chars: Int, utf16: Int)] {
-        var out: [(Int, Int)] = [(0, 0)]
+        var out = [(0, 0)]
         var c = 0, u = 0
         for ch in texto {
             c += 1

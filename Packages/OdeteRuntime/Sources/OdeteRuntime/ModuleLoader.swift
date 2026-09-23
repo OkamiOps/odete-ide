@@ -55,7 +55,7 @@ enum ModuleLoader {
             let cjs = try CacheDeTransformacao.transformar(
                 original, caminho: path, tipo: "entrada", versao: rt.versaoDoTransformador
             ) { src, arquivo in
-                interopDeModuloES(try transformarEntrada(src, arquivo, te))
+                try interopDeModuloES(transformarEntrada(src, arquivo, te))
             }
             return esm ? embrulharModuloES(cjs) : cjs
         }
@@ -69,7 +69,7 @@ enum ModuleLoader {
             let cjs = try CacheDeTransformacao.transformar(
                 original, caminho: path, tipo: "cjs", versao: rt.versaoDoTransformador
             ) { src, arquivo in
-                interopDeModuloES(try t(src, arquivo))
+                try interopDeModuloES(t(src, arquivo))
             }
             return embrulharModuloES(cjs)
         }
@@ -246,7 +246,10 @@ enum ModuleLoader {
                 guard let imports = packageJSON(pj, cache: cache)["imports"] as? [String: Any],
                       let alvo = casarSubpath(imports, key: spec).flatMap(pickCondition) else { return nil }
                 if alvo.hasPrefix("./") || alvo.hasPrefix("../") {
-                    return resolveFileOrDir(Confinamento.normalizar((dir as NSString).appendingPathComponent(alvo)), cache: cache)
+                    return resolveFileOrDir(
+                        Confinamento.normalizar((dir as NSString).appendingPathComponent(alvo)),
+                        cache: cache
+                    )
                 }
                 return resolveModule(alvo, from: pj, cache: cache)
             }

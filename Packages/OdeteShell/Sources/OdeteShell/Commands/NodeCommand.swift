@@ -26,7 +26,8 @@ struct NodeCommand: ShellCommand {
         while let a = argv.first, a.hasPrefix("--"), a != "--eval", a != "--print" {
             argv.removeFirst()
             if a.hasPrefix("--env-file") {
-                let caminho = a.hasPrefix("--env-file=") ? String(a.dropFirst(11)) : argv.isEmpty ? "" : argv.removeFirst()
+                let caminho = a.hasPrefix("--env-file=") ? String(a.dropFirst(11)) : argv.isEmpty ? "" : argv
+                    .removeFirst()
                 guard let u = ctx.noProjeto(caminho), let texto = try? String(contentsOf: u, encoding: .utf8) else {
                     io.err(tr("node: %1$@: não existe", caminho)); return 9
                 }

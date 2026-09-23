@@ -37,7 +37,8 @@ func linha(_ sh: Shell, _ l: String) async -> (Int32, String, String) {
         let sh = Shell(root: raiz)
         let fm = FileManager.default
         for l in ["rm -rf ../proj2", "rm ../proj2/importante.txt", "cat ../proj2/importante.txt", "cp a.txt ../proj2/",
-                  "mv a.txt ../proj2/", "mkdir ../proj2/novo", "touch ../proj2/novo.txt", "ls ..", "grep x ../proj2/importante.txt",
+                  "mv a.txt ../proj2/", "mkdir ../proj2/novo", "touch ../proj2/novo.txt", "ls ..",
+                  "grep x ../proj2/importante.txt",
                   "echo x > ../proj2/novo.txt", "cat < ../proj2/importante.txt", "node ../proj2/x.js", "find .."]
         {
             let (c, _, e) = await linha(sh, l)
@@ -91,7 +92,8 @@ func linha(_ sh: Shell, _ l: String) async -> (Int32, String, String) {
         #expect(try String(contentsOf: raiz.appending(path: "tudo.txt"), encoding: .utf8).contains("nada"))
         let p = try Parser.parse("cmd 2>e.txt 2>>f.txt >&2 1>o.txt")
         let s = p.items[0].pipeline.commands[0]
-        #expect(s.argv == ["cmd"] && s.stderrFile == "f.txt" && s.stderrAppend && s.stdoutToStderr && s.stdoutFile == "o.txt")
+        #expect(s.argv == ["cmd"] && s.stderrFile == "f.txt" && s.stderrAppend && s.stdoutToStderr && s
+            .stdoutFile == "o.txt")
     }
 
     @Test func atribuicaoAntesDoComando() async throws {
@@ -212,7 +214,10 @@ func linha(_ sh: Shell, _ l: String) async -> (Int32, String, String) {
         """.write(to: raiz.appending(path: "le.js"), atomically: true, encoding: .utf8)
         let sh = Shell(root: raiz)
         #expect(await linha(sh, "echo ola | node le.js").1 == "stdin:ola")
-        #expect(await linha(sh, #"cat a.txt | node -e "console.log(require('fs').readFileSync(0, 'utf8').split('\n').length)""#).1 == "4")
+        #expect(await linha(
+            sh,
+            #"cat a.txt | node -e "console.log(require('fs').readFileSync(0, 'utf8').split('\n').length)""#
+        ).1 == "4")
     }
 
     @Test func stdoutBinarioEPedacos() async throws {
@@ -223,7 +228,15 @@ func linha(_ sh: Shell, _ l: String) async -> (Int32, String, String) {
             .write(to: raiz.appending(path: "pedacos.js"), atomically: true, encoding: .utf8)
         let sh = Shell(root: raiz)
         _ = await linha(sh, "node bin.js > bin.out")
-        #expect(try Data(contentsOf: raiz.appending(path: "bin.out")) == Data([0x89, 0x50, 0x4E, 0x47, 0xFF, 0x00, 0x41]))
+        #expect(try Data(contentsOf: raiz.appending(path: "bin.out")) == Data([
+            0x89,
+            0x50,
+            0x4E,
+            0x47,
+            0xFF,
+            0x00,
+            0x41,
+        ]))
         #expect(await linha(sh, "node pedacos.js").1 == "ab\nc\n100%")
         #expect(await linha(sh, #"node -e "console.log()""#).1 == "")
     }
@@ -263,7 +276,10 @@ func linha(_ sh: Shell, _ l: String) async -> (Int32, String, String) {
         ]
         for (caminho, texto) in arquivos {
             let u = raiz.appending(path: caminho)
-            try FileManager.default.createDirectory(at: u.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try FileManager.default.createDirectory(
+                at: u.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
             try texto.write(to: u, atomically: true, encoding: .utf8)
         }
         let (c, o, e) = await linha(Shell(root: raiz), "node main.js")

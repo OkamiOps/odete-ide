@@ -113,7 +113,10 @@ enum Builtins {
             // `cd -` volta para a pasta de antes, e mostra qual é, como no sh.
             if args.first == "-" {
                 guard let antes = ctx.shell.cwdAnterior else { ctx.io.err(tr("cd: não há pasta anterior")); return 1 }
-                guard ctx.shell.setCwd(antes) else { ctx.io.err(tr("cd: %1$@: não é uma pasta do projeto", "-")); return 1 }
+                guard ctx.shell.setCwd(antes) else { ctx.io.err(tr(
+                    "cd: %1$@: não é uma pasta do projeto",
+                    "-"
+                )); return 1 }
                 ctx.io.out(ctx.display(antes))
                 return 0
             }
@@ -197,7 +200,8 @@ enum Builtins {
                 // O link é apagado, não seguido; e nada fora do projeto — `rm -rf ../Outro`
                 // apagava outro projeto inteiro.
                 // `rm link/` (com a barra) é a pasta do outro lado do link, como no sh.
-                guard let u = ctx.noProjeto(r, seguirUltimo: r.hasSuffix("/")) else { ctx.avisarFora("rm", r); return 1 }
+                guard let u = ctx.noProjeto(r, seguirUltimo: r.hasSuffix("/"))
+                else { ctx.avisarFora("rm", r); return 1 }
                 let conf = Confinamento(raiz: ctx.root)
                 if conf.raizes.contains(Confinamento.real(u.path, seguirUltimo: false)) {
                     ctx.io.err(tr("rm: não vou apagar a raiz do projeto")); return 1
@@ -242,7 +246,10 @@ enum Builtins {
         Simple(name: "mv", help: "move ou renomeia") { args, ctx in
             guard let (_, rest) = opcoes("mv", args, aceitas: "fiv", ctx) else { return 2 }
             guard rest.count >= 2 else { ctx.io.err(tr("mv: origem destino")); return 1 }
-            guard let dest = ctx.noProjeto(rest.last!, seguirUltimo: false) else { ctx.avisarFora("mv", rest.last!); return 1 }
+            guard let dest = ctx.noProjeto(rest.last!, seguirUltimo: false) else { ctx.avisarFora(
+                "mv",
+                rest.last!
+            ); return 1 }
             let destIsDir = Shell.ehPasta(dest)
             for src in rest.dropLast() {
                 guard let s = ctx.noProjeto(src, seguirUltimo: false) else { ctx.avisarFora("mv", src); return 1 }
@@ -272,7 +279,9 @@ enum Builtins {
                         iname = args[i + 1]
                     }
                     i += 2
-                } else if a == "-type", i + 1 < args.count, let t = args[i + 1].first, "fd".contains(t), args[i + 1].count == 1 {
+                } else if a == "-type", i + 1 < args.count, let t = args[i + 1].first, "fd".contains(t),
+                          args[i + 1].count == 1
+                {
                     tipo = t; i += 2
                 } else if !a.hasPrefix("-") {
                     start = a; i += 1

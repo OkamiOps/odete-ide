@@ -104,7 +104,7 @@ struct PerdasNoEditorTests {
     }
 
     /// Duplicar a última linha (sem quebra no fim) num arquivo CRLF usava `\n`.
-    @Test func duplicarUltimaLinhaCRLF() throws {
+    @Test func duplicarUltimaLinhaCRLF() {
         let ns = "a\r\nb" as NSString
         let e = EdicaoDeLinhas.duplicar(ns, selecao: NSRange(location: 3, length: 0))
         #expect(ns.replacingCharacters(in: e.faixa, with: e.texto) == "a\r\nb\r\nb")
@@ -201,7 +201,7 @@ struct PerdasNoEditorTests {
     }
 
     @Test func recuoDetectadoEmArquivoPequeno() {
-        // `DetectedIndentStrategy` não é `Equatable`: compara pela descrição.
+        /// `DetectedIndentStrategy` não é `Equatable`: compara pela descrição.
         func recuo(_ t: String) -> String {
             "\(RecuoDoTexto.detectar(t))"
         }
@@ -312,6 +312,9 @@ struct PerdasNoEditorTests {
         #expect(EditorConfig.config(para: "web/a.js", arquivos: perto).tamanhoDoRecuo == 3)
         let comRaiz = [(pasta: "web", texto: "root = true\n[*.css]\nindent_size = 3\n"), (pasta: "", texto: raiz)]
         #expect(EditorConfig.config(para: "web/a.js", arquivos: comRaiz).tamanhoDoRecuo == nil)
-        #expect(EditorConfig.config(para: "a.txt", arquivos: [(pasta: "", texto: "[*]\ntrim_trailing_whitespace = true\ninsert_final_newline = false\n")]).aparar == true)
+        #expect(EditorConfig.config(
+            para: "a.txt",
+            arquivos: [(pasta: "", texto: "[*]\ntrim_trailing_whitespace = true\ninsert_final_newline = false\n")]
+        ).aparar == true)
     }
 }

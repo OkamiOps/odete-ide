@@ -167,13 +167,31 @@ import Testing
         <i className={`!font-bold md:hover:bg-red-500/50 ${x ? "grid-cols-[1fr_2fr]" : "px-1.5"}`} />
         <img class=flex-1 src="/a.png" /><b class="bg-[url('/img.png')] [&[data-x='1']]:p-2 bg-[#123456]" />
         """#
-        let json = try await es.engine.call("eval", ["JSON.stringify(globalThis.__odeteTailwind.candidatosDe(\(DevServer.comoLiteralJS(jsx))))"])
+        let json = try await es.engine.call(
+            "eval",
+            ["JSON.stringify(globalThis.__odeteTailwind.candidatosDe(\(DevServer.comoLiteralJS(jsx))))"]
+        )
         let lista = try JSONDecoder().decode(String.self, from: Data(json.utf8))
         let achados = try Set(JSONDecoder().decode([String].self, from: Data(lista.utf8)))
-        for c in ["text-red-500", "md:flex", "hover:underline", "content-['oi']", "[&>*]:p-4", "data-[state=open]:bg-red-500",
-                  "w-[calc(100%-2rem)]", "bg-(--minha)", "*:p-2", "!font-bold", "md:hover:bg-red-500/50", "grid-cols-[1fr_2fr]",
-                  "px-1.5", "flex-1", "bg-[url('/img.png')]", "[&[data-x='1']]:p-2", "bg-[#123456]"]
-        {
+        for c in [
+            "text-red-500",
+            "md:flex",
+            "hover:underline",
+            "content-['oi']",
+            "[&>*]:p-4",
+            "data-[state=open]:bg-red-500",
+            "w-[calc(100%-2rem)]",
+            "bg-(--minha)",
+            "*:p-2",
+            "!font-bold",
+            "md:hover:bg-red-500/50",
+            "grid-cols-[1fr_2fr]",
+            "px-1.5",
+            "flex-1",
+            "bg-[url('/img.png')]",
+            "[&[data-x='1']]:p-2",
+            "bg-[#123456]",
+        ] {
             #expect(achados.contains(c), "faltou \(c)")
         }
     }
@@ -235,8 +253,17 @@ import Testing
         let inicio = ContinuousClock.now
         let css = try await Apoio.texto(dev.url.appending(path: "@odete/css/src/main.tsx"))
         let primeira = ContinuousClock.now - inicio
-        let medidaInicial = try await dev.esbuild.engine.call("eval", ["JSON.stringify(globalThis.__odeteTailwind.medicoes)"])
-        for classe in [#".text-red-500"#, #".md\:flex"#, #".hover\:underline"#, ##".bg-\[\#123456\]"##, #".text-marca"#] {
+        let medidaInicial = try await dev.esbuild.engine.call(
+            "eval",
+            ["JSON.stringify(globalThis.__odeteTailwind.medicoes)"]
+        )
+        for classe in [
+            #".text-red-500"#,
+            #".md\:flex"#,
+            #".hover\:underline"#,
+            ##".bg-\[\#123456\]"##,
+            #".text-marca"#,
+        ] {
             #expect(css.contains(classe), "faltou \(classe)")
         }
         #expect(css.contains("--color-red-500") && css.contains("#0a7cff"))
@@ -246,15 +273,23 @@ import Testing
 
         // Edição com classe nova no componente: o JS muda (recarrega) e a folha já vem com ela.
         let tsx = raiz.appending(path: "src/App.tsx")
-        let texto = try String(contentsOf: tsx, encoding: .utf8).replacingOccurrences(of: "text-marca", with: "text-marca underline-offset-8")
+        let texto = try String(contentsOf: tsx, encoding: .utf8).replacingOccurrences(
+            of: "text-marca",
+            with: "text-marca underline-offset-8"
+        )
         try texto.write(to: tsx, atomically: true, encoding: .utf8)
         let t0 = ContinuousClock.now
         _ = await dev.arquivosMudaram([tsx.path])
         let edicao = ContinuousClock.now - t0
         let depois = try await Apoio.texto(dev.url.appending(path: "@odete/css/src/main.tsx"))
         #expect(depois.contains(".underline-offset-8"))
-        let m = try await dev.esbuild.engine.call("eval", ["JSON.stringify(globalThis.__odeteTailwind.medicoes.ultima)"])
-        print("[medida] tailwind no Preview: primeiro pedido de CSS (bundle inteiro) \(primeira) \(medidaInicial); edição com classe nova (rebuild inteiro) \(edicao), geração \(m)")
+        let m = try await dev.esbuild.engine.call(
+            "eval",
+            ["JSON.stringify(globalThis.__odeteTailwind.medicoes.ultima)"]
+        )
+        print(
+            "[medida] tailwind no Preview: primeiro pedido de CSS (bundle inteiro) \(primeira) \(medidaInicial); edição com classe nova (rebuild inteiro) \(edicao), geração \(m)"
+        )
     }
 
     @Test(.enabled(if: temTailwind)) func tailwindDeVerdadeNoViteBuild() async throws {
@@ -263,7 +298,13 @@ import Testing
         let (r, _, css) = try await Apoio.viteBuild(raiz)
         print("[medida] vite build com tailwind: \(ContinuousClock.now - inicio), CSS \(css.utf8.count) bytes")
         #expect(r.ok, "\(r.diagnosticos.map(\.text))")
-        for classe in [#".text-red-500"#, #".md\:flex"#, #".hover\:underline"#, ##".bg-\[\#123456\]"##, #".text-marca"#] {
+        for classe in [
+            #".text-red-500"#,
+            #".md\:flex"#,
+            #".hover\:underline"#,
+            ##".bg-\[\#123456\]"##,
+            #".text-marca"#,
+        ] {
             #expect(css.contains(classe), "faltou \(classe)")
         }
         // Minificado pelo esbuild, e sem CSS aninhado (o `@apply hover:` escreve `&:hover`).
@@ -280,7 +321,11 @@ import Testing
         let nomes = try FileManager.default.contentsOfDirectory(atPath: origem).filter { !$0.hasPrefix(".") }
         #expect(try Apoio.copiaPacotes("ODETE_TAILWIND3_DIR", nomes, para: raiz))
         try Apoio.pagina(raiz, entrada: "/src/main.tsx")
-        try Apoio.grava(#"{"name":"app","type":"module","devDependencies":{"tailwindcss":"^3.4.0","postcss":"^8"}}"#, raiz, "package.json")
+        try Apoio.grava(
+            #"{"name":"app","type":"module","devDependencies":{"tailwindcss":"^3.4.0","postcss":"^8"}}"#,
+            raiz,
+            "package.json"
+        )
         try Apoio.grava("""
         /** @type {import('tailwindcss').Config} */
         export default {
@@ -289,9 +334,21 @@ import Testing
           plugins: [],
         }
         """, raiz, "tailwind.config.js")
-        try Apoio.grava("export default { plugins: { tailwindcss: {}, autoprefixer: {} } }\n", raiz, "postcss.config.js")
-        try Apoio.grava("@tailwind base;\n@tailwind components;\n@tailwind utilities;\n.botao { @apply px-4 hover:underline; }\n", raiz, "src/index.css")
-        try Apoio.grava("import \"./index.css\";\n(globalThis as any).__r = `<p class=\"text-red-500 md:flex bg-[#123456] text-marca\">`;\n", raiz, "src/main.tsx")
+        try Apoio.grava(
+            "export default { plugins: { tailwindcss: {}, autoprefixer: {} } }\n",
+            raiz,
+            "postcss.config.js"
+        )
+        try Apoio.grava(
+            "@tailwind base;\n@tailwind components;\n@tailwind utilities;\n.botao { @apply px-4 hover:underline; }\n",
+            raiz,
+            "src/index.css"
+        )
+        try Apoio.grava(
+            "import \"./index.css\";\n(globalThis as any).__r = `<p class=\"text-red-500 md:flex bg-[#123456] text-marca\">`;\n",
+            raiz,
+            "src/main.tsx"
+        )
         let inicio = ContinuousClock.now
         let (r, _, css) = try await Apoio.viteBuild(raiz)
         print("[medida] vite build com tailwind 3: \(ContinuousClock.now - inicio)")
@@ -305,10 +362,18 @@ import Testing
     /// `@plugin` com um plugin JS de verdade (o typography), carregado pelo esbuild.
     @Test(.enabled(if: temTailwind)) func pluginDeVerdade() async throws {
         guard let raiz = try projetoOficial() else { return }
-        guard try Apoio.copiaPacotes("ODETE_TAILWIND_DIR", ["@tailwindcss/typography", "postcss-selector-parser", "cssesc", "util-deprecate"], para: raiz)
+        guard try Apoio.copiaPacotes(
+            "ODETE_TAILWIND_DIR",
+            ["@tailwindcss/typography", "postcss-selector-parser", "cssesc", "util-deprecate"],
+            para: raiz
+        )
         else { return }
         try Apoio.grava("@import \"tailwindcss\";\n@plugin \"@tailwindcss/typography\";\n", raiz, "src/index.css")
-        try Apoio.grava("export function App() { return `<article class=\"prose lg:prose-xl\">x</article>`; }\n", raiz, "src/App.tsx")
+        try Apoio.grava(
+            "export function App() { return `<article class=\"prose lg:prose-xl\">x</article>`; }\n",
+            raiz,
+            "src/App.tsx"
+        )
         let (r, _, css) = try await Apoio.viteBuild(raiz)
         #expect(r.ok, "\(r.diagnosticos.map(\.text))")
         #expect(css.contains(".prose"), "\(css.prefix(400))")

@@ -73,7 +73,8 @@ public struct FileOps: Sendable {
             guard let alvo = try? FileManager.default.destinationOfSymbolicLink(atPath: atual.path) else {
                 return atual
             }
-            atual = (alvo.hasPrefix("/") ? URL(filePath: alvo) : atual.deletingLastPathComponent().appending(path: alvo))
+            atual = (alvo.hasPrefix("/") ? URL(filePath: alvo) : atual.deletingLastPathComponent()
+                .appending(path: alvo))
                 .standardizedFileURL
         }
         return atual

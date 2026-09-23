@@ -98,9 +98,9 @@ struct SearchPane: View {
                             previa = ws.previaDaTroca(consulta, por: troca, em: grouped.map(\.path))
                             confirmandoTroca = true
                         }
-                            .font(.caption.weight(.medium))
-                            .buttonStyle(.glass)
-                            .controlSize(.small)
+                        .font(.caption.weight(.medium))
+                        .buttonStyle(.glass)
+                        .controlSize(.small)
                     }
                 }
                 if let recado {
@@ -193,7 +193,12 @@ struct SearchPane: View {
             linhas.append(tr("e mais %1$@", "\(resto)"))
         }
         linhas.append("")
-        linhas.append(tr("Abas abertas recebem a troca no editor, e dá para desfazer lá. Os outros arquivos são gravados no disco, e a versão de antes de cada um fica no histórico local."))
+        linhas
+            .append(
+                tr(
+                    "Abas abertas recebem a troca no editor, e dá para desfazer lá. Os outros arquivos são gravados no disco, e a versão de antes de cada um fica no histórico local."
+                )
+            )
         return linhas.joined(separator: "\n")
     }
 
@@ -261,7 +266,10 @@ struct SearchPane: View {
         // está na tela, e a troca trabalha sobre o mesmo texto.
         let abertos = ws.textosAbertos()
         Task.detached(priority: .userInitiated) {
-            let found = (try? TextSearch.search(root: root, query: q, regex: re, caseSensitive: cs, abertos: abertos)) ?? []
+            let found = (
+                try? TextSearch.search(root: root, query: q, regex: re, caseSensitive: cs, abertos: abertos)
+            ) ??
+                []
             await MainActor.run {
                 if query == q {
                     hits = found; searching = false

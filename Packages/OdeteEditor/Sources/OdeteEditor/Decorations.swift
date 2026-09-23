@@ -429,7 +429,11 @@ extension CodeEditorView.Coordinator {
         let items = Complete.sugestoes(
             para: ctx,
             indice: indicePalavras,
-            linha: LinhaDoCursor(texto: lugar.linha, inicio: lugar.inicioDaLinha, cursor: lugar.cursor - lugar.inicioDaLinha),
+            linha: LinhaDoCursor(
+                texto: lugar.linha,
+                inicio: lugar.inicioDaLinha,
+                cursor: lugar.cursor - lugar.inicioDaLinha
+            ),
             language: parent.language,
             files: source.files,
             currentPath: source.path,

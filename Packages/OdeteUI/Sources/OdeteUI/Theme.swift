@@ -1,6 +1,6 @@
 import OdeteCore
-import Synchronization
 import SwiftUI
+import Synchronization
 
 /// Cores já convertidas, por texto hex.
 ///

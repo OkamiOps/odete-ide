@@ -293,13 +293,15 @@ enum MessagesStream {
                             if blocos[i]?["type"] as? String == "tool_use" {
                                 acc.fechar(i)
                                 let args = acc.items[i]?.args ?? ""
-                                let objeto = try? JSONSerialization.jsonObject(with: Data((args.isEmpty ? "{}" : args).utf8))
+                                let objeto = try? JSONSerialization
+                                    .jsonObject(with: Data((args.isEmpty ? "{}" : args).utf8))
                                 blocos[i]?["input"] = (objeto as? [String: Any]) ?? [String: Any]()
                             }
                         case "message_delta":
                             let d = j["delta"] as? [String: Any]
                             parada = (d?["stop_reason"] as? String) ?? parada
-                            detalhes = (d?["stop_details"] as? [String: Any]) ?? (j["stop_details"] as? [String: Any]) ??
+                            detalhes = (d?["stop_details"] as? [String: Any]) ??
+                                (j["stop_details"] as? [String: Any]) ??
                                 detalhes
                         case "message_stop":
                             terminou = true
@@ -322,7 +324,12 @@ enum MessagesStream {
                         cont.finish(); return
                     case "pause_turn":
                         // Quem abriu o pedido continua a resposta de onde parou.
-                        ctx.fim?.anotar { $0.pausado = RaciocinioBruto.de(todos, formato: "anthropic", origem: "", modelo: "")?.json }
+                        ctx.fim?.anotar { $0.pausado = RaciocinioBruto.de(
+                            todos,
+                            formato: "anthropic",
+                            origem: "",
+                            modelo: ""
+                        )?.json }
                         cont.finish(); return
                     default: break
                     }
@@ -331,8 +338,9 @@ enum MessagesStream {
                         cont.finish(); return
                     }
                     let cortado = parada == "max_tokens"
-                    if todos.contains(where: { ["thinking", "redacted_thinking"].contains($0["type"] as? String ?? "") }),
-                       let r = RaciocinioBruto.de(todos, formato: "anthropic", origem: ctx.origem, modelo: modelo)
+                    if todos
+                        .contains(where: { ["thinking", "redacted_thinking"].contains($0["type"] as? String ?? "") }),
+                        let r = RaciocinioBruto.de(todos, formato: "anthropic", origem: ctx.origem, modelo: modelo)
                     {
                         cont.yield(.raciocinio(r))
                     }

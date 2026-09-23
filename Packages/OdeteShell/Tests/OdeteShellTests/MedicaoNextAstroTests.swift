@@ -25,7 +25,10 @@ struct MedicaoNextAstroTests {
         let c0 = Self.cpu(), t0 = ContinuousClock.now
         try await f()
         let d = ContinuousClock.now - t0
-        return Medida(parede: Double(d.components.seconds) + Double(d.components.attoseconds) / 1e18, cpu: Self.cpu() - c0)
+        return Medida(
+            parede: Double(d.components.seconds) + Double(d.components.attoseconds) / 1e18,
+            cpu: Self.cpu() - c0
+        )
     }
 
     func pega(_ dev: DevServer, _ rota: String) async throws -> String {
@@ -34,7 +37,8 @@ struct MedicaoNextAstroTests {
     }
 
     func linha(_ nome: String, _ m: [(String, Medida)]) {
-        print("ODETE_MEDIDA \(nome) " + m.map { String(format: "%@=%.2fs/%.2fcpu", $0.0, $0.1.parede, $0.1.cpu) }.joined(separator: " "))
+        print("ODETE_MEDIDA \(nome) " + m.map { String(format: "%@=%.2fs/%.2fcpu", $0.0, $0.1.parede, $0.1.cpu) }
+            .joined(separator: " "))
     }
 
     @Test func medeNext() async throws {
@@ -51,7 +55,11 @@ struct MedicaoNextAstroTests {
         let page = raiz.appending(path: "app/page.tsx")
         let texto = try String(contentsOf: page, encoding: .utf8)
         let edicao = try await mede {
-            try texto.replacingOccurrences(of: "To get started", with: "Para começar").write(to: page, atomically: true, encoding: .utf8)
+            try texto.replacingOccurrences(of: "To get started", with: "Para começar").write(
+                to: page,
+                atomically: true,
+                encoding: .utf8
+            )
             _ = await dev.arquivosMudaram([page.path])
             let html = try await pega(dev, "/")
             #expect(html.contains("Para começar"))
@@ -81,7 +89,11 @@ struct MedicaoNextAstroTests {
         let index = raiz.appending(path: "src/pages/index.astro")
         let texto = try String(contentsOf: index, encoding: .utf8)
         let edicao = try await mede {
-            try texto.replacingOccurrences(of: "Astro no iPad.", with: "Editado.").write(to: index, atomically: true, encoding: .utf8)
+            try texto.replacingOccurrences(of: "Astro no iPad.", with: "Editado.").write(
+                to: index,
+                atomically: true,
+                encoding: .utf8
+            )
             _ = await dev.arquivosMudaram([index.path])
             #expect(try await pega(dev, "/").contains("Editado."))
         }
@@ -106,7 +118,11 @@ struct MedicaoNextAstroTests {
         let footer = raiz.appending(path: "src/components/Footer.astro")
         let texto = try String(contentsOf: footer, encoding: .utf8)
         let edicao = try await mede {
-            try texto.replacingOccurrences(of: "Your name here", with: "Marcos").write(to: footer, atomically: true, encoding: .utf8)
+            try texto.replacingOccurrences(of: "Your name here", with: "Marcos").write(
+                to: footer,
+                atomically: true,
+                encoding: .utf8
+            )
             _ = await dev.arquivosMudaram([footer.path])
             let html = try await pega(dev, "/")
             #expect(html.contains("Marcos"))

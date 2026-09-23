@@ -165,7 +165,10 @@ final class MinimapView: UIView {
         out.reserveCapacity(1024)
         // Separado por qualquer quebra: `"\r\n"` é um `Character` só em Swift, e separar
         // por `"\n"` deixava um arquivo CRLF inteiro numa linha só do mapa.
-        for linha in texto.split(omittingEmptySubsequences: false, whereSeparator: { $0 == "\n" || $0 == "\r\n" || $0 == "\r" }) {
+        for linha in texto.split(
+            omittingEmptySubsequences: false,
+            whereSeparator: { $0 == "\n" || $0 == "\r\n" || $0 == "\r" }
+        ) {
             var recuo = 0
             var i = linha.startIndex
             while i < linha.endIndex, linha[i] == " " || linha[i] == "\t" {

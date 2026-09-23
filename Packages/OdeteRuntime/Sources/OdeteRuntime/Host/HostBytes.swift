@@ -259,7 +259,8 @@ enum HostBytes {
         guard let v, let s = JSValueToStringCopy(ctx, v, nil) else { return nil }
         defer { JSStringRelease(s) }
         let n = JSStringGetLength(s)
-        guard n >= 256, let cf = JSStringCopyCFString(kCFAllocatorDefault, s), CFStringGetLength(cf) == n else { return nil }
+        guard n >= 256, let cf = JSStringCopyCFString(kCFAllocatorDefault, s),
+              CFStringGetLength(cf) == n else { return nil }
         return corpo(cf, n, n * 3)
     }
 

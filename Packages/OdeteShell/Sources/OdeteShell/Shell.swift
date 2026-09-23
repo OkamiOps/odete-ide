@@ -214,9 +214,11 @@ public final class Shell: @unchecked Sendable {
                     }
                     // Expandido agora, e não antes da linha: em `cmd; echo $?` o `$?` é o do `cmd`,
                     // e em `export X=1; echo $X` o `X` já é o novo. Os curingas (`*.ts`) também.
-                    let pipeline = crua.expandido({ [self] in valor(de: $0, status: status) }, glob: { [self] in
+                    let pipeline = crua.expandido {
+                        [self] in valor(de: $0, status: status)
+                    } glob: { [self] in
                         expandirGlob($0)
-                    })
+                    }
                     if pipeline.background {
                         let text = pipeline.commands.map { $0.argv.joined(separator: " ") }.joined(separator: " | ")
                         startJob(text) { [self] in

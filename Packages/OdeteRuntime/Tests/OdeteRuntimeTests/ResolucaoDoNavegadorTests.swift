@@ -87,7 +87,11 @@ struct ResolucaoDoNavegadorTests {
     /// Sem `exports`: `browser` (texto) ganha de `module`, que ganha de `main`.
     @Test func camposBrowserModuleMain() throws {
         let raiz = try projeto()
-        try grava(#"{"name":"a","main":"node.js","module":"esm.js","browser":"navegador.js"}"#, raiz, "node_modules/a/package.json")
+        try grava(
+            #"{"name":"a","main":"node.js","module":"esm.js","browser":"navegador.js"}"#,
+            raiz,
+            "node_modules/a/package.json"
+        )
         try grava(#"{"name":"b","main":"node.js","module":"esm.js"}"#, raiz, "node_modules/b/package.json")
         for p in ["a", "b"] {
             for f in ["node.js", "esm.js", "navegador.js"] {

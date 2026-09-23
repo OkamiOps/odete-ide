@@ -106,7 +106,11 @@ public final class JSProcess: @unchecked Sendable {
             defer { e = nil }
             return e
         }
-        concluido.withLock { if $0 == nil { $0 = codigo } }
+        concluido.withLock {
+            if $0 == nil {
+                $0 = codigo
+            }
+        }
         c?.resume(returning: codigo)
     }
 

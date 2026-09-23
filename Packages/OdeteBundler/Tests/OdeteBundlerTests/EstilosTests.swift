@@ -19,8 +19,15 @@ import Testing
     }
 
     @Test func cssModulesDevolveOMapaDasClasses() async throws {
-        let raiz = try projeto("import s from \"./a.module.css\";\n(globalThis as any).__r = s.titulo + \"|\" + s[\"com-traco\"];\n")
-        try Apoio.grava(".titulo { color: red }\n.com-traco { color: blue }\n:global(.solta) { margin: 0 }\n", raiz, "src/a.module.css")
+        let raiz =
+            try projeto(
+                "import s from \"./a.module.css\";\n(globalThis as any).__r = s.titulo + \"|\" + s[\"com-traco\"];\n"
+            )
+        try Apoio.grava(
+            ".titulo { color: red }\n.com-traco { color: blue }\n:global(.solta) { margin: 0 }\n",
+            raiz,
+            "src/a.module.css"
+        )
         let (r, js, css) = try await Apoio.viteBuild(raiz)
         #expect(r.ok, "\(r.diagnosticos.map(\.text))")
         let v = Apoio.roda(js).valor ?? ""
@@ -53,7 +60,11 @@ import Testing
     /// chegava cru ao navegador e a folha sumia calada.
     @Test func importDeCSSDePacoteQueFaltaDizQueFalta() async throws {
         let raiz = try projeto("import \"./app.css\";\nconsole.log(1);\n")
-        try Apoio.grava(#"{"name":"app","type":"module","dependencies":{"estilos-que-faltam":"^1.0.0"}}"#, raiz, "package.json")
+        try Apoio.grava(
+            #"{"name":"app","type":"module","dependencies":{"estilos-que-faltam":"^1.0.0"}}"#,
+            raiz,
+            "package.json"
+        )
         try Apoio.grava("@import \"estilos-que-faltam/base.css\";\n.a { color: red }\n", raiz, "src/app.css")
         let dev = DevServer(root: raiz)
         try await dev.start(port: Apoio.porta())
@@ -67,7 +78,10 @@ import Testing
     /// O Sass de verdade (o dart-sass em JS): `@use` de parcial, aninhamento, variável, e
     /// o `.module.scss`.
     @Test(.enabled(if: temPacotes)) func sassDeVerdade() async throws {
-        let raiz = try projeto("import \"./app.scss\";\nimport s from \"./b.module.scss\";\n(globalThis as any).__r = s.caixa;\n")
+        let raiz =
+            try projeto(
+                "import \"./app.scss\";\nimport s from \"./b.module.scss\";\n(globalThis as any).__r = s.caixa;\n"
+            )
         #expect(try Apoio.copiaPacotes("ODETE_ESTILOS_DIR", ["sass", "immutable"], para: raiz))
         try Apoio.grava("$cor: #ff0000;\n", raiz, "src/_vars.scss")
         try Apoio.grava("@use \"./vars\" as v;\n.a { .b { color: v.$cor; } }\n", raiz, "src/app.scss")
@@ -100,7 +114,10 @@ import Testing
         try Apoio.grava("@import \"./vars.less\";\n.a { .b { color: @cor; } }\n", raiz, "src/app.less")
         let (r, _, css) = try await Apoio.viteBuild(raiz)
         #expect(r.ok, "\(r.diagnosticos.map(\.text))")
-        #expect(css.contains(".a .b") && (css.contains("#0f0") || css.contains("lime") || css.contains("#00ff00")), "\(css)")
+        #expect(
+            css.contains(".a .b") && (css.contains("#0f0") || css.contains("lime") || css.contains("#00ff00")),
+            "\(css)"
+        )
     }
 
     /// No dev server: mexer no parcial que o `.scss` usa refaz só a folha — o parcial não

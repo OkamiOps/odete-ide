@@ -46,7 +46,11 @@ import Testing
             path: "odete-pre-\(UUID().uuidString)", directoryHint: .isDirectory
         )
         try grava(#"{"name":"app","private":true,"type":"module"}"#, raiz, "package.json")
-        try grava(#"{"name":"app","lockfileVersion":3,"packages":{"node_modules/react":{"version":"19.0.0"}}}"#, raiz, "package-lock.json")
+        try grava(
+            #"{"name":"app","lockfileVersion":3,"packages":{"node_modules/react":{"version":"19.0.0"}}}"#,
+            raiz,
+            "package-lock.json"
+        )
         try grava(
             "<!doctype html><html><head></head><body><div id=\"root\"></div><script type=\"module\" src=\"/src/main.tsx\"></script></body></html>",
             raiz, "index.html"
@@ -147,11 +151,14 @@ import Testing
         let dev = DevServer(root: raiz)
         try await dev.start(port: porta())
         defer { dev.stop() }
-        let contexto = JSContext()!
+        let contexto = try #require(JSContext())
         let r = try await roda(dev, contexto: contexto)
         #expect(r.erro == nil, "o app quebrou: \(r.erro ?? "")")
         #expect(r.texto == "42", "o componente com useState não renderizou: \(r.texto)")
-        #expect(contexto.evaluateScript("globalThis.__copiasDoReact")?.toInt32() == 1, "mais de uma cópia do React rodou")
+        #expect(
+            contexto.evaluateScript("globalThis.__copiasDoReact")?.toInt32() == 1,
+            "mais de uma cópia do React rodou"
+        )
 
         // O React está no pacote de dependências, e só lá.
         let app = try await texto(dev.url.appending(path: "@odete/js/src/main.tsx"))
@@ -204,7 +211,7 @@ import Testing
         let dev = DevServer(root: raiz)
         try await dev.start(port: porta())
         defer { dev.stop() }
-        let contexto = JSContext()!
+        let contexto = try #require(JSContext())
         let r = try await roda(dev, contexto: contexto)
         #expect(r.erro == nil, "\(r.erro ?? "")")
         #expect(
@@ -224,7 +231,10 @@ import Testing
         dev.stop()
         let pasta = raiz.appending(path: "node_modules/.odete-deps")
         let guardados = try FileManager.default.contentsOfDirectory(atPath: pasta.path)
-        #expect(guardados.contains { $0.hasSuffix(".js") } && guardados.contains { $0.hasSuffix(".json") }, "\(guardados)")
+        #expect(
+            guardados.contains { $0.hasSuffix(".js") } && guardados.contains { $0.hasSuffix(".json") },
+            "\(guardados)"
+        )
 
         // Motor novo, como o app reaberto: nada de build do pacote.
         let outro = DevServer(esbuild: Esbuild(root: raiz))
@@ -250,7 +260,11 @@ import Testing
         dev.stop()
 
         // Lockfile diferente: a chave muda.
-        try grava(#"{"name":"app","lockfileVersion":3,"packages":{"node_modules/react":{"version":"19.0.1"}}}"#, raiz, "package-lock.json")
+        try grava(
+            #"{"name":"app","lockfileVersion":3,"packages":{"node_modules/react":{"version":"19.0.1"}}}"#,
+            raiz,
+            "package-lock.json"
+        )
         let segundo = DevServer(esbuild: Esbuild(root: raiz))
         try await segundo.start(port: porta())
         _ = try await roda(segundo)
@@ -279,7 +293,11 @@ import Testing
         try await dev.start(port: porta())
         defer { dev.stop() }
         _ = try await roda(dev)
-        try grava(#"{"name":"app","lockfileVersion":3,"packages":{"node_modules/react":{"version":"19.9.9"}}}"#, raiz, "package-lock.json")
+        try grava(
+            #"{"name":"app","lockfileVersion":3,"packages":{"node_modules/react":{"version":"19.9.9"}}}"#,
+            raiz,
+            "package-lock.json"
+        )
         let reacao = await dev.arquivosMudaram([raiz.appending(path: "package-lock.json").path])
         #expect(reacao == .reload)
         let r = try await roda(dev)
@@ -302,7 +320,7 @@ import Testing
         let s = await stats(dev)
         // Os três do começo, o `react-dom` novo e o `interno.js`, que já estava dentro.
         #expect(s["depsBuilds"] == 2 && s["depsModulos"] == 5, "\(s)")
-        let contexto = JSContext()!
+        let contexto = try #require(JSContext())
         let r = try await roda(dev, contexto: contexto)
         #expect(r.erro == nil && r.texto == "42", "\(r)")
         #expect(contexto.evaluateScript("globalThis.__versao")?.toString() == "19.0.0-falso")
@@ -314,7 +332,7 @@ import Testing
         try fonte.write(to: main, atomically: true, encoding: .utf8)
         #expect(await ate { await stats(dev)["reload"] == 2 }, "o segundo import não recarregou")
         #expect(await stats(dev)["depsBuilds"] == 2, "import de arquivo que já estava no pacote refez o pacote")
-        let outroContexto = JSContext()!
+        let outroContexto = try #require(JSContext())
         let r2 = try await roda(dev, contexto: outroContexto)
         #expect(r2.erro == nil && r2.texto == "42", "\(r2)")
         #expect(outroContexto.evaluateScript("globalThis.__marca")?.toString() == "interno-do-react-dom")
@@ -377,7 +395,10 @@ import Testing
         let raiz = try projetoComHooks()
         let fm = FileManager.default
         try fm.moveItem(at: raiz.appending(path: "node_modules"), to: raiz.appending(path: "node_modules.nosync"))
-        try fm.createSymbolicLink(atPath: raiz.appending(path: "node_modules").path, withDestinationPath: "node_modules.nosync")
+        try fm.createSymbolicLink(
+            atPath: raiz.appending(path: "node_modules").path,
+            withDestinationPath: "node_modules.nosync"
+        )
         let dev = DevServer(root: raiz)
         try await dev.start(port: porta())
         defer { dev.stop() }

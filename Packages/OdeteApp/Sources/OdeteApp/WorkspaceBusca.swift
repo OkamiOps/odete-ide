@@ -9,10 +9,10 @@ import OdeteI18n
 /// troca usava outra regex que a busca, então trocava outra coisa que a lista mostrava.
 /// Agora a busca e a troca olham os mesmos textos (a aba aberta, com o que não foi salvo;
 /// o disco dos fechados) com a mesma `ConsultaDeTexto`.
-extension WorkspaceModel {
+public extension WorkspaceModel {
     /// Os textos das abas abertas, por caminho: onde a busca e a troca do projeto olham no
     /// lugar do disco.
-    public func textosAbertos() -> [String: String] {
+    func textosAbertos() -> [String: String] {
         var out: [String: String] = [:]
         for t in tabs where !naoEhTexto.contains(t.path) {
             out[t.path] = buffers[t.path]
@@ -21,14 +21,14 @@ extension WorkspaceModel {
     }
 
     /// Quantas trocas cada arquivo teria — a mesma conta de `trocarNoProjeto`, sem gravar.
-    public struct PreviaDaTroca: Equatable {
+    struct PreviaDaTroca: Equatable {
         public var arquivos: [ArquivoDaTroca] = []
         public var total: Int {
             arquivos.reduce(0) { $0 + $1.trocas }
         }
     }
 
-    public struct ArquivoDaTroca: Equatable, Identifiable {
+    struct ArquivoDaTroca: Equatable, Identifiable {
         public var path: String
         public var trocas: Int
         public var id: String {
@@ -36,7 +36,7 @@ extension WorkspaceModel {
         }
     }
 
-    public func previaDaTroca(_ consulta: ConsultaDeTexto, por troca: String, em paths: [String]) -> PreviaDaTroca {
+    func previaDaTroca(_ consulta: ConsultaDeTexto, por troca: String, em paths: [String]) -> PreviaDaTroca {
         guard let re = try? consulta.expressao() else { return PreviaDaTroca() }
         var p = PreviaDaTroca()
         for path in paths {
@@ -56,7 +56,7 @@ extension WorkspaceModel {
     /// cima do que a pessoa digitou — gravar isso sem ela pedir seria gravar o que ela
     /// ainda não quis gravar.
     @discardableResult
-    public func trocarNoProjeto(
+    func trocarNoProjeto(
         _ consulta: ConsultaDeTexto,
         por troca: String,
         em paths: [String]
@@ -93,7 +93,7 @@ extension WorkspaceModel {
             trocas += r.trocas
         }
         if !falhas.isEmpty {
-            self.error = tr("Não deu para gravar: %1$@", falhas.joined(separator: ", "))
+            error = tr("Não deu para gravar: %1$@", falhas.joined(separator: ", "))
         }
         reload()
         git.agendarMarcas()

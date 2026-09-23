@@ -21,7 +21,13 @@ func rodarArquivo(
     limite: Duration = .seconds(8)
 ) async -> (Int32, Capture) {
     let cap = Capture()
-    let p = JSProcess(cwd: dir, argv: [dir.appending(path: arquivo).path], raiz: raiz, stdin: stdin, output: cap.handler)
+    let p = JSProcess(
+        cwd: dir,
+        argv: [dir.appending(path: arquivo).path],
+        raiz: raiz,
+        stdin: stdin,
+        output: cap.handler
+    )
     let vigia = Task { try? await Task.sleep(for: limite); p.kill() }
     let code = await p.run(file: dir.appending(path: arquivo))
     vigia.cancel()
@@ -86,7 +92,12 @@ struct CarregamentoDeModulosTests {
         let linhas = c.stdout.split(separator: "\n").map(String.init)
         #expect(linhas.first == "não mexer: import('z') true", Comment(rawValue: c.stdout))
         // CJS importado: `default` é o `module.exports` inteiro, como no Node.
-        #expect(Set(linhas.dropFirst()) == ["x { v: 'x', default: 'padrão' }", "function y", "url x", "builtin function function"])
+        #expect(Set(linhas.dropFirst()) == [
+            "x { v: 'x', default: 'padrão' }",
+            "function y",
+            "url x",
+            "builtin function function",
+        ])
     }
 
     @Test func reescritaDeImportRespeitaStringsComentariosERegex() {
@@ -128,7 +139,12 @@ struct ApiDoV8EHerancaTests {
         Error.stackTraceLimit = 0; console.log(JSON.stringify(new Error("sem").stack));
         """)
         #expect(code == 0, Comment(rawValue: c.stderr))
-        #expect(c.stdout == "string chamador true boolean\nError: boom true\nMeuErro: x true true\ntrue true\n\"Error: sem\"", Comment(rawValue: c.stdout))
+        #expect(
+            c
+                .stdout ==
+                "string chamador true boolean\nError: boom true\nMeuErro: x true true\ntrue true\n\"Error: sem\"",
+            Comment(rawValue: c.stdout)
+        )
     }
 
     @Test func eventEmitterEStreamComoFuncao() async throws {
@@ -149,7 +165,10 @@ struct ApiDoV8EHerancaTests {
         EE.defaultMaxListeners = 20; console.log(EE.defaultMaxListeners, typeof EE.errorMonitor);
         """)
         #expect(code == 0, Comment(rawValue: c.stderr))
-        #expect(c.stdout == "recebi 1\nmixin ok\nstream function true\n20 symbol\ndado a\nfim", Comment(rawValue: c.stdout))
+        #expect(
+            c.stdout == "recebi 1\nmixin ok\nstream function true\n20 symbol\ndado a\nfim",
+            Comment(rawValue: c.stdout)
+        )
     }
 }
 
@@ -184,7 +203,10 @@ struct ErrosNaoTratadosTests {
         process.nextTick(() => { throw new Error("erro-no-tick"); });
         setTimeout(() => console.log("continuou"), 20);
         """)
-        #expect(code == 1 && c.stderr.contains("erro-no-tick") && c.stdout.isEmpty, Comment(rawValue: c.stdout + c.stderr))
+        #expect(
+            code == 1 && c.stderr.contains("erro-no-tick") && c.stdout.isEmpty,
+            Comment(rawValue: c.stdout + c.stderr)
+        )
         let (code2, c2) = try await run("queueMicrotask(() => { throw new Error('micro'); });")
         #expect(code2 == 1 && c2.stderr.contains("micro"))
     }
@@ -301,10 +323,17 @@ struct LacoDeEventosTests {
     /// para arquivo). Antes passava por UTF-8 e o 0xFF engolia os bytes seguintes.
     @Test func stdoutBinarioChegaInteiro() async throws {
         let dir = try tmp()
-        try escrever(["main.js": "process.stdout.write(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0xff, 0x00, 0x41]));"], em: dir)
+        try escrever(
+            ["main.js": "process.stdout.write(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0xff, 0x00, 0x41]));"],
+            em: dir
+        )
         let bytes = Mutex(Data())
         let p = JSProcess(cwd: dir, output: { _, _ in })
-        p.setSaidaBruta { k, d in if k == .out { bytes.withLock { $0.append(d) } } }
+        p.setSaidaBruta {
+            k, d in if k == .out {
+                bytes.withLock { $0.append(d) }
+            }
+        }
         let code = await p.run(file: dir.appending(path: "main.js"))
         #expect(code == 0)
         #expect(bytes.withLock { $0 } == Data([0x89, 0x50, 0x4E, 0x47, 0xFF, 0x00, 0x41]))
@@ -326,7 +355,12 @@ struct LacoDeEventosTests {
         console.log(fs.readSync(fd, b, 0, 4, 3), b.toString(), fs.readSync(fd, b, 0, 2, null), b.toString()); fs.closeSync(fd);
         """)
         #expect(code == 0, Comment(rawValue: c.stderr))
-        #expect(c.stdout == "false 10 true true\ntrue false nao-existe.txt\nalvo.txt:f,link.txt:l,quebrado.txt:l\n4 3456 2 0156", Comment(rawValue: c.stdout))
+        #expect(
+            c
+                .stdout ==
+                "false 10 true true\ntrue false nao-existe.txt\nalvo.txt:f,link.txt:l,quebrado.txt:l\n4 3456 2 0156",
+            Comment(rawValue: c.stdout)
+        )
     }
 }
 
@@ -403,8 +437,14 @@ struct ConfinamentoDoFsTests {
         let raiz = base.appending(path: "proj")
         try FileManager.default.createDirectory(at: raiz.appending(path: "src"), withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: base.appending(path: "proj2"), withIntermediateDirectories: true)
-        try FileManager.default.createSymbolicLink(atPath: raiz.appending(path: "fora").path, withDestinationPath: "../proj2")
-        try FileManager.default.createSymbolicLink(atPath: raiz.appending(path: "quebrado").path, withDestinationPath: "../proj2/novo")
+        try FileManager.default.createSymbolicLink(
+            atPath: raiz.appending(path: "fora").path,
+            withDestinationPath: "../proj2"
+        )
+        try FileManager.default.createSymbolicLink(
+            atPath: raiz.appending(path: "quebrado").path,
+            withDestinationPath: "../proj2/novo"
+        )
         let c = Confinamento(raiz: raiz)
         #expect(c.permite(raiz.path) && c.permite(raiz.appending(path: "src/../x.txt").path))
         #expect(c.permite(raiz.appending(path: "novo/fundo/arquivo").path))
@@ -413,7 +453,8 @@ struct ConfinamentoDoFsTests {
         #expect(!c.permite(raiz.appending(path: "fora/x.txt").path))
         #expect(!c.permite(raiz.appending(path: "quebrado").path))
         #expect(c.permite(raiz.appending(path: "fora").path, seguirUltimo: false))
-        #expect(Confinamento.normalizar("/a/./b/../c//d/") == "/a/c/d" && Confinamento.normalizar("../x/./y") == "../x/y")
+        #expect(Confinamento.normalizar("/a/./b/../c//d/") == "/a/c/d" && Confinamento
+            .normalizar("../x/./y") == "../x/y")
     }
 }
 

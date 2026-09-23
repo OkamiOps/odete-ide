@@ -23,7 +23,11 @@ import Testing
         ])
         let loop = AgentLoop(provider: p, host: TestHost(root: root), patches: PatchStore(root: root))
         var sistemaNovo: String?
-        for await e in loop.run(history: [], userText: "cria", config: LoopConfig(mode: .build, permit: .full, model: "m")) {
+        for await e in loop.run(
+            history: [],
+            userText: "cria",
+            config: LoopConfig(mode: .build, permit: .full, model: "m")
+        ) {
             if case let .sistema(s) = e {
                 sistemaNovo = s
             }
@@ -157,7 +161,7 @@ import Testing
             var m = assinada
             m.toolCalls = [ToolCall(id: "\(i)", name: "grep", arguments: "{}")]
             ms.append(m)
-            ms.append(.tool("\(i)", String(repeating: "r", count: 40_000)))
+            ms.append(.tool("\(i)", String(repeating: "r", count: 40000)))
         }
         let podado = try #require(Compactacao.podar(ms))
         #expect(podado.mensagens.allSatisfy { $0.raciocinio == nil })
@@ -174,8 +178,12 @@ import Testing
     @Test func estimativaContaOBrutoUmaVez() {
         let so = AgentMessage(role: .assistant, content: "", thinking: String(repeating: "p", count: 4000))
         var com = so
-        com.raciocinio = RaciocinioBruto(formato: "anthropic", origem: "o", modelo: "m",
-                                         json: String(repeating: "j", count: 8000))
+        com.raciocinio = RaciocinioBruto(
+            formato: "anthropic",
+            origem: "o",
+            modelo: "m",
+            json: String(repeating: "j", count: 8000)
+        )
         #expect(Compactacao.estimar(so) < Compactacao.estimar(com))
         #expect(Compactacao.estimar(com) < 2000 + 100, "contou o texto e o bruto juntos")
     }
@@ -194,12 +202,21 @@ import Testing
         let host = TestHost(root: root)
         let loop = AgentLoop(provider: p, host: host, patches: PatchStore(root: root))
         let r = await runAll(loop, "escreve", LoopConfig(mode: .chat, permit: .ask, model: "m"))
-        #expect(!r.items.contains { if case .permit = $0 { true } else { false } }, "pediu licença para a cortada")
+        #expect(!r.items.contains {
+            if case .permit = $0 {
+                true
+            } else {
+                false
+            }
+        }, "pediu licença para a cortada")
         #expect(r.history.contains { $0.role == .tool && $0.content.contains("cortada no limite") })
         #expect(host.read("a.txt") == "a\nb\nc\n")
         #expect(!AgentLoop.podeEscrever(cortada))
         // E no resumo ela vai marcada, com o motivo.
-        let texto = Compactacao.serializar(AgentMessage(role: .assistant, content: "", toolCalls: [cortada]), teto: 2000)
+        let texto = Compactacao.serializar(
+            AgentMessage(role: .assistant, content: "", toolCalls: [cortada]),
+            teto: 2000
+        )
         #expect(texto.contains("não rodou") && texto.contains("cortada no limite"))
     }
 }

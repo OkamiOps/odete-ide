@@ -29,7 +29,9 @@ struct NextCompletoTests {
     func ate(_ prazo: Duration = .seconds(30), _ condicao: () async -> Bool) async -> Bool {
         let fim = ContinuousClock.now + prazo
         while ContinuousClock.now < fim {
-            if await condicao() { return true }
+            if await condicao() {
+                return true
+            }
             try? await Task.sleep(for: .milliseconds(50))
         }
         return await condicao()
@@ -63,24 +65,32 @@ struct NextCompletoTests {
     }
 
     func texto(_ wv: WKWebView, _ codigo: String) async -> String {
-        (await js(wv, codigo) as? String) ?? ""
+        await (js(wv, codigo) as? String) ?? ""
     }
 
     /// O que chegou pelo socket do Preview (css ou reload).
     final class Avisos: @unchecked Sendable {
         private var lista: [String] = []
         private let trava = NSLock()
-        func poe(_ s: String) { trava.withLock { lista.append(s) } }
-        var todos: [String] { trava.withLock { lista } }
+        func poe(_ s: String) {
+            trava.withLock { lista.append(s) }
+        }
+
+        var todos: [String] {
+            trava.withLock { lista }
+        }
     }
 
     func escuta(_ dev: DevServer) throws -> (URLSessionWebSocketTask, Avisos, Task<Void, Never>) {
-        let ws = try URLSession.shared.webSocketTask(with: #require(URL(string: "ws://127.0.0.1:\(dev.port)/@odete/ws")))
+        let ws = try URLSession.shared
+            .webSocketTask(with: #require(URL(string: "ws://127.0.0.1:\(dev.port)/@odete/ws")))
         ws.resume()
         let avisos = Avisos()
         let t = Task {
             while let m = try? await ws.receive() {
-                if case let .string(s) = m { avisos.poe(s) }
+                if case let .string(s) = m {
+                    avisos.poe(s)
+                }
             }
         }
         return (ws, avisos, t)
@@ -114,7 +124,10 @@ struct NextCompletoTests {
         #expect(html.hasPrefix("<!DOCTYPE html><html lang=\"pt-BR\"><head>"), "\(html.prefix(300))")
         #expect(!html.contains("<body><html"), "o documento saiu aninhado: \(html.prefix(300))")
         #expect(html.contains("<body class=\"corpo\">"))
-        #expect(html.contains(#"<link rel="stylesheet" href="/@odete/css/@next/">"#), "faltou a folha: \(html.prefix(600))")
+        #expect(
+            html.contains(#"<link rel="stylesheet" href="/@odete/css/@next/">"#),
+            "faltou a folha: \(html.prefix(600))"
+        )
 
         let (css, r) = try await pega(dev, "/@odete/css/@next/")
         #expect(r?.value(forHTTPHeaderField: "content-type")?.contains("text/css") == true)
@@ -125,7 +138,11 @@ struct NextCompletoTests {
         let (ws, recebido, t) = try escuta(dev)
         defer { ws.cancel(with: .normalClosure, reason: nil); t.cancel() }
         try await Task.sleep(for: .milliseconds(300))
-        try "body { margin-left: 21px; }".write(to: raiz.appending(path: "app/globals.css"), atomically: true, encoding: .utf8)
+        try "body { margin-left: 21px; }".write(
+            to: raiz.appending(path: "app/globals.css"),
+            atomically: true,
+            encoding: .utf8
+        )
         let trocou = await ate { recebido.todos.contains("css") }
         #expect(trocou, "CSS sozinho não avisou o Preview: \(recebido.todos)")
         #expect(!recebido.todos.contains("reload"), "CSS sozinho recarregou a página")
@@ -202,11 +219,15 @@ struct NextCompletoTests {
         #expect(html.contains("<odete-filhos data-slot=\"children\">"))
         #expect(html.contains("<b id=\"tema\">claro</b>"), "o contexto não chegou no servidor: \(html.prefix(800))")
         let (ilhas, _) = try await pega(dev, "/@odete/ilhas/")
-        #expect(ilhas.contains("MostraTema") && ilhas.contains("Providers"), "faltou ilha no pacote: \(ilhas.suffix(1500))")
+        #expect(
+            ilhas.contains("MostraTema") && ilhas.contains("Providers"),
+            "faltou ilha no pacote: \(ilhas.suffix(1500))"
+        )
 
         let wv = await navegador(dev.url)
         let trocou = await ate {
-            await texto(wv, "document.getElementById('troca').click(); document.getElementById('tema').textContent") == "escuro"
+            await texto(wv, "document.getElementById('troca').click(); document.getElementById('tema').textContent") ==
+                "escuro"
         }
         let corpo = await texto(wv, "document.body.innerHTML + '\\n' + window.__erros.join('\\n')")
         #expect(trocou, "a ilha de dentro não enxergou o provider: \(corpo)")
@@ -289,10 +310,13 @@ struct NextCompletoTests {
         let (js, _) = try await pega(dev, "/@odete/ilhas/produtos/um")
         #expect(js.contains("__odeteNextFabrica"), "o pacote não levou o substituto de next/*")
 
-        let wv = await navegador(try #require(URL(string: "/produtos/um?q=1", relativeTo: dev.url)))
+        let wv = try await navegador(#require(URL(string: "/produtos/um?q=1", relativeTo: dev.url)))
         let foi = await ate {
             _ = await self.js(wv, "document.getElementById('vai') && document.getElementById('vai').click()")
-            return await texto(wv, "document.getElementById('titulo') ? document.getElementById('titulo').textContent : ''") == "terceiro"
+            return await texto(
+                wv,
+                "document.getElementById('titulo') ? document.getElementById('titulo').textContent : ''"
+            ) == "terceiro"
         }
         let onde = await texto(wv, "location.href + '\\n' + window.__erros.join('\\n')")
         #expect(foi, "o router.push não navegou: \(onde)")
@@ -333,8 +357,11 @@ struct NextCompletoTests {
 
         let (a, _) = try await pega(dev, "/")
         #expect(a.contains("<title>Loja</title>"), "o default do título não valeu: \(a.prefix(600))")
-        #expect(a.contains("<div id=\"molde\"><p>inicio</p></div>") || a.contains("<div id=\"molde\"><!--$--><p>inicio</p>"),
-                "o template não embrulhou: \(a.prefix(800))")
+        #expect(
+            a.contains("<div id=\"molde\"><p>inicio</p></div>") || a
+                .contains("<div id=\"molde\"><!--$--><p>inicio</p>"),
+            "o template não embrulhou: \(a.prefix(800))"
+        )
         #expect(a.contains(#"<link rel="icon" href="/favicon.ico""#), "o ícone de app/ não foi para o head")
         #expect(a.contains("fonts.googleapis.com/css2?family=Inter"), "a fonte do Google não entrou")
         #expect(a.contains("__odete_fonte_inter_var"), "a variável da fonte não foi para o <html>")
@@ -342,7 +369,10 @@ struct NextCompletoTests {
         let (b, rb) = try await pega(dev, "/produto/42")
         #expect(rb?.statusCode == 200, "\(b.prefix(400))")
         #expect(b.contains("<title>Produto 42 | Loja</title>"), "o template do título não valeu: \(b.prefix(600))")
-        #expect(b.contains(#"src="/foto.png""#) && b.contains(#"width="40""#), "o next/image não virou <img>: \(b.prefix(900))")
+        #expect(
+            b.contains(#"src="/foto.png""#) && b.contains(#"width="40""#),
+            "o next/image não virou <img>: \(b.prefix(900))"
+        )
         #expect(!b.contains(" priority"), "prop do next/image vazou para o HTML")
 
         let (_, ri) = try await pega(dev, "/favicon.ico")
@@ -411,7 +441,10 @@ struct NextCompletoTests {
         #expect(r?.statusCode == 200, "\(html.prefix(600))")
         #expect(html.hasPrefix("<!DOCTYPE html><html lang=\"en\""), "\(html.prefix(300))")
         #expect(html.contains("<title>Create Next App</title>"))
-        #expect(html.contains("family=Geist&") && html.contains("family=Geist+Mono"), "as fontes do Google não entraram")
+        #expect(
+            html.contains("family=Geist&") && html.contains("family=Geist+Mono"),
+            "as fontes do Google não entraram"
+        )
         #expect(html.contains("__odete_fonte_geist_var"), "a variável da fonte não foi para o <html>")
         #expect(html.contains(#"alt="Next.js logo""#) && html.contains(#"src="/next.svg""#))
         #expect(html.contains("/@odete/css/@next/"), "a folha do globals.css não entrou")

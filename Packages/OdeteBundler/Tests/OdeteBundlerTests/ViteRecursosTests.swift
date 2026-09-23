@@ -108,7 +108,11 @@ import Testing
         import Trabalhador from "./trabalho.ts?worker";
         (globalThis as any).__r = typeof Trabalhador;
         """)
-        try Apoio.grava("import { dobro } from './conta';\nself.onmessage = (e) => postMessage(dobro(e.data));\n", raiz, "src/trabalho.ts")
+        try Apoio.grava(
+            "import { dobro } from './conta';\nself.onmessage = (e) => postMessage(dobro(e.data));\n",
+            raiz,
+            "src/trabalho.ts"
+        )
         try Apoio.grava("export const dobro = (n: number) => n * 2 + 1000;\n", raiz, "src/conta.ts")
         let (r, js, _) = try await Apoio.viteBuild(raiz)
         #expect(r.ok, "\(r.diagnosticos.map(\.text))")

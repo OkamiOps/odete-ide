@@ -356,12 +356,11 @@ enum HostFs {
             if nome == "." || nome == ".." {
                 continue
             }
-            var tipo: Int
-            switch Int32(ent.d_type) {
-            case DT_REG: tipo = 1
-            case DT_DIR: tipo = 2
-            case DT_LNK: tipo = 3
-            default: tipo = 0
+            var tipo = switch Int32(ent.d_type) {
+            case DT_REG: 1
+            case DT_DIR: 2
+            case DT_LNK: 3
+            default: 0
             }
             if Int32(ent.d_type) == DT_UNKNOWN {
                 var st = Darwin.stat()

@@ -30,7 +30,7 @@ public struct ToolRunner: Sendable {
     /// três desses enchiam a janela de um modelo de 200 mil tokens. O número vem do
     /// opencode (`tool/truncate.ts`: `MAX_BYTES = 50 * 1024`), que também corta a saída de
     /// toda ferramenta antes de ela entrar na conversa.
-    static let tetoDoResultado = 50_000
+    static let tetoDoResultado = 50000
 
     /// Corta o meio e fica com o começo e o fim.
     ///
@@ -234,7 +234,8 @@ public struct ToolRunner: Sendable {
                 return .init(text: "old e new são iguais — isso não mudaria nada. Escreva em new o texto corrigido.")
             }
             guard let before = host.read(path) else {
-                return .init(text: host.exists(path) ? "\(path) existe, mas não é texto em UTF-8" : "não existe: \(path)")
+                return .init(text: host
+                    .exists(path) ? "\(path) existe, mas não é texto em UTF-8" : "não existe: \(path)")
             }
             let hits = before.components(separatedBy: old).count - 1
             if hits == 0 {

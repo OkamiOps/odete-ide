@@ -342,7 +342,11 @@ extension CheckpointStore {
     /// criou e ficaram vazias.
     func aplicar(_ v: VoltaDoTurno, de cp: Checkpoint) {
         let fm = FileManager.default
-        HistoricoDeArquivos.guardar((v.apagados + v.voltaram).map { root.appending(path: $0) }, raiz: root, origem: .patchRejeitado)
+        HistoricoDeArquivos.guardar(
+            (v.apagados + v.voltaram).map { root.appending(path: $0) },
+            raiz: root,
+            origem: .patchRejeitado
+        )
         for p in v.apagados {
             try? fm.removeItem(at: root.appending(path: p))
         }

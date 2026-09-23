@@ -17,8 +17,9 @@ struct EstilosNextAstroTests {
             try corpo.write(to: f, atomically: true, encoding: .utf8)
         }
         try pacote.write(to: raiz.appending(path: "package.json"), atomically: true, encoding: .utf8)
-        guard let rep = try? await Installer(project: raiz, registry: HTTPRegistry()).install(add: instala.map { .init($0) }),
-              !rep.installed.isEmpty
+        guard let rep = try? await Installer(project: raiz, registry: HTTPRegistry())
+            .install(add: instala.map { .init($0) }),
+            !rep.installed.isEmpty
         else { return nil }
         return raiz
     }
@@ -111,17 +112,30 @@ struct EstilosNextAstroTests {
         let html = try await pega(dev, "/")
         #expect(html.contains(#"class="flex p-4""#), "\(html.prefix(600))")
         var css = try await pega(dev, "/@odete/css/@astro/")
-        #expect(css.contains(".flex") && css.contains(".p-4"), "o Tailwind do global.css não gerou as utilidades: \(css.prefix(500))")
+        #expect(
+            css.contains(".flex") && css.contains(".p-4"),
+            "o Tailwind do global.css não gerou as utilidades: \(css.prefix(500))"
+        )
         #expect(css.contains("h1[data-astro-cid-"), "o <style> com @apply não ganhou escopo: \(css.suffix(800))")
         #expect(css.contains("--color-red-500") || css.contains("oklch"), "o @apply não virou CSS: \(css.suffix(800))")
         #expect(!css.contains("@apply"), "sobrou @apply cru")
         #expect(css.contains("color: #123456"), "o Sass não compilou: \(css.suffix(800))")
-        #expect(css.range(of: #"p\[data-astro-cid-[a-z0-9]+\] \.x\[data-astro-cid-[a-z0-9]+\]"#, options: .regularExpression) != nil,
-                "o aninhamento do Sass não ganhou escopo: \(css.suffix(800))")
+        #expect(
+            css
+                .range(
+                    of: #"p\[data-astro-cid-[a-z0-9]+\] \.x\[data-astro-cid-[a-z0-9]+\]"#,
+                    options: .regularExpression
+                ) != nil,
+            "o aninhamento do Sass não ganhou escopo: \(css.suffix(800))"
+        )
 
         let pagina = raiz.appending(path: "src/pages/index.astro")
         let texto = try String(contentsOf: pagina, encoding: .utf8)
-        try texto.replacingOccurrences(of: "flex p-4", with: "grid gap-7").write(to: pagina, atomically: true, encoding: .utf8)
+        try texto.replacingOccurrences(of: "flex p-4", with: "grid gap-7").write(
+            to: pagina,
+            atomically: true,
+            encoding: .utf8
+        )
         #expect(await dev.arquivosMudaram([pagina.path]) == .reload)
         _ = try await pega(dev, "/")
         css = try await pega(dev, "/@odete/css/@astro/")

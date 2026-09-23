@@ -39,6 +39,7 @@ struct HistoricoLocalAjustes: View {
                 }
             }
             CardNote(tr(
+                // swiftlint:disable:next line_length
                 "Antes de um arquivo ser salvo por cima, mudado pelo agente, pelo git ou pelo terminal, ou apagado, a Odete guarda como ele estava: até 50 versões por arquivo, por 30 dias. Fica só neste aparelho, fora do projeto — não vai para o iCloud nem para o git. Para ver, toque e segure a aba ou o arquivo na árvore."
             ))
         }

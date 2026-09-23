@@ -99,7 +99,7 @@ final class ProvedorDeTeste: Provider, @unchecked Sendable {
         #expect(ag.running)
         let noDisco = try #require(ChatStore(root: raiz).load(ag.thread.id), "nada foi gravado no meio do turno")
         #expect(noDisco.messages.contains { $0.toolCalls?.first?.name == "write_file" })
-        ag.approve(try #require(ag.pendingPermit), true)
+        try ag.approve(#require(ag.pendingPermit), true)
         try await esperar { !ag.running }
         #expect(ler(raiz, "n.txt") == "novo\n")
         ws.stop()
@@ -187,8 +187,14 @@ final class ProvedorDeTeste: Provider, @unchecked Sendable {
         ag.send()
         try await esperar { !ag.running && !provedor.pedidos.withLock { $0.isEmpty } }
         try await esperar { !ag.running }
-        #expect(Compactacao.ehResumo(try #require(ag.thread.messages.first)))
-        #expect(ag.items.contains { if case let .compactado(_, resumo, _, _) = $0 { !resumo.isEmpty } else { false } })
+        #expect(try Compactacao.ehResumo(#require(ag.thread.messages.first)))
+        #expect(ag.items.contains {
+            if case let .compactado(_, resumo, _, _) = $0 {
+                !resumo.isEmpty
+            } else {
+                false
+            }
+        })
         #expect(provedor.pedidos.withLock { $0.first?.tools.isEmpty } == true)
         #expect(ag.draft.isEmpty)
         ws.stop()

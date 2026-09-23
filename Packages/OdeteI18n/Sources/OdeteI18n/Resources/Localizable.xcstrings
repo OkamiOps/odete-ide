@@ -533,6 +533,34 @@
         }
       }
     },
+    "%1$@ e mais %2$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ and %2$@ more"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ und %2$@ weitere"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ et %2$@ de plus"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ y %2$@ más"
+          }
+        }
+      }
+    },
     "%1$@ em %2$@ arquivos": {
       "localizations": {
         "en": {
@@ -3049,6 +3077,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Anterior"
+          }
+        }
+      }
+    },
+    "Apagados, por terem nascido no turno: %1$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deleted because the turn created them: %1$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gelöscht, weil sie in der Runde entstanden sind: %1$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supprimés, car créés pendant le tour : %1$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Borrados por haberse creado en el turno: %1$@"
           }
         }
       }
@@ -7109,6 +7165,62 @@
           "stringUnit": {
             "state": "translated",
             "value": "Deshacer %1$@"
+          }
+        }
+      }
+    },
+    "Desfazer o resto": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Undo the rest"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Den Rest widerrufen"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Annuler le reste"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deshacer el resto"
+          }
+        }
+      }
+    },
+    "Desfazer o último turno?": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Undo the last turn?"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Letzte Runde widerrufen?"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Annuler le dernier tour ?"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "¿Deshacer el último turno?"
           }
         }
       }
@@ -12937,6 +13049,34 @@
         }
       }
     },
+    "Não voltaram, por não haver cópia de antes do turno: %1$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not restored because there is no copy from before the turn: %1$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nicht wiederhergestellt, da es keine Kopie von vor der Runde gibt: %1$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non restaurés, faute de copie d’avant le tour : %1$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se restauraron por no haber copia de antes del turno: %1$@"
+          }
+        }
+      }
+    },
     "Não voltaram, por passarem de 10 MB: %1$@": {
       "localizations": {
         "en": {
@@ -12961,6 +13101,62 @@
           "stringUnit": {
             "state": "translated",
             "value": "No se restauraron por superar los 10 MB: %1$@"
+          }
+        }
+      }
+    },
+    "Não voltaram, porque não dá para conferir se você mexeu neles depois do turno: %1$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not restored because there’s no way to check whether you edited them after the turn: %1$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nicht wiederhergestellt, weil sich nicht prüfen lässt, ob du sie nach der Runde geändert hast: %1$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non restaurés, car impossible de vérifier si tu les as modifiés après le tour : %1$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se restauraron porque no se puede comprobar si los editaste después del turno: %1$@"
+          }
+        }
+      }
+    },
+    "Não voltaram, porque você mexeu neles depois do turno: %1$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not restored because you edited them after the turn: %1$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nicht wiederhergestellt, weil du sie nach der Runde geändert hast: %1$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Non restaurés, car tu les as modifiés après le tour : %1$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No se restauraron porque los editaste después del turno: %1$@"
           }
         }
       }
@@ -18985,6 +19181,34 @@
         }
       }
     },
+    "Você mexeu nestes arquivos depois do turno, e eles vão ficar como estão: %1$@. O resto volta ao que era antes do turno.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You edited these files after the turn, so they’ll stay as they are: %1$@. Everything else goes back to how it was before the turn."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Du hast diese Dateien nach der Runde geändert, sie bleiben, wie sie sind: %1$@. Alles andere wird auf den Stand vor der Runde zurückgesetzt."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tu as modifié ces fichiers après le tour, ils resteront tels quels : %1$@. Le reste revient à son état d’avant le tour."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Editaste estos archivos después del turno, así que se quedan como están: %1$@. El resto vuelve a como estaba antes del turno."
+          }
+        }
+      }
+    },
     "Você é a Odete, IDE no iPad. Responda em português, curto e direto.": {
       "localizations": {
         "en": {
@@ -19121,6 +19345,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "Volver a los colores del tema"
+          }
+        }
+      }
+    },
+    "Voltaram ao que eram antes do turno: %1$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restored to how they were before the turn: %1$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auf den Stand vor der Runde zurückgesetzt: %1$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Revenus à leur état d’avant le tour : %1$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Volvieron a como estaban antes del turno: %1$@"
           }
         }
       }
@@ -27437,6 +27689,34 @@
           "stringUnit": {
             "state": "translated",
             "value": "tú: "
+          }
+        }
+      }
+    },
+    "voltou: %1$@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "undone: %1$@"
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "rückgängig gemacht: %1$@"
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "annulé : %1$@"
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "deshecho: %1$@"
           }
         }
       }

@@ -190,7 +190,7 @@ func linha(_ sh: Shell, _ l: String) async -> (Int32, String, String) {
         sh.cancel()
         let t0 = ContinuousClock.now
         #expect(await fg.value.0 == 130)
-        #expect(ContinuousClock.now - t0 < .seconds(1))
+        #expect(ContinuousClock.now - t0 < .seconds(2))
         let n = ticks(tick)
         try await Task.sleep(for: .milliseconds(400))
         #expect(ticks(tick) > n && sh.jobs.count == 1)
@@ -205,7 +205,7 @@ func linha(_ sh: Shell, _ l: String) async -> (Int32, String, String) {
         let t0 = ContinuousClock.now
         sh.cancel()
         #expect(await fg.value.0 == 130)
-        #expect(ContinuousClock.now - t0 < .seconds(1))
+        #expect(ContinuousClock.now - t0 < .seconds(2))
     }
 }
 

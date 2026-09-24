@@ -242,7 +242,8 @@ struct LacoDeEventosTests {
         let t0 = ContinuousClock.now
         let (code, c) = try await run("setInterval(() => {}, 1000).unref(); console.log('fim');")
         #expect(code == 0 && c.stdout == "fim")
-        #expect(ContinuousClock.now - t0 < .seconds(2))
+        // Folga para subir o motor num simulador lento; preso de verdade seria para sempre.
+        #expect(ContinuousClock.now - t0 < .seconds(6))
         let (code2, c2) = try await run("""
         const t = setTimeout(() => console.log("rodou"), 30); t.unref(); t.ref();
         console.log(t.hasRef());
@@ -492,9 +493,11 @@ struct InterrupcaoTests {
         let dir = try tmp()
         let cap = Capture()
         let p = JSProcess(cwd: dir, output: cap.handler)
-        let t0 = ContinuousClock.now
         let tarefa = Task { await p.run(code: "const fs = require('fs'); for (;;) { fs.existsSync('x'); }") }
         try await Task.sleep(for: .milliseconds(300))
+        // Mede do kill em diante: subir o motor num simulador lento passa de 2 s sozinho,
+        // e o que o teste garante é que o kill solta quem espera na hora.
+        let t0 = ContinuousClock.now
         p.kill()
         let code = await tarefa.value
         #expect(code == 130)

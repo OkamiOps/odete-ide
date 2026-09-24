@@ -188,11 +188,13 @@ import Testing
         try FileManager.default.createDirectory(
             at: root.appending(path: "src/componentes"), withIntermediateDirectories: true
         )
-        try await Task.sleep(for: .milliseconds(300))
+        // A pasta nova precisa entrar no vigia antes do arquivo: no simulador do CI isso passa
+        // bem de 300 ms.
+        try await Task.sleep(for: .seconds(1))
         try "export const novo = 'apareceu';".write(
             to: root.appending(path: "src/componentes/novo.ts"), atomically: true, encoding: .utf8
         )
-        let recarregou = await ate { await stats(dev).reload >= 1 }
+        let recarregou = await ate(.seconds(30)) { await stats(dev).reload >= 1 }
         #expect(recarregou, "o arquivo que faltava apareceu e o build não foi refeito")
         let js = try await texto(dev.url.appending(path: "@odete/js/src/main.tsx"))
         #expect(js.contains("apareceu"))
